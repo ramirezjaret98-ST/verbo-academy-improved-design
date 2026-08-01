@@ -979,3 +979,14 @@ Sin cambios de lógica ni rutas. `DATA_MODEL.md` sigue sincronizado.
 - Reschedule/Spotlight: cabecera de sección con icono, barra superior de acento (teal-oscuro / violeta), cita lateral para el contexto del alumno y CTA sólido.
 - Motion respeta `prefers-reduced-motion` y los hovers están tras `@media (hover: hover)`.
 - Visual only — no logic, data or route changes; `DATA_MODEL.md` remains synchronized.
+
+## Entry 073 — /teacher/financial: KPIs minimalistas (rampa lima/ámbar/rojo)
+- Nueva paleta de señal: verde lima `#84cc16`, ámbar claro `#fbbf24` y rojo intenso `#dc2626`, en lugar del verde/naranja/rojo saturados.
+- Cada KPI es ahora una tarjeta blanca de esquinas 26px sin línea superior de color: el progreso llena la tarjeta completa con el color al 8% de opacidad.
+- El número gigante en bold vive a la izquierda sobre la zona llena, al 15% de opacidad del color de señal (blanco puro resultaba invisible sobre un fondo al 8%).
+- El nombre del KPI sale de la tarjeta: encima, con padding pequeño, tipografía light en mayúsculas espaciadas y sin pill; el icono lo acompaña en gris.
+- Se eliminan las barras y los números en color sólido; el color solo aparece como glow de fondo (`0 20px 50px -32px`) y como relleno tenue.
+- Distribución re-equilibrada: 1 / 2 / 3 columnas con más aire vertical entre etiqueta y tarjeta.
+- Composite Score adaptado al mismo lenguaje: anillo fino de 4px, cifra en `foreground` con "%" light, relleno de tarjeta al 8% y su etiqueta arriba.
+- Hover: elevación de 2px; respeta `prefers-reduced-motion`.
+- Visual only — no logic, data or route changes; `DATA_MODEL.md` remains synchronized.
