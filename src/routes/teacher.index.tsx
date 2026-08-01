@@ -512,105 +512,120 @@ function TeacherDashboard() {
   };
 
   return (
-    <div className="space-y-10">
-      <header>
-        <div className="text-sm text-muted-foreground">Good day,</div>
-        <div className="mt-1 flex flex-wrap items-center justify-between gap-2">
-          <h1 className="text-3xl font-semibold tracking-tight text-black">{user.name}</h1>
-          <Pill>{rankLabel(user)}</Pill>
-          <span className="ml-auto"><Pill>{sessionsTaught} sessions taught</Pill></span>
+    <div className="space-y-8 sm:space-y-10">
+      <header className="verbo-td-in grid grid-cols-[minmax(0,1fr)_auto] items-end gap-3 border-b border-border pb-5">
+        <div className="min-w-0">
+          <div className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Good day,</div>
+          <h1
+            className="mt-1.5 truncate text-2xl font-semibold text-foreground sm:text-4xl"
+            style={{ letterSpacing: "-0.02em", lineHeight: 1.05 }}
+          >
+            {user.name}
+          </h1>
         </div>
-
-
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+          <Pill>{rankLabel(user)}</Pill>
+          <Pill>{sessionsTaught} sessions taught</Pill>
+        </div>
       </header>
 
       {!hydrated ? (
-        <SkeletonStatCards count={4} className="grid gap-4 md:grid-cols-2 lg:grid-cols-4" />
+        <SkeletonStatCards count={4} className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4" />
       ) : (
-      <section className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <section className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
 
-        <Link to="/teacher/students" className="block cursor-pointer">
+        <Link to="/teacher/students" className="verbo-td-in verbo-td-press block cursor-pointer" style={{ animationDelay: "0ms" }}>
           <HeroStatCard className="!items-start border border-border bg-card">
-            <div className="absolute right-6 top-6 flex h-11 w-11 items-center justify-center rounded-xl bg-transparent">
-              <img src={studentsIconAsset.url} alt="" className="h-[52px] w-[52px]" />
+            <div className="absolute right-4 top-4 flex items-center justify-center sm:right-6 sm:top-6">
+              <img src={studentsIconAsset.url} alt="" className="h-10 w-10 sm:h-[52px] sm:w-[52px]" />
             </div>
             <div className="relative w-full">
-              <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground sm:text-xs">
                 Assigned Students
               </div>
-              <div className="mt-2 text-5xl font-bold leading-none text-foreground">
+              <div className="mt-2 text-4xl font-bold leading-none tabular-nums text-foreground sm:text-5xl">
                 <AnimatedNumber value={students.length} />
               </div>
-
+              <div className="mt-2 text-[11px] font-medium text-muted-foreground">active roster</div>
             </div>
           </HeroStatCard>
         </Link>
-        <Link to="/teacher/calendar" className="block cursor-pointer">
+        <Link to="/teacher/calendar" className="verbo-td-in verbo-td-press block cursor-pointer" style={{ animationDelay: "45ms" }}>
           <HeroStatCard className="!items-start border border-border bg-card">
-            <div className="absolute right-6 top-6 flex h-11 w-11 items-center justify-center rounded-xl bg-transparent">
-              <img src={upcomingIconAsset.url} alt="" className="h-[52px] w-[52px]" />
+            <div className="absolute right-4 top-4 flex items-center justify-center sm:right-6 sm:top-6">
+              <img src={upcomingIconAsset.url} alt="" className="h-10 w-10 sm:h-[52px] sm:w-[52px]" />
             </div>
             <div className="relative w-full">
-              <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground sm:text-xs">
                 Upcoming Sessions
               </div>
-              <div className="mt-2 text-5xl font-bold leading-none text-foreground">
-
+              <div className="mt-2 text-4xl font-bold leading-none tabular-nums text-foreground sm:text-5xl">
                 <AnimatedNumber value={upcoming7dCount} />
               </div>
-              <div className="mt-2 text-xs font-medium text-muted-foreground">next 7 days</div>
+              <div className="mt-2 text-[11px] font-medium text-muted-foreground">next 7 days</div>
             </div>
           </HeroStatCard>
         </Link>
-        <button type="button" onClick={() => setShowRatingTrend(true)} className="block cursor-pointer text-left">
+        <button
+          type="button"
+          onClick={() => setShowRatingTrend(true)}
+          className="verbo-td-in verbo-td-press block cursor-pointer text-left"
+          style={{ animationDelay: "90ms" }}
+        >
           <HeroStatCard
             className="verbo-focus-pulse !items-start border border-border bg-card"
             style={{ ["--verbo-focus-pulse-color" as any]: ratingGlow } as React.CSSProperties}
           >
-            <div className="absolute right-6 top-6 flex h-11 w-11 items-center justify-center rounded-xl bg-transparent">
-              <img src={starIconAsset.url} alt="" className="h-[52px] w-[52px]" />
+            <div className="absolute right-4 top-4 flex items-center justify-center sm:right-6 sm:top-6">
+              <img src={starIconAsset.url} alt="" className="h-10 w-10 sm:h-[52px] sm:w-[52px]" />
             </div>
             <div className="relative w-full">
-              <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground sm:text-xs">
                 Avg Rating
               </div>
-              <div className="mt-2 text-5xl font-bold leading-none text-foreground">
+              <div className="mt-2 text-4xl font-bold leading-none tabular-nums sm:text-5xl" style={{ color: ratingGlow }}>
                 {avgRating30 != null ? `${avgRating30.toFixed(1)}★` : "—"}
               </div>
-              <div className="mt-2 text-xs font-medium text-muted-foreground">last 30 days · view trend</div>
+              <div className="mt-2 text-[11px] font-medium text-muted-foreground">last 30 days · view trend</div>
             </div>
           </HeroStatCard>
         </button>
-        <Link to="/teacher/financial" className="group block">
+        <Link to="/teacher/financial" className="verbo-td-in verbo-td-press group block" style={{ animationDelay: "135ms" }}>
           <HeroStatCard
             className="verbo-focus-pulse !items-start border border-border bg-card"
             style={{ ["--verbo-focus-pulse-color" as any]: performanceGlow } as React.CSSProperties}
           >
-            <div className="absolute right-6 top-6 flex h-11 w-11 items-center justify-center rounded-xl bg-transparent">
-              <img src={performanceIconAsset.url} alt="" className="h-[52px] w-[52px]" />
+            <div className="absolute right-4 top-4 flex items-center justify-center sm:right-6 sm:top-6">
+              <img src={performanceIconAsset.url} alt="" className="h-10 w-10 sm:h-[52px] sm:w-[52px]" />
             </div>
             <div className="relative w-full">
-              <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground sm:text-xs">
                 Performance
               </div>
-              <div className="mt-2 text-6xl font-bold leading-none text-foreground">
+              <div className="mt-2 text-4xl font-bold leading-none tabular-nums sm:text-5xl" style={{ color: performanceGlow }}>
                 <AnimatedNumber value={kpis?.composite ?? 0} suffix="%" />
-                {kpis?.onboarding && (
-                  <span className="ml-2 rounded-full bg-white/85 px-2 py-0.5 align-middle text-[10px] font-semibold uppercase tracking-wider text-blue-700">
-                    Onboarding
-                  </span>
-                )}
               </div>
-              <div className="mt-2 text-xs font-medium text-muted-foreground">
+              {kpis?.onboarding && (
+                <span className="mt-2 inline-flex rounded-full bg-blue-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-blue-700">
+                  Onboarding
+                </span>
+              )}
+              <div className="mt-2 text-[11px] font-medium text-muted-foreground">
                 Composite Score · view balance
               </div>
+              <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-foreground/[0.07]">
+                <span
+                  className="block h-full rounded-full transition-[width] duration-700 ease-out"
+                  style={{ width: `${Math.min(100, Math.max(0, kpis?.composite ?? 0))}%`, background: performanceGlow }}
+                />
+              </div>
             </div>
-
           </HeroStatCard>
         </Link>
 
       </section>
       )}
+
 
 
 
