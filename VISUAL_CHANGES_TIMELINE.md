@@ -990,3 +990,11 @@ Sin cambios de lógica ni rutas. `DATA_MODEL.md` sigue sincronizado.
 - Composite Score adaptado al mismo lenguaje: anillo fino de 4px, cifra en `foreground` con "%" light, relleno de tarjeta al 8% y su etiqueta arriba.
 - Hover: elevación de 2px; respeta `prefers-reduced-motion`.
 - Visual only — no logic, data or route changes; `DATA_MODEL.md` remains synchronized.
+
+## Entry 074 — /teacher/students: badges de access plan correctos + rediseño de la student card
+- Los badges de nivel de acceso (Core / Advance / Elite / Signature) ahora usan `accessPlanPillStyle` del modelo compartido, igual que Admin > Students: naranja Core, navy Advance, negro con borde dorado Elite/Signature. Antes salían con un `bg-accent/10` genérico que no coincidía con el panel de admin.
+- La tarjeta adopta el lenguaje de Admin: rail de color de tier a la izquierda, sheen dorado para Elite/Signature, campo azul para miembros de grupo, entrada escalonada y hover con glow del tier (`verbo-student-card`).
+- Jerarquía visual clara en 4 bloques: identidad (avatar + nombre + empresa · nivel + tier), contexto (producto / focus / grupo como chips outline), sesiones (etiqueta light en mayúsculas + cifra grande + barra fina de 1px) y señales de cumplimiento (Insights / Book Clubs / Attendance).
+- El bloque "Overall Skills" pasa a 2xl rounding con superficie tenue, iconos y cifras que se tiñen de rojo cuando la macro está por debajo de 70%.
+- Responsiveness: grid 1 / 2 / 3 columnas con breakpoints `md` y `2xl`, header de la tarjeta en grid `auto_minmax(0,1fr)_auto` con `min-w-0` y `truncate` para que nombres y empresas largas no rompan el layout; badges con `max-w-full truncate`.
+- Visual only — no logic, data or route changes; `DATA_MODEL.md` remains synchronized.

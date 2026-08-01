@@ -5,7 +5,7 @@ import { ASSIGNMENTS, USERS, SESSIONS, type User } from "@/lib/mock-data";
 import { studentAttendance } from "@/lib/sessions-store";
 import {
   MAX_INSIGHT_STRIKES, MAX_BOOKCLUB_STRIKES,
-  getProduct,
+  getProduct, accessPlanPillStyle,
 } from "@/lib/student-model";
 import { hydrateStudents, subscribeStudents } from "@/lib/students-store";
 import { groupOfStudent, subscribeGroups, effectiveSessionCounts, sessionProgressFor } from "@/lib/groups-store";
@@ -168,11 +168,12 @@ function Page() {
               {g.label} <span className="text-muted-foreground/60">· {g.items.length}</span>
             </h2>
           )}
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
-            {g.items.map((s) => (
-              <StudentCard key={s.id} student={s} onOpen={() => setDetail(s)} />
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 2xl:grid-cols-3">
+            {g.items.map((s, i) => (
+              <StudentCard key={s.id} student={s} index={i} onOpen={() => setDetail(s)} />
             ))}
           </div>
+
         </section>
       ))}
 
@@ -190,7 +191,14 @@ function Page() {
 // ============================================================================
 // STUDENT CARD — read-only summary (mirrors Admin > Students layout).
 // ============================================================================
-function StudentCard({ student: s, onOpen }: { student: User; onOpen: () => void }) {
+const TIER_ACCENT: Record<string, string> = {
+  Core: "#f38934",
+  Advance: "#01304a",
+  Elite: "#d4af37",
+  Signature: "#d4af37",
+};
+
+function StudentCard({ student: s, onOpen, index = 0 }: { student: User; onOpen: () => void; index?: number }) {
   const avatar = useAvatar(s.id);
   const product = getProduct(s.product);
   const strikes = s.insights_strikes ?? 0;
@@ -216,6 +224,13 @@ function StudentCard({ student: s, onOpen }: { student: User; onOpen: () => void
   const macros = useComputedMacros(s.id);
   const anySkillLow = macros.some((m) => m.overall !== null && m.overall < 70);
 
+  // Tier identity — same accent language as Admin > Students so a student's
+  // access plan reads identically across panels.
+  const accent = (s.access_plan && TIER_ACCENT[s.access_plan]) || "var(--navy-400, #64748b)";
+  const isPremiumTier = s.access_plan === "Elite" || s.access_plan === "Signature";
+  const groupInfo = groupOfStudent(s.id);
+  const cardVars = { "--tier": accent, "--verbo-card-i": index } as React.CSSProperties;
+
   // Standalone Workshops / Insights students (no performance sessions) get
   // the same compact treatment used in Admin > Students.
   if (productType !== "performance") {
@@ -223,24 +238,24 @@ function StudentCard({ student: s, onOpen }: { student: User; onOpen: () => void
     return (
       <button
         onClick={onOpen}
-        className="group relative flex flex-col rounded-2xl border border-border bg-card p-5 text-left shadow-soft transition-all hover:-translate-y-1 hover:shadow-elevated"
+        style={{ ...cardVars, "--tier": "var(--primary)" } as React.CSSProperties}
+        className="verbo-student-card group relative flex flex-col overflow-hidden rounded-[22px] border border-border/80 bg-card p-5 text-left"
       >
-        <div className="flex items-center gap-3">
+        <span aria-hidden className="verbo-student-card__rail" />
+        <div className="flex min-w-0 items-center gap-3 pl-1.5">
           {avatar ? (
-            <img src={avatar} alt={s.name} className="h-12 w-12 rounded-full object-cover" />
+            <img src={avatar} alt={s.name} className="verbo-student-card__avatar h-11 w-11 shrink-0 rounded-full object-cover" />
           ) : (
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground">
+            <div className="verbo-student-card__avatar flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground">
               {initials(s.name)}
             </div>
           )}
-          <div className="min-w-0">
-            <div className="truncate font-semibold text-foreground">
-              {s.name}{s.company ? <span className="text-muted-foreground"> · {s.company}</span> : null}
-            </div>
-            <div className="truncate text-xs text-muted-foreground">{s.email}</div>
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-[15px] font-semibold leading-tight text-foreground">{s.name}</div>
+            <div className="truncate text-xs font-light text-muted-foreground">{s.company || s.email}</div>
           </div>
         </div>
-        <div className="mt-4 flex flex-wrap items-center gap-1.5">
+        <div className="mt-4 flex flex-wrap items-center gap-1.5 pl-1.5">
           <Tag className="bg-primary/10 text-primary">{typeLabel}</Tag>
           {showInsightsBadge && (
             <Tag className={blocked ? "bg-destructive/10 text-destructive" : "bg-secondary text-secondary-foreground"}>
@@ -252,62 +267,80 @@ function StudentCard({ student: s, onOpen }: { student: User; onOpen: () => void
     );
   }
 
+  const level = computeCurrentProgress(s.id, s.product, s.contracted_levels ?? [], 0)?.levelName;
+
   return (
     <div
       onClick={onOpen}
       role="button"
       tabIndex={0}
       onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpen(); } }}
-      className="group relative flex cursor-pointer flex-col rounded-2xl border border-border bg-card p-5 text-left shadow-soft transition-all hover:-translate-y-1 hover:shadow-elevated"
+      style={cardVars}
+      data-premium={isPremiumTier ? "true" : undefined}
+      data-group={groupInfo ? "true" : undefined}
+      className="verbo-student-card group relative flex cursor-pointer flex-col overflow-hidden rounded-[22px] border border-border/80 bg-card p-5 text-left"
     >
-      {isVip && (
-        <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold text-amber-600">
-          <Crown className="h-3 w-3" /> VIP
-        </span>
-      )}
+      <span aria-hidden className="verbo-student-card__rail" />
+      {isPremiumTier && <span aria-hidden className="verbo-student-card__sheen" />}
 
-      <div className="flex items-center gap-3">
+      {/* ── Identity ─────────────────────────────────────────────── */}
+      <div className="relative grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-3 pl-1.5">
         {avatar ? (
-          <img src={avatar} alt={s.name} className="h-12 w-12 rounded-full object-cover" />
+          <img src={avatar} alt={s.name} className="verbo-student-card__avatar h-12 w-12 shrink-0 rounded-full object-cover" />
         ) : (
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground">
+          <div className="verbo-student-card__avatar flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground">
             {initials(s.name)}
           </div>
         )}
         <div className="min-w-0">
-          <div className="truncate font-semibold text-foreground">
-            {s.name}{s.company ? <span className="text-muted-foreground"> · {s.company}</span> : null}
+          <div className="truncate text-[15px] font-semibold leading-tight tracking-tight text-foreground">{s.name}</div>
+          <div className="mt-0.5 truncate text-xs font-light text-muted-foreground">
+            {[s.company, level].filter(Boolean).join(" · ") || s.email}
           </div>
-          {(() => {
-            const lv = computeCurrentProgress(s.id, s.product, s.contracted_levels ?? [], 0)?.levelName;
-            return lv ? <div className="truncate text-xs text-muted-foreground">{lv}</div> : null;
-          })()}
+        </div>
+        {/* Access tier — same palette as Admin so the badge always matches */}
+        <div className="flex shrink-0 flex-col items-end gap-1">
+          {s.access_plan && (
+            <Tag className="shadow-sm" style={accessPlanPillStyle(s.access_plan)}>{s.access_plan}</Tag>
+          )}
+          {isVip && (
+            <Tag className="bg-amber-500/15 text-amber-600">
+              <Crown className="mr-1 h-3 w-3" /> VIP
+            </Tag>
+          )}
         </div>
       </div>
 
-      <div className="mt-3 flex flex-wrap gap-1.5">
-        {product && <Tag className="bg-primary/10 text-primary">{product.name}</Tag>}
-        {s.access_plan && <Tag className="bg-accent/10 text-accent">{s.access_plan}</Tag>}
-        {s.focus && <Tag className="bg-secondary text-secondary-foreground">{s.focus}</Tag>}
-        {(() => {
-          const gi = groupOfStudent(s.id);
-          return gi ? (
-            <Tag className="bg-primary text-primary-foreground">Group: {gi.group.name}</Tag>
-          ) : null;
-        })()}
+      {/* ── Context: product / focus / group ─────────────────────── */}
+      <div className="mt-3.5 flex flex-wrap gap-1.5 pl-1.5">
+        {product && <Tag className="border border-border bg-transparent font-medium text-muted-foreground">{product.name}</Tag>}
+        {s.focus && <Tag className="border border-border bg-transparent font-medium text-muted-foreground">{s.focus}</Tag>}
+        {groupInfo && (
+          <Tag className="bg-blue-500/10 text-blue-700">
+            <span className="verbo-student-card__groupdot mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-blue-600" />
+            {groupInfo.group.name}
+          </Tag>
+        )}
       </div>
 
-      <div className="mt-4">
-        <div className="mb-1 flex items-center justify-between text-[11px] text-muted-foreground">
-          <span>Sessions</span>
-          <span className="font-medium text-foreground">{remaining}/{hired}</span>
+      {/* ── Sessions ledger ──────────────────────────────────────── */}
+      <div className="mt-4 pl-1.5">
+        <div className="mb-1.5 flex items-baseline justify-between gap-2">
+          <span className="text-[10px] font-light uppercase tracking-[0.16em] text-muted-foreground">Sessions left</span>
+          <span className="text-sm font-semibold tabular-nums text-foreground">
+            {remaining}<span className="text-xs font-light text-muted-foreground">/{hired}</span>
+          </span>
         </div>
-        <div className="h-1.5 w-full overflow-hidden rounded-full bg-secondary">
-          <div className={`h-full rounded-full ${pct >= 90 ? "bg-destructive" : pct >= 70 ? "bg-warning" : "bg-accent"}`} style={{ width: `${Math.min(100, pct)}%` }} />
+        <div className="h-1 w-full overflow-hidden rounded-full bg-foreground/[0.07]">
+          <div
+            className={`verbo-student-card__bar h-full rounded-full ${pct >= 90 ? "bg-destructive" : pct >= 70 ? "bg-warning" : "bg-accent"}`}
+            style={{ width: `${Math.min(100, pct)}%` }}
+          />
         </div>
       </div>
 
-      <div className="mt-4 flex flex-wrap items-center gap-1.5">
+      {/* ── Compliance signals ───────────────────────────────────── */}
+      <div className="mt-4 flex flex-wrap items-center gap-1.5 pl-1.5">
         <Tag className={blocked ? "bg-destructive/10 text-destructive" : "bg-secondary text-secondary-foreground"}>
           {blocked ? <>Insights Blocked</> : <>Insights {strikes}/{MAX_INSIGHT_STRIKES}</>}
         </Tag>
@@ -324,13 +357,13 @@ function StudentCard({ student: s, onOpen }: { student: User; onOpen: () => void
       {/* Compact 4-tile skill summary — clicking opens the shared Advanced
           Performance Analytics modal (same modal used by the student). */}
       <div
-        className={`mt-4 rounded-xl border p-2.5 transition-all ${anySkillLow ? "verbo-pay-glow border-destructive/40" : "border-border"}`}
+        className={`mt-4 ml-1.5 rounded-2xl border p-2.5 transition-all ${anySkillLow ? "verbo-pay-glow border-destructive/40" : "border-border/70 bg-foreground/[0.015]"}`}
       >
-        <div className="mb-1.5 flex items-center justify-between px-1">
-          <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+        <div className="mb-2 flex items-center justify-between gap-2 px-1">
+          <span className="text-[10px] font-light uppercase tracking-[0.16em] text-muted-foreground">
             Overall Skills
           </span>
-          <span className="text-[10px] text-muted-foreground">Click for detail</span>
+          <span className="text-[10px] font-light text-muted-foreground/70">Click for detail</span>
         </div>
         <div className="grid grid-cols-4 gap-1.5">
           {macros.map((m) => {
@@ -339,11 +372,11 @@ function StudentCard({ student: s, onOpen }: { student: User; onOpen: () => void
             return (
               <div
                 key={m.key}
-                className={`flex flex-col items-center rounded-lg px-1 py-1.5 ${low ? "bg-destructive/5" : "bg-background"}`}
+                className={`flex flex-col items-center rounded-xl px-1 py-2 ${low ? "bg-destructive/5" : "bg-card"}`}
                 title={m.key}
               >
-                <Icon className="h-3.5 w-3.5 text-muted-foreground" />
-                <span className="mt-0.5 text-[11px] font-bold tabular-nums text-foreground">
+                <Icon className={`h-3.5 w-3.5 ${low ? "text-destructive/70" : "text-muted-foreground"}`} />
+                <span className={`mt-1 text-[12px] font-semibold tabular-nums ${low ? "text-destructive" : "text-foreground"}`}>
                   {m.overall === null ? "--" : `${m.overall}%`}
                 </span>
               </div>
@@ -355,13 +388,17 @@ function StudentCard({ student: s, onOpen }: { student: User; onOpen: () => void
   );
 }
 
-function Tag({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+function Tag({ children, className = "", style }: { children: React.ReactNode; className?: string; style?: React.CSSProperties }) {
   return (
-    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10.5px] font-semibold ${className}`}>
+    <span
+      style={style}
+      className={`inline-flex max-w-full items-center truncate rounded-full px-2 py-0.5 text-[10.5px] font-semibold ${className}`}
+    >
       {children}
     </span>
   );
 }
+
 
 // ============================================================================
 // DETAIL MODAL — read-only, plus the editable coverage-notes text field.
