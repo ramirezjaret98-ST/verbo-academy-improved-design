@@ -615,79 +615,72 @@ function TeacherDashboard() {
 
 
       {/* Compressed action cards */}
-      <section className="grid gap-4 md:grid-cols-3">
-        <div
-          role="button"
-          tabIndex={0}
-          onClick={() => setOpenPanel("attention")}
-          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpenPanel("attention"); } }}
-          className="block cursor-pointer text-left"
-        >
-          <HeroStatCard
-            className={`card-gradient-crimson !min-h-[92px] !py-4${attention.length > 0 ? " verbo-focus-pulse" : ""}`}
-            style={attention.length > 0 ? ({ ["--verbo-focus-pulse-color" as any]: CRIMSON } as React.CSSProperties) : undefined}
+      <section className="grid gap-3 sm:gap-4 md:grid-cols-3">
+        {([
+          {
+            key: "attention" as DashboardPanel,
+            eyebrow: "Action Required",
+            title: "Needs Your Attention",
+            sub: attention.length === 0 ? "You're all caught up" : `${attention.length} item${attention.length === 1 ? "" : "s"} need review`,
+            gradient: "card-gradient-crimson",
+            icon: alertIconAsset.url,
+            count: attention.length,
+            pulse: attention.length > 0 ? CRIMSON : null,
+          },
+          {
+            key: "plan" as DashboardPanel,
+            eyebrow: "Lesson Planning",
+            title: "Plan Your Upcoming Sessions",
+            sub: `${toPlanAll.length} session${toPlanAll.length === 1 ? "" : "s"} to plan`,
+            gradient: "card-gradient-violet",
+            icon: planIconAsset.url,
+            count: toPlanAll.length,
+            pulse: null,
+          },
+          {
+            key: "complete" as DashboardPanel,
+            eyebrow: "Session Reports",
+            title: "Complete Your Sessions",
+            sub: `${awaitingCompletion.length + pendingClubEvents.length} session${awaitingCompletion.length + pendingClubEvents.length === 1 ? "" : "s"} awaiting completion`,
+            gradient: "card-gradient-lime",
+            icon: completeIconAsset.url,
+            count: awaitingCompletion.length + pendingClubEvents.length,
+            pulse: null,
+          },
+        ]).map((p, i) => (
+          <div
+            key={p.key}
+            role="button"
+            tabIndex={0}
+            onClick={() => setOpenPanel(p.key)}
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpenPanel(p.key); } }}
+            className="verbo-td-in verbo-td-press block cursor-pointer text-left"
+            style={{ animationDelay: `${180 + i * 50}ms` }}
           >
-            <div className="relative flex w-full items-center justify-between gap-3">
-              <div className="min-w-0">
-                <div className="text-xs font-semibold uppercase tracking-wider" style={{ color: "rgba(255,255,255,0.75)" }}>
-                  Action Required
+            <HeroStatCard
+              className={`${p.gradient} !min-h-[104px] !py-4${p.pulse ? " verbo-focus-pulse" : ""}`}
+              style={p.pulse ? ({ ["--verbo-focus-pulse-color" as any]: p.pulse } as React.CSSProperties) : undefined}
+            >
+              <div className="relative flex w-full items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.14em]" style={{ color: "rgba(255,255,255,0.72)" }}>
+                    {p.eyebrow}
+                  </div>
+                  <div className="mt-1 flex items-center gap-2">
+                    <span className="text-3xl font-bold leading-none tabular-nums text-white">{p.count}</span>
+                    <span className="min-w-0 text-base font-semibold leading-tight text-white sm:text-lg">{p.title}</span>
+                  </div>
+                  <div className="mt-1.5 text-[11px] font-medium" style={{ color: "rgba(255,255,255,0.82)" }}>
+                    {p.sub}
+                  </div>
                 </div>
-                <div className="mt-1 text-xl font-semibold leading-tight text-white">Needs Your Attention</div>
-                <div className="mt-1 text-xs font-medium" style={{ color: "rgba(255,255,255,0.8)" }}>
-                  {attention.length === 0 ? "You're all caught up" : `${attention.length} item${attention.length === 1 ? "" : "s"} need review`}
-                </div>
+                <img src={p.icon} alt="" aria-hidden className="h-[31px] w-[31px] shrink-0" />
               </div>
-              <img src={alertIconAsset.url} alt="" aria-hidden className="h-[31px] w-[31px] shrink-0" />
-            </div>
-          </HeroStatCard>
-        </div>
-
-        <div
-          role="button"
-          tabIndex={0}
-          onClick={() => setOpenPanel("plan")}
-          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpenPanel("plan"); } }}
-          className="block cursor-pointer text-left"
-        >
-          <HeroStatCard className="card-gradient-violet !min-h-[92px] !py-4">
-            <div className="relative flex w-full items-center justify-between gap-3">
-              <div className="min-w-0">
-                <div className="text-xs font-semibold uppercase tracking-wider" style={{ color: "rgba(255,255,255,0.75)" }}>
-                  Lesson Planning
-                </div>
-                <div className="mt-1 text-xl font-semibold leading-tight text-white">Plan Your Upcoming Sessions</div>
-                <div className="mt-1 text-xs font-medium" style={{ color: "rgba(255,255,255,0.8)" }}>
-                  {toPlanAll.length} session{toPlanAll.length === 1 ? "" : "s"} to plan
-                </div>
-              </div>
-              <img src={planIconAsset.url} alt="" aria-hidden className="h-[31px] w-[31px] shrink-0" />
-            </div>
-          </HeroStatCard>
-        </div>
-
-        <div
-          role="button"
-          tabIndex={0}
-          onClick={() => setOpenPanel("complete")}
-          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpenPanel("complete"); } }}
-          className="block cursor-pointer text-left"
-        >
-          <HeroStatCard className="card-gradient-lime !min-h-[92px] !py-4">
-            <div className="relative flex w-full items-center justify-between gap-3">
-              <div className="min-w-0">
-                <div className="text-xs font-semibold uppercase tracking-wider" style={{ color: "rgba(255,255,255,0.75)" }}>
-                  Session Reports
-                </div>
-                <div className="mt-1 text-xl font-semibold leading-tight text-white">Complete Your Sessions</div>
-                <div className="mt-1 text-xs font-medium" style={{ color: "rgba(255,255,255,0.8)" }}>
-                  {awaitingCompletion.length + pendingClubEvents.length} session{awaitingCompletion.length + pendingClubEvents.length === 1 ? "" : "s"} awaiting completion
-                </div>
-              </div>
-              <img src={completeIconAsset.url} alt="" aria-hidden className="h-[31px] w-[31px] shrink-0" />
-            </div>
-          </HeroStatCard>
-        </div>
+            </HeroStatCard>
+          </div>
+        ))}
       </section>
+
 
       {openPanel === "attention" && (
         <AccentModal
