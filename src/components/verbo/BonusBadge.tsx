@@ -24,7 +24,7 @@ export function BonusBadge({ status, size = "md", glow = false }: Props) {
 
   if (status.kind === "eligible") {
     return (
-      <span className={`${glow ? "verbo-bonus-glow " : ""}inline-flex items-center gap-1.5 rounded-full bg-success/15 ${px} ${text} font-semibold text-success`}>
+      <span className={`${glow ? "verbo-bonus-glow " : ""}inline-flex items-center gap-1.5 rounded-full bg-bonus/15 ${px} ${text} font-semibold text-bonus`}>
         <Trophy className={icon} /> Bonus Eligible
       </span>
     );

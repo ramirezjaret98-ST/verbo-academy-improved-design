@@ -34,6 +34,8 @@
   --color-destructive-foreground: var(--destructive-foreground);
   --color-success: var(--success);
   --color-success-foreground: var(--success-foreground);
+  --color-bonus: var(--bonus);
+  --color-bonus-foreground: var(--bonus-foreground);
   --color-warning: var(--warning);
   --color-warning-foreground: var(--warning-foreground);
   --color-border: var(--border);
@@ -119,6 +121,8 @@
 
   --success: oklch(0.62 0.14 155);
   --success-foreground: oklch(0.99 0 0);
+  --bonus: #84cc16;
+  --bonus-foreground: oklch(0.99 0 0);
 
   --warning: oklch(0.75 0.14 75);
   --warning-foreground: oklch(0.18 0.01 250);
@@ -188,6 +192,8 @@
   --destructive-foreground: oklch(0.99 0 0);
   --success: oklch(0.65 0.14 155);
   --success-foreground: oklch(0.99 0 0);
+  --bonus: #84cc16;
+  --bonus-foreground: oklch(0.99 0 0);
   --warning: oklch(0.78 0.14 75);
   --warning-foreground: oklch(0.18 0.01 250);
   --border: oklch(1 0 0 / 8%);
@@ -1976,8 +1982,8 @@
 
 /* ---- Teacher · My Balance (financial) ---- */
 @keyframes verbo-bonus-glow {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.45); transform: translateY(0); }
-  50%      { box-shadow: 0 0 0 8px rgba(34, 197, 94, 0);   transform: translateY(-1px); }
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--bonus) 45%, transparent); transform: translateY(0); }
+  50%      { box-shadow: 0 0 0 8px color-mix(in oklab, var(--bonus) 0%, transparent);   transform: translateY(-1px); }
 }
 .verbo-bonus-glow { animation: verbo-bonus-glow 2.2s ease-in-out infinite; }
 
