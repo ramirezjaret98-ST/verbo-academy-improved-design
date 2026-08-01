@@ -366,14 +366,21 @@ function Overview() {
                   key={a.label}
                   type="button"
                   onClick={a.onClick}
-                  className="verbo-admin-press group inline-flex items-center gap-2 rounded-full border border-border bg-card px-3.5 py-2 text-sm font-medium text-foreground shadow-[0_1px_2px_color-mix(in_oklab,var(--navy-700)_7%,transparent)]"
+                  className="verbo-quick-action group inline-flex items-center gap-2 rounded-full border bg-card py-1.5 pl-1.5 pr-4 text-sm font-medium text-foreground"
+                  style={{ "--qa": a.color } as React.CSSProperties}
                 >
-                  <Icon className="h-4 w-4 shrink-0" strokeWidth={1.6} style={{ color: a.color }} aria-hidden />
-                  <span className="whitespace-nowrap">{a.label}</span>
+                  <span
+                    className="verbo-quick-action__chip flex h-7 w-7 shrink-0 items-center justify-center rounded-full"
+                    aria-hidden
+                  >
+                    <Icon className="h-[15px] w-[15px]" strokeWidth={1.8} />
+                  </span>
+                  <span className="whitespace-nowrap tracking-[-0.01em]">{a.label}</span>
                 </button>
               );
             })}
           </div>
+
         </div>
       </header>
 
