@@ -1,0 +1,57 @@
+import { createFileRoute, Outlet } from "@tanstack/react-router";
+import { RoleGuard } from "@/components/verbo/RoleGuard";
+import { PageTransition } from "@/components/verbo/PageTransition";
+import { Footer } from "@/components/verbo/Footer";
+import { TopNav, NavItem, NavGroup } from "@/components/verbo/TopNav";
+import { AnnouncementBanner } from "@/components/verbo/AnnouncementBanner";
+import { useAuth } from "@/lib/auth";
+import { ASSIGNMENTS, USERS } from "@/lib/mock-data";
+
+export const Route = createFileRoute("/teacher")({ component: Layout });
+
+function Layout() {
+  const { user } = useAuth();
+  const assignedStudents = user
+    ? USERS.filter((u) => u.role === "student" && ASSIGNMENTS.some((a) => a.teacher_id === user.id && a.student_id === u.id))
+    : [];
+  const hasVipStudent = assignedStudents.some((u) => u.product === "vip");
+  const hasEliteStudent = assignedStudents.some((u) => u.access_plan === "Elite");
+
+  const academicItems: NavItem[] = [
+    { to: "/teacher/students", label: "My Students" },
+    { to: "/teacher/performance-sessions", label: "Performance Sessions" },
+    { to: "/teacher/challenges", label: "Challenges" },
+    { to: "/teacher/flash", label: "Verbo Flash" },
+    { to: "/teacher/materials", label: "Materials" },
+    { to: "/teacher/workshops", label: "Focus Workshops" },
+    ...(hasVipStudent ? [{ to: "/teacher/vip", label: "Course Builder VIP" }] : []),
+    ...(hasEliteStudent ? [{ to: "/teacher/tailored-content", label: "Tailored Content" }] : []),
+    { to: "/teacher/clubs", label: "Clubs" },
+  ];
+
+  const items: (NavItem | NavGroup)[] = [
+    { to: "/teacher", label: "Dashboard" },
+    { to: "/teacher/calendar", label: "Calendar" },
+    { label: "Academic", items: academicItems },
+    { to: "/teacher/financial", label: "Financial" },
+  ];
+
+  return (
+    <RoleGuard allow="teacher">
+      <TopNav variant="dark" items={items} />
+      <div className="flex min-h-screen flex-col" style={{ backgroundColor: "#f4f6f8" }}>
+        <main className="mx-auto w-full max-w-7xl flex-1 pt-24 pb-10">
+          <div className="px-6">
+            <AnnouncementBanner />
+            <PageTransition>
+              <Outlet />
+            </PageTransition>
+          </div>
+        </main>
+
+        <Footer />
+      </div>
+
+    </RoleGuard>
+  );
+}

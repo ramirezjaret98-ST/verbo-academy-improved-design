@@ -1,0 +1,4705 @@
+{
+  "GO-L1": [
+    {
+      "id": "GO-L1-U1",
+      "title": "First Impressions, First Words",
+      "block": "Meet & Greet (Vida Real)",
+      "vocabulary": [
+        "name",
+        "from",
+        "like",
+        "nice to meet you",
+        "age"
+      ],
+      "grammar_point": "Subject pronouns + “to be”"
+    },
+    {
+      "id": "GO-L1-U2",
+      "title": "My People",
+      "block": "Meet & Greet (Vida Real)",
+      "vocabulary": [
+        "friend",
+        "sibling",
+        "partner",
+        "roommate",
+        "pet"
+      ],
+      "grammar_point": "Possessives (my/your/his/her)"
+    },
+    {
+      "id": "GO-L1-U3",
+      "title": "Texting Like a Local",
+      "block": "Meet & Greet (Vida Real)",
+      "vocabulary": [
+        "lol",
+        "omw",
+        "brb",
+        "text",
+        "reply"
+      ],
+      "grammar_point": "Imperatives / short forms"
+    },
+    {
+      "id": "GO-L1-U4",
+      "title": "What’s Your Vibe?",
+      "block": "Meet & Greet (Vida Real)",
+      "vocabulary": [
+        "funny",
+        "chill",
+        "honest",
+        "curious",
+        "easygoing"
+      ],
+      "grammar_point": "Adjectives + “to be”"
+    },
+    {
+      "id": "GO-L1-U5",
+      "title": "Small Talk, Big Wins",
+      "block": "Meet & Greet (Vida Real)",
+      "vocabulary": [
+        "weather",
+        "plans",
+        "weekend",
+        "day",
+        "mood"
+      ],
+      "grammar_point": "Wh- questions"
+    },
+    {
+      "id": "GO-L1-U6",
+      "title": "Where I’m From, Where I’m At",
+      "block": "Meet & Greet (Vida Real)",
+      "vocabulary": [
+        "from",
+        "live",
+        "city",
+        "country",
+        "move"
+      ],
+      "grammar_point": "I’m from / I live in"
+    },
+    {
+      "id": "GO-L1-U7",
+      "title": "Ordering Without Panic",
+      "block": "Vida Diaria y Apps",
+      "vocabulary": [
+        "order",
+        "please",
+        "to go",
+        "extra",
+        "check"
+      ],
+      "grammar_point": "I’d like…"
+    },
+    {
+      "id": "GO-L1-U8",
+      "title": "Apps I Can’t Live Without",
+      "block": "Vida Diaria y Apps",
+      "vocabulary": [
+        "app",
+        "download",
+        "notification",
+        "scroll",
+        "swipe"
+      ],
+      "grammar_point": "Present simple (habits)"
+    },
+    {
+      "id": "GO-L1-U9",
+      "title": "Getting Around Town",
+      "block": "Vida Diaria y Apps",
+      "vocabulary": [
+        "bus",
+        "ride",
+        "app",
+        "traffic",
+        "walk"
+      ],
+      "grammar_point": "There is/are + prepositions"
+    },
+    {
+      "id": "GO-L1-U10",
+      "title": "Shopping Smart",
+      "block": "Vida Diaria y Apps",
+      "vocabulary": [
+        "price",
+        "discount",
+        "size",
+        "try on",
+        "cash"
+      ],
+      "grammar_point": "How much…?"
+    },
+    {
+      "id": "GO-L1-U11",
+      "title": "Plans for Tonight",
+      "block": "Vida Diaria y Apps",
+      "vocabulary": [
+        "free",
+        "busy",
+        "meet up",
+        "maybe",
+        "sure"
+      ],
+      "grammar_point": "Going to (future)"
+    },
+    {
+      "id": "GO-L1-U12",
+      "title": "What’s for Dinner?",
+      "block": "Vida Diaria y Apps",
+      "vocabulary": [
+        "spicy",
+        "sweet",
+        "vegetarian",
+        "craving",
+        "recipe"
+      ],
+      "grammar_point": "Like / would like"
+    },
+    {
+      "id": "GO-L1-U13",
+      "title": "How I’m Really Feeling",
+      "block": "Emociones, Pantallas y Conexión",
+      "vocabulary": [
+        "excited",
+        "stressed",
+        "tired",
+        "proud",
+        "nervous"
+      ],
+      "grammar_point": "I feel / I’m feeling"
+    },
+    {
+      "id": "GO-L1-U14",
+      "title": "Scrolling & Sharing",
+      "block": "Emociones, Pantallas y Conexión",
+      "vocabulary": [
+        "post",
+        "like",
+        "follow",
+        "story",
+        "trend"
+      ],
+      "grammar_point": "Present continuous"
+    },
+    {
+      "id": "GO-L1-U15",
+      "title": "What I’m Watching",
+      "block": "Emociones, Pantallas y Conexión",
+      "vocabulary": [
+        "series",
+        "episode",
+        "binge",
+        "recommend",
+        "spoiler"
+      ],
+      "grammar_point": "Present simple / continuous"
+    },
+    {
+      "id": "GO-L1-U16",
+      "title": "Music That Moves Me",
+      "block": "Emociones, Pantallas y Conexión",
+      "vocabulary": [
+        "playlist",
+        "artist",
+        "genre",
+        "lyrics",
+        "concert"
+      ],
+      "grammar_point": "Like/love + -ing"
+    },
+    {
+      "id": "GO-L1-U17",
+      "title": "Talking About Money",
+      "block": "Emociones, Pantallas y Conexión",
+      "vocabulary": [
+        "save",
+        "spend",
+        "budget",
+        "afford",
+        "borrow"
+      ],
+      "grammar_point": "Can / can’t"
+    },
+    {
+      "id": "GO-L1-U18",
+      "title": "Asking for a Favor",
+      "block": "Emociones, Pantallas y Conexión",
+      "vocabulary": [
+        "could",
+        "mind",
+        "favor",
+        "help",
+        "quick"
+      ],
+      "grammar_point": "Could you…?"
+    },
+    {
+      "id": "GO-L1-U19",
+      "title": "Getting Lost (Politely)",
+      "block": "Moviéndote por el Mundo",
+      "vocabulary": [
+        "turn",
+        "straight",
+        "next to",
+        "map",
+        "lost"
+      ],
+      "grammar_point": "Imperatives"
+    },
+    {
+      "id": "GO-L1-U20",
+      "title": "Weather Talk That Works",
+      "block": "Moviéndote por el Mundo",
+      "vocabulary": [
+        "sunny",
+        "rain",
+        "forecast",
+        "cold",
+        "layer"
+      ],
+      "grammar_point": "It’s + adjective"
+    },
+    {
+      "id": "GO-L1-U21",
+      "title": "Travel Mode: On",
+      "block": "Moviéndote por el Mundo",
+      "vocabulary": [
+        "ticket",
+        "passport",
+        "gate",
+        "luggage",
+        "delay"
+      ],
+      "grammar_point": "Present continuous for plans"
+    },
+    {
+      "id": "GO-L1-U22",
+      "title": "New Places, New Faces",
+      "block": "Moviéndote por el Mundo",
+      "vocabulary": [
+        "local",
+        "recommend",
+        "hidden gem",
+        "tourist",
+        "explore"
+      ],
+      "grammar_point": "Wh- questions"
+    },
+    {
+      "id": "GO-L1-U23",
+      "title": "Health Check",
+      "block": "Moviéndote por el Mundo",
+      "vocabulary": [
+        "headache",
+        "tired",
+        "sick",
+        "rest",
+        "doctor"
+      ],
+      "grammar_point": "I have / I feel"
+    },
+    {
+      "id": "GO-L1-U24",
+      "title": "Home Sweet (Temporary) Home",
+      "block": "Moviéndote por el Mundo",
+      "vocabulary": [
+        "roommate",
+        "rent",
+        "apartment",
+        "neighbor",
+        "move in"
+      ],
+      "grammar_point": "There is/are"
+    },
+    {
+      "id": "GO-L1-U25",
+      "title": "My Weekend Plans (With a Twist)",
+      "block": "Quién Soy, En Voz Alta",
+      "vocabulary": [
+        "because",
+        "so",
+        "want to",
+        "hope",
+        "excited"
+      ],
+      "grammar_point": "Going to / want to"
+    },
+    {
+      "id": "GO-L1-U26",
+      "title": "Things I’m Into",
+      "block": "Quién Soy, En Voz Alta",
+      "vocabulary": [
+        "into",
+        "hobby",
+        "passionate",
+        "collect",
+        "try"
+      ],
+      "grammar_point": "Present simple + gerunds"
+    },
+    {
+      "id": "GO-L1-U27",
+      "title": "What Made My Day",
+      "block": "Quién Soy, En Voz Alta",
+      "vocabulary": [
+        "happened",
+        "surprised",
+        "funny",
+        "best part",
+        "glad"
+      ],
+      "grammar_point": "Past simple"
+    },
+    {
+      "id": "GO-L1-U28",
+      "title": "Giving My Opinion",
+      "block": "Quién Soy, En Voz Alta",
+      "vocabulary": [
+        "think",
+        "prefer",
+        "agree",
+        "disagree",
+        "actually"
+      ],
+      "grammar_point": "I think / I don’t think"
+    },
+    {
+      "id": "GO-L1-U29",
+      "title": "Small Wins, Loud Cheers",
+      "block": "Quién Soy, En Voz Alta",
+      "vocabulary": [
+        "proud",
+        "achieve",
+        "finally",
+        "worked hard",
+        "celebrate"
+      ],
+      "grammar_point": "Present perfect"
+    },
+    {
+      "id": "GO-L1-U30",
+      "title": "What’s Next for Me",
+      "block": "Quién Soy, En Voz Alta",
+      "vocabulary": [
+        "plan",
+        "hope",
+        "want",
+        "next",
+        "soon"
+      ],
+      "grammar_point": "Going to / Would like to"
+    }
+  ],
+  "GO-L2": [
+    {
+      "id": "GO-L2-U1",
+      "title": "DMs & Group Chats",
+      "block": "Vida Digital y Conexión",
+      "vocabulary": [
+        "reply",
+        "ghost",
+        "seen",
+        "group chat",
+        "meme"
+      ],
+      "grammar_point": "Present simple / continuous"
+    },
+    {
+      "id": "GO-L2-U2",
+      "title": "Dating Apps 101",
+      "block": "Vida Digital y Conexión",
+      "vocabulary": [
+        "match",
+        "swipe",
+        "profile",
+        "date",
+        "chemistry"
+      ],
+      "grammar_point": "Present simple / questions"
+    },
+    {
+      "id": "GO-L2-U3",
+      "title": "Oversharing or Just Sharing?",
+      "block": "Vida Digital y Conexión",
+      "vocabulary": [
+        "post",
+        "private",
+        "comment",
+        "overshare",
+        "audience"
+      ],
+      "grammar_point": "Should / shouldn’t"
+    },
+    {
+      "id": "GO-L2-U4",
+      "title": "Subscriptions I Forgot About",
+      "block": "Vida Digital y Conexión",
+      "vocabulary": [
+        "subscription",
+        "cancel",
+        "free trial",
+        "auto-renew",
+        "plan"
+      ],
+      "grammar_point": "Present perfect"
+    },
+    {
+      "id": "GO-L2-U5",
+      "title": "Explaining a Meme",
+      "block": "Vida Digital y Conexión",
+      "vocabulary": [
+        "trend",
+        "viral",
+        "joke",
+        "reference",
+        "relatable"
+      ],
+      "grammar_point": "Present simple for explanation"
+    },
+    {
+      "id": "GO-L2-U6",
+      "title": "Video Call Etiquette",
+      "block": "Vida Digital y Conexión",
+      "vocabulary": [
+        "freeze",
+        "background",
+        "mute",
+        "awkward",
+        "connection"
+      ],
+      "grammar_point": "Should for advice"
+    },
+    {
+      "id": "GO-L2-U7",
+      "title": "Budgeting Without Boring Me",
+      "block": "Dinero, Independencia y Adultez",
+      "vocabulary": [
+        "budget",
+        "save",
+        "expense",
+        "splurge",
+        "goal"
+      ],
+      "grammar_point": "Present simple / will"
+    },
+    {
+      "id": "GO-L2-U8",
+      "title": "Splitting the Bill",
+      "block": "Dinero, Independencia y Adultez",
+      "vocabulary": [
+        "split",
+        "owe",
+        "transfer",
+        "treat",
+        "even"
+      ],
+      "grammar_point": "Let’s / Shall we"
+    },
+    {
+      "id": "GO-L2-U9",
+      "title": "Adulting 101",
+      "block": "Dinero, Independencia y Adultez",
+      "vocabulary": [
+        "bill",
+        "rent",
+        "due",
+        "pay",
+        "remind"
+      ],
+      "grammar_point": "Have to"
+    },
+    {
+      "id": "GO-L2-U10",
+      "title": "Side Hustle Talk",
+      "block": "Dinero, Independencia y Adultez",
+      "vocabulary": [
+        "side hustle",
+        "gig",
+        "sell",
+        "freelance",
+        "extra"
+      ],
+      "grammar_point": "Present simple"
+    },
+    {
+      "id": "GO-L2-U11",
+      "title": "Moving Out (Finally)",
+      "block": "Dinero, Independencia y Adultez",
+      "vocabulary": [
+        "lease",
+        "deposit",
+        "roommate",
+        "utilities",
+        "furnish"
+      ],
+      "grammar_point": "Future: going to"
+    },
+    {
+      "id": "GO-L2-U12",
+      "title": "Big Purchases, Big Decisions",
+      "block": "Dinero, Independencia y Adultez",
+      "vocabulary": [
+        "worth it",
+        "deal",
+        "compare",
+        "save up",
+        "regret"
+      ],
+      "grammar_point": "Comparatives"
+    },
+    {
+      "id": "GO-L2-U13",
+      "title": "Mental Health Check-In",
+      "block": "Bienestar e Identidad",
+      "vocabulary": [
+        "overwhelmed",
+        "anxious",
+        "cope",
+        "therapy",
+        "boundaries"
+      ],
+      "grammar_point": "Present simple / should"
+    },
+    {
+      "id": "GO-L2-U14",
+      "title": "Finding Your Routine",
+      "block": "Bienestar e Identidad",
+      "vocabulary": [
+        "habit",
+        "consistent",
+        "motivation",
+        "goal",
+        "progress"
+      ],
+      "grammar_point": "Present simple (habits)"
+    },
+    {
+      "id": "GO-L2-U15",
+      "title": "Screen Time Reality Check",
+      "block": "Bienestar e Identidad",
+      "vocabulary": [
+        "screen time",
+        "notification",
+        "distraction",
+        "unplug",
+        "limit"
+      ],
+      "grammar_point": "Should / shouldn’t"
+    },
+    {
+      "id": "GO-L2-U16",
+      "title": "Talking About Boundaries",
+      "block": "Bienestar e Identidad",
+      "vocabulary": [
+        "boundary",
+        "say no",
+        "respect",
+        "comfortable",
+        "space"
+      ],
+      "grammar_point": "Should / need to"
+    },
+    {
+      "id": "GO-L2-U17",
+      "title": "The Comparison Trap",
+      "block": "Bienestar e Identidad",
+      "vocabulary": [
+        "compare",
+        "highlight reel",
+        "insecure",
+        "confidence",
+        "real life"
+      ],
+      "grammar_point": "Present simple statements"
+    },
+    {
+      "id": "GO-L2-U18",
+      "title": "Small Habits, Big Change",
+      "block": "Bienestar e Identidad",
+      "vocabulary": [
+        "routine",
+        "consistent",
+        "streak",
+        "track",
+        "improve"
+      ],
+      "grammar_point": "Present continuous"
+    },
+    {
+      "id": "GO-L2-U19",
+      "title": "Hot Takes & Opinions",
+      "block": "Cultura, Tendencias y Opiniones",
+      "vocabulary": [
+        "trend",
+        "overrated",
+        "underrated",
+        "agree",
+        "honestly"
+      ],
+      "grammar_point": "I think / In my opinion"
+    },
+    {
+      "id": "GO-L2-U20",
+      "title": "Binge-Worthy or Not?",
+      "block": "Cultura, Tendencias y Opiniones",
+      "vocabulary": [
+        "plot",
+        "character",
+        "twist",
+        "recommend",
+        "rating"
+      ],
+      "grammar_point": "Comparatives / superlatives"
+    },
+    {
+      "id": "GO-L2-U21",
+      "title": "What’s Trending Today",
+      "block": "Cultura, Tendencias y Opiniones",
+      "vocabulary": [
+        "headline",
+        "trending",
+        "breaking",
+        "update",
+        "source"
+      ],
+      "grammar_point": "Present simple / present perfect"
+    },
+    {
+      "id": "GO-L2-U22",
+      "title": "Festival Season",
+      "block": "Cultura, Tendencias y Opiniones",
+      "vocabulary": [
+        "lineup",
+        "ticket",
+        "crowd",
+        "vibe",
+        "sold out"
+      ],
+      "grammar_point": "Going to / present continuous"
+    },
+    {
+      "id": "GO-L2-U23",
+      "title": "Food Trends I Don’t Get",
+      "block": "Cultura, Tendencias y Opiniones",
+      "vocabulary": [
+        "trend",
+        "ingredient",
+        "viral",
+        "recipe",
+        "taste"
+      ],
+      "grammar_point": "Present simple / opinions"
+    },
+    {
+      "id": "GO-L2-U24",
+      "title": "Sustainability, Kind Of",
+      "block": "Cultura, Tendencias y Opiniones",
+      "vocabulary": [
+        "recycle",
+        "reusable",
+        "sustainable",
+        "waste",
+        "eco-friendly"
+      ],
+      "grammar_point": "Should / could"
+    },
+    {
+      "id": "GO-L2-U25",
+      "title": "Planning a Trip on a Budget",
+      "block": "Viaje, Crecimiento y Lo Que Sigue",
+      "vocabulary": [
+        "itinerary",
+        "hostel",
+        "deal",
+        "flexible",
+        "backpack"
+      ],
+      "grammar_point": "Going to / will"
+    },
+    {
+      "id": "GO-L2-U26",
+      "title": "Culture Shock Moments",
+      "block": "Viaje, Crecimiento y Lo Que Sigue",
+      "vocabulary": [
+        "custom",
+        "awkward",
+        "different",
+        "adjust",
+        "surprised"
+      ],
+      "grammar_point": "Past simple"
+    },
+    {
+      "id": "GO-L2-U27",
+      "title": "Learning From a Bad Day",
+      "block": "Viaje, Crecimiento y Lo Que Sigue",
+      "vocabulary": [
+        "lesson",
+        "mistake",
+        "better",
+        "next time",
+        "grow"
+      ],
+      "grammar_point": "Past simple / should have"
+    },
+    {
+      "id": "GO-L2-U28",
+      "title": "Talking About Big Changes",
+      "block": "Viaje, Crecimiento y Lo Que Sigue",
+      "vocabulary": [
+        "change",
+        "decision",
+        "nervous",
+        "excited",
+        "ready"
+      ],
+      "grammar_point": "Going to / present continuous"
+    },
+    {
+      "id": "GO-L2-U29",
+      "title": "Setting Real Goals",
+      "block": "Viaje, Crecimiento y Lo Que Sigue",
+      "vocabulary": [
+        "goal",
+        "plan",
+        "achieve",
+        "deadline",
+        "motivation"
+      ],
+      "grammar_point": "Will / going to"
+    },
+    {
+      "id": "GO-L2-U30",
+      "title": "Where I See Myself",
+      "block": "Viaje, Crecimiento y Lo Que Sigue",
+      "vocabulary": [
+        "future",
+        "hope",
+        "imagine",
+        "path",
+        "growth"
+      ],
+      "grammar_point": "Will / would like to"
+    }
+  ],
+  "GO-L3": [
+    {
+      "id": "GO-L3-U1",
+      "title": "Disagreeing Without the Drama",
+      "block": "Hablar Sin Miedo",
+      "vocabulary": [
+        "perspective",
+        "valid point",
+        "however",
+        "respect",
+        "agree to disagree"
+      ],
+      "grammar_point": "Modals for opinion"
+    },
+    {
+      "id": "GO-L3-U2",
+      "title": "Telling a Story That Lands",
+      "block": "Hablar Sin Miedo",
+      "vocabulary": [
+        "plot twist",
+        "punchline",
+        "buildup",
+        "moment",
+        "reaction"
+      ],
+      "grammar_point": "Past simple / past continuous"
+    },
+    {
+      "id": "GO-L3-U3",
+      "title": "Explaining Yourself Clearly",
+      "block": "Hablar Sin Miedo",
+      "vocabulary": [
+        "mean",
+        "clarify",
+        "misunderstood",
+        "actually",
+        "context"
+      ],
+      "grammar_point": "Reported speech (basic)"
+    },
+    {
+      "id": "GO-L3-U4",
+      "title": "Reading Between the Lines",
+      "block": "Hablar Sin Miedo",
+      "vocabulary": [
+        "sarcasm",
+        "tone",
+        "imply",
+        "hint",
+        "subtext"
+      ],
+      "grammar_point": "Present simple for interpretation"
+    },
+    {
+      "id": "GO-L3-U5",
+      "title": "Making Small Talk Interesting",
+      "block": "Hablar Sin Miedo",
+      "vocabulary": [
+        "follow-up",
+        "curious",
+        "relate",
+        "connect",
+        "genuine"
+      ],
+      "grammar_point": "Wh- questions (deeper)"
+    },
+    {
+      "id": "GO-L3-U6",
+      "title": "Owning an Awkward Moment",
+      "block": "Hablar Sin Miedo",
+      "vocabulary": [
+        "awkward",
+        "cringe",
+        "laugh it off",
+        "recover",
+        "honestly"
+      ],
+      "grammar_point": "Past simple"
+    },
+    {
+      "id": "GO-L3-U7",
+      "title": "Setting Boundaries With Family",
+      "block": "Relaciones y Vida Social",
+      "vocabulary": [
+        "boundary",
+        "expectation",
+        "respect",
+        "honest",
+        "space"
+      ],
+      "grammar_point": "Should / need to"
+    },
+    {
+      "id": "GO-L3-U8",
+      "title": "Making Friends as an Adult",
+      "block": "Relaciones y Vida Social",
+      "vocabulary": [
+        "connect",
+        "effort",
+        "consistent",
+        "vulnerable",
+        "community"
+      ],
+      "grammar_point": "Present simple / gerunds"
+    },
+    {
+      "id": "GO-L3-U9",
+      "title": "Navigating Group Chat Drama",
+      "block": "Relaciones y Vida Social",
+      "vocabulary": [
+        "drama",
+        "misunderstanding",
+        "resolve",
+        "awkward",
+        "honest"
+      ],
+      "grammar_point": "Reported speech"
+    },
+    {
+      "id": "GO-L3-U10",
+      "title": "Talking About Relationships",
+      "block": "Relaciones y Vida Social",
+      "vocabulary": [
+        "communicate",
+        "compromise",
+        "trust",
+        "honest",
+        "support"
+      ],
+      "grammar_point": "Present simple / should"
+    },
+    {
+      "id": "GO-L3-U11",
+      "title": "Giving Advice (Without Being Asked)",
+      "block": "Relaciones y Vida Social",
+      "vocabulary": [
+        "advice",
+        "honestly",
+        "maybe",
+        "consider",
+        "perspective"
+      ],
+      "grammar_point": "Should / could / modals"
+    },
+    {
+      "id": "GO-L3-U12",
+      "title": "Apologizing Like You Mean It",
+      "block": "Relaciones y Vida Social",
+      "vocabulary": [
+        "apologize",
+        "responsibility",
+        "genuine",
+        "make it right",
+        "understand"
+      ],
+      "grammar_point": "Past simple / conditionals"
+    },
+    {
+      "id": "GO-L3-U13",
+      "title": "Building Your Online Presence",
+      "block": "Identidad y Expresión Propia",
+      "vocabulary": [
+        "presence",
+        "authentic",
+        "niche",
+        "audience",
+        "consistent"
+      ],
+      "grammar_point": "Present perfect"
+    },
+    {
+      "id": "GO-L3-U14",
+      "title": "Talking About What Matters to You",
+      "block": "Identidad y Expresión Propia",
+      "vocabulary": [
+        "value",
+        "cause",
+        "passionate",
+        "advocate",
+        "belief"
+      ],
+      "grammar_point": "Present simple statements"
+    },
+    {
+      "id": "GO-L3-U15",
+      "title": "Redefining Success",
+      "block": "Identidad y Expresión Propia",
+      "vocabulary": [
+        "success",
+        "fulfillment",
+        "balance",
+        "ambition",
+        "priorities"
+      ],
+      "grammar_point": "Comparatives"
+    },
+    {
+      "id": "GO-L3-U16",
+      "title": "Creative Outlets",
+      "block": "Identidad y Expresión Propia",
+      "vocabulary": [
+        "creative",
+        "outlet",
+        "skill",
+        "practice",
+        "express"
+      ],
+      "grammar_point": "Present simple / gerunds"
+    },
+    {
+      "id": "GO-L3-U17",
+      "title": "Talking About Failure Honestly",
+      "block": "Identidad y Expresión Propia",
+      "vocabulary": [
+        "failure",
+        "setback",
+        "lesson",
+        "bounce back",
+        "growth"
+      ],
+      "grammar_point": "Past simple / present perfect"
+    },
+    {
+      "id": "GO-L3-U18",
+      "title": "What Makes Me, Me",
+      "block": "Identidad y Expresión Propia",
+      "vocabulary": [
+        "identity",
+        "background",
+        "influence",
+        "shape",
+        "unique"
+      ],
+      "grammar_point": "Present perfect + relative clauses"
+    },
+    {
+      "id": "GO-L3-U19",
+      "title": "Debating a Hot Topic (Respectfully)",
+      "block": "El Mundo Alrededor",
+      "vocabulary": [
+        "argument",
+        "evidence",
+        "counterpoint",
+        "respectfully",
+        "perspective"
+      ],
+      "grammar_point": "Modals for possibility"
+    },
+    {
+      "id": "GO-L3-U20",
+      "title": "Talking About the News",
+      "block": "El Mundo Alrededor",
+      "vocabulary": [
+        "headline",
+        "source",
+        "credible",
+        "bias",
+        "opinion"
+      ],
+      "grammar_point": "Present perfect / present simple"
+    },
+    {
+      "id": "GO-L3-U21",
+      "title": "Environmental Choices",
+      "block": "El Mundo Alrededor",
+      "vocabulary": [
+        "impact",
+        "footprint",
+        "conscious",
+        "alternative",
+        "effort"
+      ],
+      "grammar_point": "Should / could"
+    },
+    {
+      "id": "GO-L3-U22",
+      "title": "Money & Values",
+      "block": "El Mundo Alrededor",
+      "vocabulary": [
+        "ethical",
+        "support",
+        "boycott",
+        "conscious",
+        "worth it"
+      ],
+      "grammar_point": "Should / would"
+    },
+    {
+      "id": "GO-L3-U23",
+      "title": "Traveling Like a Local",
+      "block": "El Mundo Alrededor",
+      "vocabulary": [
+        "immerse",
+        "local",
+        "authentic",
+        "custom",
+        "respect"
+      ],
+      "grammar_point": "Present continuous / should"
+    },
+    {
+      "id": "GO-L3-U24",
+      "title": "Understanding Other Perspectives",
+      "block": "El Mundo Alrededor",
+      "vocabulary": [
+        "perspective",
+        "empathy",
+        "assume",
+        "context",
+        "understand"
+      ],
+      "grammar_point": "Modals for speculation"
+    },
+    {
+      "id": "GO-L3-U25",
+      "title": "Talking About Side Projects",
+      "block": "Crecimiento y Ambición",
+      "vocabulary": [
+        "project",
+        "passion",
+        "momentum",
+        "launch",
+        "grind"
+      ],
+      "grammar_point": "Present continuous / going to"
+    },
+    {
+      "id": "GO-L3-U26",
+      "title": "Networking Without Cringing",
+      "block": "Crecimiento y Ambición",
+      "vocabulary": [
+        "connect",
+        "introduce",
+        "follow up",
+        "genuine",
+        "opportunity"
+      ],
+      "grammar_point": "Could / would"
+    },
+    {
+      "id": "GO-L3-U27",
+      "title": "Asking for What You Want",
+      "block": "Crecimiento y Ambición",
+      "vocabulary": [
+        "assertive",
+        "request",
+        "deserve",
+        "confident",
+        "direct"
+      ],
+      "grammar_point": "Could / would like"
+    },
+    {
+      "id": "GO-L3-U28",
+      "title": "Handling Criticism Gracefully",
+      "block": "Crecimiento y Ambición",
+      "vocabulary": [
+        "feedback",
+        "defensive",
+        "open",
+        "consider",
+        "improve"
+      ],
+      "grammar_point": "Should / could"
+    },
+    {
+      "id": "GO-L3-U29",
+      "title": "Talking About Big Life Decisions",
+      "block": "Crecimiento y Ambición",
+      "vocabulary": [
+        "decision",
+        "weigh",
+        "risk",
+        "ready",
+        "commit"
+      ],
+      "grammar_point": "Conditionals (1st & 2nd)"
+    },
+    {
+      "id": "GO-L3-U30",
+      "title": "The Version of Me I’m Becoming",
+      "block": "Crecimiento y Ambición",
+      "vocabulary": [
+        "growth",
+        "evolve",
+        "reflect",
+        "proud",
+        "direction"
+      ],
+      "grammar_point": "Present perfect + present continuous"
+    }
+  ],
+  "GO-L4": [
+    {
+      "id": "GO-L4-U1",
+      "title": "Disagreeing at a Higher Level",
+      "block": "Conversaciones Con Matiz",
+      "vocabulary": [
+        "nuance",
+        "concede",
+        "however",
+        "valid",
+        "counter"
+      ],
+      "grammar_point": "Complex conditionals"
+    },
+    {
+      "id": "GO-L4-U2",
+      "title": "The Art of the Follow-Up Question",
+      "block": "Conversaciones Con Matiz",
+      "vocabulary": [
+        "curiosity",
+        "follow-up",
+        "dig deeper",
+        "genuine",
+        "insight"
+      ],
+      "grammar_point": "Indirect questions"
+    },
+    {
+      "id": "GO-L4-U3",
+      "title": "Reading Irony & Sarcasm",
+      "block": "Conversaciones Con Matiz",
+      "vocabulary": [
+        "irony",
+        "sarcasm",
+        "deadpan",
+        "tone",
+        "get the joke"
+      ],
+      "grammar_point": "Present simple for interpretation"
+    },
+    {
+      "id": "GO-L4-U4",
+      "title": "Making an Argument Stick",
+      "block": "Conversaciones Con Matiz",
+      "vocabulary": [
+        "conviction",
+        "evidence",
+        "framing",
+        "resonate",
+        "land"
+      ],
+      "grammar_point": "Emphatic structures"
+    },
+    {
+      "id": "GO-L4-U5",
+      "title": "Navigating Cultural Missteps",
+      "block": "Conversaciones Con Matiz",
+      "vocabulary": [
+        "misstep",
+        "offend",
+        "context",
+        "intent",
+        "repair"
+      ],
+      "grammar_point": "Passive voice"
+    },
+    {
+      "id": "GO-L4-U6",
+      "title": "Talking About Sensitive Topics Carefully",
+      "block": "Conversaciones Con Matiz",
+      "vocabulary": [
+        "sensitive",
+        "tactful",
+        "respectful",
+        "boundary",
+        "navigate"
+      ],
+      "grammar_point": "Modals for tact"
+    },
+    {
+      "id": "GO-L4-U7",
+      "title": "Spotting Misinformation",
+      "block": "Medios, Cultura y Pensamiento Crítico",
+      "vocabulary": [
+        "misinformation",
+        "source",
+        "verify",
+        "bias",
+        "credible"
+      ],
+      "grammar_point": "Passive reporting"
+    },
+    {
+      "id": "GO-L4-U8",
+      "title": "Pop Culture, Deeper Look",
+      "block": "Medios, Cultura y Pensamiento Crítico",
+      "vocabulary": [
+        "subtext",
+        "representation",
+        "impact",
+        "critique",
+        "influence"
+      ],
+      "grammar_point": "Present perfect continuous"
+    },
+    {
+      "id": "GO-L4-U9",
+      "title": "The Algorithm Knows Me Too Well",
+      "block": "Medios, Cultura y Pensamiento Crítico",
+      "vocabulary": [
+        "algorithm",
+        "personalize",
+        "data",
+        "privacy",
+        "feed"
+      ],
+      "grammar_point": "Passive structures"
+    },
+    {
+      "id": "GO-L4-U10",
+      "title": "Comedy That Translates (Or Doesn’t)",
+      "block": "Medios, Cultura y Pensamiento Crítico",
+      "vocabulary": [
+        "translate",
+        "punchline",
+        "cultural reference",
+        "lost in translation",
+        "relatable"
+      ],
+      "grammar_point": "Reduced relative clauses"
+    },
+    {
+      "id": "GO-L4-U11",
+      "title": "When Art Says More Than Words",
+      "block": "Medios, Cultura y Pensamiento Crítico",
+      "vocabulary": [
+        "interpretation",
+        "meaning",
+        "provoke",
+        "resonate",
+        "abstract"
+      ],
+      "grammar_point": "Present perfect"
+    },
+    {
+      "id": "GO-L4-U12",
+      "title": "Debating the Ethics of Everyday Tech",
+      "block": "Medios, Cultura y Pensamiento Crítico",
+      "vocabulary": [
+        "ethical",
+        "convenience",
+        "trade-off",
+        "privacy",
+        "dependency"
+      ],
+      "grammar_point": "Passive modals"
+    },
+    {
+      "id": "GO-L4-U13",
+      "title": "Code-Switching and Identity",
+      "block": "Identidad, Pertenencia y Crecimiento",
+      "vocabulary": [
+        "code-switch",
+        "identity",
+        "context",
+        "authentic",
+        "adapt"
+      ],
+      "grammar_point": "Gerund structures"
+    },
+    {
+      "id": "GO-L4-U14",
+      "title": "Belonging in a New Place",
+      "block": "Identidad, Pertenencia y Crecimiento",
+      "vocabulary": [
+        "belong",
+        "homesick",
+        "adjust",
+        "community",
+        "identity"
+      ],
+      "grammar_point": "Present perfect continuous"
+    },
+    {
+      "id": "GO-L4-U15",
+      "title": "Unlearning Old Habits",
+      "block": "Identidad, Pertenencia y Crecimiento",
+      "vocabulary": [
+        "unlearn",
+        "habit",
+        "mindset",
+        "intentional",
+        "shift"
+      ],
+      "grammar_point": "Gerund / infinitive structures"
+    },
+    {
+      "id": "GO-L4-U16",
+      "title": "The Stories We Tell Ourselves",
+      "block": "Identidad, Pertenencia y Crecimiento",
+      "vocabulary": [
+        "narrative",
+        "mindset",
+        "self-doubt",
+        "reframe",
+        "perspective"
+      ],
+      "grammar_point": "Reduced relative clauses"
+    },
+    {
+      "id": "GO-L4-U17",
+      "title": "Owning a Complicated Identity",
+      "block": "Identidad, Pertenencia y Crecimiento",
+      "vocabulary": [
+        "multicultural",
+        "hybrid",
+        "belonging",
+        "heritage",
+        "navigate"
+      ],
+      "grammar_point": "Complex comparatives"
+    },
+    {
+      "id": "GO-L4-U18",
+      "title": "Redefining What Success Looks Like",
+      "block": "Identidad, Pertenencia y Crecimiento",
+      "vocabulary": [
+        "fulfillment",
+        "ambition",
+        "balance",
+        "priorities",
+        "redefine"
+      ],
+      "grammar_point": "Complex conditionals"
+    },
+    {
+      "id": "GO-L4-U19",
+      "title": "Talking About Global Issues (Without the Jargon)",
+      "block": "El Panorama General",
+      "vocabulary": [
+        "global",
+        "impact",
+        "awareness",
+        "perspective",
+        "solution"
+      ],
+      "grammar_point": "Passive structures"
+    },
+    {
+      "id": "GO-L4-U20",
+      "title": "Climate Conversations That Don’t Get Awkward",
+      "block": "El Panorama General",
+      "vocabulary": [
+        "sustainability",
+        "impact",
+        "urgency",
+        "solution",
+        "responsibility"
+      ],
+      "grammar_point": "Modals of obligation"
+    },
+    {
+      "id": "GO-L4-U21",
+      "title": "Money, Ethics & Everyday Choices",
+      "block": "El Panorama General",
+      "vocabulary": [
+        "ethical",
+        "transparency",
+        "impact",
+        "conscious",
+        "trade-off"
+      ],
+      "grammar_point": "Mixed conditionals"
+    },
+    {
+      "id": "GO-L4-U22",
+      "title": "The Future of Work (For Everyone)",
+      "block": "El Panorama General",
+      "vocabulary": [
+        "automation",
+        "flexibility",
+        "gig economy",
+        "adapt",
+        "opportunity"
+      ],
+      "grammar_point": "Future continuous"
+    },
+    {
+      "id": "GO-L4-U23",
+      "title": "Travel With Purpose",
+      "block": "El Panorama General",
+      "vocabulary": [
+        "purposeful",
+        "immersive",
+        "sustainable",
+        "authentic",
+        "impact"
+      ],
+      "grammar_point": "Present perfect continuous"
+    },
+    {
+      "id": "GO-L4-U24",
+      "title": "When Technology Changes How We Connect",
+      "block": "El Panorama General",
+      "vocabulary": [
+        "connection",
+        "digital",
+        "authentic",
+        "distance",
+        "presence"
+      ],
+      "grammar_point": "Passive reporting"
+    },
+    {
+      "id": "GO-L4-U25",
+      "title": "Telling Your Story With Confidence",
+      "block": "Maestría y Lo Que Sigue",
+      "vocabulary": [
+        "narrative",
+        "authentic",
+        "vulnerable",
+        "impact",
+        "connect"
+      ],
+      "grammar_point": "Emphatic structures"
+    },
+    {
+      "id": "GO-L4-U26",
+      "title": "Making Peace With Uncertainty",
+      "block": "Maestría y Lo Que Sigue",
+      "vocabulary": [
+        "uncertainty",
+        "adapt",
+        "resilience",
+        "unknown",
+        "embrace"
+      ],
+      "grammar_point": "Mixed conditionals"
+    },
+    {
+      "id": "GO-L4-U27",
+      "title": "The Feedback You Didn’t Ask For",
+      "block": "Maestría y Lo Que Sigue",
+      "vocabulary": [
+        "unsolicited",
+        "boundary",
+        "filter",
+        "consider",
+        "respond"
+      ],
+      "grammar_point": "Reported speech"
+    },
+    {
+      "id": "GO-L4-U28",
+      "title": "Building a Life You Actually Want",
+      "block": "Maestría y Lo Que Sigue",
+      "vocabulary": [
+        "intentional",
+        "priorities",
+        "alignment",
+        "fulfillment",
+        "design"
+      ],
+      "grammar_point": "Future perfect"
+    },
+    {
+      "id": "GO-L4-U29",
+      "title": "Legacy, But Make It Personal",
+      "block": "Maestría y Lo Que Sigue",
+      "vocabulary": [
+        "legacy",
+        "impact",
+        "values",
+        "influence",
+        "meaningful"
+      ],
+      "grammar_point": "Inversion for emphasis"
+    },
+    {
+      "id": "GO-L4-U30",
+      "title": "Fluent in Life, Not Just Language",
+      "block": "Maestría y Lo Que Sigue",
+      "vocabulary": [
+        "fluency",
+        "growth",
+        "confidence",
+        "journey",
+        "mastery"
+      ],
+      "grammar_point": "Present perfect + complex comparatives"
+    }
+  ],
+  "ENTERPRISE-L1": [
+    {
+      "id": "ENTERPRISE-L1-U1",
+      "title": "Who I Am, What I Do",
+      "block": "Quién Soy, Qué Hago",
+      "vocabulary": [
+        "name",
+        "job title",
+        "company",
+        "role",
+        "department"
+      ],
+      "grammar_point": "Subject pronouns + verb “to be”"
+    },
+    {
+      "id": "ENTERPRISE-L1-U2",
+      "title": "My Work Week",
+      "block": "Quién Soy, Qué Hago",
+      "vocabulary": [
+        "Monday-Sunday",
+        "morning",
+        "schedule",
+        "shift",
+        "day off"
+      ],
+      "grammar_point": "Present simple (routines)"
+    },
+    {
+      "id": "ENTERPRISE-L1-U3",
+      "title": "This Is My Team",
+      "block": "Quién Soy, Qué Hago",
+      "vocabulary": [
+        "colleague",
+        "manager",
+        "client",
+        "department",
+        "team"
+      ],
+      "grammar_point": "This is / These are"
+    },
+    {
+      "id": "ENTERPRISE-L1-U4",
+      "title": "Around My Workspace",
+      "block": "Quién Soy, Qué Hago",
+      "vocabulary": [
+        "laptop",
+        "desk",
+        "screen",
+        "notebook",
+        "charger"
+      ],
+      "grammar_point": "There is / There are"
+    },
+    {
+      "id": "ENTERPRISE-L1-U5",
+      "title": "Who’s Who at Work",
+      "block": "Quién Soy, Qué Hago",
+      "vocabulary": [
+        "boss",
+        "client",
+        "coworker",
+        "vendor",
+        "assistant"
+      ],
+      "grammar_point": "Who is…? questions"
+    },
+    {
+      "id": "ENTERPRISE-L1-U6",
+      "title": "Every Kind of Workplace",
+      "block": "Quién Soy, Qué Hago",
+      "vocabulary": [
+        "office",
+        "remote",
+        "freelance",
+        "store",
+        "headquarters"
+      ],
+      "grammar_point": "Prepositions of place"
+    },
+    {
+      "id": "ENTERPRISE-L1-U7",
+      "title": "Sending a Quick Email",
+      "block": "Herramientas Digitales del Día a Día",
+      "vocabulary": [
+        "subject",
+        "attach",
+        "reply",
+        "send",
+        "inbox"
+      ],
+      "grammar_point": "Imperatives / Can you…?"
+    },
+    {
+      "id": "ENTERPRISE-L1-U8",
+      "title": "Making a Phone Call",
+      "block": "Herramientas Digitales del Día a Día",
+      "vocabulary": [
+        "call",
+        "hold",
+        "voicemail",
+        "dial",
+        "answer"
+      ],
+      "grammar_point": "Can I…?"
+    },
+    {
+      "id": "ENTERPRISE-L1-U9",
+      "title": "Joining an Online Meeting",
+      "block": "Herramientas Digitales del Día a Día",
+      "vocabulary": [
+        "mute",
+        "camera",
+        "link",
+        "join",
+        "screen-share"
+      ],
+      "grammar_point": "Present continuous"
+    },
+    {
+      "id": "ENTERPRISE-L1-U10",
+      "title": "Everyday Chat @ Work",
+      "block": "Herramientas Digitales del Día a Día",
+      "vocabulary": [
+        "how’s it going",
+        "weekend",
+        "weather",
+        "plans"
+      ],
+      "grammar_point": "Wh- questions"
+    },
+    {
+      "id": "ENTERPRISE-L1-U11",
+      "title": "Asking for Help",
+      "block": "Herramientas Digitales del Día a Día",
+      "vocabulary": [
+        "help",
+        "problem",
+        "question",
+        "please",
+        "sure"
+      ],
+      "grammar_point": "Can you help me?"
+    },
+    {
+      "id": "ENTERPRISE-L1-U12",
+      "title": "Numbers That Matter",
+      "block": "Herramientas Digitales del Día a Día",
+      "vocabulary": [
+        "price",
+        "cost",
+        "hundred",
+        "thousand",
+        "percent"
+      ],
+      "grammar_point": "Numbers & How much…?"
+    },
+    {
+      "id": "ENTERPRISE-L1-U13",
+      "title": "Planning My Day",
+      "block": "Tiempo y Tareas",
+      "vocabulary": [
+        "schedule",
+        "task",
+        "priority",
+        "break",
+        "deadline"
+      ],
+      "grammar_point": "Going to (future)"
+    },
+    {
+      "id": "ENTERPRISE-L1-U14",
+      "title": "What I Do Every Day",
+      "block": "Tiempo y Tareas",
+      "vocabulary": [
+        "check",
+        "send",
+        "write",
+        "call",
+        "finish"
+      ],
+      "grammar_point": "Present simple (habits)"
+    },
+    {
+      "id": "ENTERPRISE-L1-U15",
+      "title": "Giving Simple Instructions",
+      "block": "Tiempo y Tareas",
+      "vocabulary": [
+        "open",
+        "close",
+        "click",
+        "save",
+        "send"
+      ],
+      "grammar_point": "Imperatives"
+    },
+    {
+      "id": "ENTERPRISE-L1-U16",
+      "title": "Small Problems, Quick Fixes",
+      "block": "Tiempo y Tareas",
+      "vocabulary": [
+        "broken",
+        "fix",
+        "restart",
+        "error",
+        "support"
+      ],
+      "grammar_point": "Present continuous for problems"
+    },
+    {
+      "id": "ENTERPRISE-L1-U17",
+      "title": "Asking Politely",
+      "block": "Tiempo y Tareas",
+      "vocabulary": [
+        "could",
+        "would",
+        "may",
+        "please",
+        "mind"
+      ],
+      "grammar_point": "Could you…?"
+    },
+    {
+      "id": "ENTERPRISE-L1-U18",
+      "title": "Making Plans Together",
+      "block": "Tiempo y Tareas",
+      "vocabulary": [
+        "meet",
+        "available",
+        "confirm",
+        "invite",
+        "calendar"
+      ],
+      "grammar_point": "Wh- questions / prepositions of time"
+    },
+    {
+      "id": "ENTERPRISE-L1-U19",
+      "title": "My First Meeting",
+      "block": "Reuniones, Dinero y Primeros Tratos",
+      "vocabulary": [
+        "agenda",
+        "start",
+        "topic",
+        "notes",
+        "end"
+      ],
+      "grammar_point": "There is/are + prepositions"
+    },
+    {
+      "id": "ENTERPRISE-L1-U20",
+      "title": "Talking About Money",
+      "block": "Reuniones, Dinero y Primeros Tratos",
+      "vocabulary": [
+        "cost",
+        "budget",
+        "expensive",
+        "cheap",
+        "pay"
+      ],
+      "grammar_point": "How much/many"
+    },
+    {
+      "id": "ENTERPRISE-L1-U21",
+      "title": "Placing a Simple Order",
+      "block": "Reuniones, Dinero y Primeros Tratos",
+      "vocabulary": [
+        "order",
+        "quantity",
+        "delivery",
+        "invoice",
+        "confirm"
+      ],
+      "grammar_point": "Simple present"
+    },
+    {
+      "id": "ENTERPRISE-L1-U22",
+      "title": "A Quick Negotiation",
+      "block": "Reuniones, Dinero y Primeros Tratos",
+      "vocabulary": [
+        "price",
+        "discount",
+        "deal",
+        "offer",
+        "agree"
+      ],
+      "grammar_point": "Zero conditional"
+    },
+    {
+      "id": "ENTERPRISE-L1-U23",
+      "title": "Giving & Getting Feedback",
+      "block": "Reuniones, Dinero y Primeros Tratos",
+      "vocabulary": [
+        "good job",
+        "improve",
+        "suggestion",
+        "thanks",
+        "next time"
+      ],
+      "grammar_point": "Should"
+    },
+    {
+      "id": "ENTERPRISE-L1-U24",
+      "title": "Solving a Simple Problem",
+      "block": "Reuniones, Dinero y Primeros Tratos",
+      "vocabulary": [
+        "issue",
+        "solution",
+        "fix",
+        "try",
+        "resolve"
+      ],
+      "grammar_point": "Should / Could"
+    },
+    {
+      "id": "ENTERPRISE-L1-U25",
+      "title": "Talking About My Job",
+      "block": "Personas, Cultura y Cierre",
+      "vocabulary": [
+        "responsibility",
+        "task",
+        "skill",
+        "experience",
+        "goal"
+      ],
+      "grammar_point": "Present perfect"
+    },
+    {
+      "id": "ENTERPRISE-L1-U26",
+      "title": "Small Talk, Big Connections",
+      "block": "Personas, Cultura y Cierre",
+      "vocabulary": [
+        "hobby",
+        "weekend",
+        "family",
+        "sports",
+        "movie"
+      ],
+      "grammar_point": "Like/likes + -ing"
+    },
+    {
+      "id": "ENTERPRISE-L1-U27",
+      "title": "Where I’m From, Where I Work",
+      "block": "Personas, Cultura y Cierre",
+      "vocabulary": [
+        "country",
+        "nationality",
+        "remote",
+        "based",
+        "from"
+      ],
+      "grammar_point": "I am from / I work from"
+    },
+    {
+      "id": "ENTERPRISE-L1-U28",
+      "title": "Celebrating a Win",
+      "block": "Personas, Cultura y Cierre",
+      "vocabulary": [
+        "congratulations",
+        "success",
+        "proud",
+        "achieve",
+        "team"
+      ],
+      "grammar_point": "Present perfect"
+    },
+    {
+      "id": "ENTERPRISE-L1-U29",
+      "title": "My Plans for Next Month",
+      "block": "Personas, Cultura y Cierre",
+      "vocabulary": [
+        "plan",
+        "goal",
+        "next",
+        "start",
+        "finish"
+      ],
+      "grammar_point": "Going to / Will"
+    },
+    {
+      "id": "ENTERPRISE-L1-U30",
+      "title": "Wrapping Up the Year",
+      "block": "Personas, Cultura y Cierre",
+      "vocabulary": [
+        "result",
+        "goal",
+        "review",
+        "lesson",
+        "next"
+      ],
+      "grammar_point": "Present perfect + past simple"
+    }
+  ],
+  "ENTERPRISE-L2": [
+    {
+      "id": "ENTERPRISE-L2-U1",
+      "title": "Say Hello (Wherever You Work)",
+      "block": "Vida Digital en el Trabajo",
+      "vocabulary": [
+        "status",
+        "mute",
+        "connection",
+        "ping",
+        "colleague"
+      ],
+      "grammar_point": "Can/can’t for ability"
+    },
+    {
+      "id": "ENTERPRISE-L2-U2",
+      "title": "Inbox Zero, Almost",
+      "block": "Vida Digital en el Trabajo",
+      "vocabulary": [
+        "attachment",
+        "forward",
+        "cc",
+        "urgent",
+        "draft"
+      ],
+      "grammar_point": "Should for advice"
+    },
+    {
+      "id": "ENTERPRISE-L2-U3",
+      "title": "When Tech Doesn’t Cooperate",
+      "block": "Vida Digital en el Trabajo",
+      "vocabulary": [
+        "password",
+        "bug",
+        "update",
+        "glitch",
+        "reboot"
+      ],
+      "grammar_point": "Present continuous for irritation"
+    },
+    {
+      "id": "ENTERPRISE-L2-U4",
+      "title": "Slack Speak",
+      "block": "Vida Digital en el Trabajo",
+      "vocabulary": [
+        "FYI",
+        "ASAP",
+        "thread",
+        "DM",
+        "ping"
+      ],
+      "grammar_point": "Imperatives"
+    },
+    {
+      "id": "ENTERPRISE-L2-U5",
+      "title": "Calendar Tetris",
+      "block": "Vida Digital en el Trabajo",
+      "vocabulary": [
+        "slot",
+        "invite",
+        "conflict",
+        "reminder",
+        "reschedule"
+      ],
+      "grammar_point": "Prepositions of time"
+    },
+    {
+      "id": "ENTERPRISE-L2-U6",
+      "title": "Your Job in One Line",
+      "block": "Vida Digital en el Trabajo",
+      "vocabulary": [
+        "role",
+        "workflow",
+        "responsibility",
+        "deliverable",
+        "client"
+      ],
+      "grammar_point": "Present simple for description"
+    },
+    {
+      "id": "ENTERPRISE-L2-U7",
+      "title": "Setting Real Deadlines",
+      "block": "Proyectos y Resultados",
+      "vocabulary": [
+        "due",
+        "milestone",
+        "buffer",
+        "postpone",
+        "urgent"
+      ],
+      "grammar_point": "Have to (obligation)"
+    },
+    {
+      "id": "ENTERPRISE-L2-U8",
+      "title": "Kicking Off a Project",
+      "block": "Proyectos y Resultados",
+      "vocabulary": [
+        "objective",
+        "scope",
+        "timeline",
+        "owner",
+        "task"
+      ],
+      "grammar_point": "Let’s / Shall we"
+    },
+    {
+      "id": "ENTERPRISE-L2-U9",
+      "title": "Status Update, No Drama",
+      "block": "Proyectos y Resultados",
+      "vocabulary": [
+        "on-track",
+        "behind",
+        "blocker",
+        "risk",
+        "ahead"
+      ],
+      "grammar_point": "Still / yet"
+    },
+    {
+      "id": "ENTERPRISE-L2-U10",
+      "title": "Brainstorm Like a Pro",
+      "block": "Proyectos y Resultados",
+      "vocabulary": [
+        "idea",
+        "shortlist",
+        "vote",
+        "feasible",
+        "sticky-note"
+      ],
+      "grammar_point": "Let’s + verb"
+    },
+    {
+      "id": "ENTERPRISE-L2-U11",
+      "title": "Assigning Work Fairly",
+      "block": "Proyectos y Resultados",
+      "vocabulary": [
+        "owner",
+        "priority",
+        "delegate",
+        "deadline",
+        "follow-up"
+      ],
+      "grammar_point": "Have to / need to"
+    },
+    {
+      "id": "ENTERPRISE-L2-U12",
+      "title": "Small Wins, Loud Praise",
+      "block": "Proyectos y Resultados",
+      "vocabulary": [
+        "shout-out",
+        "milestone",
+        "treat",
+        "appreciate",
+        "success"
+      ],
+      "grammar_point": "Past simple"
+    },
+    {
+      "id": "ENTERPRISE-L2-U13",
+      "title": "Reading the Numbers",
+      "block": "Dinero, Datos y Decisiones",
+      "vocabulary": [
+        "increase",
+        "decrease",
+        "trend",
+        "stable",
+        "sharp"
+      ],
+      "grammar_point": "Comparatives"
+    },
+    {
+      "id": "ENTERPRISE-L2-U14",
+      "title": "Talking Prices & Budgets",
+      "block": "Dinero, Datos y Decisiones",
+      "vocabulary": [
+        "cost",
+        "discount",
+        "estimate",
+        "invoice",
+        "budget"
+      ],
+      "grammar_point": "How much/many"
+    },
+    {
+      "id": "ENTERPRISE-L2-U15",
+      "title": "What the Data Says",
+      "block": "Dinero, Datos y Decisiones",
+      "vocabulary": [
+        "majority",
+        "minority",
+        "forecast",
+        "rise",
+        "fall"
+      ],
+      "grammar_point": "Will vs might"
+    },
+    {
+      "id": "ENTERPRISE-L2-U16",
+      "title": "Comparing Two Options",
+      "block": "Dinero, Datos y Decisiones",
+      "vocabulary": [
+        "feature",
+        "premium",
+        "basic",
+        "value",
+        "warranty"
+      ],
+      "grammar_point": "Which is + comparative"
+    },
+    {
+      "id": "ENTERPRISE-L2-U17",
+      "title": "Getting a Better Deal",
+      "block": "Dinero, Datos y Decisiones",
+      "vocabulary": [
+        "quote",
+        "bulk",
+        "lead-time",
+        "counter",
+        "terms"
+      ],
+      "grammar_point": "Could you tell me…?"
+    },
+    {
+      "id": "ENTERPRISE-L2-U18",
+      "title": "Quick, Confident Decisions",
+      "block": "Dinero, Datos y Decisiones",
+      "vocabulary": [
+        "option",
+        "priority",
+        "risk",
+        "benefit",
+        "choice"
+      ],
+      "grammar_point": "First conditional"
+    },
+    {
+      "id": "ENTERPRISE-L2-U19",
+      "title": "Welcoming a Client",
+      "block": "Clientes, Gente y Cultura",
+      "vocabulary": [
+        "reception",
+        "appointment",
+        "badge",
+        "lobby",
+        "greet"
+      ],
+      "grammar_point": "Present continuous for arrangements"
+    },
+    {
+      "id": "ENTERPRISE-L2-U20",
+      "title": "Handling a Complaint Calmly",
+      "block": "Clientes, Gente y Cultura",
+      "vocabulary": [
+        "apology",
+        "delay",
+        "refund",
+        "replace",
+        "resolve"
+      ],
+      "grammar_point": "I’m afraid…"
+    },
+    {
+      "id": "ENTERPRISE-L2-U21",
+      "title": "Small Talk That Works",
+      "block": "Clientes, Gente y Cultura",
+      "vocabulary": [
+        "icebreaker",
+        "weather",
+        "weekend",
+        "sports",
+        "holiday"
+      ],
+      "grammar_point": "Past simple questions"
+    },
+    {
+      "id": "ENTERPRISE-L2-U22",
+      "title": "Saying Thanks the Right Way",
+      "block": "Clientes, Gente y Cultura",
+      "vocabulary": [
+        "appreciate",
+        "effort",
+        "gesture",
+        "regard",
+        "note"
+      ],
+      "grammar_point": "Present perfect"
+    },
+    {
+      "id": "ENTERPRISE-L2-U23",
+      "title": "Feedback That Helps",
+      "block": "Clientes, Gente y Cultura",
+      "vocabulary": [
+        "comment",
+        "improve",
+        "concern",
+        "progress",
+        "helpful"
+      ],
+      "grammar_point": "Could you…?"
+    },
+    {
+      "id": "ENTERPRISE-L2-U24",
+      "title": "Describing Your Strengths",
+      "block": "Clientes, Gente y Cultura",
+      "vocabulary": [
+        "organized",
+        "proactive",
+        "creative",
+        "reliable",
+        "flexible"
+      ],
+      "grammar_point": "Comparatives with -er"
+    },
+    {
+      "id": "ENTERPRISE-L2-U25",
+      "title": "Remote, Hybrid, or Office?",
+      "block": "Tech, Cambio y Futuro del Trabajo",
+      "vocabulary": [
+        "hybrid",
+        "remote",
+        "commute",
+        "flexible",
+        "in-person"
+      ],
+      "grammar_point": "Gerunds"
+    },
+    {
+      "id": "ENTERPRISE-L2-U26",
+      "title": "Everyday AI at Work",
+      "block": "Tech, Cambio y Futuro del Trabajo",
+      "vocabulary": [
+        "automate",
+        "prompt",
+        "tool",
+        "shortcut",
+        "assistant"
+      ],
+      "grammar_point": "Can/could for possibility"
+    },
+    {
+      "id": "ENTERPRISE-L2-U27",
+      "title": "Keeping Your Data Safe",
+      "block": "Tech, Cambio y Futuro del Trabajo",
+      "vocabulary": [
+        "password",
+        "phishing",
+        "secure",
+        "breach",
+        "update"
+      ],
+      "grammar_point": "Mustn’t / don’t"
+    },
+    {
+      "id": "ENTERPRISE-L2-U28",
+      "title": "Selling Yourself Online",
+      "block": "Tech, Cambio y Futuro del Trabajo",
+      "vocabulary": [
+        "profile",
+        "headline",
+        "network",
+        "endorse",
+        "connect"
+      ],
+      "grammar_point": "Present perfect for experience"
+    },
+    {
+      "id": "ENTERPRISE-L2-U29",
+      "title": "A Business With a Cause",
+      "block": "Tech, Cambio y Futuro del Trabajo",
+      "vocabulary": [
+        "sustainable",
+        "community",
+        "give-back",
+        "impact",
+        "values"
+      ],
+      "grammar_point": "Present simple statements"
+    },
+    {
+      "id": "ENTERPRISE-L2-U30",
+      "title": "Where I’m Headed",
+      "block": "Tech, Cambio y Futuro del Trabajo",
+      "vocabulary": [
+        "goal",
+        "growth",
+        "plan",
+        "opportunity",
+        "next-step"
+      ],
+      "grammar_point": "Going to / Would like to"
+    }
+  ],
+  "ENTERPRISE-L3": [
+    {
+      "id": "ENTERPRISE-L3-U1",
+      "title": "Making a Strong First Impression",
+      "block": "Presencia y Primeras Impresiones",
+      "vocabulary": [
+        "impression",
+        "strength",
+        "credibility",
+        "tone",
+        "presence"
+      ],
+      "grammar_point": "Comparisons with “like”"
+    },
+    {
+      "id": "ENTERPRISE-L3-U2",
+      "title": "Owning the Room",
+      "block": "Presencia y Primeras Impresiones",
+      "vocabulary": [
+        "floor",
+        "interrupt",
+        "follow-up",
+        "point",
+        "agree"
+      ],
+      "grammar_point": "Indefinite pronouns"
+    },
+    {
+      "id": "ENTERPRISE-L3-U3",
+      "title": "Speaking Up With Confidence",
+      "block": "Presencia y Primeras Impresiones",
+      "vocabulary": [
+        "perspective",
+        "argue",
+        "agree",
+        "disagree",
+        "viewpoint"
+      ],
+      "grammar_point": "Suffixes / past participles"
+    },
+    {
+      "id": "ENTERPRISE-L3-U4",
+      "title": "Reading the Room",
+      "block": "Presencia y Primeras Impresiones",
+      "vocabulary": [
+        "tension",
+        "empathy",
+        "tone",
+        "body language",
+        "rapport"
+      ],
+      "grammar_point": "Questions with who/what"
+    },
+    {
+      "id": "ENTERPRISE-L3-U5",
+      "title": "Your Elevator Pitch",
+      "block": "Presencia y Primeras Impresiones",
+      "vocabulary": [
+        "background",
+        "strengths",
+        "value",
+        "goals",
+        "pitch"
+      ],
+      "grammar_point": "Present perfect"
+    },
+    {
+      "id": "ENTERPRISE-L3-U6",
+      "title": "Handling Different Work Styles",
+      "block": "Presencia y Primeras Impresiones",
+      "vocabulary": [
+        "direct",
+        "flexible",
+        "detail-oriented",
+        "adaptable",
+        "compromise"
+      ],
+      "grammar_point": "Prefixes/suffixes"
+    },
+    {
+      "id": "ENTERPRISE-L3-U7",
+      "title": "Proposing a New Idea",
+      "block": "Reuniones, Propuestas y Persuasión",
+      "vocabulary": [
+        "proposal",
+        "benefit",
+        "feasible",
+        "support",
+        "momentum"
+      ],
+      "grammar_point": "Linking expressions"
+    },
+    {
+      "id": "ENTERPRISE-L3-U8",
+      "title": "Running a Meeting That Works",
+      "block": "Reuniones, Propuestas y Persuasión",
+      "vocabulary": [
+        "agenda",
+        "time-box",
+        "action item",
+        "wrap-up",
+        "decision"
+      ],
+      "grammar_point": "Modals of obligation"
+    },
+    {
+      "id": "ENTERPRISE-L3-U9",
+      "title": "Making Your Case",
+      "block": "Reuniones, Propuestas y Persuasión",
+      "vocabulary": [
+        "evidence",
+        "argument",
+        "benefit",
+        "counterpoint",
+        "conclusion"
+      ],
+      "grammar_point": "Comparatives/superlatives"
+    },
+    {
+      "id": "ENTERPRISE-L3-U10",
+      "title": "Pitching Your Vision",
+      "block": "Reuniones, Propuestas y Persuasión",
+      "vocabulary": [
+        "investor",
+        "pitch",
+        "funding",
+        "value proposition",
+        "ask"
+      ],
+      "grammar_point": "Modal question tags"
+    },
+    {
+      "id": "ENTERPRISE-L3-U11",
+      "title": "Negotiating Like a Pro",
+      "block": "Reuniones, Propuestas y Persuasión",
+      "vocabulary": [
+        "leverage",
+        "compromise",
+        "terms",
+        "counteroffer",
+        "deal"
+      ],
+      "grammar_point": "Conditionals (1st & 2nd)"
+    },
+    {
+      "id": "ENTERPRISE-L3-U12",
+      "title": "Closing With Confidence",
+      "block": "Reuniones, Propuestas y Persuasión",
+      "vocabulary": [
+        "agreement",
+        "next steps",
+        "commitment",
+        "follow-up",
+        "close"
+      ],
+      "grammar_point": "Future tenses"
+    },
+    {
+      "id": "ENTERPRISE-L3-U13",
+      "title": "Leading Without a Title",
+      "block": "Liderazgo y Feedback",
+      "vocabulary": [
+        "influence",
+        "initiative",
+        "ownership",
+        "accountability",
+        "trust"
+      ],
+      "grammar_point": "Modals of obligation"
+    },
+    {
+      "id": "ENTERPRISE-L3-U14",
+      "title": "Giving Feedback That Lands",
+      "block": "Liderazgo y Feedback",
+      "vocabulary": [
+        "constructive",
+        "specific",
+        "actionable",
+        "tone",
+        "growth"
+      ],
+      "grammar_point": "Could you…?"
+    },
+    {
+      "id": "ENTERPRISE-L3-U15",
+      "title": "Handling Pushback Gracefully",
+      "block": "Liderazgo y Feedback",
+      "vocabulary": [
+        "objection",
+        "pushback",
+        "revise",
+        "resilience",
+        "adapt"
+      ],
+      "grammar_point": "Comparisons of adverbs"
+    },
+    {
+      "id": "ENTERPRISE-L3-U16",
+      "title": "Delegating Without Guilt",
+      "block": "Liderazgo y Feedback",
+      "vocabulary": [
+        "trust",
+        "ownership",
+        "follow-up",
+        "priority",
+        "capacity"
+      ],
+      "grammar_point": "Have to / need to"
+    },
+    {
+      "id": "ENTERPRISE-L3-U17",
+      "title": "Managing Up (and Sideways)",
+      "block": "Liderazgo y Feedback",
+      "vocabulary": [
+        "expectation",
+        "priority",
+        "align",
+        "escalate",
+        "buy-in"
+      ],
+      "grammar_point": "Reported speech"
+    },
+    {
+      "id": "ENTERPRISE-L3-U18",
+      "title": "Stories of Missteps",
+      "block": "Liderazgo y Feedback",
+      "vocabulary": [
+        "lesson",
+        "mistake",
+        "accountability",
+        "growth",
+        "insight"
+      ],
+      "grammar_point": "Past passive / reflexives"
+    },
+    {
+      "id": "ENTERPRISE-L3-U19",
+      "title": "Talking Business Across Cultures",
+      "block": "Habilidades Globales e Interculturales",
+      "vocabulary": [
+        "custom",
+        "etiquette",
+        "norm",
+        "respect",
+        "adapt"
+      ],
+      "grammar_point": "Impersonal “you” / gerunds"
+    },
+    {
+      "id": "ENTERPRISE-L3-U20",
+      "title": "Hosting International Clients",
+      "block": "Habilidades Globales e Interculturales",
+      "vocabulary": [
+        "hospitality",
+        "itinerary",
+        "preference",
+        "dietary",
+        "agenda"
+      ],
+      "grammar_point": "2nd conditional / passive"
+    },
+    {
+      "id": "ENTERPRISE-L3-U21",
+      "title": "Writing Emails That Get Replies",
+      "block": "Habilidades Globales e Interculturales",
+      "vocabulary": [
+        "tone",
+        "subject line",
+        "follow-up",
+        "concise",
+        "CTA"
+      ],
+      "grammar_point": "Formal vs informal tone"
+    },
+    {
+      "id": "ENTERPRISE-L3-U22",
+      "title": "Small Talk Around the World",
+      "block": "Habilidades Globales e Interculturales",
+      "vocabulary": [
+        "icebreaker",
+        "custom",
+        "taboo",
+        "humor",
+        "rapport"
+      ],
+      "grammar_point": "“Same as” / never-ever"
+    },
+    {
+      "id": "ENTERPRISE-L3-U23",
+      "title": "Presenting to Any Audience",
+      "block": "Habilidades Globales e Interculturales",
+      "vocabulary": [
+        "audience",
+        "tailor",
+        "engage",
+        "clarity",
+        "takeaway"
+      ],
+      "grammar_point": "Present continuous / frequency"
+    },
+    {
+      "id": "ENTERPRISE-L3-U24",
+      "title": "Telling a Story That Sticks",
+      "block": "Habilidades Globales e Interculturales",
+      "vocabulary": [
+        "narrative",
+        "hook",
+        "impact",
+        "connection",
+        "message"
+      ],
+      "grammar_point": "Quantities / should"
+    },
+    {
+      "id": "ENTERPRISE-L3-U25",
+      "title": "Navigating Change at Work",
+      "block": "Crecimiento, Cambio y Cierre",
+      "vocabulary": [
+        "transition",
+        "adapt",
+        "resistance",
+        "momentum",
+        "mindset"
+      ],
+      "grammar_point": "Gerunds and infinitives"
+    },
+    {
+      "id": "ENTERPRISE-L3-U26",
+      "title": "Bouncing Back From Setbacks",
+      "block": "Crecimiento, Cambio y Cierre",
+      "vocabulary": [
+        "setback",
+        "recover",
+        "lesson",
+        "pivot",
+        "perspective"
+      ],
+      "grammar_point": "3rd conditional"
+    },
+    {
+      "id": "ENTERPRISE-L3-U27",
+      "title": "Building Your Personal Brand",
+      "block": "Crecimiento, Cambio y Cierre",
+      "vocabulary": [
+        "reputation",
+        "network",
+        "visibility",
+        "endorsement",
+        "niche"
+      ],
+      "grammar_point": "Used to / get used to"
+    },
+    {
+      "id": "ENTERPRISE-L3-U28",
+      "title": "Doing Business the Right Way",
+      "block": "Crecimiento, Cambio y Cierre",
+      "vocabulary": [
+        "integrity",
+        "transparency",
+        "dilemma",
+        "values",
+        "trust"
+      ],
+      "grammar_point": "Reported speech"
+    },
+    {
+      "id": "ENTERPRISE-L3-U29",
+      "title": "Working (and Leading) Remotely",
+      "block": "Crecimiento, Cambio y Cierre",
+      "vocabulary": [
+        "accountability",
+        "async",
+        "check-in",
+        "autonomy",
+        "trust"
+      ],
+      "grammar_point": "Gerunds and infinitives"
+    },
+    {
+      "id": "ENTERPRISE-L3-U30",
+      "title": "Owning Your Wins",
+      "block": "Crecimiento, Cambio y Cierre",
+      "vocabulary": [
+        "achievement",
+        "milestone",
+        "pride",
+        "growth",
+        "next-chapter"
+      ],
+      "grammar_point": "Present perfect + superlatives"
+    }
+  ],
+  "ENTERPRISE-L4": [
+    {
+      "id": "ENTERPRISE-L4-U1",
+      "title": "Thinking Several Steps Ahead",
+      "block": "Pensamiento Estratégico y Visión",
+      "vocabulary": [
+        "roadmap",
+        "milestone",
+        "trade-off",
+        "foresight",
+        "alignment"
+      ],
+      "grammar_point": "Future perfect"
+    },
+    {
+      "id": "ENTERPRISE-L4-U2",
+      "title": "Turning Data Into a Story",
+      "block": "Pensamiento Estratégico y Visión",
+      "vocabulary": [
+        "insight",
+        "pattern",
+        "narrative",
+        "takeaway",
+        "so-what"
+      ],
+      "grammar_point": "Nominalization"
+    },
+    {
+      "id": "ENTERPRISE-L4-U3",
+      "title": "Reading the Market",
+      "block": "Pensamiento Estratégico y Visión",
+      "vocabulary": [
+        "disruption",
+        "trend",
+        "competitor",
+        "positioning",
+        "edge"
+      ],
+      "grammar_point": "Present perfect continuous"
+    },
+    {
+      "id": "ENTERPRISE-L4-U4",
+      "title": "Making the Tough Call",
+      "block": "Pensamiento Estratégico y Visión",
+      "vocabulary": [
+        "trade-off",
+        "judgment call",
+        "uncertainty",
+        "criteria",
+        "consequence"
+      ],
+      "grammar_point": "Mixed conditionals"
+    },
+    {
+      "id": "ENTERPRISE-L4-U5",
+      "title": "Planning for What Could Go Wrong",
+      "block": "Pensamiento Estratégico y Visión",
+      "vocabulary": [
+        "exposure",
+        "mitigation",
+        "contingency",
+        "likelihood",
+        "impact"
+      ],
+      "grammar_point": "Probability modals"
+    },
+    {
+      "id": "ENTERPRISE-L4-U6",
+      "title": "Leading Through a Turnaround",
+      "block": "Pensamiento Estratégico y Visión",
+      "vocabulary": [
+        "transformation",
+        "resistance",
+        "momentum",
+        "buy-in",
+        "pivot"
+      ],
+      "grammar_point": "Complex modals"
+    },
+    {
+      "id": "ENTERPRISE-L4-U7",
+      "title": "Presenting to Decision-Makers",
+      "block": "Comunicación de Alto Impacto",
+      "vocabulary": [
+        "objection",
+        "USP",
+        "close",
+        "credibility",
+        "ask"
+      ],
+      "grammar_point": "Emphatic structures"
+    },
+    {
+      "id": "ENTERPRISE-L4-U8",
+      "title": "Winning the Room",
+      "block": "Comunicación de Alto Impacto",
+      "vocabulary": [
+        "conviction",
+        "framing",
+        "rebuttal",
+        "resonance",
+        "momentum"
+      ],
+      "grammar_point": "Inversion for emphasis"
+    },
+    {
+      "id": "ENTERPRISE-L4-U9",
+      "title": "Handling the Hard Question",
+      "block": "Comunicación de Alto Impacto",
+      "vocabulary": [
+        "deflect",
+        "reframe",
+        "transparency",
+        "composure",
+        "message"
+      ],
+      "grammar_point": "Subjunctive reporting"
+    },
+    {
+      "id": "ENTERPRISE-L4-U10",
+      "title": "Negotiating When It’s Complicated",
+      "block": "Comunicación de Alto Impacto",
+      "vocabulary": [
+        "leverage",
+        "concession",
+        "BATNA",
+        "impasse",
+        "trade-off"
+      ],
+      "grammar_point": "Mixed conditionals"
+    },
+    {
+      "id": "ENTERPRISE-L4-U11",
+      "title": "Managing a High-Conflict Client",
+      "block": "Comunicación de Alto Impacto",
+      "vocabulary": [
+        "de-escalation",
+        "empathy",
+        "boundary",
+        "resolution",
+        "professionalism"
+      ],
+      "grammar_point": "Mixed tenses"
+    },
+    {
+      "id": "ENTERPRISE-L4-U12",
+      "title": "Delivering Bad News Well",
+      "block": "Comunicación de Alto Impacto",
+      "vocabulary": [
+        "transparency",
+        "empathy",
+        "clarity",
+        "next-steps",
+        "tone"
+      ],
+      "grammar_point": "Passive indirect speech"
+    },
+    {
+      "id": "ENTERPRISE-L4-U13",
+      "title": "Leading People Who Don’t Report to You",
+      "block": "Liderazgo y Personas",
+      "vocabulary": [
+        "influence",
+        "alignment",
+        "credibility",
+        "coalition",
+        "buy-in"
+      ],
+      "grammar_point": "Reduced adverbial clauses"
+    },
+    {
+      "id": "ENTERPRISE-L4-U14",
+      "title": "Building a Team That Delivers",
+      "block": "Liderazgo y Personas",
+      "vocabulary": [
+        "synergy",
+        "accountability",
+        "cohesion",
+        "complementary",
+        "trust"
+      ],
+      "grammar_point": "Complex comparatives"
+    },
+    {
+      "id": "ENTERPRISE-L4-U15",
+      "title": "Coaching, Not Just Managing",
+      "block": "Liderazgo y Personas",
+      "vocabulary": [
+        "feedback",
+        "potential",
+        "growth-mindset",
+        "autonomy",
+        "development"
+      ],
+      "grammar_point": "Gerund structures"
+    },
+    {
+      "id": "ENTERPRISE-L4-U16",
+      "title": "Resolving Conflict Like a Diplomat",
+      "block": "Liderazgo y Personas",
+      "vocabulary": [
+        "mediation",
+        "compromise",
+        "de-escalation",
+        "common-ground",
+        "resolution"
+      ],
+      "grammar_point": "Indirect questions"
+    },
+    {
+      "id": "ENTERPRISE-L4-U17",
+      "title": "Succession & Letting Go",
+      "block": "Liderazgo y Personas",
+      "vocabulary": [
+        "transition",
+        "handover",
+        "continuity",
+        "mentor",
+        "legacy"
+      ],
+      "grammar_point": "Future perfect"
+    },
+    {
+      "id": "ENTERPRISE-L4-U18",
+      "title": "Leading Across Time Zones & Cultures",
+      "block": "Liderazgo y Personas",
+      "vocabulary": [
+        "cross-cultural",
+        "synergy",
+        "timezone",
+        "virtual",
+        "inclusion"
+      ],
+      "grammar_point": "Complex comparatives"
+    },
+    {
+      "id": "ENTERPRISE-L4-U19",
+      "title": "Betting on the Next Big Thing",
+      "block": "Innovación, Tecnología y Futuro del Trabajo",
+      "vocabulary": [
+        "disruption",
+        "prototype",
+        "scalability",
+        "adoption",
+        "pivot"
+      ],
+      "grammar_point": "Future continuous"
+    },
+    {
+      "id": "ENTERPRISE-L4-U20",
+      "title": "AI, Ethics & Your Business",
+      "block": "Innovación, Tecnología y Futuro del Trabajo",
+      "vocabulary": [
+        "bias",
+        "transparency",
+        "accountability",
+        "automation",
+        "oversight"
+      ],
+      "grammar_point": "Passive modals"
+    },
+    {
+      "id": "ENTERPRISE-L4-U21",
+      "title": "Protecting What Matters",
+      "block": "Innovación, Tecnología y Futuro del Trabajo",
+      "vocabulary": [
+        "vulnerability",
+        "breach",
+        "safeguard",
+        "resilience",
+        "protocol"
+      ],
+      "grammar_point": "Passive structures"
+    },
+    {
+      "id": "ENTERPRISE-L4-U22",
+      "title": "Working Smarter, Not Harder",
+      "block": "Innovación, Tecnología y Futuro del Trabajo",
+      "vocabulary": [
+        "bottleneck",
+        "workflow",
+        "automation",
+        "efficiency",
+        "output"
+      ],
+      "grammar_point": "Gerund structures"
+    },
+    {
+      "id": "ENTERPRISE-L4-U23",
+      "title": "Building Something That Lasts",
+      "block": "Innovación, Tecnología y Futuro del Trabajo",
+      "vocabulary": [
+        "sustainability",
+        "footprint",
+        "transparency",
+        "stakeholder",
+        "impact"
+      ],
+      "grammar_point": "Passive voice (complex)"
+    },
+    {
+      "id": "ENTERPRISE-L4-U24",
+      "title": "The Next Frontier",
+      "block": "Innovación, Tecnología y Futuro del Trabajo",
+      "vocabulary": [
+        "decentralized",
+        "ledger",
+        "adoption",
+        "disruption",
+        "use-case"
+      ],
+      "grammar_point": "Passive reporting"
+    },
+    {
+      "id": "ENTERPRISE-L4-U25",
+      "title": "Your Reputation Precedes You",
+      "block": "Influencia, Legado y Maestría Global",
+      "vocabulary": [
+        "credibility",
+        "authority",
+        "visibility",
+        "niche",
+        "influence"
+      ],
+      "grammar_point": "Reduced relative clauses"
+    },
+    {
+      "id": "ENTERPRISE-L4-U26",
+      "title": "Giving Back, Strategically",
+      "block": "Influencia, Legado y Maestría Global",
+      "vocabulary": [
+        "impact",
+        "initiative",
+        "community",
+        "transparency",
+        "legacy"
+      ],
+      "grammar_point": "Complex comparatives"
+    },
+    {
+      "id": "ENTERPRISE-L4-U27",
+      "title": "Handling a Crisis in Public",
+      "block": "Influencia, Legado y Maestría Global",
+      "vocabulary": [
+        "statement",
+        "transparency",
+        "composure",
+        "narrative",
+        "trust"
+      ],
+      "grammar_point": "Passive indirect speech"
+    },
+    {
+      "id": "ENTERPRISE-L4-U28",
+      "title": "Vendor & Partner Negotiations at Scale",
+      "block": "Influencia, Legado y Maestría Global",
+      "vocabulary": [
+        "leverage",
+        "terms",
+        "counteroffer",
+        "margin",
+        "compromise"
+      ],
+      "grammar_point": "Mixed conditionals"
+    },
+    {
+      "id": "ENTERPRISE-L4-U29",
+      "title": "When the Stakes Are Global",
+      "block": "Influencia, Legado y Maestría Global",
+      "vocabulary": [
+        "expansion",
+        "localization",
+        "compliance",
+        "adaptation",
+        "scale"
+      ],
+      "grammar_point": "Passive complex structures"
+    },
+    {
+      "id": "ENTERPRISE-L4-U30",
+      "title": "The Leader You’re Becoming",
+      "block": "Influencia, Legado y Maestría Global",
+      "vocabulary": [
+        "legacy",
+        "vision",
+        "influence",
+        "growth",
+        "impact"
+      ],
+      "grammar_point": "Inversion + complex comparatives"
+    }
+  ],
+  "INTERNATIONAL-L1": [
+    {
+      "id": "INTERNATIONAL-L1-U1",
+      "title": "Arriving and Getting Through",
+      "block": "Aterrizando y Orientándote",
+      "vocabulary": [
+        "passport",
+        "customs",
+        "luggage",
+        "form",
+        "officer"
+      ],
+      "grammar_point": "Subject pronouns + “to be”"
+    },
+    {
+      "id": "INTERNATIONAL-L1-U2",
+      "title": "Finding Your Way",
+      "block": "Aterrizando y Orientándote",
+      "vocabulary": [
+        "street",
+        "address",
+        "map",
+        "nearby",
+        "corner"
+      ],
+      "grammar_point": "Prepositions of place"
+    },
+    {
+      "id": "INTERNATIONAL-L1-U3",
+      "title": "Introducing Yourself Abroad",
+      "block": "Aterrizando y Orientándote",
+      "vocabulary": [
+        "name",
+        "from",
+        "nice to meet you",
+        "live",
+        "work"
+      ],
+      "grammar_point": "I’m from / I live in"
+    },
+    {
+      "id": "INTERNATIONAL-L1-U4",
+      "title": "Asking for Basic Help",
+      "block": "Aterrizando y Orientándote",
+      "vocabulary": [
+        "help",
+        "please",
+        "sorry",
+        "excuse me",
+        "understand"
+      ],
+      "grammar_point": "Can you help me?"
+    },
+    {
+      "id": "INTERNATIONAL-L1-U5",
+      "title": "Numbers, Dates & Time",
+      "block": "Aterrizando y Orientándote",
+      "vocabulary": [
+        "date",
+        "time",
+        "o’clock",
+        "today",
+        "tomorrow"
+      ],
+      "grammar_point": "Numbers & time expressions"
+    },
+    {
+      "id": "INTERNATIONAL-L1-U6",
+      "title": "Reading Signs & Instructions",
+      "block": "Aterrizando y Orientándote",
+      "vocabulary": [
+        "entrance",
+        "exit",
+        "closed",
+        "open",
+        "caution"
+      ],
+      "grammar_point": "Imperatives"
+    },
+    {
+      "id": "INTERNATIONAL-L1-U7",
+      "title": "Looking for a Place to Live",
+      "block": "Instalándote: Casa y Esenciales",
+      "vocabulary": [
+        "apartment",
+        "rent",
+        "lease",
+        "deposit",
+        "roommate"
+      ],
+      "grammar_point": "There is/are"
+    },
+    {
+      "id": "INTERNATIONAL-L1-U8",
+      "title": "Talking to a Landlord",
+      "block": "Instalándote: Casa y Esenciales",
+      "vocabulary": [
+        "landlord",
+        "fix",
+        "broken",
+        "pay",
+        "month"
+      ],
+      "grammar_point": "Present simple"
+    },
+    {
+      "id": "INTERNATIONAL-L1-U9",
+      "title": "Setting Up Utilities",
+      "block": "Instalándote: Casa y Esenciales",
+      "vocabulary": [
+        "electricity",
+        "water",
+        "internet",
+        "bill",
+        "set up"
+      ],
+      "grammar_point": "Can I…?"
+    },
+    {
+      "id": "INTERNATIONAL-L1-U10",
+      "title": "Grocery Shopping 101",
+      "block": "Instalándote: Casa y Esenciales",
+      "vocabulary": [
+        "aisle",
+        "cart",
+        "checkout",
+        "fresh",
+        "price"
+      ],
+      "grammar_point": "How much…?"
+    },
+    {
+      "id": "INTERNATIONAL-L1-U11",
+      "title": "Opening a Bank Account",
+      "block": "Instalándote: Casa y Esenciales",
+      "vocabulary": [
+        "account",
+        "deposit",
+        "ID",
+        "card",
+        "balance"
+      ],
+      "grammar_point": "I’d like to…"
+    },
+    {
+      "id": "INTERNATIONAL-L1-U12",
+      "title": "Getting a Phone Plan",
+      "block": "Instalándote: Casa y Esenciales",
+      "vocabulary": [
+        "plan",
+        "data",
+        "SIM card",
+        "signal",
+        "top-up"
+      ],
+      "grammar_point": "Can I…?"
+    },
+    {
+      "id": "INTERNATIONAL-L1-U13",
+      "title": "Using Public Transport",
+      "block": "Moverte y Resolver",
+      "vocabulary": [
+        "ticket",
+        "station",
+        "transfer",
+        "schedule",
+        "fare"
+      ],
+      "grammar_point": "There is/are + prepositions"
+    },
+    {
+      "id": "INTERNATIONAL-L1-U14",
+      "title": "Understanding a Bill or Receipt",
+      "block": "Moverte y Resolver",
+      "vocabulary": [
+        "total",
+        "tax",
+        "due date",
+        "charge",
+        "refund"
+      ],
+      "grammar_point": "How much / How many"
+    },
+    {
+      "id": "INTERNATIONAL-L1-U15",
+      "title": "Making an Appointment",
+      "block": "Moverte y Resolver",
+      "vocabulary": [
+        "appointment",
+        "available",
+        "confirm",
+        "cancel",
+        "reschedule"
+      ],
+      "grammar_point": "Can I…? / Wh- questions"
+    },
+    {
+      "id": "INTERNATIONAL-L1-U16",
+      "title": "At the Doctor’s Office",
+      "block": "Moverte y Resolver",
+      "vocabulary": [
+        "symptom",
+        "appointment",
+        "insurance",
+        "prescription",
+        "pharmacy"
+      ],
+      "grammar_point": "I feel / I have"
+    },
+    {
+      "id": "INTERNATIONAL-L1-U17",
+      "title": "Handling an Emergency",
+      "block": "Moverte y Resolver",
+      "vocabulary": [
+        "emergency",
+        "help",
+        "call",
+        "address",
+        "urgent"
+      ],
+      "grammar_point": "Imperatives"
+    },
+    {
+      "id": "INTERNATIONAL-L1-U18",
+      "title": "Asking Politely for Anything",
+      "block": "Moverte y Resolver",
+      "vocabulary": [
+        "could",
+        "would",
+        "please",
+        "mind",
+        "sure"
+      ],
+      "grammar_point": "Could you…?"
+    },
+    {
+      "id": "INTERNATIONAL-L1-U19",
+      "title": "Small Talk With Neighbors",
+      "block": "Comunicación del Día a Día",
+      "vocabulary": [
+        "neighbor",
+        "weather",
+        "nice to meet",
+        "welcome",
+        "borrow"
+      ],
+      "grammar_point": "Wh- questions"
+    },
+    {
+      "id": "INTERNATIONAL-L1-U20",
+      "title": "Ordering Food & Understanding Menus",
+      "block": "Comunicación del Día a Día",
+      "vocabulary": [
+        "order",
+        "allergy",
+        "spicy",
+        "to go",
+        "bill"
+      ],
+      "grammar_point": "I’d like…"
+    },
+    {
+      "id": "INTERNATIONAL-L1-U21",
+      "title": "Shopping for Clothes",
+      "block": "Comunicación del Día a Día",
+      "vocabulary": [
+        "size",
+        "try on",
+        "exchange",
+        "receipt",
+        "fit"
+      ],
+      "grammar_point": "This/That, these/those"
+    },
+    {
+      "id": "INTERNATIONAL-L1-U22",
+      "title": "Understanding Local Money Talk",
+      "block": "Comunicación del Día a Día",
+      "vocabulary": [
+        "sale",
+        "discount",
+        "cash",
+        "card",
+        "change"
+      ],
+      "grammar_point": "How much…?"
+    },
+    {
+      "id": "INTERNATIONAL-L1-U23",
+      "title": "Talking About the Weather (and Dressing for It)",
+      "block": "Comunicación del Día a Día",
+      "vocabulary": [
+        "cold",
+        "layer",
+        "forecast",
+        "umbrella",
+        "warm"
+      ],
+      "grammar_point": "It’s + adjective"
+    },
+    {
+      "id": "INTERNATIONAL-L1-U24",
+      "title": "Making Simple Phone Calls",
+      "block": "Comunicación del Día a Día",
+      "vocabulary": [
+        "hold",
+        "call back",
+        "message",
+        "busy",
+        "voicemail"
+      ],
+      "grammar_point": "Can I…?"
+    },
+    {
+      "id": "INTERNATIONAL-L1-U25",
+      "title": "Talking About Where I’m From",
+      "block": "Construyendo Una Nueva Vida",
+      "vocabulary": [
+        "background",
+        "culture",
+        "hometown",
+        "tradition",
+        "miss"
+      ],
+      "grammar_point": "I’m from / I used to"
+    },
+    {
+      "id": "INTERNATIONAL-L1-U26",
+      "title": "My First Week Here",
+      "block": "Construyendo Una Nueva Vida",
+      "vocabulary": [
+        "new",
+        "different",
+        "exciting",
+        "nervous",
+        "adjust"
+      ],
+      "grammar_point": "Past simple"
+    },
+    {
+      "id": "INTERNATIONAL-L1-U27",
+      "title": "Making a Friend",
+      "block": "Construyendo Una Nueva Vida",
+      "vocabulary": [
+        "friend",
+        "invite",
+        "hang out",
+        "in common",
+        "connect"
+      ],
+      "grammar_point": "Present simple / like"
+    },
+    {
+      "id": "INTERNATIONAL-L1-U28",
+      "title": "Asking About Local Customs",
+      "block": "Construyendo Una Nueva Vida",
+      "vocabulary": [
+        "custom",
+        "normal",
+        "common",
+        "different",
+        "polite"
+      ],
+      "grammar_point": "Is it normal to…?"
+    },
+    {
+      "id": "INTERNATIONAL-L1-U29",
+      "title": "Celebrating a Small Win",
+      "block": "Construyendo Una Nueva Vida",
+      "vocabulary": [
+        "proud",
+        "first time",
+        "finally",
+        "achieve",
+        "happy"
+      ],
+      "grammar_point": "Present perfect"
+    },
+    {
+      "id": "INTERNATIONAL-L1-U30",
+      "title": "What I Need Next",
+      "block": "Construyendo Una Nueva Vida",
+      "vocabulary": [
+        "need",
+        "plan",
+        "next",
+        "find",
+        "figure out"
+      ],
+      "grammar_point": "Going to / need to"
+    }
+  ],
+  "INTERNATIONAL-L2": [
+    {
+      "id": "INTERNATIONAL-L2-U1",
+      "title": "Understanding Your Visa/Status",
+      "block": "Independencia y Papeleo",
+      "vocabulary": [
+        "visa",
+        "status",
+        "renew",
+        "document",
+        "deadline"
+      ],
+      "grammar_point": "Present simple / have to"
+    },
+    {
+      "id": "INTERNATIONAL-L2-U2",
+      "title": "Filling Out Official Forms",
+      "block": "Independencia y Papeleo",
+      "vocabulary": [
+        "form",
+        "signature",
+        "section",
+        "required",
+        "submit"
+      ],
+      "grammar_point": "Imperatives"
+    },
+    {
+      "id": "INTERNATIONAL-L2-U3",
+      "title": "Dealing With Customer Service",
+      "block": "Independencia y Papeleo",
+      "vocabulary": [
+        "hold",
+        "representative",
+        "issue",
+        "resolve",
+        "reference number"
+      ],
+      "grammar_point": "Could you…?"
+    },
+    {
+      "id": "INTERNATIONAL-L2-U4",
+      "title": "Understanding a Lease Agreement",
+      "block": "Independencia y Papeleo",
+      "vocabulary": [
+        "clause",
+        "deposit",
+        "notice",
+        "terms",
+        "renew"
+      ],
+      "grammar_point": "Have to / must"
+    },
+    {
+      "id": "INTERNATIONAL-L2-U5",
+      "title": "Setting Up Direct Deposit & Bills",
+      "block": "Independencia y Papeleo",
+      "vocabulary": [
+        "direct deposit",
+        "autopay",
+        "statement",
+        "overdraft",
+        "transfer"
+      ],
+      "grammar_point": "Present simple"
+    },
+    {
+      "id": "INTERNATIONAL-L2-U6",
+      "title": "Getting a Local ID or License",
+      "block": "Independencia y Papeleo",
+      "vocabulary": [
+        "application",
+        "test",
+        "appointment",
+        "requirement",
+        "valid"
+      ],
+      "grammar_point": "Have to / need to"
+    },
+    {
+      "id": "INTERNATIONAL-L2-U7",
+      "title": "Understanding a Job Posting",
+      "block": "Trabajo y Carrera",
+      "vocabulary": [
+        "requirement",
+        "apply",
+        "resume",
+        "position",
+        "benefits"
+      ],
+      "grammar_point": "Present simple"
+    },
+    {
+      "id": "INTERNATIONAL-L2-U8",
+      "title": "Your First Day at Work",
+      "block": "Trabajo y Carrera",
+      "vocabulary": [
+        "orientation",
+        "colleague",
+        "schedule",
+        "break room",
+        "badge"
+      ],
+      "grammar_point": "Present continuous"
+    },
+    {
+      "id": "INTERNATIONAL-L2-U9",
+      "title": "Workplace Small Talk",
+      "block": "Trabajo y Carrera",
+      "vocabulary": [
+        "weekend",
+        "commute",
+        "coffee",
+        "weather",
+        "break"
+      ],
+      "grammar_point": "Wh- questions"
+    },
+    {
+      "id": "INTERNATIONAL-L2-U10",
+      "title": "Asking Questions at Work",
+      "block": "Trabajo y Carrera",
+      "vocabulary": [
+        "clarify",
+        "task",
+        "deadline",
+        "unsure",
+        "confirm"
+      ],
+      "grammar_point": "Could you explain…?"
+    },
+    {
+      "id": "INTERNATIONAL-L2-U11",
+      "title": "Understanding Your Paycheck",
+      "block": "Trabajo y Carrera",
+      "vocabulary": [
+        "paycheck",
+        "tax",
+        "deduction",
+        "net",
+        "gross"
+      ],
+      "grammar_point": "Present simple"
+    },
+    {
+      "id": "INTERNATIONAL-L2-U12",
+      "title": "Calling in Sick or Requesting Time Off",
+      "block": "Trabajo y Carrera",
+      "vocabulary": [
+        "sick",
+        "request",
+        "day off",
+        "cover",
+        "notify"
+      ],
+      "grammar_point": "Should / have to"
+    },
+    {
+      "id": "INTERNATIONAL-L2-U13",
+      "title": "Choosing Health Insurance",
+      "block": "Salud y Bienestar",
+      "vocabulary": [
+        "coverage",
+        "premium",
+        "copay",
+        "provider",
+        "claim"
+      ],
+      "grammar_point": "Present simple"
+    },
+    {
+      "id": "INTERNATIONAL-L2-U14",
+      "title": "Describing Symptoms Clearly",
+      "block": "Salud y Bienestar",
+      "vocabulary": [
+        "symptom",
+        "since",
+        "worse",
+        "allergic",
+        "prescription"
+      ],
+      "grammar_point": "Present perfect (since/for)"
+    },
+    {
+      "id": "INTERNATIONAL-L2-U15",
+      "title": "Understanding Medical Instructions",
+      "block": "Salud y Bienestar",
+      "vocabulary": [
+        "dosage",
+        "follow-up",
+        "refill",
+        "rest",
+        "avoid"
+      ],
+      "grammar_point": "Should / must"
+    },
+    {
+      "id": "INTERNATIONAL-L2-U16",
+      "title": "Mental Health & Feeling Homesick",
+      "block": "Salud y Bienestar",
+      "vocabulary": [
+        "homesick",
+        "overwhelmed",
+        "adjust",
+        "support",
+        "cope"
+      ],
+      "grammar_point": "Present simple / should"
+    },
+    {
+      "id": "INTERNATIONAL-L2-U17",
+      "title": "Finding Community Support",
+      "block": "Salud y Bienestar",
+      "vocabulary": [
+        "community",
+        "group",
+        "connect",
+        "resource",
+        "support"
+      ],
+      "grammar_point": "There is/are"
+    },
+    {
+      "id": "INTERNATIONAL-L2-U18",
+      "title": "Talking About Stress & Balance",
+      "block": "Salud y Bienestar",
+      "vocabulary": [
+        "stress",
+        "balance",
+        "overtime",
+        "rest",
+        "manage"
+      ],
+      "grammar_point": "Present continuous"
+    },
+    {
+      "id": "INTERNATIONAL-L2-U19",
+      "title": "Understanding Local Humor",
+      "block": "Vida Social y Cultura",
+      "vocabulary": [
+        "joke",
+        "funny",
+        "get it",
+        "sarcasm",
+        "laugh"
+      ],
+      "grammar_point": "Present simple for interpretation"
+    },
+    {
+      "id": "INTERNATIONAL-L2-U20",
+      "title": "Navigating Small Talk Topics",
+      "block": "Vida Social y Cultura",
+      "vocabulary": [
+        "appropriate",
+        "avoid",
+        "polite",
+        "comfortable",
+        "topic"
+      ],
+      "grammar_point": "Should / shouldn’t"
+    },
+    {
+      "id": "INTERNATIONAL-L2-U21",
+      "title": "Being Invited Somewhere",
+      "block": "Vida Social y Cultura",
+      "vocabulary": [
+        "invite",
+        "RSVP",
+        "bring",
+        "potluck",
+        "host"
+      ],
+      "grammar_point": "Would you like to…?"
+    },
+    {
+      "id": "INTERNATIONAL-L2-U22",
+      "title": "Understanding Tipping & Etiquette",
+      "block": "Vida Social y Cultura",
+      "vocabulary": [
+        "tip",
+        "percentage",
+        "service",
+        "custom",
+        "expected"
+      ],
+      "grammar_point": "Should"
+    },
+    {
+      "id": "INTERNATIONAL-L2-U23",
+      "title": "Celebrating Local Holidays",
+      "block": "Vida Social y Cultura",
+      "vocabulary": [
+        "holiday",
+        "celebrate",
+        "tradition",
+        "gather",
+        "custom"
+      ],
+      "grammar_point": "Present simple / going to"
+    },
+    {
+      "id": "INTERNATIONAL-L2-U24",
+      "title": "Talking About Where You’re From (Deeper)",
+      "block": "Vida Social y Cultura",
+      "vocabulary": [
+        "heritage",
+        "tradition",
+        "compare",
+        "similar",
+        "different"
+      ],
+      "grammar_point": "Comparatives"
+    },
+    {
+      "id": "INTERNATIONAL-L2-U25",
+      "title": "Making Real Friends",
+      "block": "Echando Raíces",
+      "vocabulary": [
+        "trust",
+        "consistent",
+        "effort",
+        "connect",
+        "community"
+      ],
+      "grammar_point": "Present perfect"
+    },
+    {
+      "id": "INTERNATIONAL-L2-U26",
+      "title": "Handling a Misunderstanding",
+      "block": "Echando Raíces",
+      "vocabulary": [
+        "misunderstand",
+        "mean",
+        "clarify",
+        "sorry",
+        "confused"
+      ],
+      "grammar_point": "Past simple"
+    },
+    {
+      "id": "INTERNATIONAL-L2-U27",
+      "title": "Talking About Missing Home",
+      "block": "Echando Raíces",
+      "vocabulary": [
+        "miss",
+        "remind",
+        "familiar",
+        "comfort",
+        "memory"
+      ],
+      "grammar_point": "Present simple / present perfect"
+    },
+    {
+      "id": "INTERNATIONAL-L2-U28",
+      "title": "Setting Goals in a New Country",
+      "block": "Echando Raíces",
+      "vocabulary": [
+        "goal",
+        "save",
+        "plan",
+        "achieve",
+        "opportunity"
+      ],
+      "grammar_point": "Going to / will"
+    },
+    {
+      "id": "INTERNATIONAL-L2-U29",
+      "title": "Understanding the School System",
+      "block": "Echando Raíces",
+      "vocabulary": [
+        "enroll",
+        "grade",
+        "teacher",
+        "semester",
+        "report card"
+      ],
+      "grammar_point": "Present simple"
+    },
+    {
+      "id": "INTERNATIONAL-L2-U30",
+      "title": "Reflecting on How Far I’ve Come",
+      "block": "Echando Raíces",
+      "vocabulary": [
+        "progress",
+        "confident",
+        "grown",
+        "proud",
+        "journey"
+      ],
+      "grammar_point": "Present perfect"
+    }
+  ],
+  "INTERNATIONAL-L3": [
+    {
+      "id": "INTERNATIONAL-L3-U1",
+      "title": "Standing Up for Yourself Politely",
+      "block": "Hablando Por Ti Mismo",
+      "vocabulary": [
+        "assertive",
+        "boundary",
+        "respect",
+        "firm",
+        "polite"
+      ],
+      "grammar_point": "Modals for assertiveness"
+    },
+    {
+      "id": "INTERNATIONAL-L3-U2",
+      "title": "Disagreeing With a Landlord or Boss",
+      "block": "Hablando Por Ti Mismo",
+      "vocabulary": [
+        "disagree",
+        "however",
+        "understand",
+        "but",
+        "reasonable"
+      ],
+      "grammar_point": "Modals for opinion"
+    },
+    {
+      "id": "INTERNATIONAL-L3-U3",
+      "title": "Handling Discrimination or Bias Calmly",
+      "block": "Hablando Por Ti Mismo",
+      "vocabulary": [
+        "uncomfortable",
+        "address",
+        "respect",
+        "report",
+        "calmly"
+      ],
+      "grammar_point": "Should / could"
+    },
+    {
+      "id": "INTERNATIONAL-L3-U4",
+      "title": "Negotiating Rent or Salary",
+      "block": "Hablando Por Ti Mismo",
+      "vocabulary": [
+        "negotiate",
+        "offer",
+        "counter",
+        "fair",
+        "agree"
+      ],
+      "grammar_point": "Conditionals (1st & 2nd)"
+    },
+    {
+      "id": "INTERNATIONAL-L3-U5",
+      "title": "Making a Formal Complaint",
+      "block": "Hablando Por Ti Mismo",
+      "vocabulary": [
+        "complaint",
+        "unacceptable",
+        "resolve",
+        "refund",
+        "formal"
+      ],
+      "grammar_point": "I would like to…"
+    },
+    {
+      "id": "INTERNATIONAL-L3-U6",
+      "title": "Understanding Your Rights",
+      "block": "Hablando Por Ti Mismo",
+      "vocabulary": [
+        "rights",
+        "entitled",
+        "contract",
+        "protection",
+        "fair"
+      ],
+      "grammar_point": "Modals of obligation"
+    },
+    {
+      "id": "INTERNATIONAL-L3-U7",
+      "title": "Asking for a Raise or Promotion",
+      "block": "Crecimiento Profesional",
+      "vocabulary": [
+        "raise",
+        "promotion",
+        "deserve",
+        "contribute",
+        "growth"
+      ],
+      "grammar_point": "Conditionals / modals"
+    },
+    {
+      "id": "INTERNATIONAL-L3-U8",
+      "title": "Networking in a New Country",
+      "block": "Crecimiento Profesional",
+      "vocabulary": [
+        "connect",
+        "introduce",
+        "follow up",
+        "opportunity",
+        "referral"
+      ],
+      "grammar_point": "Could / would"
+    },
+    {
+      "id": "INTERNATIONAL-L3-U9",
+      "title": "Writing a Local-Style Resume",
+      "block": "Crecimiento Profesional",
+      "vocabulary": [
+        "resume",
+        "tailor",
+        "format",
+        "highlight",
+        "apply"
+      ],
+      "grammar_point": "Present perfect"
+    },
+    {
+      "id": "INTERNATIONAL-L3-U10",
+      "title": "Acing a Job Interview",
+      "block": "Crecimiento Profesional",
+      "vocabulary": [
+        "strength",
+        "experience",
+        "question",
+        "confident",
+        "prepare"
+      ],
+      "grammar_point": "Present perfect"
+    },
+    {
+      "id": "INTERNATIONAL-L3-U11",
+      "title": "Understanding Workplace Culture",
+      "block": "Crecimiento Profesional",
+      "vocabulary": [
+        "hierarchy",
+        "direct",
+        "feedback",
+        "expectation",
+        "norm"
+      ],
+      "grammar_point": "Comparatives"
+    },
+    {
+      "id": "INTERNATIONAL-L3-U12",
+      "title": "Giving and Receiving Feedback at Work",
+      "block": "Crecimiento Profesional",
+      "vocabulary": [
+        "constructive",
+        "improve",
+        "appreciate",
+        "consider",
+        "growth"
+      ],
+      "grammar_point": "Could you…?"
+    },
+    {
+      "id": "INTERNATIONAL-L3-U13",
+      "title": "Making Small Talk Interesting",
+      "block": "Fluidez Social y Cultural",
+      "vocabulary": [
+        "follow-up",
+        "curious",
+        "relate",
+        "genuine",
+        "connect"
+      ],
+      "grammar_point": "Wh- questions (deeper)"
+    },
+    {
+      "id": "INTERNATIONAL-L3-U14",
+      "title": "Understanding Sarcasm & Idioms",
+      "block": "Fluidez Social y Cultural",
+      "vocabulary": [
+        "idiom",
+        "sarcasm",
+        "figure out",
+        "context",
+        "meaning"
+      ],
+      "grammar_point": "Present simple for interpretation"
+    },
+    {
+      "id": "INTERNATIONAL-L3-U15",
+      "title": "Talking About Two Cultures at Once",
+      "block": "Fluidez Social y Cultural",
+      "vocabulary": [
+        "bicultural",
+        "blend",
+        "tradition",
+        "adapt",
+        "identity"
+      ],
+      "grammar_point": "Present perfect + relative clauses"
+    },
+    {
+      "id": "INTERNATIONAL-L3-U16",
+      "title": "Explaining Your Culture to Others",
+      "block": "Fluidez Social y Cultural",
+      "vocabulary": [
+        "explain",
+        "tradition",
+        "custom",
+        "curious",
+        "share"
+      ],
+      "grammar_point": "Present simple statements"
+    },
+    {
+      "id": "INTERNATIONAL-L3-U17",
+      "title": "Handling Culture Shock (Round Two)",
+      "block": "Fluidez Social y Cultural",
+      "vocabulary": [
+        "adjust",
+        "familiar",
+        "expectation",
+        "reflect",
+        "cope"
+      ],
+      "grammar_point": "Past simple / present perfect"
+    },
+    {
+      "id": "INTERNATIONAL-L3-U18",
+      "title": "Building a Support Network",
+      "block": "Fluidez Social y Cultural",
+      "vocabulary": [
+        "mentor",
+        "community",
+        "resource",
+        "connect",
+        "support"
+      ],
+      "grammar_point": "Present continuous"
+    },
+    {
+      "id": "INTERNATIONAL-L3-U19",
+      "title": "Understanding Taxes as a Newcomer",
+      "block": "Navegando los Sistemas",
+      "vocabulary": [
+        "file",
+        "deadline",
+        "refund",
+        "deduction",
+        "form"
+      ],
+      "grammar_point": "Present simple / have to"
+    },
+    {
+      "id": "INTERNATIONAL-L3-U20",
+      "title": "Dealing With Immigration Renewals",
+      "block": "Navegando los Sistemas",
+      "vocabulary": [
+        "renew",
+        "deadline",
+        "document",
+        "process",
+        "status"
+      ],
+      "grammar_point": "Have to / must"
+    },
+    {
+      "id": "INTERNATIONAL-L3-U21",
+      "title": "Buying a Car or Getting a License",
+      "block": "Navegando los Sistemas",
+      "vocabulary": [
+        "loan",
+        "insurance",
+        "license",
+        "inspection",
+        "register"
+      ],
+      "grammar_point": "Present simple"
+    },
+    {
+      "id": "INTERNATIONAL-L3-U22",
+      "title": "Understanding Credit & Loans",
+      "block": "Navegando los Sistemas",
+      "vocabulary": [
+        "credit score",
+        "loan",
+        "interest",
+        "debt",
+        "build"
+      ],
+      "grammar_point": "Present simple"
+    },
+    {
+      "id": "INTERNATIONAL-L3-U23",
+      "title": "Handling a Medical Emergency Confidently",
+      "block": "Navegando los Sistemas",
+      "vocabulary": [
+        "emergency room",
+        "urgent",
+        "insurance",
+        "symptom",
+        "treatment"
+      ],
+      "grammar_point": "Should / must"
+    },
+    {
+      "id": "INTERNATIONAL-L3-U24",
+      "title": "Advocating for a Family Member",
+      "block": "Navegando los Sistemas",
+      "vocabulary": [
+        "advocate",
+        "explain",
+        "support",
+        "request",
+        "understand"
+      ],
+      "grammar_point": "Modals for necessity"
+    },
+    {
+      "id": "INTERNATIONAL-L3-U25",
+      "title": "Feeling At Home, Finally",
+      "block": "Perteneciendo y Creciendo",
+      "vocabulary": [
+        "belong",
+        "home",
+        "comfortable",
+        "familiar",
+        "settled"
+      ],
+      "grammar_point": "Present perfect continuous"
+    },
+    {
+      "id": "INTERNATIONAL-L3-U26",
+      "title": "Mentoring Someone Newly Arrived",
+      "block": "Perteneciendo y Creciendo",
+      "vocabulary": [
+        "mentor",
+        "advice",
+        "guide",
+        "share",
+        "support"
+      ],
+      "grammar_point": "Should / could"
+    },
+    {
+      "id": "INTERNATIONAL-L3-U27",
+      "title": "Talking About Long-Term Plans",
+      "block": "Perteneciendo y Creciendo",
+      "vocabulary": [
+        "long-term",
+        "plan",
+        "citizenship",
+        "permanent",
+        "future"
+      ],
+      "grammar_point": "Will / going to"
+    },
+    {
+      "id": "INTERNATIONAL-L3-U28",
+      "title": "Balancing Two Identities",
+      "block": "Perteneciendo y Creciendo",
+      "vocabulary": [
+        "identity",
+        "balance",
+        "heritage",
+        "blend",
+        "proud"
+      ],
+      "grammar_point": "Present perfect"
+    },
+    {
+      "id": "INTERNATIONAL-L3-U29",
+      "title": "Reflecting on the Journey",
+      "block": "Perteneciendo y Creciendo",
+      "vocabulary": [
+        "journey",
+        "growth",
+        "challenge",
+        "proud",
+        "lesson"
+      ],
+      "grammar_point": "Present perfect + past simple"
+    },
+    {
+      "id": "INTERNATIONAL-L3-U30",
+      "title": "Giving Back to the Community",
+      "block": "Perteneciendo y Creciendo",
+      "vocabulary": [
+        "volunteer",
+        "give back",
+        "community",
+        "contribute",
+        "support"
+      ],
+      "grammar_point": "Present simple / going to"
+    }
+  ],
+  "INTERNATIONAL-L4": [
+    {
+      "id": "INTERNATIONAL-L4-U1",
+      "title": "Negotiating a Major Life Decision",
+      "block": "Maestría en Situaciones Complejas",
+      "vocabulary": [
+        "leverage",
+        "compromise",
+        "weigh",
+        "decision",
+        "terms"
+      ],
+      "grammar_point": "Mixed conditionals"
+    },
+    {
+      "id": "INTERNATIONAL-L4-U2",
+      "title": "Handling a Legal or Contract Dispute",
+      "block": "Maestría en Situaciones Complejas",
+      "vocabulary": [
+        "dispute",
+        "clause",
+        "resolve",
+        "mediation",
+        "agreement"
+      ],
+      "grammar_point": "Passive voice"
+    },
+    {
+      "id": "INTERNATIONAL-L4-U3",
+      "title": "Advocating in a High-Stakes Meeting",
+      "block": "Maestría en Situaciones Complejas",
+      "vocabulary": [
+        "advocate",
+        "present",
+        "evidence",
+        "credibility",
+        "outcome"
+      ],
+      "grammar_point": "Emphatic structures"
+    },
+    {
+      "id": "INTERNATIONAL-L4-U4",
+      "title": "Navigating Bureaucracy Like a Pro",
+      "block": "Maestría en Situaciones Complejas",
+      "vocabulary": [
+        "navigate",
+        "process",
+        "escalate",
+        "resolve",
+        "persistence"
+      ],
+      "grammar_point": "Passive structures"
+    },
+    {
+      "id": "INTERNATIONAL-L4-U5",
+      "title": "Making a High-Stakes Phone Call",
+      "block": "Maestría en Situaciones Complejas",
+      "vocabulary": [
+        "formal",
+        "clarify",
+        "confirm",
+        "escalate",
+        "resolution"
+      ],
+      "grammar_point": "Reported speech"
+    },
+    {
+      "id": "INTERNATIONAL-L4-U6",
+      "title": "Understanding Nuanced Legal Language",
+      "block": "Maestría en Situaciones Complejas",
+      "vocabulary": [
+        "clause",
+        "liability",
+        "terms",
+        "obligation",
+        "agreement"
+      ],
+      "grammar_point": "Passive + modals"
+    },
+    {
+      "id": "INTERNATIONAL-L4-U7",
+      "title": "Leading a Meeting or Project",
+      "block": "Maestría Profesional",
+      "vocabulary": [
+        "lead",
+        "delegate",
+        "agenda",
+        "decision",
+        "outcome"
+      ],
+      "grammar_point": "Modals of obligation"
+    },
+    {
+      "id": "INTERNATIONAL-L4-U8",
+      "title": "Giving a Presentation With Confidence",
+      "block": "Maestría Profesional",
+      "vocabulary": [
+        "audience",
+        "engage",
+        "clarity",
+        "structure",
+        "impact"
+      ],
+      "grammar_point": "Present continuous / frequency"
+    },
+    {
+      "id": "INTERNATIONAL-L4-U9",
+      "title": "Mentoring a Colleague",
+      "block": "Maestría Profesional",
+      "vocabulary": [
+        "mentor",
+        "guide",
+        "feedback",
+        "growth",
+        "support"
+      ],
+      "grammar_point": "Gerund structures"
+    },
+    {
+      "id": "INTERNATIONAL-L4-U10",
+      "title": "Navigating Office Politics Diplomatically",
+      "block": "Maestría Profesional",
+      "vocabulary": [
+        "diplomatic",
+        "alliance",
+        "tension",
+        "navigate",
+        "tactful"
+      ],
+      "grammar_point": "Modals for tact"
+    },
+    {
+      "id": "INTERNATIONAL-L4-U11",
+      "title": "Advocating for a Raise or New Role",
+      "block": "Maestría Profesional",
+      "vocabulary": [
+        "advocate",
+        "value",
+        "contribute",
+        "negotiate",
+        "deserve"
+      ],
+      "grammar_point": "Conditionals (mixed)"
+    },
+    {
+      "id": "INTERNATIONAL-L4-U12",
+      "title": "Building a Professional Reputation",
+      "block": "Maestría Profesional",
+      "vocabulary": [
+        "reputation",
+        "credibility",
+        "network",
+        "visibility",
+        "trust"
+      ],
+      "grammar_point": "Present perfect continuous"
+    },
+    {
+      "id": "INTERNATIONAL-L4-U13",
+      "title": "Debating Cultural Differences Respectfully",
+      "block": "Fluidez Cultural y Social Profunda",
+      "vocabulary": [
+        "perspective",
+        "respect",
+        "nuance",
+        "however",
+        "valid"
+      ],
+      "grammar_point": "Modals for possibility"
+    },
+    {
+      "id": "INTERNATIONAL-L4-U14",
+      "title": "Understanding Regional Dialects & Slang",
+      "block": "Fluidez Cultural y Social Profunda",
+      "vocabulary": [
+        "dialect",
+        "regional",
+        "slang",
+        "accent",
+        "local"
+      ],
+      "grammar_point": "Present simple for interpretation"
+    },
+    {
+      "id": "INTERNATIONAL-L4-U15",
+      "title": "Navigating Family Expectations Across Cultures",
+      "block": "Fluidez Cultural y Social Profunda",
+      "vocabulary": [
+        "expectation",
+        "tradition",
+        "balance",
+        "honor",
+        "navigate"
+      ],
+      "grammar_point": "Reported speech"
+    },
+    {
+      "id": "INTERNATIONAL-L4-U16",
+      "title": "Talking About Identity and Belonging (In Depth)",
+      "block": "Fluidez Cultural y Social Profunda",
+      "vocabulary": [
+        "belonging",
+        "hybrid",
+        "heritage",
+        "navigate",
+        "authentic"
+      ],
+      "grammar_point": "Complex comparatives"
+    },
+    {
+      "id": "INTERNATIONAL-L4-U17",
+      "title": "Explaining Complex Ideas to Any Audience",
+      "block": "Fluidez Cultural y Social Profunda",
+      "vocabulary": [
+        "simplify",
+        "audience",
+        "clarity",
+        "tailor",
+        "engage"
+      ],
+      "grammar_point": "Present continuous / relative clauses"
+    },
+    {
+      "id": "INTERNATIONAL-L4-U18",
+      "title": "Mediating a Cultural Misunderstanding",
+      "block": "Fluidez Cultural y Social Profunda",
+      "vocabulary": [
+        "mediate",
+        "misunderstanding",
+        "perspective",
+        "resolve",
+        "bridge"
+      ],
+      "grammar_point": "Indirect questions"
+    },
+    {
+      "id": "INTERNATIONAL-L4-U19",
+      "title": "Organizing a Community Event",
+      "block": "Liderazgo Comunitario",
+      "vocabulary": [
+        "organize",
+        "coordinate",
+        "volunteer",
+        "logistics",
+        "outreach"
+      ],
+      "grammar_point": "Future continuous"
+    },
+    {
+      "id": "INTERNATIONAL-L4-U20",
+      "title": "Speaking Publicly About Your Experience",
+      "block": "Liderazgo Comunitario",
+      "vocabulary": [
+        "narrative",
+        "authentic",
+        "impact",
+        "connect",
+        "share"
+      ],
+      "grammar_point": "Emphatic structures"
+    },
+    {
+      "id": "INTERNATIONAL-L4-U21",
+      "title": "Advocating for Positive Change",
+      "block": "Liderazgo Comunitario",
+      "vocabulary": [
+        "advocate",
+        "awareness",
+        "petition",
+        "impact",
+        "policy"
+      ],
+      "grammar_point": "Passive reporting"
+    },
+    {
+      "id": "INTERNATIONAL-L4-U22",
+      "title": "Supporting Newcomers Through Their First Year",
+      "block": "Liderazgo Comunitario",
+      "vocabulary": [
+        "guide",
+        "resource",
+        "support",
+        "transition",
+        "community"
+      ],
+      "grammar_point": "Gerund structures"
+    },
+    {
+      "id": "INTERNATIONAL-L4-U23",
+      "title": "Bridging Two Communities",
+      "block": "Liderazgo Comunitario",
+      "vocabulary": [
+        "bridge",
+        "connect",
+        "collaborate",
+        "understanding",
+        "unity"
+      ],
+      "grammar_point": "Complex comparatives"
+    },
+    {
+      "id": "INTERNATIONAL-L4-U24",
+      "title": "Handling a Public Misunderstanding Gracefully",
+      "block": "Liderazgo Comunitario",
+      "vocabulary": [
+        "clarify",
+        "composure",
+        "statement",
+        "resolve",
+        "trust"
+      ],
+      "grammar_point": "Passive indirect speech"
+    },
+    {
+      "id": "INTERNATIONAL-L4-U25",
+      "title": "Reflecting on a Life Rebuilt",
+      "block": "Legado y Visión de Largo Plazo",
+      "vocabulary": [
+        "rebuild",
+        "resilience",
+        "growth",
+        "proud",
+        "journey"
+      ],
+      "grammar_point": "Present perfect continuous"
+    },
+    {
+      "id": "INTERNATIONAL-L4-U26",
+      "title": "Planning for Citizenship or Permanent Roots",
+      "block": "Legado y Visión de Largo Plazo",
+      "vocabulary": [
+        "permanent",
+        "citizenship",
+        "roots",
+        "future",
+        "commit"
+      ],
+      "grammar_point": "Future perfect"
+    },
+    {
+      "id": "INTERNATIONAL-L4-U27",
+      "title": "Passing Down Culture and Language",
+      "block": "Legado y Visión de Largo Plazo",
+      "vocabulary": [
+        "pass down",
+        "heritage",
+        "language",
+        "tradition",
+        "teach"
+      ],
+      "grammar_point": "Gerund / infinitive structures"
+    },
+    {
+      "id": "INTERNATIONAL-L4-U28",
+      "title": "Building a Life of Purpose Abroad",
+      "block": "Legado y Visión de Largo Plazo",
+      "vocabulary": [
+        "purpose",
+        "fulfillment",
+        "intentional",
+        "design",
+        "meaningful"
+      ],
+      "grammar_point": "Future perfect"
+    },
+    {
+      "id": "INTERNATIONAL-L4-U29",
+      "title": "Becoming a Bridge for Others",
+      "block": "Legado y Visión de Largo Plazo",
+      "vocabulary": [
+        "bridge",
+        "guide",
+        "legacy",
+        "impact",
+        "community"
+      ],
+      "grammar_point": "Inversion for emphasis"
+    },
+    {
+      "id": "INTERNATIONAL-L4-U30",
+      "title": "Fluent in Two Worlds",
+      "block": "Legado y Visión de Largo Plazo",
+      "vocabulary": [
+        "fluent",
+        "belonging",
+        "mastery",
+        "confidence",
+        "home"
+      ],
+      "grammar_point": "Present perfect + complex comparatives"
+    }
+  ]
+}
