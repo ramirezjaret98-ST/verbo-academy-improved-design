@@ -1867,14 +1867,33 @@ function Stat({ label, value }: { label: string; value: string }) {
   );
 }
 
-function Info({ label, value }: { label: string; value: string }) {
+const infoLabelCls = "text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/80";
+
+function Info({ label, value, emphasis = false }: { label: string; value: string; emphasis?: boolean }) {
   return (
-    <div>
-      <div className="text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</div>
-      <div className="mt-0.5 text-sm text-foreground">{value}</div>
+    <div className="min-w-0">
+      <div className={infoLabelCls}>{label}</div>
+      <div className={`mt-1 break-words ${emphasis ? "text-[15px] font-semibold tabular-nums text-foreground" : "text-sm font-normal text-foreground/90"}`}>{value}</div>
     </div>
   );
 }
+
+/** Titled block: a hairline rule + heavier heading makes section edges obvious. */
+function Section({
+  title, description, index = 0, children,
+}: { title: string; description?: string; index?: number; children: React.ReactNode }) {
+  return (
+    <section className="verbo-sdm-section" style={{ animationDelay: `${Math.min(index, 6) * 45}ms` }}>
+      <div className="mb-3.5 flex items-center gap-3">
+        <h3 className="text-[13px] font-bold uppercase tracking-[0.1em] text-foreground">{title}</h3>
+        <span className="h-px flex-1 bg-border" />
+      </div>
+      {description && <p className="mb-3 max-w-prose text-xs leading-relaxed text-muted-foreground">{description}</p>}
+      {children}
+    </section>
+  );
+}
+
 
 // ===========================================================================
 // Shared building blocks
