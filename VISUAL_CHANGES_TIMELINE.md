@@ -722,3 +722,27 @@ Sin cambios de lógica ni rutas.
 - **Reduced motion:** todas las animaciones caen a un fade de 120ms y se anula el press.
 
 Sin cambios de lógica ni rutas.
+
+---
+
+## Entry 042 — Rediseño del modal de perfil (`StaffProfileModal`)
+**Archivos:** `src/components/verbo/StaffProfileModal.tsx`, `src/styles.css`
+
+- **Proporción superior:** banner pasa de `h-24` a `h-36`, avatar de `h-24` a `h-20` y su desplazamiento de `-bottom-12` a `-bottom-10`, dejando más aire en la cabecera y evitando que el avatar se sienta gigante.
+- **Gradiente:** reemplazo de cuatro radiales superpuestos por un degradado lineal limpio (`navy-700 → navy-600 → navy-500`) con un solo acento naranja sutil en la esquina superior derecha.
+- **Redondeo:** el modal pasa de `rounded-[28px]` a `rounded-[32px]` y conserva un borde fino `border-border/40` para definirlo sin pesadez.
+- **Jerarquía visual:** cada sección principal (stats, tags, badges, leaderboard, about me, security) ahora vive dentro de una tarjeta `rounded-2xl bg-card border border-border/60 p-4 shadow-soft`, separando claramente los bloques.
+- **Títulos de sección:** pasan a `text-navy-700` con `tracking-[0.14em]` para darles peso y no perderse en el fondo claro.
+- **Stats:** reorganizados como icono → valor → etiqueta, con divisores verticales sutiles y valores en navy para jerarquía.
+- **Tags:** contador alineado a la derecha del título; chips inactivos con borde y fondo secundario, activos en navy sólido.
+- **Badges equipados:** grid más compacto, slots vacíos con borde punteado y hover naranja sutil, badge con fondo secundario y hover.
+- **Leaderboard:** radios envueltos en celdas con borde y fondo secundario, hover sutil, input con animación de foco.
+- **About me / Security:** mismas tarjetas limpias; inputs con borde y fondo de superficie, no solo fondo gris.
+- **Tokens de color:** se reemplazan hardcodes `#01304a`, `#0a4a6e`, `#f38934` por `navy-700`, `navy-600`, `navy-500`, `orange-500`, `orange-600` en las líneas tocadas.
+- **Motion:** nueva familia `.verbo-profile-*` en `src/styles.css`:
+  - `.verbo-profile-section`: entrada escalonada `translateY(8px) + opacity`, 280ms, delay 40ms por índice.
+  - `.verbo-profile-press`: feedback `:active scale(0.97)` a 160ms.
+  - `.verbo-profile-chip` y `.verbo-profile-input`: transiciones de estado suaves; el input levanta 1px y proyecta sombra sutil al enfocarse.
+  - `prefers-reduced-motion`: se elimina movimiento y press.
+
+Sin cambios de lógica ni rutas.

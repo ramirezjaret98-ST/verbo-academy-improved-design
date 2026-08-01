@@ -202,28 +202,28 @@ export function StaffProfileModal({ open, onOpenChange }: Props) {
   return (
     <>
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-xl gap-0 overflow-hidden rounded-[28px] border-0 p-0 shadow-elevated">
+      <DialogContent className="max-w-xl gap-0 overflow-hidden rounded-[32px] border border-border/40 p-0 shadow-floating">
         <DialogTitle className="sr-only">My profile</DialogTitle>
 
         {/* Hero banner + avatar — kept outside the scroll container so the avatar overlap isn't clipped */}
         <div className="relative">
-          {/* Hero banner — soft brand blobs, no geometric pattern */}
+          {/* Hero banner — taller, calmer navy gradient with a single soft orange accent */}
           <div
-            className="relative h-24 w-full"
+            className="relative h-36 w-full"
             style={{
               background:
-                "radial-gradient(circle at 12% 20%, rgba(1,48,74,0.95), transparent 62%), radial-gradient(circle at 42% 95%, rgba(10,74,110,0.9), transparent 60%), radial-gradient(circle at 74% 15%, rgba(243,137,52,0.85), transparent 58%), radial-gradient(circle at 95% 90%, rgba(95,202,22,0.8), transparent 55%), linear-gradient(120deg, #01304a 0%, #0a4a6e 60%, #f38934 100%)",
+                "radial-gradient(circle at 85% 20%, color-mix(in oklab, var(--orange-500) 55%, transparent), transparent 46%), linear-gradient(135deg, var(--navy-700) 0%, var(--navy-600) 55%, var(--navy-500) 100%)",
             }}
           />
 
           {/* Avatar overlaps the banner bottom edge */}
-          <div className="absolute -bottom-12 left-1/2 -translate-x-1/2">
+          <div className="absolute -bottom-10 left-1/2 -translate-x-1/2">
             <div className="relative">
-              <div className="h-24 w-24 overflow-hidden rounded-full border-4 border-background shadow-elevated">
+              <div className="h-20 w-20 overflow-hidden rounded-full border-4 border-background shadow-floating">
                 {avatar ? (
                   <img src={avatar} alt={user.name} className="h-full w-full object-cover" />
                 ) : (
-                  <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-[#01304a] to-[#0a4a6e] text-3xl font-semibold text-white">
+                  <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-navy-700 to-navy-500 text-2xl font-semibold text-primary-foreground">
                     {initial}
                   </div>
                 )}
@@ -232,13 +232,13 @@ export function StaffProfileModal({ open, onOpenChange }: Props) {
                 type="button"
                 onClick={() => fileRef.current?.click()}
                 aria-label="Change profile photo"
-                className="absolute -right-1 bottom-1 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-[#f38934] text-white shadow-md transition-transform hover:scale-105"
+                className="verbo-profile-press absolute -right-1 bottom-1 flex h-7 w-7 cursor-pointer items-center justify-center rounded-full bg-orange-500 text-white shadow-md hover:bg-orange-600"
               >
-                <Pencil className="h-3.5 w-3.5" />
+                <Pencil className="h-3 w-3" />
               </button>
               <span
                 title={online ? "Online" : "Offline"}
-                className={`absolute bottom-2 left-1 h-4 w-4 rounded-full border-2 border-background ${
+                className={`absolute bottom-1.5 left-1 h-3.5 w-3.5 rounded-full border-2 border-background ${
                   online ? "bg-emerald-500" : "bg-zinc-400"
                 }`}
               />
@@ -247,20 +247,20 @@ export function StaffProfileModal({ open, onOpenChange }: Props) {
           </div>
         </div>
 
-        <div className="max-h-[78vh] overflow-y-auto px-6 pb-6 pt-12">
+        <div className="max-h-[78vh] overflow-y-auto px-5 pb-6 pt-12 sm:px-6">
 
           {/* Identity */}
-          <div className="mt-3 text-center">
-            <h2 className="text-xl font-bold tracking-tight text-foreground">{user.name}</h2>
-            <p className="mt-0.5 text-sm font-light text-muted-foreground">{rankLabel(user)}</p>
+          <div className="verbo-profile-section text-center" style={{ "--verbo-profile-i": 0 } as React.CSSProperties}>
+            <h2 className="font-display text-2xl font-semibold tracking-tight text-foreground">{user.name}</h2>
+            <p className="mt-1 text-sm font-light text-muted-foreground">{rankLabel(user)}</p>
           </div>
 
           {/* Chips */}
-          <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+          <div className="verbo-profile-section mt-3 flex flex-wrap items-center justify-center gap-2" style={{ "--verbo-profile-i": 1 } as React.CSSProperties}>
             {chips.map((c) => (
               <span
                 key={c}
-                className="rounded-full bg-secondary px-3 py-1 text-xs font-medium text-foreground"
+                className="rounded-full border border-border bg-card px-3 py-1 text-xs font-medium text-foreground shadow-soft"
               >
                 {c}
               </span>
@@ -268,73 +268,80 @@ export function StaffProfileModal({ open, onOpenChange }: Props) {
           </div>
 
           {/* Stats */}
-          <div className="mt-5 grid grid-cols-3">
-            {stats.map((s, i) => {
-              const Icon = STAT_ICON[s.key];
-              return (
-                <div
-                  key={s.key}
-                  className={`flex flex-col items-center gap-1 px-2 ${i > 0 ? "border-l border-border" : ""}`}
-                >
-                  <Icon className="h-4 w-4 text-[#f38934]" />
-                  <div className="text-lg font-bold text-foreground">{s.value}</div>
-                  <div className="text-center text-xs text-muted-foreground">{s.label}</div>
-                </div>
-              );
-            })}
+          <div
+            className="verbo-profile-section mt-5 rounded-2xl border border-border/60 bg-card p-4 shadow-soft"
+            style={{ "--verbo-profile-i": 2 } as React.CSSProperties}
+          >
+            <div className="grid grid-cols-3 divide-x divide-border">
+              {stats.map((s) => {
+                const Icon = STAT_ICON[s.key];
+                return (
+                  <div key={s.key} className="flex flex-col items-center gap-1.5 px-2 first:pl-0 last:pr-0">
+                    <Icon className="h-4 w-4 text-orange-500" strokeWidth={1.5} />
+                    <div className="text-lg font-bold tracking-tight text-navy-700">{s.value}</div>
+                    <div className="text-center text-[11px] font-medium uppercase tracking-wider text-muted-foreground">{s.label}</div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
 
           {/* Tags */}
-          <div className="mt-5">
-            <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              {isStudent ? "Personality tags" : "Specializes in"}
+          <div
+            className="verbo-profile-section mt-5 rounded-2xl border border-border/60 bg-card p-4 shadow-soft"
+            style={{ "--verbo-profile-i": 3 } as React.CSSProperties}
+          >
+            <div className="flex items-center justify-between">
+              <div className="text-xs font-semibold uppercase tracking-[0.14em] text-navy-700">
+                {isStudent ? "Personality tags" : "Specializes in"}
+              </div>
+              {isStudent && (
+                <div className="text-[11px] font-medium text-muted-foreground">
+                  {specializations.length}/{MAX_PERSONALITY_TAGS}
+                </div>
+              )}
             </div>
             {isStudent ? (
-              <>
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  {PERSONALITY_TAG_OPTIONS.map((tag) => {
-                    const active = specializations.includes(tag);
-                    return (
-                      <button
-                        key={tag}
-                        type="button"
-                        aria-pressed={active}
-                        onClick={() => togglePersonalityTag(user.id, tag)}
-                        className={`cursor-pointer rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
-                          active
-                            ? "bg-[#01304a] text-white"
-                            : "bg-[#01304a]/[0.06] text-muted-foreground hover:text-foreground"
-                        }`}
-                      >
-                        {tag}
-                      </button>
-                    );
-                  })}
-                </div>
-                <div className="mt-1.5 text-[11px] text-muted-foreground">
-                  {specializations.length}/{MAX_PERSONALITY_TAGS} selected
-                </div>
-              </>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {PERSONALITY_TAG_OPTIONS.map((tag) => {
+                  const active = specializations.includes(tag);
+                  return (
+                    <button
+                      key={tag}
+                      type="button"
+                      aria-pressed={active}
+                      onClick={() => togglePersonalityTag(user.id, tag)}
+                      className={`verbo-profile-chip cursor-pointer rounded-full px-3 py-1.5 text-xs font-medium ${
+                        active
+                          ? "bg-navy-700 text-primary-foreground"
+                          : "border border-border bg-secondary/50 text-muted-foreground hover:border-navy-200 hover:text-foreground"
+                      }`}
+                    >
+                      {tag}
+                    </button>
+                  );
+                })}
+              </div>
             ) : (
-              <div className="mt-2 flex flex-wrap items-center gap-2">
+              <div className="mt-3 flex flex-wrap items-center gap-2">
                 {specializations.map((tag) => (
                   <span
                     key={tag}
-                    className="inline-flex items-center gap-1.5 rounded-full bg-[#01304a]/[0.06] px-3 py-1.5 text-xs font-medium text-foreground"
+                    className="inline-flex items-center gap-1.5 rounded-full border border-border bg-secondary/50 px-3 py-1.5 text-xs font-medium text-foreground"
                   >
                     {tag}
                     <button
                       type="button"
                       aria-label={`Remove ${tag}`}
                       onClick={() => removeTag(tag)}
-                      className="cursor-pointer text-muted-foreground transition-colors hover:text-foreground"
+                      className="verbo-profile-press cursor-pointer rounded-full p-0.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
                     >
                       <X className="h-3 w-3" />
                     </button>
                   </span>
                 ))}
                 {specializations.length < MAX_SPECIALIZATIONS && (
-                  <span className="inline-flex items-center gap-1 rounded-full border border-dashed border-border px-2 py-1">
+                  <span className="inline-flex items-center gap-1 rounded-full border border-dashed border-border bg-secondary/30 px-2 py-1">
                     <input
                       value={tagDraft}
                       onChange={(e) => setTagDraft(e.target.value)}
@@ -343,13 +350,13 @@ export function StaffProfileModal({ open, onOpenChange }: Props) {
                       }}
                       placeholder="Add a focus area"
                       maxLength={40}
-                      className="w-32 bg-transparent px-1 text-xs text-foreground outline-none placeholder:text-muted-foreground"
+                      className="verbo-profile-input w-32 bg-transparent px-1 text-xs text-foreground outline-none placeholder:text-muted-foreground"
                     />
                     <button
                       type="button"
                       onClick={addTag}
                       aria-label="Add specialization"
-                      className="cursor-pointer text-muted-foreground transition-colors hover:text-foreground"
+                      className="verbo-profile-press cursor-pointer rounded-full p-1 text-muted-foreground transition-colors hover:text-foreground"
                     >
                       <Plus className="h-3.5 w-3.5" />
                     </button>
@@ -362,41 +369,44 @@ export function StaffProfileModal({ open, onOpenChange }: Props) {
           {/* Student-only: equipped badges + leaderboard identity */}
           {isStudent && (
             <>
-              <div className="mt-5">
+              <div
+                className="verbo-profile-section mt-5 rounded-2xl border border-border/60 bg-card p-4 shadow-soft"
+                style={{ "--verbo-profile-i": 4 } as React.CSSProperties}
+              >
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  <span className="text-xs font-semibold uppercase tracking-[0.14em] text-navy-700">
                     Equipped badges
                   </span>
                   <button
                     type="button"
                     onClick={() => setGallery(true)}
-                    className="cursor-pointer text-xs font-medium text-[#01304a] underline-offset-4 hover:underline"
+                    className="verbo-profile-press cursor-pointer text-xs font-medium text-navy-700 underline-offset-4 hover:underline"
                   >
-                    View all achievements →
+                    View all →
                   </button>
                 </div>
-                <div className="mt-2 grid grid-cols-3 gap-2">
+                <div className="mt-3 grid grid-cols-3 gap-2">
                   {slots.map((b, i) =>
                     !b ? (
                       <button
                         key={`empty-${i}`}
                         type="button"
                         onClick={() => setPickerSlot(i)}
-                        className="flex cursor-pointer flex-col items-center justify-center gap-1 rounded-2xl border border-dashed border-border bg-secondary/60 px-2 py-3 text-xs text-muted-foreground transition-colors hover:text-foreground"
+                        className="verbo-profile-press flex cursor-pointer flex-col items-center justify-center gap-1 rounded-2xl border border-dashed border-border bg-secondary/40 px-2 py-3 text-xs text-muted-foreground transition-colors hover:border-orange-300 hover:text-foreground"
                       >
-                        <Plus className="h-4 w-4" />
+                        <Plus className="h-4 w-4" strokeWidth={1.5} />
                         <span className="font-medium">Add</span>
                       </button>
                     ) : (
                       <div
                         key={b.id}
-                        className="group relative flex flex-col items-center rounded-2xl bg-secondary/60 px-2 py-3"
+                        className="group relative flex flex-col items-center rounded-2xl bg-secondary/40 px-2 py-3 transition-colors hover:bg-secondary/60"
                       >
                         <button
                           type="button"
                           aria-label={`Unequip ${b.name}`}
                           onClick={() => unequip(b.id)}
-                          className="absolute right-1 top-1 flex h-5 w-5 cursor-pointer items-center justify-center rounded-full bg-background text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100"
+                          className="verbo-profile-press absolute right-1 top-1 flex h-5 w-5 cursor-pointer items-center justify-center rounded-full bg-background text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100"
                         >
                           <X className="h-3 w-3" />
                         </button>
@@ -410,16 +420,19 @@ export function StaffProfileModal({ open, onOpenChange }: Props) {
                 </div>
               </div>
 
-              <div className="mt-5">
-                <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <div
+                className="verbo-profile-section mt-5 rounded-2xl border border-border/60 bg-card p-4 shadow-soft"
+                style={{ "--verbo-profile-i": 5 } as React.CSSProperties}
+              >
+                <div className="text-xs font-semibold uppercase tracking-[0.14em] text-navy-700">
                   Show on leaderboard as
                 </div>
-                <div className="mt-2 space-y-2">
-                  <label className="flex cursor-pointer items-start gap-2 rounded-2xl bg-secondary/60 px-3 py-2.5 text-sm">
+                <div className="mt-3 space-y-2">
+                  <label className="verbo-profile-press flex cursor-pointer items-start gap-3 rounded-xl border border-border bg-secondary/40 px-3 py-2.5 text-sm transition-colors hover:bg-secondary/60">
                     <input
                       type="radio"
                       name="lb-mode"
-                      className="mt-0.5"
+                      className="mt-0.5 accent-navy-700"
                       checked={lbMode === "real"}
                       onChange={() => {
                         setLbMode("real");
@@ -428,11 +441,11 @@ export function StaffProfileModal({ open, onOpenChange }: Props) {
                     />
                     <span className="font-medium text-foreground">My name and photo</span>
                   </label>
-                  <label className="flex cursor-pointer items-start gap-2 rounded-2xl bg-secondary/60 px-3 py-2.5 text-sm">
+                  <label className="verbo-profile-press flex cursor-pointer items-start gap-3 rounded-xl border border-border bg-secondary/40 px-3 py-2.5 text-sm transition-colors hover:bg-secondary/60">
                     <input
                       type="radio"
                       name="lb-mode"
-                      className="mt-0.5"
+                      className="mt-0.5 accent-navy-700"
                       checked={lbMode === "nickname"}
                       onChange={() => {
                         setLbMode("nickname");
@@ -451,7 +464,7 @@ export function StaffProfileModal({ open, onOpenChange }: Props) {
                             setLbNickname(v);
                             setLeaderboardIdentity(user.id, { mode: "nickname", nickname: v });
                           }}
-                          className="mt-2 w-full rounded-xl border border-input bg-background px-2.5 py-1.5 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring"
+                          className="verbo-profile-input mt-2 w-full rounded-xl border border-input bg-background px-2.5 py-1.5 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring"
                         />
                       )}
                     </div>
@@ -462,12 +475,15 @@ export function StaffProfileModal({ open, onOpenChange }: Props) {
           )}
 
           {/* Headline */}
-          <div className="mt-5">
+          <div
+            className="verbo-profile-section mt-5 rounded-2xl border border-border/60 bg-card p-4 shadow-soft"
+            style={{ "--verbo-profile-i": 6 } as React.CSSProperties}
+          >
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <span className="text-xs font-semibold uppercase tracking-[0.14em] text-navy-700">
                 About me
               </span>
-              <span className="text-[11px] text-muted-foreground">
+              <span className="text-[11px] font-medium text-muted-foreground">
                 {headline.length}/{MAX_HEADLINE_CHARS}
               </span>
             </div>
@@ -482,55 +498,61 @@ export function StaffProfileModal({ open, onOpenChange }: Props) {
                   ? "Write a short phrase about yourself…"
                   : "Write a short phrase your students will see…"
               }
-              className="mt-2 w-full resize-none rounded-2xl bg-secondary/60 px-4 py-2.5 text-sm leading-relaxed text-foreground outline-none transition-shadow focus:ring-2 focus:ring-ring"
+              className="verbo-profile-input mt-3 w-full resize-none rounded-xl border border-input bg-background px-4 py-2.5 text-sm leading-relaxed text-foreground outline-none focus:ring-2 focus:ring-ring"
             />
             {savedTick && (
-              <div className="mt-1 flex items-center gap-1.5 text-xs font-medium text-emerald-600">
+              <div className="mt-2 flex items-center gap-1.5 text-xs font-medium text-emerald-600">
                 <Check className="h-3.5 w-3.5" /> Saved
               </div>
             )}
           </div>
 
           {/* Password */}
-          <div className="mt-5 space-y-3">
+          <div
+            className="verbo-profile-section mt-5 rounded-2xl border border-border/60 bg-card p-4 shadow-soft"
+            style={{ "--verbo-profile-i": 7 } as React.CSSProperties}
+          >
+            <div className="text-xs font-semibold uppercase tracking-[0.14em] text-navy-700">
+              Security
+            </div>
             {!pwOpen ? (
-              <div className="flex flex-col gap-2 sm:flex-row">
+              <div className="mt-3 flex flex-col gap-2 sm:flex-row">
                 <button
                   type="button"
                   onClick={() => setPwOpen(true)}
-                  className="inline-flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-full bg-[#01304a] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#0a4a6e]"
+                  className="verbo-profile-press inline-flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-full bg-navy-700 px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-navy-800"
                 >
-                  <KeyRound className="h-4 w-4" /> Change password
+                  <KeyRound className="h-4 w-4" strokeWidth={1.5} /> Change password
                 </button>
                 <button
                   type="button"
-                  className="flex-1 cursor-pointer rounded-full bg-secondary px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-secondary/70"
+                  className="verbo-profile-press flex-1 cursor-pointer rounded-full border border-border bg-secondary px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-secondary/70"
                 >
                   Forgot password
                 </button>
               </div>
             ) : (
-              <form className="space-y-3" onSubmit={submitPassword}>
+              <form className="mt-3 space-y-3" onSubmit={submitPassword}>
                 <input
                   type="password"
                   placeholder="Current password"
                   value={current}
                   onChange={(e) => setCurrent(e.target.value)}
-                  className="w-full rounded-2xl bg-secondary/60 px-4 py-2.5 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring"
+                  className="verbo-profile-input w-full rounded-xl border border-input bg-background px-4 py-2.5 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring"
                 />
                 <input
                   type="password"
                   placeholder="New password"
                   value={next}
                   onChange={(e) => setNext(e.target.value)}
-                  className="w-full rounded-2xl bg-secondary/60 px-4 py-2.5 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring"
+                  className="verbo-profile-input w-full rounded-xl border border-input bg-background px-4 py-2.5 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring"
                 />
                 <input
                   type="password"
                   placeholder="Confirm new password"
                   value={confirm}
                   onChange={(e) => setConfirm(e.target.value)}
-                  className="w-full rounded-2xl bg-secondary/60 px-4 py-2.5 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring"
+                  className="verbo-profile-input w-full rounded-xl border border-input bg-background px-4 py-2.5 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring"
                 />
                 <p className="text-[11px] text-muted-foreground">
                   Use at least 4 characters, one uppercase letter and one number.
@@ -544,14 +566,14 @@ export function StaffProfileModal({ open, onOpenChange }: Props) {
                 <div className="flex gap-2">
                   <button
                     type="submit"
-                    className="flex-1 cursor-pointer rounded-full bg-[#f38934] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#e07a25]"
+                    className="verbo-profile-press flex-1 cursor-pointer rounded-full bg-orange-500 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-orange-600"
                   >
                     Update password
                   </button>
                   <button
                     type="button"
                     onClick={() => { setPwOpen(false); setPwError(null); }}
-                    className="cursor-pointer rounded-full bg-secondary px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-secondary/70"
+                    className="verbo-profile-press cursor-pointer rounded-full border border-border bg-secondary px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-secondary/70"
                   >
                     Cancel
                   </button>
