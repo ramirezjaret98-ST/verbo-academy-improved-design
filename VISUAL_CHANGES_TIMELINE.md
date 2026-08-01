@@ -766,3 +766,8 @@ Sin cambios de lógica ni rutas. `DATA_MODEL.md` sigue sincronizado.
 - Hero banner grew to `h-40`; avatar enlarged from `h-20 w-20` to `h-28 w-28`, with the edit button and presence dot rescaled and repositioned; content top padding to `pt-16`.
 - Added `.verbo-scroll-hidden` in `src/styles.css` and applied it to the modal scroll area so the scrollbar is fully invisible while scrolling still works.
 - No logic, data or route changes; `DATA_MODEL.md` remains synchronized.
+
+## Entry 045 — Current Course card: icon treatment
+- Replaced the grey `bg-primary/10` rounded-square icon tile with a 48px circular chip on the card background, a hairline navy border and a 1px soft shadow.
+- Icon reduced to `h-5 w-5` with `strokeWidth 1.5`; hover scale softened to `1.03` at 200ms ease-out.
+- Purely presentational; no logic, data or route changes. `DATA_MODEL.md` remains synchronized.

@@ -765,12 +765,13 @@ function StudentDashboard() {
               />
               <div className="relative flex items-start gap-4">
                 <div
-                  className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-primary/10 transition-transform duration-300 group-hover:scale-105"
+                  className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-[color-mix(in_oklab,var(--navy-700)_14%,transparent)] bg-background shadow-[0_1px_2px_color-mix(in_oklab,var(--navy-700)_8%,transparent)] transition-transform duration-200 ease-out group-hover:scale-[1.03]"
                   style={{ color: "#01304a" }}
                   aria-hidden
                 >
-                  <BookOpen className="h-6 w-6" strokeWidth={1.6} />
+                  <BookOpen className="h-5 w-5" strokeWidth={1.5} />
                 </div>
+
                 <div>
                   <Pill tone="muted">{currentLevelName ?? "Learning Path"}</Pill>
                   <h3 className="mt-3 text-xl font-semibold tracking-tight" style={{ color: "#01304a" }}>
