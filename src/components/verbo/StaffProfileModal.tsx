@@ -234,16 +234,17 @@ export function StaffProfileModal({ open, onOpenChange }: Props) {
                 type="button"
                 onClick={() => fileRef.current?.click()}
                 aria-label="Change profile photo"
-                className="verbo-profile-press absolute -right-1 bottom-1 flex h-7 w-7 cursor-pointer items-center justify-center rounded-full bg-orange-500 text-white shadow-md hover:bg-orange-600"
+                className="verbo-profile-press absolute bottom-1 right-0 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-orange-500 text-white shadow-md hover:bg-orange-600"
               >
-                <Pencil className="h-3 w-3" />
+                <Pencil className="h-3.5 w-3.5" />
               </button>
               <span
                 title={online ? "Online" : "Offline"}
-                className={`absolute bottom-1.5 left-1 h-3.5 w-3.5 rounded-full border-2 border-background ${
+                className={`absolute bottom-2 left-1 h-4 w-4 rounded-full border-2 border-background ${
                   online ? "bg-emerald-500" : "bg-zinc-400"
                 }`}
               />
+
               <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onPickAvatar} />
             </div>
           </div>
