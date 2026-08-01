@@ -956,3 +956,9 @@ Sin cambios de lógica ni rutas. `DATA_MODEL.md` sigue sincronizado.
 - Ahora usa la misma rampa continua rojo → naranja → ámbar → verde del panel de KPIs (`scoreScaleColor`), mapeando el rating 0-5 a 0-100; sin rating, gris neutro `#94a3b8`.
 - El color alimenta a la vez la cifra y el `--verbo-focus-pulse-color` de la tarjeta, por lo que el glow acompaña al valor real.
 - Visual only — no logic, data or route changes; `DATA_MODEL.md` remains synchronized.
+
+## Entry 070 — /teacher: nueva acción rápida "Tailored Content"
+- Se añadió una cuarta acción en el panel Quick Actions con ruta a `/teacher/tailored-content`, etiqueta "Tailored Content" y descripción "Prepare your personalized sessions".
+- Su icono usa el SVG animado aportado por el usuario, servido como asset (`src/assets/vip-tailored.svg.asset.json`), en la misma posición que los iconos de las otras acciones.
+- La entrada escalonada se recalibró: Tailored Content a 135ms y Course Builder VIP (condicional) a 180ms.
+- Visual/content only — no logic, data or route logic changes; `DATA_MODEL.md` remains synchronized.
