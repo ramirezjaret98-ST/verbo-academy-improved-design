@@ -320,60 +320,39 @@ function TeacherKpiCard({
 
   return (
     <div
-      className={`flex flex-col rounded-2xl border border-border bg-card p-5 shadow-soft${needsReview ? " verbo-focus-pulse cursor-pointer" : ""}`}
-      style={needsReview ? ({ ["--verbo-focus-pulse-color" as string]: REVIEW_PULSE } as React.CSSProperties) : undefined}
+      className={`verbo-kpi-card group relative flex flex-col overflow-hidden rounded-[22px] border border-border/80 bg-card p-5 pl-6${needsReview ? " verbo-critical-glow cursor-pointer" : ""}`}
+      style={{ ["--st" as string]: tierColor.bg, ["--verbo-card-i" as string]: index } as React.CSSProperties}
       onClick={needsReview ? onOpenReviews : undefined}
       role={needsReview ? "button" : undefined}
-      title={needsReview ? "View sessions needing review" : undefined}
+      title={needsReview ? `${pending} session${pending === 1 ? "" : "s"} needing review` : undefined}
     >
-      {/* Header — tier color band */}
-      <div
-        className="relative -mx-5 -mt-5 overflow-hidden rounded-t-2xl px-5 pb-3 pt-4"
-        style={{ backgroundColor: tierColor.bg }}
-      >
-        <span
-          className="pointer-events-none absolute -right-2 -top-2 select-none text-[48px] font-black uppercase leading-none tracking-tighter"
-          style={{ color: tierColor.fg, opacity: 0.12 }}
-          aria-hidden
-        >
+      <span className="verbo-kpi-card__rail" aria-hidden />
+
+      {/* Identity — name leads, tier is a quiet tinted chip */}
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="truncate font-display text-[19px] font-semibold leading-tight tracking-[-0.02em] text-foreground">
+            {t.name}
+          </div>
+          <div className="mt-0.5 truncate text-[11.5px] font-light text-muted-foreground">{t.email}</div>
+        </div>
+        <span className="verbo-kpi-card__tier shrink-0 rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.1em]">
           {tier.name}
         </span>
-        <div className="relative flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <div className="truncate text-xl font-bold tracking-tight" style={{ color: tierColor.fg }}>
-              {t.name}
-            </div>
-            <div className="truncate text-xs" style={{ color: tierColor.fg, opacity: 0.7 }}>
-              {t.email}
-            </div>
-          </div>
-          {needsReview && (
-            <AlertTriangle className="h-4 w-4 shrink-0" style={{ color: tierColor.fg }} />
-          )}
-        </div>
       </div>
 
       {/* Rating + bonus */}
-      <div
-        className="flex items-center gap-2 border-t border-border/60 pt-3"
-        onClick={(e) => e.stopPropagation()}
-      >
+      <div className="mt-3.5 flex flex-wrap items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
         <button
           onClick={onOpenChart}
-          className="inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold text-white transition-transform hover:scale-105"
-          style={{
-            backgroundColor:
-              displayRating != null && displayRating >= 4
-                ? "#5fca16"
-                : displayRating != null && displayRating >= 2.5
-                  ? "#f59e0b"
-                  : "#ef4444",
-          }}
+          className="verbo-kpi-rating inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-[11.5px] font-semibold"
+          style={{ ["--rt" as string]: ratingColor(displayRating) } as React.CSSProperties}
           title="View monthly rating trend"
         >
           <Star className="h-3 w-3 fill-current" />
-          {displayRating != null ? displayRating.toFixed(1) : "—"} · {band.label}
-          <TrendingUp className="h-3 w-3" />
+          <span className="tabular-nums">{displayRating != null ? displayRating.toFixed(1) : "—"}</span>
+          <span className="font-light opacity-70">{band.label}</span>
+          <TrendingUp className="h-3 w-3" strokeWidth={2} />
         </button>
 
         {canOverride && (
@@ -403,21 +382,21 @@ function TeacherKpiCard({
         </div>
       </div>
 
-
-      {/* Composite score — prominent */}
+      {/* Composite score — the headline number */}
       <div
-        className="mt-4 flex items-center gap-4 rounded-xl border border-border border-t-border/60 bg-secondary/30 p-4"
-        style={{ boxShadow: `0 0 20px -6px ${compositeColor(kpis.composite)}80` }}
+        className="mt-4 flex items-center gap-4 rounded-2xl border border-border/60 bg-background/50 p-4"
         onClick={(e) => e.stopPropagation()}
       >
         <CompositeRing value={kpis.composite} />
         <div className="min-w-0 flex-1">
-          <div className="flex items-center justify-between gap-2">
-            <div className="text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground">Composite score</div>
+          <div className="flex items-start justify-between gap-2">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+              Composite score
+            </div>
             {canOverride && (
               <button
                 onClick={() => onOverride("composite", kpis.composite)}
-                className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                className="-mt-1 shrink-0 rounded-md p-1 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
                 title="Manually adjust composite score"
                 aria-label="Manually adjust composite score"
               >
@@ -425,27 +404,50 @@ function TeacherKpiCard({
               </button>
             )}
           </div>
-          <div className="text-3xl font-bold tracking-tight text-foreground">
-            {kpis.composite}%
+          <div className="mt-0.5 flex flex-wrap items-baseline gap-x-2 gap-y-1">
+            <span
+              className="font-display text-[34px] font-semibold leading-none tracking-[-0.03em] tabular-nums"
+              style={{ color: compositeColor(kpis.composite) }}
+            >
+              {kpis.composite}
+              <span className="text-[18px] font-light opacity-60">%</span>
+            </span>
             {kpis.onboarding && (
-              <span className="ml-2 rounded-full bg-blue-50 px-2 py-0.5 align-middle text-[10px] font-semibold uppercase tracking-wider text-blue-700">Onboarding</span>
+              <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-primary">
+                Onboarding
+              </span>
             )}
             {monthOverrides.composite && <AdjustedBadge override={monthOverrides.composite} />}
           </div>
-          <div className="text-[10.5px] text-muted-foreground">avg of 5 signals{kpis.penaltyState > 0 ? ` − ${kpis.penaltyState} responsiveness penalty` : ""}</div>
+          <div className="mt-1.5 text-[11px] font-light leading-tight text-muted-foreground">
+            avg of 5 signals{kpis.penaltyState > 0 ? ` − ${kpis.penaltyState} responsiveness penalty` : ""}
+          </div>
         </div>
       </div>
 
-      {/* Metric bars */}
-      <div className="mt-4 grid grid-cols-2 gap-2 border-t border-border/60 pt-4" onClick={(e) => e.stopPropagation()}>
-        <KpiTile label="Connection punctuality" value={kpis.connectionPunctuality} metric="connectionPunctuality" canOverride={canOverride} onOverride={onOverride} override={monthOverrides.connectionPunctuality} />
-        <KpiTile label="Planning punctuality" value={kpis.planningPunctuality} metric="planningPunctuality" canOverride={canOverride} onOverride={onOverride} override={monthOverrides.planningPunctuality} />
-        <KpiTile label="Session completion rate" value={kpis.completionRate} metric="completionRate" canOverride={canOverride} onOverride={onOverride} override={monthOverrides.completionRate} />
-        <KpiTile label="Cancellations / No-Shows" value={kpis.cancellationScore} sub={`${Math.min(3, kpis.activeStrikes)}/3 (last 6 months)`} metric="cancellationScore" canOverride={canOverride} onOverride={onOverride} override={monthOverrides.cancellationScore} />
-        <KpiTile label="Reschedule/Substitute Responsiveness" value={kpis.responsiveness} sub={kpis.penaltyState > 0 ? `−${kpis.penaltyState} cumulative penalty this month` : "No penalty this month"} metric="responsiveness" canOverride={canOverride} onOverride={onOverride} override={monthOverrides.responsiveness} />
-        <KpiTile label="Teacher-caused absence rate" value={kpis.teacherAbsenceRate} invert />
+      {/* Signals */}
+      <div className="mt-4 border-t border-border/60 pt-3.5" onClick={(e) => e.stopPropagation()}>
+        <div className="mb-2.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/80">
+          Signals
+        </div>
+        <div className="grid gap-x-4 gap-y-3 sm:grid-cols-2">
+          <KpiTile label="Connection punctuality" value={kpis.connectionPunctuality} metric="connectionPunctuality" canOverride={canOverride} onOverride={onOverride} override={monthOverrides.connectionPunctuality} />
+          <KpiTile label="Planning punctuality" value={kpis.planningPunctuality} metric="planningPunctuality" canOverride={canOverride} onOverride={onOverride} override={monthOverrides.planningPunctuality} />
+          <KpiTile label="Session completion" value={kpis.completionRate} metric="completionRate" canOverride={canOverride} onOverride={onOverride} override={monthOverrides.completionRate} />
+          <KpiTile label="Cancellations / no-shows" value={kpis.cancellationScore} sub={`${Math.min(3, kpis.activeStrikes)}/3 strikes · last 6 months`} metric="cancellationScore" canOverride={canOverride} onOverride={onOverride} override={monthOverrides.cancellationScore} />
+          <KpiTile label="Reschedule responsiveness" value={kpis.responsiveness} sub={kpis.penaltyState > 0 ? `−${kpis.penaltyState} cumulative penalty this month` : "No penalty this month"} metric="responsiveness" canOverride={canOverride} onOverride={onOverride} override={monthOverrides.responsiveness} />
+          <KpiTile label="Teacher-caused absence" value={kpis.teacherAbsenceRate} invert />
+        </div>
       </div>
+
+      {needsReview && (
+        <div className="mt-4 flex items-center gap-2 border-t border-destructive/20 pt-3 text-[11.5px] font-medium text-destructive">
+          <AlertTriangle className="h-3.5 w-3.5 shrink-0" strokeWidth={1.9} />
+          {pending} session{pending === 1 ? "" : "s"} needing review
+        </div>
+      )}
     </div>
+
 
   );
 }
