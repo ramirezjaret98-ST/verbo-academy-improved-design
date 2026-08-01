@@ -87,7 +87,7 @@ const KPI_ICONS: Record<string, typeof Wifi> = {
 const FIN = {
   sessions: { base: "#6d28d9", soft: "rgba(109,40,217,0.10)", ring: "rgba(109,40,217,0.28)", label: "Sessions Taught" },
   adjust:   { base: "#e11d48", soft: "rgba(225,29,72,0.10)",  ring: "rgba(225,29,72,0.28)",  label: "Adjustments" },
-  bonus:    { base: "#d97706", soft: "rgba(217,119,6,0.10)",  ring: "rgba(217,119,6,0.28)",  label: "Bonus" },
+  bonus:    { base: "#84cc16", soft: "rgba(132,204,22,0.10)",  ring: "rgba(132,204,22,0.28)",  label: "Bonus" },
   total:    { base: "#0d9488", soft: "rgba(13,148,136,0.10)", ring: "rgba(13,148,136,0.28)", label: "Total Earned" },
 } as const;
 
