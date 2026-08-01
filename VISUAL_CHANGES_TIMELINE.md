@@ -944,3 +944,9 @@ Sin cambios de lógica ni rutas. `DATA_MODEL.md` sigue sincronizado.
 - Se alineó el padding izquierdo de la cabecera y de todas las filas a `pl-6` (antes `px-5`/`pl-5`), de modo que el riel ya no compite con el nombre del alumno/grupo y las columnas quedan a plomo con sus encabezados.
 - Estado vacío alineado al mismo padding; `prefers-reduced-motion` conserva el riel visible sin transformación.
 - Visual only — no logic, data or route changes; `DATA_MODEL.md` remains synchronized.
+
+## Entry 068 — /teacher: contadores de las tarjetas de foco como watermark gigante
+- Los números (5 / 3 / 2) vivían inline junto al título en 30px, compitiendo con el texto y sin jerarquía propia.
+- Ahora se renderizan como watermark: cifra en 104px bold tabular, blanca al 8% de opacidad, anclada a la derecha (`right-3`) y ocupando el 100% de la altura de la tarjeta (`-inset-y-4` para compensar el `py-4`), con `overflow-hidden` en la tarjeta y `pointer-events-none`.
+- El título pasa a ocupar la primera línea sin el número delante; el icono se mantiene por encima del watermark.
+- El valor sigue siendo dinámico (`p.count`) — visual only, no logic, data or route changes; `DATA_MODEL.md` remains synchronized.
