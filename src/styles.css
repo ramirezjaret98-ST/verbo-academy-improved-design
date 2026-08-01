@@ -2006,3 +2006,67 @@
 @media (prefers-reduced-motion: reduce) {
   .verbo-hdr-chip:hover { transform: none; }
 }
+
+/* ---------------------------------------------------------------------------
+   Teacher · Clubs page (Entry 072)
+--------------------------------------------------------------------------- */
+
+/* Propose a Club — the primary CTA, breathing green glow */
+@keyframes verbo-propose-glow {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--success) 42%, transparent), 0 10px 30px -14px color-mix(in oklab, var(--success) 70%, transparent); }
+  50%      { box-shadow: 0 0 0 10px color-mix(in oklab, var(--success) 0%, transparent), 0 16px 40px -12px color-mix(in oklab, var(--success) 85%, transparent); }
+}
+.verbo-propose-cta {
+  animation: verbo-propose-glow 2.6s cubic-bezier(0.23, 1, 0.32, 1) infinite;
+  transition: transform 180ms cubic-bezier(0.23, 1, 0.32, 1), filter 180ms ease;
+}
+@media (hover: hover) and (pointer: fine) {
+  .verbo-propose-cta:hover { transform: translateY(-2px); filter: brightness(1.06); }
+}
+.verbo-propose-cta:active { transform: scale(0.97); }
+
+/* Sheen sweep across the CTA */
+@keyframes verbo-propose-sheen {
+  0%   { transform: translateX(-140%) skewX(-18deg); opacity: 0; }
+  12%  { opacity: 0.55; }
+  40%  { transform: translateX(240%) skewX(-18deg); opacity: 0; }
+  100% { transform: translateX(240%) skewX(-18deg); opacity: 0; }
+}
+.verbo-propose-sheen { animation: verbo-propose-sheen 4.2s cubic-bezier(0.23, 1, 0.32, 1) infinite; }
+
+/* Club poster entrance */
+@keyframes verbo-club-in {
+  from { opacity: 0; transform: translateY(14px) scale(0.97); }
+  to   { opacity: 1; transform: none; }
+}
+.verbo-club-in { animation: verbo-club-in 420ms cubic-bezier(0.23, 1, 0.32, 1) both; }
+
+.verbo-club-poster {
+  transition: transform 260ms cubic-bezier(0.23, 1, 0.32, 1), box-shadow 260ms ease;
+  will-change: transform;
+}
+@media (hover: hover) and (pointer: fine) {
+  .verbo-club-poster:hover { transform: translateY(-6px) scale(1.012); }
+  .verbo-club-poster:hover .verbo-club-mark { transform: translateX(-6px) rotate(-6deg) scale(1.06); opacity: 0.22; }
+  .verbo-club-poster:hover .verbo-club-cta { transform: translateY(0); opacity: 1; }
+}
+.verbo-club-mark { transition: transform 420ms cubic-bezier(0.23, 1, 0.32, 1), opacity 420ms ease; }
+.verbo-club-cta { transition: transform 220ms cubic-bezier(0.23, 1, 0.32, 1), opacity 220ms ease, background-color 180ms ease; }
+.verbo-club-cta:active { transform: scale(0.97); }
+
+/* Tab underline slide */
+.verbo-club-tab { transition: color 180ms ease, transform 160ms cubic-bezier(0.23, 1, 0.32, 1); }
+.verbo-club-tab:active { transform: scale(0.97); }
+
+/* Ledger row for "My Clubs" */
+.verbo-club-row { transition: transform 200ms cubic-bezier(0.23, 1, 0.32, 1), background-color 200ms ease; }
+@media (hover: hover) and (pointer: fine) {
+  .verbo-club-row:hover { transform: translateX(3px); }
+  .verbo-club-row:hover .verbo-club-rail { transform: scaleY(1); }
+}
+.verbo-club-rail { transform: scaleY(0.4); transform-origin: center; transition: transform 240ms cubic-bezier(0.23, 1, 0.32, 1); }
+
+@media (prefers-reduced-motion: reduce) {
+  .verbo-propose-cta, .verbo-propose-sheen, .verbo-club-in { animation: none; }
+  .verbo-club-poster:hover, .verbo-club-row:hover { transform: none; }
+}
