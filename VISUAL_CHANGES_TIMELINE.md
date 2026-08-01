@@ -839,3 +839,12 @@ Sin cambios de lógica ni rutas. `DATA_MODEL.md` sigue sincronizado.
 - Motion: entrada `translateY(8px) scale(0.985)` a 300ms `cubic-bezier(0.23, 1, 0.32, 1)` con stagger de 34ms (tope 11), hover `-3px` + zoom del avatar 1.04 gated por `hover:hover`/`pointer:fine`, press `scale(0.985)`; todo neutralizado bajo `prefers-reduced-motion`.
 - El glow rojo de "Needs review" (`.verbo-review-glow`) se mantiene intacto.
 - Visual only — no logic, data or route changes; `DATA_MODEL.md` remains synchronized.
+
+## Entry 055 — Admin teacher detail modal: hierarchy + section grouping
+- Header rediseñado: avatar 64px con anillo `ring-white/25`, nombre a 22px semibold y email en 12px al 60% — la tarifa y el tier salen del subtítulo y pasan a una tira de datos rápidos.
+- Nueva tira de 4 celdas bajo el header (Tier · Rate · Students activos/total · Rating) con micro-labels de 9.5px uppercase `tracking-[0.14em]` y valores semibold tabulares, separadas por hairlines de 1px.
+- Overview reorganizado en tres secciones tituladas (`Compensation`, `Qualified products`, `Assigned students`) con encabezado 13px bold + hint contextual + regla hairline, en vez de una lista plana de labels iguales.
+- Chips de producto en pastilla completa (activo sólido / inactivo con borde hairline), filas de alumno con nombre semibold, tag de producto debajo y botón Reassign redondeado.
+- Modal a `rounded-[28px]`, header y tabs `shrink-0`, cuerpo `min-h-0 overflow-y-auto`, tabs con scroll horizontal sin scrollbar; footer separa acciones neutras (izquierda) de estatus/destructivas (derecha).
+- Motion: entrada del modal `verbo-sdm-in` (240ms, `cubic-bezier(0.23, 1, 0.32, 1)`), secciones escalonadas cada 45ms, press `scale(0.97)` y hover lift en acciones; todo neutralizado bajo `prefers-reduced-motion`.
+- Visual only — no logic, data or route changes; `DATA_MODEL.md` remains synchronized.
