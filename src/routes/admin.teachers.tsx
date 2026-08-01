@@ -299,8 +299,11 @@ function TeacherCard({ teacher: t, index = 0, onOpen }: { teacher: User; index?:
     <button
       onClick={onOpen}
       data-status={status}
+      data-review={glow ? "true" : undefined}
+      title={glow ? `Needs review (${pending})` : undefined}
       style={{ "--verbo-card-i": index } as React.CSSProperties}
-      className={`verbo-teacher-card group relative flex flex-col overflow-hidden rounded-[22px] border border-border/80 bg-card p-5 pl-6 text-left ${glow ? "verbo-review-glow" : ""} ${dim ? "opacity-60" : ""}`}
+      className={`verbo-teacher-card group relative flex flex-col overflow-hidden rounded-[22px] border border-border/80 bg-card p-5 pl-6 text-left ${glow ? "verbo-review-glow" : ""} ${dim ? "verbo-teacher-card--off" : ""}`}
+
     >
       <span className="verbo-teacher-card__rail" aria-hidden />
 
@@ -364,11 +367,8 @@ function TeacherCard({ teacher: t, index = 0, onOpen }: { teacher: User; index?:
         </div>
       )}
 
-      {glow && (
-        <span className="absolute right-4 top-[3.35rem] z-20 inline-flex items-center gap-1 rounded-full bg-destructive/10 px-2 py-0.5 text-[10px] font-semibold text-destructive">
-          <AlertTriangle className="h-3 w-3" /> Needs review ({pending})
-        </span>
-      )}
+      {/* Needs review is communicated by the pulsing red glow on the card itself */}
+
 
       {/* Frozen: the whole card reads as encased in ice */}
       {status === "frozen" && (
