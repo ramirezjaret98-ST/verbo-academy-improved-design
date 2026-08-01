@@ -72,14 +72,22 @@ function signalColor(v: number) {
   return t === "good" ? "#22c55e" : t === "mid" ? "#f59e0b" : "#ef4444";
 }
 
-const KPI_ICONS: Record<string, typeof Plug> = {
-  connection: Plug,
-  planning: CalendarClock,
-  completion: CheckCircle2,
-  rating: ThumbsUp,
-  cancellation: XOctagon,
-  responsiveness: Repeat2,
+const KPI_ICONS: Record<string, typeof Wifi> = {
+  connection: Wifi,
+  planning: CalendarCheck2,
+  completion: ClipboardCheck,
+  rating: Smile,
+  cancellation: CalendarX2,
+  responsiveness: RefreshCcwDot,
 };
+
+/** One dedicated hue per money bucket so each block is instantly identifiable. */
+const FIN = {
+  sessions: { base: "#6d28d9", soft: "rgba(109,40,217,0.10)", ring: "rgba(109,40,217,0.28)", label: "Sessions Taught" },
+  adjust:   { base: "#e11d48", soft: "rgba(225,29,72,0.10)",  ring: "rgba(225,29,72,0.28)",  label: "Adjustments" },
+  bonus:    { base: "#d97706", soft: "rgba(217,119,6,0.10)",  ring: "rgba(217,119,6,0.28)",  label: "Bonus" },
+  total:    { base: "#0d9488", soft: "rgba(13,148,136,0.10)", ring: "rgba(13,148,136,0.28)", label: "Total Earned" },
+} as const;
 
 // --- page -------------------------------------------------------------------
 function MyBalancePage() {
