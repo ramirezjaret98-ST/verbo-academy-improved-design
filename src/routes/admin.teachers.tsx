@@ -488,30 +488,47 @@ function TeacherDetailModal({
 
   return (
     <Overlay onClose={onClose}>
-      <div className="relative flex max-h-[88vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-card shadow-floating">
+      <div className="verbo-sdm relative flex max-h-[88vh] w-full max-w-3xl flex-col overflow-hidden rounded-[28px] bg-card shadow-floating">
         {/* Header */}
-        <div className="flex items-start justify-between border-b border-border px-6 py-5" style={{ background: "linear-gradient(135deg, #01304a 0%, #02466b 100%)" }}>
-          <div className="flex items-center gap-3">
-            {avatar ? (
-              <img src={avatar} alt={t.name} className="h-12 w-12 rounded-full object-cover" />
-            ) : (
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white/15 text-sm font-semibold text-white">{initials(t.name)}</div>
-            )}
-            <div>
-              <h2 className="text-xl font-semibold tracking-tight text-white">{t.name}</h2>
-              <p className="text-xs text-white/70">{t.email} · ${effectiveHourlyRate(t)} MXN/h · {teacherTier(t).name}</p>
+        <div className="shrink-0 px-6 pb-5 pt-6" style={{ background: "linear-gradient(135deg, #01304a 0%, #02466b 100%)" }}>
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-center gap-4">
+              {avatar ? (
+                <img src={avatar} alt={t.name} className="h-16 w-16 rounded-full object-cover ring-2 ring-white/25" />
+              ) : (
+                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-white/15 text-base font-semibold text-white ring-2 ring-white/25">{initials(t.name)}</div>
+              )}
+              <div className="min-w-0">
+                <h2 className="truncate text-[22px] font-semibold leading-tight tracking-tight text-white">{t.name}</h2>
+                <p className="mt-0.5 truncate text-xs text-white/60">{t.email}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Tag className={meta.cls}>{meta.label}</Tag>
+              <button onClick={onClose} aria-label="Close" className="verbo-sdm-action rounded-full p-1.5 text-white/70 hover:bg-white/10 hover:text-white"><X className="h-4 w-4" /></button>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <Tag className={meta.cls}>{meta.label}</Tag>
-            <button onClick={onClose} aria-label="Close" className="rounded-md p-1 text-white/70 transition-colors hover:bg-white/10 hover:text-white"><X className="h-4 w-4" /></button>
+
+          {/* Quick facts strip */}
+          <div className="mt-5 grid grid-cols-2 gap-px overflow-hidden rounded-2xl bg-white/10 sm:grid-cols-4">
+            {([
+              ["Tier", teacherTier(t).name],
+              ["Rate", `$${effectiveHourlyRate(t)} /h`],
+              ["Students", `${actives.length}/${assigned.length}`],
+              ["Rating", avgRating(t) != null ? avgRating(t)!.toFixed(1) : "—"],
+            ] as [string, string][]).map(([k, v]) => (
+              <div key={k} className="bg-[#02405f] px-3 py-2.5">
+                <div className="text-[9.5px] font-semibold uppercase tracking-[0.14em] text-white/45">{k}</div>
+                <div className="mt-0.5 truncate text-sm font-semibold tabular-nums text-white">{v}</div>
+              </div>
+            ))}
           </div>
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-1 border-b border-border px-6 pt-3">
+        <div className="shrink-0 flex gap-1 overflow-x-auto border-b border-border px-6 pt-3 verbo-scroll-hidden">
           {([["overview", "Overview"], ["kpis", "KPIs & Performance"], ["availability", "Availability"], ["financial", "Financial"], ["notes", "Admin Notes"]] as [Tab, string][]).map(([id, label]) => (
-            <button key={id} onClick={() => setTab(id)} className={`relative px-3 py-2 text-sm font-medium transition-colors ${tab === id ? "text-accent" : "text-muted-foreground hover:text-foreground"}`}>
+            <button key={id} onClick={() => setTab(id)} className={`verbo-sdm-tab relative whitespace-nowrap px-3 py-2 text-sm font-medium ${tab === id ? "text-accent" : "text-muted-foreground hover:text-foreground"}`}>
               {label}
               {id === "kpis" && pending > 0 && <span className="ml-1 rounded-full bg-destructive/10 px-1.5 py-0.5 text-[10px] font-semibold text-destructive">{pending}</span>}
               {tab === id && <span className="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-accent" />}
@@ -520,81 +537,76 @@ function TeacherDetailModal({
         </div>
 
         {/* Body */}
-        <div className="flex-1 overflow-y-auto px-6 py-5 report-modal-scroll">
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5 report-modal-scroll">
           {tab === "overview" && (
-            <div className="space-y-6">
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <Info label="Name" value={t.name} />
-                <Info label="Email" value={t.email} />
-              </div>
-
-              {/* Hourly rate + payment frequency */}
-              <div className="flex flex-wrap items-end gap-4">
-                <div>
-                  <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Hourly rate (MXN)</div>
-                  <div className="flex items-center rounded-lg border border-input bg-background">
-                    <span className="pl-3 text-sm text-muted-foreground">$</span>
-                    <input type="number" min={0} value={rate} onChange={(e) => setRate(e.target.value)} className="w-16 bg-transparent py-2 px-1 text-sm text-foreground focus:outline-none" />
-                    <span className="pr-3 text-xs text-muted-foreground">/h</span>
+            <div className="space-y-7">
+              {/* Compensation */}
+              <TSection title="Compensation" hint="Applies to future payment records" index={0}>
+                <div className="flex flex-wrap items-end gap-4">
+                  <div>
+                    <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/80">Hourly rate (MXN)</div>
+                    <div className="flex items-center rounded-xl border border-input bg-background">
+                      <span className="pl-3 text-sm text-muted-foreground">$</span>
+                      <input type="number" min={0} value={rate} onChange={(e) => setRate(e.target.value)} className="w-16 bg-transparent py-2 px-1 text-sm font-semibold tabular-nums text-foreground focus:outline-none" />
+                      <span className="pr-3 text-xs text-muted-foreground">/h</span>
+                    </div>
                   </div>
-                </div>
-                <div>
-                  <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Payment frequency</div>
-                  <div className="relative">
-                    <select value={freq} onChange={(e) => setFreq(e.target.value as PaymentFrequency)} className={`${selectCls} w-40 appearance-none pr-8`}>
-                      {PAYMENT_FREQUENCIES.map((f) => <option key={f.id} value={f.id}>{f.label}</option>)}
-                    </select>
-                    <CalendarClock className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                  <div>
+                    <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/80">Payment frequency</div>
+                    <div className="relative">
+                      <select value={freq} onChange={(e) => setFreq(e.target.value as PaymentFrequency)} className={`${selectCls} w-40 appearance-none pr-8`}>
+                        {PAYMENT_FREQUENCIES.map((f) => <option key={f.id} value={f.id}>{f.label}</option>)}
+                      </select>
+                      <CalendarClock className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                    </div>
                   </div>
+                  {(String(effectiveHourlyRate(t)) !== rate || paymentFrequency(t) !== freq) && (
+                    <PrimaryBtn onClick={() => {
+                      const patch: User = { ...t, hourly_rate: Number(rate) || teacherTier(t).rate, payment_frequency: freq };
+                      if (paymentFrequency(t) !== freq) patch.payment_records = defaultPaymentRecords(freq);
+                      onPersist(patch);
+                    }}>Save</PrimaryBtn>
+                  )}
                 </div>
-                {(String(effectiveHourlyRate(t)) !== rate || paymentFrequency(t) !== freq) && (
-                  <PrimaryBtn onClick={() => {
-                    const patch: User = { ...t, hourly_rate: Number(rate) || teacherTier(t).rate, payment_frequency: freq };
-                    if (paymentFrequency(t) !== freq) patch.payment_records = defaultPaymentRecords(freq);
-                    onPersist(patch);
-                  }}>Save</PrimaryBtn>
-                )}
-              </div>
+              </TSection>
 
               {/* Qualified products */}
-              <div>
-                <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Qualified products (hard rule for assignments)</div>
+              <TSection title="Qualified products" hint="Hard rule for assignments" index={1}>
                 <div className="flex flex-wrap gap-2">
                   {QUALIFIED_PRODUCTS.map((p) => {
                     const on = products.includes(p.id);
                     return (
-                      <button key={p.id} onClick={() => setProducts((prev) => on ? prev.filter((x) => x !== p.id) : [...prev, p.id])} className={`rounded-full px-3 py-1 text-xs font-semibold transition ${on ? "bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground hover:bg-secondary/70"}`}>
+                      <button key={p.id} onClick={() => setProducts((prev) => on ? prev.filter((x) => x !== p.id) : [...prev, p.id])} className={`verbo-sdm-action rounded-full px-3.5 py-1.5 text-xs font-semibold ${on ? "bg-primary text-primary-foreground shadow-sm" : "border border-border bg-transparent text-muted-foreground hover:text-foreground"}`}>
                         {p.name}
                       </button>
                     );
                   })}
                 </div>
-                {productsDirty && <div className="mt-2"><PrimaryBtn onClick={() => onPersist({ ...t, qualified_products: products })} disabled={products.length === 0}>Save products</PrimaryBtn></div>}
-              </div>
+                {productsDirty && <div className="mt-3"><PrimaryBtn onClick={() => onPersist({ ...t, qualified_products: products })} disabled={products.length === 0}>Save products</PrimaryBtn></div>}
+              </TSection>
 
               {/* Assigned students */}
-              <div>
-                <div className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Assigned students ({assigned.length})</div>
+              <TSection title="Assigned students" hint={`${assigned.length} total · ${actives.length} active`} index={2}>
                 {assigned.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No students assigned.</p>
+                  <p className="rounded-xl border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">No students assigned.</p>
                 ) : (
                   <div className="space-y-2">
                     {assigned.map((s) => {
                       const prod = getProduct(s.product);
                       const eligible = teachersForProduct(otherTeachers, s.product);
                       return (
-                        <div key={s.id} className="rounded-lg border border-border bg-background px-3 py-2.5">
+                        <div key={s.id} className="verbo-sdm-row rounded-xl border border-border bg-background px-3.5 py-3 hover:border-primary/25">
                           <div className="flex items-center justify-between gap-2">
                             <div className="min-w-0">
-                              <div className="truncate text-sm font-medium text-foreground">{s.name}</div>
-                              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">{prod && <Tag className="bg-primary/10 text-primary">{prod.name}</Tag>}{(s.status ?? "active") === "suspended" && <Tag className="bg-muted text-muted-foreground">Suspended</Tag>}</div>
+                              <div className="truncate text-sm font-semibold text-foreground">{s.name}</div>
+                              <div className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">{prod && <Tag className="bg-primary/10 text-primary">{prod.name}</Tag>}{(s.status ?? "active") === "suspended" && <Tag className="bg-muted text-muted-foreground">Suspended</Tag>}</div>
                             </div>
-                            <button onClick={() => setReassignFor(reassignFor === s.id ? null : s.id)} className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-[#0f766e] px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-opacity hover:opacity-90"><Users className="h-3.5 w-3.5" /> Reassign</button>
+                            <button onClick={() => setReassignFor(reassignFor === s.id ? null : s.id)} className="verbo-sdm-action inline-flex items-center justify-center gap-1.5 rounded-full bg-[#0f766e] px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm"><Users className="h-3.5 w-3.5" strokeWidth={1.75} /> Reassign</button>
                           </div>
                           {reassignFor === s.id && (
-                            <div className="mt-2 flex items-end gap-2 border-t border-border pt-2">
+                            <div className="mt-3 flex items-end gap-2 border-t border-border pt-3">
                               <div className="flex-1">
-                                <label className="mb-1 block text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground">New teacher (qualified for {prod?.name ?? "product"})</label>
+                                <label className="mb-1 block text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/80">New teacher (qualified for {prod?.name ?? "product"})</label>
                                 <select id={`ra-${s.id}`} defaultValue="" className={selectCls}>
                                   <option value="" disabled>Select teacher…</option>
                                   {eligible.map((tt) => <option key={tt.id} value={tt.id}>{tt.name}</option>)}
@@ -609,9 +621,10 @@ function TeacherDetailModal({
                     })}
                   </div>
                 )}
-              </div>
+              </TSection>
             </div>
           )}
+
 
           {tab === "kpis" && (
             <div className="space-y-6">
