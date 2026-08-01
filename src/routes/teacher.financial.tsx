@@ -411,7 +411,7 @@ function MyBalancePage() {
               {sessionRows.map((r, i) => (
                 <li
                   key={r.id}
-                  className="verbo-td-in grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1.5 px-5 py-3 md:grid-cols-[92px_minmax(0,1.3fr)_minmax(0,0.7fr)_auto_110px]"
+                  className="verbo-td-in grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1.5 px-5 py-3 md:grid-cols-[92px_minmax(0,1fr)_120px_128px_110px]"
                   style={{ animationDelay: `${Math.min(i, 10) * 26}ms` }}
                 >
                   <span className="order-2 text-xs font-medium tabular-nums text-muted-foreground md:order-none">
@@ -450,7 +450,7 @@ function MyBalancePage() {
                 return (
                   <li
                     key={a.id}
-                    className="verbo-td-in grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-4 gap-y-1 px-5 py-3.5 md:grid-cols-[92px_minmax(0,1fr)_minmax(0,1.4fr)_120px] md:items-center"
+                    className="verbo-td-in grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-4 gap-y-1 px-5 py-3.5 md:grid-cols-[92px_150px_minmax(0,1fr)_130px] md:items-center"
                     style={{ animationDelay: `${Math.min(i, 10) * 26}ms` }}
                   >
                     <span className="order-2 text-xs font-medium tabular-nums text-muted-foreground md:order-none">
