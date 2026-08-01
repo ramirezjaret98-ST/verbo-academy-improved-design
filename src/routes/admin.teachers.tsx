@@ -364,11 +364,8 @@ function TeacherCard({ teacher: t, index = 0, onOpen }: { teacher: User; index?:
         </div>
       )}
 
-      {glow && (
-        <span className="absolute right-4 top-[3.35rem] z-20 inline-flex items-center gap-1 rounded-full bg-destructive/10 px-2 py-0.5 text-[10px] font-semibold text-destructive">
-          <AlertTriangle className="h-3 w-3" /> Needs review ({pending})
-        </span>
-      )}
+      {/* Needs review is communicated by the pulsing red glow on the card itself */}
+
 
       {/* Frozen: the whole card reads as encased in ice */}
       {status === "frozen" && (
