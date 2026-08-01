@@ -14,10 +14,10 @@ import navyCardImage from "@/assets/navy_card_image.webp.asset.json";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Verbo Language Solutions — The Language of Global Growth" },
-      { name: "description", content: "Premium B2B English training for global teams. Private platform with live sessions, structured curriculum and measurable progress." },
-      { property: "og:title", content: "Verbo Language Solutions" },
-      { property: "og:description", content: "The Language of Global Growth." },
+      { title: "Lumina — Learn on Your Terms" },
+      { name: "description", content: "A flexible learning platform for live sessions, structured curriculum and measurable progress." },
+      { property: "og:title", content: "Lumina — Learn on Your Terms" },
+      { property: "og:description", content: "A flexible learning platform for live sessions, structured curriculum and measurable progress." },
     ],
   }),
   component: Landing,
@@ -181,17 +181,17 @@ function Landing() {
                     className="verbo-fade-up text-5xl font-semibold tracking-tight text-[var(--navy-700)] md:text-6xl"
                     style={{ animationDelay: "80ms", textWrap: "balance" }}
                   >
-                    Growth has a language.
-                    <span className="text-[var(--orange-500)]"> Speak it.</span>
+                    Learning that fits
+                    <span className="text-[var(--orange-500)]"> your life.</span>
                   </h1>
 
                   <p
                     className="verbo-fade-up mt-6 text-lg leading-relaxed text-[var(--navy-700)]/75 whitespace-pre-line"
                     style={{ animationDelay: "160ms" }}
                   >
-                    A flexible, practical English experience designed around you.
-                    {"\n"}Forget about outdated textbooks and boring grammar rules.
-                    {"\n"}At Verbo Academy, you’re in control: you decide what to learn and how to do it. Choose from a wide selection of hand-picked content and learn at your own pace
+                    A flexible, practical learning experience designed around you.
+                    {"\n"}Forget about rigid schedules and one-size-fits-all courses.
+                    {"\n"}At Lumina, you’re in control: you decide what to learn and how to do it. Choose from a wide selection of content and learn at your own pace.
                   </p>
 
                   <div
@@ -372,7 +372,7 @@ function Landing() {
               viewport={{ once: true, amount: 0.3 }}
             >
               <motion.h2 variants={item} className="text-3xl font-semibold tracking-tight text-[var(--navy-700)] md:text-4xl" style={{ textWrap: "balance" }}>
-                Your team is one conversation away from a stronger year.
+                Your next step is just one login away.
               </motion.h2>
               <motion.p variants={item} className="mx-auto mt-5 max-w-2xl text-base leading-relaxed text-[var(--navy-700)]/70 md:text-lg">
                 Step back into the platform and pick up exactly where you left off — sessions,
