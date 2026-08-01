@@ -41,7 +41,7 @@ const fadeBackground = `linear-gradient(to top, ${FADE_STOPS.map(
 
 export function Footer({ nav = [] }: { nav?: FooterNavGroup[] }) {
   return (
-    <footer className="relative isolate mt-20 overflow-hidden md:mt-28">
+    <footer className="relative isolate mt-36 overflow-hidden md:mt-52">
       {/* Navy fade — transparent at the top, solid brand navy at the floor. */}
       <div
         aria-hidden
