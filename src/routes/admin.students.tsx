@@ -1301,7 +1301,7 @@ function StudentDetailModal({
     <Overlay onClose={onClose}>
       <div className="verbo-sdm relative flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-[28px] bg-card shadow-floating">
         {/* Header */}
-        <div className="flex items-start justify-between gap-3 px-5 py-5 sm:px-7 sm:py-6" style={{ background: "linear-gradient(135deg, #01304a 0%, #02466b 100%)" }}>
+        <div className="flex shrink-0 items-start justify-between gap-3 px-5 py-5 sm:px-7 sm:py-6" style={{ background: "linear-gradient(135deg, #01304a 0%, #02466b 100%)" }}>
           <div className="flex min-w-0 items-center gap-3.5">
             {avatar ? (
               <img src={avatar} alt={student.name} className="h-14 w-14 shrink-0 rounded-full object-cover ring-2 ring-white/25" />
