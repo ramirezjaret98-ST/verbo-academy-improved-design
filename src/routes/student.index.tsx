@@ -611,7 +611,7 @@ function StudentDashboard() {
                   src={verbotStageZero.url}
                   alt=""
                   aria-hidden
-                  className="absolute -top-4 right-0 h-[150%] w-auto select-none object-contain"
+                  className="absolute -top-4 right-0 h-[150%] w-auto select-none object-contain opacity-[0.08]"
                   style={{ filter: "drop-shadow(0 12px 20px rgba(0,0,0,0.28))" }}
                 />
               </div>
