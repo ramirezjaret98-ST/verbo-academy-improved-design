@@ -376,7 +376,14 @@ function Page() {
 // ===========================================================================
 // STUDENT CARD
 // ===========================================================================
-function StudentCard({ student: s, onOpen }: { student: User; onOpen: () => void }) {
+const TIER_ACCENT: Record<string, { accent: string; label: string }> = {
+  Core: { accent: "#f38934", label: "Core" },
+  Advance: { accent: "#01304a", label: "Advance" },
+  Elite: { accent: "#d4af37", label: "Elite" },
+  Signature: { accent: "#d4af37", label: "Signature" },
+};
+
+function StudentCard({ student: s, onOpen, index = 0 }: { student: User; onOpen: () => void; index?: number }) {
   const avatar = useAvatar(s.id);
   const product = getProduct(s.product);
   const groupInfo = groupOfStudent(s.id);
@@ -405,29 +412,42 @@ function StudentCard({ student: s, onOpen }: { student: User; onOpen: () => void
   // students (kept as before) and standalone Insights customers.
   const showInsightsBadge = productType === "performance" || productType === "insights";
 
+  const tier = s.access_plan ? TIER_ACCENT[s.access_plan] : undefined;
+  const accent = tier?.accent ?? "var(--navy-400, #64748b)";
+  const isPremiumTier = s.access_plan === "Elite" || s.access_plan === "Signature";
+  const cardVars = {
+    "--tier": accent,
+    "--verbo-card-i": index,
+  } as React.CSSProperties;
+
   if (productType !== "performance") {
     const typeLabel = productType === "workshops" ? "Focus Workshops" : "Insights";
+    const TypeIcon = productType === "workshops" ? Layers : Lightbulb;
     return (
       <button
         onClick={onOpen}
-        className="group relative flex flex-col rounded-2xl border border-border bg-card p-5 text-left shadow-soft transition-all hover:-translate-y-1 hover:shadow-elevated"
+        style={{ ...cardVars, "--tier": "var(--primary)" } as React.CSSProperties}
+        className="verbo-student-card group relative flex flex-col overflow-hidden rounded-[22px] border border-border/80 bg-card p-5 text-left"
       >
+        <span className="verbo-student-card__rail" aria-hidden />
         <div className="flex items-center gap-3">
           {avatar ? (
-            <img src={avatar} alt={s.name} className="h-12 w-12 rounded-full object-cover" />
+            <img src={avatar} alt={s.name} className="verbo-student-card__avatar h-12 w-12 rounded-full object-cover" />
           ) : (
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground">
+            <div className="verbo-student-card__avatar flex h-12 w-12 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground">
               {initials(s.name)}
             </div>
           )}
           <div className="min-w-0">
-            <div className="truncate font-semibold text-foreground">{s.name}</div>
-            <div className="truncate text-xs text-muted-foreground">{s.email}</div>
+            <div className="truncate font-semibold tracking-[-0.01em] text-foreground">{s.name}</div>
+            <div className="truncate text-xs font-light text-muted-foreground">{s.email}</div>
           </div>
         </div>
 
         <div className="mt-4 flex flex-wrap items-center gap-1.5">
-          <Tag className="bg-primary/10 text-primary">{typeLabel}</Tag>
+          <Tag className="inline-flex gap-1 bg-primary/10 text-primary">
+            <TypeIcon className="h-3 w-3" strokeWidth={1.8} /> {typeLabel}
+          </Tag>
           <Tag className={statusBadge.cls}>{statusBadge.label}</Tag>
           {showInsightsBadge && (
             <Tag className={blocked ? "bg-destructive/10 text-destructive" : "bg-secondary text-secondary-foreground"}>
@@ -442,54 +462,107 @@ function StudentCard({ student: s, onOpen }: { student: User; onOpen: () => void
   return (
     <button
       onClick={onOpen}
-      className={`group relative flex flex-col rounded-2xl border border-border bg-card p-5 text-left shadow-soft transition-all hover:-translate-y-1 hover:shadow-elevated ${overdue ? "verbo-pay-overdue-glow" : payDue ? "verbo-pay-glow" : ""}`}
+      style={cardVars}
+      data-group={groupInfo ? "true" : undefined}
+      data-premium={isPremiumTier ? "true" : undefined}
+      className={`verbo-student-card group relative flex flex-col overflow-hidden rounded-[22px] border border-border/80 bg-card p-5 text-left ${overdue ? "verbo-pay-overdue-glow" : payDue ? "verbo-pay-glow" : ""}`}
     >
+      {/* Tier rail — the card's identity at a glance */}
+      <span className="verbo-student-card__rail" aria-hidden />
+      {isPremiumTier && <span className="verbo-student-card__sheen" aria-hidden />}
+
       {payDue && (
         <span
-          className={`absolute right-3 top-3 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${overdue ? "text-white" : "bg-destructive/10 text-destructive"}`}
+          className={`absolute right-3 top-3 z-10 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${overdue ? "text-white" : "bg-destructive/10 text-destructive"}`}
           style={overdue ? { background: "#b52904" } : undefined}
         >
           <CreditCard className="h-3 w-3" /> {overdue ? "Overdue" : "Payment due"}
         </span>
       )}
 
-      <div className="flex items-center gap-3">
-        {avatar ? (
-          <img src={avatar} alt={s.name} className="h-12 w-12 rounded-full object-cover" />
-        ) : (
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground">
-            {initials(s.name)}
-          </div>
-        )}
-        <div className="min-w-0">
-          <div className="truncate font-semibold text-foreground">{s.name}</div>
-          {s.product === "enterprise" && s.company && (
-            <div className="truncate text-xs text-muted-foreground">{s.company}</div>
+      {/* Identity row */}
+      <div className="flex items-start gap-3 pl-1">
+        <div className="relative shrink-0">
+          {avatar ? (
+            <img src={avatar} alt={s.name} className="verbo-student-card__avatar h-12 w-12 rounded-full object-cover" />
+          ) : (
+            <div className="verbo-student-card__avatar flex h-12 w-12 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground">
+              {initials(s.name)}
+            </div>
+          )}
+          {/* Solo vs group is legible on the avatar itself */}
+          {groupInfo && (
+            <span
+              className="verbo-student-card__groupdot absolute -bottom-0.5 -right-0.5 flex h-5 w-5 items-center justify-center rounded-full border-2 border-card bg-blue-500 text-white"
+              aria-hidden
+            >
+              <Users className="h-2.5 w-2.5" strokeWidth={2.4} />
+            </span>
           )}
         </div>
-      </div>
 
-      <div className="mt-3 flex flex-wrap gap-1.5">
-        {product && <Tag className="bg-primary/10 text-primary">{product.name}</Tag>}
-        {s.access_plan && <Tag style={accessPlanPillStyle(s.access_plan)}>{s.access_plan}</Tag>}
-        {s.focus && <Tag className="bg-secondary text-secondary-foreground">{s.focus}</Tag>}
-        {groupInfo && (
-          <Tag className="bg-blue-500/10 text-blue-600">Group: {groupInfo.group.name}</Tag>
+        <div className="min-w-0 flex-1">
+          <div className="truncate font-semibold tracking-[-0.01em] text-foreground">{s.name}</div>
+          <div className="mt-0.5 flex min-w-0 items-center gap-1.5 text-xs font-light text-muted-foreground">
+            {product && <span className="truncate">{product.name}</span>}
+            {s.product === "enterprise" && s.company && (
+              <>
+                <span className="opacity-40">·</span>
+                <span className="truncate">{s.company}</span>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Tier chip, right-aligned so tiers line up across the grid */}
+        {s.access_plan && (
+          <span
+            className="shrink-0 rounded-full px-2.5 py-1 text-[10.5px] font-semibold tracking-[0.04em]"
+            style={accessPlanPillStyle(s.access_plan)}
+          >
+            {s.access_plan}
+          </span>
         )}
       </div>
 
-      <div className="mt-4">
-        <div className="mb-1 flex items-center justify-between text-[11px] text-muted-foreground">
-          <span>Sessions</span>
-          <span className="font-medium text-foreground">{remaining}/{hired}</span>
-        </div>
-        <div className="h-1.5 w-full overflow-hidden rounded-full bg-secondary">
-          <div className="h-full rounded-full bg-accent" style={{ width: `${Math.min(100, pct)}%` }} />
-        </div>
+      {/* Group vs individual — an explicit line, not just a pill in the pile */}
+      <div className="mt-3.5 flex items-center gap-2 pl-1">
+        {groupInfo ? (
+          <span className="inline-flex min-w-0 items-center gap-1.5 rounded-lg bg-blue-500/10 px-2 py-1 text-[11px] font-medium text-blue-600">
+            <Users className="h-3 w-3 shrink-0" strokeWidth={1.9} />
+            <span className="truncate">{groupInfo.group.name}</span>
+          </span>
+        ) : (
+          <span className="inline-flex items-center gap-1.5 rounded-lg bg-secondary px-2 py-1 text-[11px] font-medium text-muted-foreground">
+            <span className="h-1.5 w-1.5 rounded-full bg-current opacity-50" aria-hidden />
+            Individual
+          </span>
+        )}
+        {s.focus && <span className="truncate text-[11px] font-light text-muted-foreground">{s.focus}</span>}
       </div>
 
-      <div className="mt-4 flex flex-wrap items-center gap-1.5">
-        {s.current_roadmap_level && <Tag className="bg-muted text-muted-foreground">{s.current_roadmap_level}</Tag>}
+      {/* Sessions — the number people scan for */}
+      <div className="mt-4 rounded-xl border border-border/60 bg-background/60 px-3 py-2.5">
+        <div className="flex items-baseline justify-between">
+          <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">Sessions</span>
+          <span className="font-display text-base font-semibold tabular-nums tracking-[-0.01em] text-foreground">
+            {remaining}
+            <span className="text-xs font-light text-muted-foreground">/{hired}</span>
+          </span>
+        </div>
+        <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-secondary">
+          <div
+            className="verbo-student-card__bar h-full rounded-full"
+            style={{ width: `${Math.min(100, pct)}%`, background: accent }}
+          />
+        </div>
+        {s.current_roadmap_level && (
+          <div className="mt-2 truncate text-[11px] font-light text-muted-foreground">{s.current_roadmap_level}</div>
+        )}
+      </div>
+
+      {/* Status strip */}
+      <div className="mt-3 flex flex-wrap items-center gap-1.5 pl-1">
         <Tag className={statusBadge.cls}>{statusBadge.label}</Tag>
         <Tag className={blocked ? "bg-destructive/10 text-destructive" : "bg-secondary text-secondary-foreground"}>
           {blocked ? <>Insights Blocked</> : <>Insights {strikes}/{MAX_INSIGHT_STRIKES}</>}
@@ -511,6 +584,7 @@ function Tag({ children, className = "", style }: { children: React.ReactNode; c
     </span>
   );
 }
+
 
 // ===========================================================================
 // REGISTER / EDIT FORM MODAL  (stepped card selection)
