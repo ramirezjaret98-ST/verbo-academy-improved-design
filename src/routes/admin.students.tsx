@@ -1546,25 +1546,25 @@ function StudentDetailModal({
         )}
 
         {/* Footer actions */}
-        <div className="flex flex-wrap items-center gap-2 border-t border-border bg-secondary/30 px-6 py-4">
-          <GhostButton onClick={onEdit} className="!py-1.5 !text-xs"><Pencil className="h-3.5 w-3.5" /> Edit profile</GhostButton>
-          <GhostButton onClick={() => { patch({ must_change_password: true }); alert("This user will be asked to set a new password the next time they log in."); }} className="!py-1.5 !text-xs"><KeyRound className="h-3.5 w-3.5" /> Require Password Reset</GhostButton>
+        <div className="flex flex-wrap items-center gap-2 border-t border-border bg-secondary/30 px-5 py-4 sm:px-7">
+          <GhostButton onClick={onEdit} className="verbo-sdm-action !py-1.5 !text-xs"><Pencil className="h-3.5 w-3.5" /> Edit profile</GhostButton>
+          <GhostButton onClick={() => { patch({ must_change_password: true }); alert("This user will be asked to set a new password the next time they log in."); }} className="verbo-sdm-action !py-1.5 !text-xs"><KeyRound className="h-3.5 w-3.5" /> Require Password Reset</GhostButton>
           <button
             onClick={() => setPanel((p) => (p === "reassign" ? "none" : "reassign"))}
-            className="inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-all hover:brightness-110"
+            className="verbo-sdm-action inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-all hover:brightness-110"
             style={{ backgroundColor: "#0f766e" }}
           >
             <Users className="h-3.5 w-3.5" /> Reassign teacher
           </button>
           <button
             onClick={() => setPanel((p) => (p === "freeze" ? "none" : "freeze"))}
-            className="inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-all hover:brightness-110"
+            className="verbo-sdm-action inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-all hover:brightness-110"
             style={{ backgroundColor: "#38bdf8" }}
           >
             <Snowflake className="h-3.5 w-3.5" /> Freeze
           </button>
           {student.status === "suspended" ? (
-            <GhostButton onClick={() => patch({ status: "active" })} className="!py-1.5 !text-xs"><Play className="h-3.5 w-3.5" /> Reactivate</GhostButton>
+            <GhostButton onClick={() => patch({ status: "active" })} className="verbo-sdm-action !py-1.5 !text-xs"><Play className="h-3.5 w-3.5" /> Reactivate</GhostButton>
           ) : (
             <button
               onClick={() => {
@@ -1576,7 +1576,7 @@ function StudentDetailModal({
                 }
               }}
               disabled={isGrouped && groupInfo?.member.status !== "active"}
-              className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-destructive px-3 py-1.5 text-xs font-semibold text-destructive-foreground shadow-sm transition-all hover:brightness-110 disabled:opacity-40"
+              className="verbo-sdm-action inline-flex items-center justify-center gap-1.5 rounded-lg bg-destructive px-3 py-1.5 text-xs font-semibold text-destructive-foreground shadow-sm transition-all hover:brightness-110 disabled:opacity-40"
             >
               <Ban className="h-3.5 w-3.5" /> Suspend
             </button>
@@ -1584,7 +1584,7 @@ function StudentDetailModal({
           <button
             onClick={() => blocked && patch({ insights_strikes: 0 })}
             disabled={!blocked}
-            className="inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-all enabled:hover:brightness-110 disabled:opacity-40"
+            className="verbo-sdm-action inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-all enabled:hover:brightness-110 disabled:opacity-40"
             style={{ backgroundColor: "#f38934" }}
           >
             <Unlock className="h-3.5 w-3.5" /> Unlock Insights ({strikes}/{MAX_INSIGHT_STRIKES})
@@ -1593,7 +1593,7 @@ function StudentDetailModal({
             <button
               onClick={() => bcBlocked && patch({ bookclub_strikes: 0 })}
               disabled={!bcBlocked}
-              className="inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-all enabled:hover:brightness-110 disabled:opacity-40"
+              className="verbo-sdm-action inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-all enabled:hover:brightness-110 disabled:opacity-40"
               style={{ backgroundColor: "#0f766e" }}
             >
               <Unlock className="h-3.5 w-3.5" /> Unlock Book Clubs ({bcStrikes}/{MAX_BOOKCLUB_STRIKES})
@@ -1602,7 +1602,7 @@ function StudentDetailModal({
           {!isGrouped && (
             <button
               onClick={markPaid}
-              className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-success px-3 py-1.5 text-xs font-semibold text-success-foreground shadow-sm transition-opacity hover:opacity-90"
+              className="verbo-sdm-action inline-flex items-center justify-center gap-1.5 rounded-lg bg-success px-3 py-1.5 text-xs font-semibold text-success-foreground shadow-sm transition-opacity hover:opacity-90"
             >
               <CreditCard className="h-3.5 w-3.5" /> Mark as paid
             </button>
