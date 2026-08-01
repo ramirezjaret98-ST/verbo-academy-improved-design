@@ -62,7 +62,9 @@ function StudentLayout() {
           </div>
         </main>
 
-        <Footer />
+        <Footer
+          nav={[{ label: "Student", items: items.map((i) => ({ label: i.label, to: i.to })) }]}
+        />
       </div>
 
     </RoleGuard>
