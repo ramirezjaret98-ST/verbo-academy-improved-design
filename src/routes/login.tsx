@@ -198,7 +198,7 @@ function LoginPage() {
                   onMouseDown={(e) => e.preventDefault()}
                   aria-label={showPassword ? "Hide password" : "Show password"}
                   aria-pressed={showPassword}
-                  className="verbo-eye-btn relative z-10 cursor-pointer absolute right-2.5 top-1/2 -translate-y-1/2 rounded-md p-1.5 text-[#01304a]/45 hover:text-[#f38934]"
+                  className="verbo-eye-btn absolute right-2 top-1/2 z-10 -translate-y-1/2 cursor-pointer rounded-md p-1.5 text-[#01304a]/45 hover:text-[#f38934]"
                 >
                   <EyeToggle open={showPassword} />
                 </button>
