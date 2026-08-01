@@ -969,7 +969,7 @@ function TeacherDashboard() {
         </div>
 
         <div className="overflow-hidden rounded-3xl border border-border bg-card">
-          <div className="hidden grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_auto_auto] items-center gap-4 border-b border-border px-5 py-2.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground md:grid">
+          <div className="hidden grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_auto_auto] items-center gap-4 border-b border-border pl-6 pr-5 py-2.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground md:grid">
             <span>Student / Group</span>
             <span>Date</span>
             <span className="justify-self-start">Origin</span>
@@ -977,7 +977,7 @@ function TeacherDashboard() {
           </div>
 
           {recentLive.length === 0 && recentClubReports.length === 0 && (
-            <div className="px-5 py-8 text-center text-sm text-muted-foreground">No recent sessions.</div>
+            <div className="px-6 py-8 text-center text-sm text-muted-foreground">No recent sessions.</div>
           )}
 
           <ul className="divide-y divide-border">
@@ -1004,12 +1004,12 @@ function TeacherDashboard() {
                 <li
                   key={s.id}
                   onClick={() => setViewing(s)}
-                  className="verbo-act-row verbo-td-in relative grid cursor-pointer grid-cols-1 items-center gap-x-4 gap-y-1.5 py-3.5 pl-5 pr-5 hover:bg-secondary/40 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_auto_auto]"
+                  className="verbo-act-row verbo-td-in relative grid cursor-pointer grid-cols-1 items-center gap-x-4 gap-y-1.5 py-3.5 pl-6 pr-5 hover:bg-secondary/40 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_auto_auto]"
                   style={{ animationDelay: `${Math.min(i, 8) * 34}ms` }}
                 >
                   <span
                     aria-hidden
-                    className="verbo-act-rail absolute left-0 top-1/2 h-8 w-[3px] -translate-y-1/2 rounded-r-full"
+                    className="verbo-act-rail absolute inset-y-1 left-0 w-[3px] rounded-r-full"
                     style={{ background: rail }}
                   />
                   <div className="flex min-w-0 items-center gap-1.5">
@@ -1042,12 +1042,12 @@ function TeacherDashboard() {
               return (
                 <li
                   key={`clubreport-${r.event_id}`}
-                  className="verbo-act-row verbo-td-in relative grid grid-cols-1 items-center gap-x-4 gap-y-1.5 py-3.5 pl-5 pr-5 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_auto_auto]"
+                  className="verbo-act-row verbo-td-in relative grid grid-cols-1 items-center gap-x-4 gap-y-1.5 py-3.5 pl-6 pr-5 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_auto_auto]"
                   style={{ animationDelay: `${Math.min(recentLive.length + i, 8) * 34}ms` }}
                 >
                   <span
                     aria-hidden
-                    className="verbo-act-rail absolute left-0 top-1/2 h-8 w-[3px] -translate-y-1/2 rounded-r-full"
+                    className="verbo-act-rail absolute inset-y-1 left-0 w-[3px] rounded-r-full"
                     style={{ background: GREEN }}
                   />
                   <div className="truncate text-sm font-semibold text-foreground">{title}</div>
