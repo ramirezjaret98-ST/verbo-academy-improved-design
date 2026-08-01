@@ -685,25 +685,31 @@ function TeacherDashboard() {
             style={{ animationDelay: `${180 + i * 50}ms` }}
           >
             <HeroStatCard
-              className={`${p.gradient} !min-h-[104px] !py-4${p.pulse ? " verbo-focus-pulse" : ""}`}
+              className={`relative overflow-hidden ${p.gradient} !min-h-[104px] !py-4${p.pulse ? " verbo-focus-pulse" : ""}`}
               style={p.pulse ? ({ ["--verbo-focus-pulse-color" as any]: p.pulse } as React.CSSProperties) : undefined}
             >
+              <span
+                aria-hidden
+                className="pointer-events-none absolute -inset-y-4 right-3 flex select-none items-center text-[104px] font-bold leading-none tabular-nums text-white opacity-[0.08]"
+              >
+                {p.count}
+              </span>
               <div className="relative flex w-full items-center justify-between gap-3">
                 <div className="min-w-0">
                   <div className="text-[10px] font-semibold uppercase tracking-[0.14em]" style={{ color: "rgba(255,255,255,0.72)" }}>
                     {p.eyebrow}
                   </div>
                   <div className="mt-1 flex items-center gap-2">
-                    <span className="text-3xl font-bold leading-none tabular-nums text-white">{p.count}</span>
                     <span className="min-w-0 text-base font-semibold leading-tight text-white sm:text-lg">{p.title}</span>
                   </div>
                   <div className="mt-1.5 text-[11px] font-medium" style={{ color: "rgba(255,255,255,0.82)" }}>
                     {p.sub}
                   </div>
                 </div>
-                <img src={p.icon} alt="" aria-hidden className="h-[31px] w-[31px] shrink-0" />
+                <img src={p.icon} alt="" aria-hidden className="relative h-[31px] w-[31px] shrink-0" />
               </div>
             </HeroStatCard>
+
           </div>
         ))}
       </section>
