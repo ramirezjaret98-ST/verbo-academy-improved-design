@@ -202,10 +202,11 @@ export function StaffProfileModal({ open, onOpenChange }: Props) {
   return (
     <>
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-xl gap-0 overflow-hidden rounded-[32px] border border-border/40 p-0 shadow-floating">
+      <DialogContent className="max-w-2xl gap-0 overflow-hidden rounded-[40px] border border-border/40 p-0 shadow-floating">
         <DialogTitle className="sr-only">My profile</DialogTitle>
 
-        {/* Hero banner + avatar — kept outside the scroll container so the avatar overlap isn't clipped */}
+        <div className="max-h-[66vh] overflow-y-auto">
+        {/* Hero banner + avatar — scrolls with the content */}
         <div className="relative">
           {/* Hero banner — taller, calmer navy gradient with a single soft orange accent */}
           <div
