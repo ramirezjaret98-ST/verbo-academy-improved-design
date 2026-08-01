@@ -292,7 +292,7 @@ function Page() {
 // TEACHER CARD
 // ===========================================================================
 function TeacherKpiCard({
-  teacher: t, kpis, pending, onOpenChart, onOpenReviews, canOverride, canOverrideStreak, onOverride,
+  teacher: t, kpis, pending, onOpenChart, onOpenReviews, canOverride, canOverrideStreak, onOverride, index = 0,
 }: {
   teacher: User;
   kpis: ReturnType<typeof computeTeacherKpis>;
@@ -302,6 +302,7 @@ function TeacherKpiCard({
   canOverride: boolean;
   canOverrideStreak: boolean;
   onOverride: (metric: KpiMetric, currentValue: number) => void;
+  index?: number;
 }) {
   const monthOverrides = overridesForMonth(t.id, monthKeyOf(new Date()));
   const displayRating = monthOverrides.ratingNormalized
