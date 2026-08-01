@@ -1883,3 +1883,45 @@
   }
   .verbo-kpi-tile__bar { transition: none; }
 }
+
+/* ── KPI card: sectioned surfaces so each zone reads apart (Entry 059) ──── */
+.verbo-kpi-card__head {
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklab, var(--st) 9%, var(--card)) 0%,
+    color-mix(in oklab, var(--st) 4%, var(--card)) 100%
+  );
+  border-bottom: 1px solid color-mix(in oklab, var(--st) 18%, var(--border));
+}
+.verbo-kpi-card__composite {
+  background: color-mix(in oklab, var(--navy-700) 4%, var(--card));
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--navy-700) 9%, transparent);
+}
+.verbo-kpi-card__signals {
+  background: color-mix(in oklab, var(--navy-700) 2.5%, var(--card));
+  border-top: 1px solid var(--border);
+}
+.verbo-kpi-tile {
+  background: var(--card);
+  border-radius: 12px;
+  padding: 8px 10px;
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--mc, var(--navy-700)) 16%, transparent);
+  transition: box-shadow 200ms ease, background 200ms ease;
+}
+/* Rating pill: solid fill, white text */
+.verbo-kpi-rating {
+  color: #fff;
+  background: var(--rt);
+  box-shadow: 0 1px 2px color-mix(in oklab, var(--rt) 45%, transparent),
+    0 6px 14px -8px color-mix(in oklab, var(--rt) 80%, transparent);
+}
+@media (hover: hover) and (pointer: fine) {
+  .verbo-kpi-rating:hover {
+    background: color-mix(in oklab, var(--rt) 88%, #000);
+    box-shadow: 0 2px 4px color-mix(in oklab, var(--rt) 45%, transparent),
+      0 10px 20px -10px color-mix(in oklab, var(--rt) 85%, transparent);
+  }
+  .verbo-kpi-card:hover .verbo-kpi-tile {
+    background: color-mix(in oklab, var(--mc, var(--navy-700)) 5%, var(--card));
+  }
+}
