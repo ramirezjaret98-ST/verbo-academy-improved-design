@@ -1017,3 +1017,8 @@ Sin cambios de lógica ni rutas. `DATA_MODEL.md` sigue sincronizado.
 - El cambio aplica a todos los pills de rating que usan `ratingBand()` (`/teacher/financial`, `/admin/kpis`) de forma consistente, sin alterar la lógica de clasificación.
 - Se documenta la paleta de `RatingBand` en `DATA_MODEL.md`.
 - Visual only — no logic, data or route changes; `DATA_MODEL.md` updated.
+
+## Entry 078 — /teacher/financial: bucket Bonus a verde lima
+- Se actualiza `FIN.bonus` en `src/routes/teacher.financial.tsx`: `base` pasa de `#d97706` (naranja) a `#84cc16` (verde lima), con `soft` y `ring` ajustados a `rgba(132,204,22,0.10)` y `rgba(132,204,22,0.28)` respectivamente.
+- Aplica al bucket colapsable, su panel expandido, el top accent de la tarjeta, el icono badge y el glow de sombra.
+- Visual only — no logic, data or route changes; `DATA_MODEL.md` remains synchronized.
