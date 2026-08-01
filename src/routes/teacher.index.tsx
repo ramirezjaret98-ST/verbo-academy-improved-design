@@ -512,100 +512,114 @@ function TeacherDashboard() {
   };
 
   return (
-    <div className="space-y-10">
-      <header>
-        <div className="text-sm text-muted-foreground">Good day,</div>
-        <div className="mt-1 flex flex-wrap items-center justify-between gap-2">
-          <h1 className="text-3xl font-semibold tracking-tight text-black">{user.name}</h1>
-          <Pill>{rankLabel(user)}</Pill>
-          <span className="ml-auto"><Pill>{sessionsTaught} sessions taught</Pill></span>
+    <div className="space-y-8 sm:space-y-10">
+      <header className="verbo-td-in grid grid-cols-[minmax(0,1fr)_auto] items-end gap-3 border-b border-border pb-5">
+        <div className="min-w-0">
+          <div className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Good day,</div>
+          <h1
+            className="mt-1.5 truncate text-2xl font-semibold text-foreground sm:text-4xl"
+            style={{ letterSpacing: "-0.02em", lineHeight: 1.05 }}
+          >
+            {user.name}
+          </h1>
         </div>
-
-
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+          <Pill>{rankLabel(user)}</Pill>
+          <Pill>{sessionsTaught} sessions taught</Pill>
+        </div>
       </header>
 
       {!hydrated ? (
-        <SkeletonStatCards count={4} className="grid gap-4 md:grid-cols-2 lg:grid-cols-4" />
+        <SkeletonStatCards count={4} className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4" />
       ) : (
-      <section className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <section className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
 
-        <Link to="/teacher/students" className="block cursor-pointer">
+        <Link to="/teacher/students" className="verbo-td-in verbo-td-press block cursor-pointer" style={{ animationDelay: "0ms" }}>
           <HeroStatCard className="!items-start border border-border bg-card">
-            <div className="absolute right-6 top-6 flex h-11 w-11 items-center justify-center rounded-xl bg-transparent">
-              <img src={studentsIconAsset.url} alt="" className="h-[52px] w-[52px]" />
+            <div className="absolute right-4 top-4 flex items-center justify-center sm:right-6 sm:top-6">
+              <img src={studentsIconAsset.url} alt="" className="h-10 w-10 sm:h-[52px] sm:w-[52px]" />
             </div>
             <div className="relative w-full">
-              <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground sm:text-xs">
                 Assigned Students
               </div>
-              <div className="mt-2 text-5xl font-bold leading-none text-foreground">
+              <div className="mt-2 text-4xl font-bold leading-none tabular-nums text-foreground sm:text-5xl">
                 <AnimatedNumber value={students.length} />
               </div>
-
+              <div className="mt-2 text-[11px] font-medium text-muted-foreground">active roster</div>
             </div>
           </HeroStatCard>
         </Link>
-        <Link to="/teacher/calendar" className="block cursor-pointer">
+        <Link to="/teacher/calendar" className="verbo-td-in verbo-td-press block cursor-pointer" style={{ animationDelay: "45ms" }}>
           <HeroStatCard className="!items-start border border-border bg-card">
-            <div className="absolute right-6 top-6 flex h-11 w-11 items-center justify-center rounded-xl bg-transparent">
-              <img src={upcomingIconAsset.url} alt="" className="h-[52px] w-[52px]" />
+            <div className="absolute right-4 top-4 flex items-center justify-center sm:right-6 sm:top-6">
+              <img src={upcomingIconAsset.url} alt="" className="h-10 w-10 sm:h-[52px] sm:w-[52px]" />
             </div>
             <div className="relative w-full">
-              <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground sm:text-xs">
                 Upcoming Sessions
               </div>
-              <div className="mt-2 text-5xl font-bold leading-none text-foreground">
-
+              <div className="mt-2 text-4xl font-bold leading-none tabular-nums text-foreground sm:text-5xl">
                 <AnimatedNumber value={upcoming7dCount} />
               </div>
-              <div className="mt-2 text-xs font-medium text-muted-foreground">next 7 days</div>
+              <div className="mt-2 text-[11px] font-medium text-muted-foreground">next 7 days</div>
             </div>
           </HeroStatCard>
         </Link>
-        <button type="button" onClick={() => setShowRatingTrend(true)} className="block cursor-pointer text-left">
+        <button
+          type="button"
+          onClick={() => setShowRatingTrend(true)}
+          className="verbo-td-in verbo-td-press block cursor-pointer text-left"
+          style={{ animationDelay: "90ms" }}
+        >
           <HeroStatCard
             className="verbo-focus-pulse !items-start border border-border bg-card"
             style={{ ["--verbo-focus-pulse-color" as any]: ratingGlow } as React.CSSProperties}
           >
-            <div className="absolute right-6 top-6 flex h-11 w-11 items-center justify-center rounded-xl bg-transparent">
-              <img src={starIconAsset.url} alt="" className="h-[52px] w-[52px]" />
+            <div className="absolute right-4 top-4 flex items-center justify-center sm:right-6 sm:top-6">
+              <img src={starIconAsset.url} alt="" className="h-10 w-10 sm:h-[52px] sm:w-[52px]" />
             </div>
             <div className="relative w-full">
-              <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground sm:text-xs">
                 Avg Rating
               </div>
-              <div className="mt-2 text-5xl font-bold leading-none text-foreground">
+              <div className="mt-2 text-4xl font-bold leading-none tabular-nums sm:text-5xl" style={{ color: ratingGlow }}>
                 {avgRating30 != null ? `${avgRating30.toFixed(1)}★` : "—"}
               </div>
-              <div className="mt-2 text-xs font-medium text-muted-foreground">last 30 days · view trend</div>
+              <div className="mt-2 text-[11px] font-medium text-muted-foreground">last 30 days · view trend</div>
             </div>
           </HeroStatCard>
         </button>
-        <Link to="/teacher/financial" className="group block">
+        <Link to="/teacher/financial" className="verbo-td-in verbo-td-press group block" style={{ animationDelay: "135ms" }}>
           <HeroStatCard
             className="verbo-focus-pulse !items-start border border-border bg-card"
             style={{ ["--verbo-focus-pulse-color" as any]: performanceGlow } as React.CSSProperties}
           >
-            <div className="absolute right-6 top-6 flex h-11 w-11 items-center justify-center rounded-xl bg-transparent">
-              <img src={performanceIconAsset.url} alt="" className="h-[52px] w-[52px]" />
+            <div className="absolute right-4 top-4 flex items-center justify-center sm:right-6 sm:top-6">
+              <img src={performanceIconAsset.url} alt="" className="h-10 w-10 sm:h-[52px] sm:w-[52px]" />
             </div>
             <div className="relative w-full">
-              <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground sm:text-xs">
                 Performance
               </div>
-              <div className="mt-2 text-6xl font-bold leading-none text-foreground">
+              <div className="mt-2 text-4xl font-bold leading-none tabular-nums sm:text-5xl" style={{ color: performanceGlow }}>
                 <AnimatedNumber value={kpis?.composite ?? 0} suffix="%" />
-                {kpis?.onboarding && (
-                  <span className="ml-2 rounded-full bg-white/85 px-2 py-0.5 align-middle text-[10px] font-semibold uppercase tracking-wider text-blue-700">
-                    Onboarding
-                  </span>
-                )}
               </div>
-              <div className="mt-2 text-xs font-medium text-muted-foreground">
+              {kpis?.onboarding && (
+                <span className="mt-2 inline-flex rounded-full bg-blue-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-blue-700">
+                  Onboarding
+                </span>
+              )}
+              <div className="mt-2 text-[11px] font-medium text-muted-foreground">
                 Composite Score · view balance
               </div>
+              <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-foreground/[0.07]">
+                <span
+                  className="block h-full rounded-full transition-[width] duration-700 ease-out"
+                  style={{ width: `${Math.min(100, Math.max(0, kpis?.composite ?? 0))}%`, background: performanceGlow }}
+                />
+              </div>
             </div>
-
           </HeroStatCard>
         </Link>
 
@@ -614,80 +628,74 @@ function TeacherDashboard() {
 
 
 
+
       {/* Compressed action cards */}
-      <section className="grid gap-4 md:grid-cols-3">
-        <div
-          role="button"
-          tabIndex={0}
-          onClick={() => setOpenPanel("attention")}
-          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpenPanel("attention"); } }}
-          className="block cursor-pointer text-left"
-        >
-          <HeroStatCard
-            className={`card-gradient-crimson !min-h-[92px] !py-4${attention.length > 0 ? " verbo-focus-pulse" : ""}`}
-            style={attention.length > 0 ? ({ ["--verbo-focus-pulse-color" as any]: CRIMSON } as React.CSSProperties) : undefined}
+      <section className="grid gap-3 sm:gap-4 md:grid-cols-3">
+        {([
+          {
+            key: "attention" as DashboardPanel,
+            eyebrow: "Action Required",
+            title: "Needs Your Attention",
+            sub: attention.length === 0 ? "You're all caught up" : `${attention.length} item${attention.length === 1 ? "" : "s"} need review`,
+            gradient: "card-gradient-crimson",
+            icon: alertIconAsset.url,
+            count: attention.length,
+            pulse: attention.length > 0 ? CRIMSON : null,
+          },
+          {
+            key: "plan" as DashboardPanel,
+            eyebrow: "Lesson Planning",
+            title: "Plan Your Upcoming Sessions",
+            sub: `${toPlanAll.length} session${toPlanAll.length === 1 ? "" : "s"} to plan`,
+            gradient: "card-gradient-violet",
+            icon: planIconAsset.url,
+            count: toPlanAll.length,
+            pulse: null,
+          },
+          {
+            key: "complete" as DashboardPanel,
+            eyebrow: "Session Reports",
+            title: "Complete Your Sessions",
+            sub: `${awaitingCompletion.length + pendingClubEvents.length} session${awaitingCompletion.length + pendingClubEvents.length === 1 ? "" : "s"} awaiting completion`,
+            gradient: "card-gradient-lime",
+            icon: completeIconAsset.url,
+            count: awaitingCompletion.length + pendingClubEvents.length,
+            pulse: null,
+          },
+        ]).map((p, i) => (
+          <div
+            key={p.key}
+            role="button"
+            tabIndex={0}
+            onClick={() => setOpenPanel(p.key)}
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpenPanel(p.key); } }}
+            className="verbo-td-in verbo-td-press block cursor-pointer text-left"
+            style={{ animationDelay: `${180 + i * 50}ms` }}
           >
-            <div className="relative flex w-full items-center justify-between gap-3">
-              <div className="min-w-0">
-                <div className="text-xs font-semibold uppercase tracking-wider" style={{ color: "rgba(255,255,255,0.75)" }}>
-                  Action Required
+            <HeroStatCard
+              className={`${p.gradient} !min-h-[104px] !py-4${p.pulse ? " verbo-focus-pulse" : ""}`}
+              style={p.pulse ? ({ ["--verbo-focus-pulse-color" as any]: p.pulse } as React.CSSProperties) : undefined}
+            >
+              <div className="relative flex w-full items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.14em]" style={{ color: "rgba(255,255,255,0.72)" }}>
+                    {p.eyebrow}
+                  </div>
+                  <div className="mt-1 flex items-center gap-2">
+                    <span className="text-3xl font-bold leading-none tabular-nums text-white">{p.count}</span>
+                    <span className="min-w-0 text-base font-semibold leading-tight text-white sm:text-lg">{p.title}</span>
+                  </div>
+                  <div className="mt-1.5 text-[11px] font-medium" style={{ color: "rgba(255,255,255,0.82)" }}>
+                    {p.sub}
+                  </div>
                 </div>
-                <div className="mt-1 text-xl font-semibold leading-tight text-white">Needs Your Attention</div>
-                <div className="mt-1 text-xs font-medium" style={{ color: "rgba(255,255,255,0.8)" }}>
-                  {attention.length === 0 ? "You're all caught up" : `${attention.length} item${attention.length === 1 ? "" : "s"} need review`}
-                </div>
+                <img src={p.icon} alt="" aria-hidden className="h-[31px] w-[31px] shrink-0" />
               </div>
-              <img src={alertIconAsset.url} alt="" aria-hidden className="h-[31px] w-[31px] shrink-0" />
-            </div>
-          </HeroStatCard>
-        </div>
-
-        <div
-          role="button"
-          tabIndex={0}
-          onClick={() => setOpenPanel("plan")}
-          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpenPanel("plan"); } }}
-          className="block cursor-pointer text-left"
-        >
-          <HeroStatCard className="card-gradient-violet !min-h-[92px] !py-4">
-            <div className="relative flex w-full items-center justify-between gap-3">
-              <div className="min-w-0">
-                <div className="text-xs font-semibold uppercase tracking-wider" style={{ color: "rgba(255,255,255,0.75)" }}>
-                  Lesson Planning
-                </div>
-                <div className="mt-1 text-xl font-semibold leading-tight text-white">Plan Your Upcoming Sessions</div>
-                <div className="mt-1 text-xs font-medium" style={{ color: "rgba(255,255,255,0.8)" }}>
-                  {toPlanAll.length} session{toPlanAll.length === 1 ? "" : "s"} to plan
-                </div>
-              </div>
-              <img src={planIconAsset.url} alt="" aria-hidden className="h-[31px] w-[31px] shrink-0" />
-            </div>
-          </HeroStatCard>
-        </div>
-
-        <div
-          role="button"
-          tabIndex={0}
-          onClick={() => setOpenPanel("complete")}
-          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpenPanel("complete"); } }}
-          className="block cursor-pointer text-left"
-        >
-          <HeroStatCard className="card-gradient-lime !min-h-[92px] !py-4">
-            <div className="relative flex w-full items-center justify-between gap-3">
-              <div className="min-w-0">
-                <div className="text-xs font-semibold uppercase tracking-wider" style={{ color: "rgba(255,255,255,0.75)" }}>
-                  Session Reports
-                </div>
-                <div className="mt-1 text-xl font-semibold leading-tight text-white">Complete Your Sessions</div>
-                <div className="mt-1 text-xs font-medium" style={{ color: "rgba(255,255,255,0.8)" }}>
-                  {awaitingCompletion.length + pendingClubEvents.length} session{awaitingCompletion.length + pendingClubEvents.length === 1 ? "" : "s"} awaiting completion
-                </div>
-              </div>
-              <img src={completeIconAsset.url} alt="" aria-hidden className="h-[31px] w-[31px] shrink-0" />
-            </div>
-          </HeroStatCard>
-        </div>
+            </HeroStatCard>
+          </div>
+        ))}
       </section>
+
 
       {openPanel === "attention" && (
         <AccentModal
@@ -924,166 +932,212 @@ function TeacherDashboard() {
       <section>
         <SectionTitle>Quick Actions</SectionTitle>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <QuickAction to="/teacher/availability" iconSrc={availabilityIconAsset.url} label="My Availability" />
-          <QuickAction to="/teacher/clubs" iconSrc={clubsIconAsset.url} label="Available Clubs" />
-          <QuickAction to="/teacher/financial" iconSrc={balanceIconAsset.url} label="My Balance" />
+          <QuickAction to="/teacher/availability" iconSrc={availabilityIconAsset.url} label="My Availability" delay={0} />
+          <QuickAction to="/teacher/clubs" iconSrc={clubsIconAsset.url} label="Available Clubs" delay={45} />
+          <QuickAction to="/teacher/financial" iconSrc={balanceIconAsset.url} label="My Balance" delay={90} />
           {hasVipStudent && (
-            <QuickAction to="/teacher/vip" icon={GraduationCap} label="Course Builder VIP" />
+            <QuickAction to="/teacher/vip" icon={GraduationCap} label="Course Builder VIP" delay={135} />
           )}
         </div>
       </section>
 
       <section>
-        <SectionTitle>Recent Activity</SectionTitle>
-        <Card className="!p-0">
-          <table className="w-full text-sm">
-            <thead className="text-left text-xs uppercase tracking-wider text-muted-foreground">
-              <tr className="border-b border-border">
-                <th className="px-6 py-3 font-medium">Student / Group</th>
-                <th className="px-6 py-3 font-medium">Date</th>
-                <th className="px-6 py-3 font-medium">Origin</th>
-                <th className="px-6 py-3 font-medium">Status</th>
-                <th className="px-6 py-3 font-medium">Rating</th>
-              </tr>
-            </thead>
-            <tbody>
-              {recentLive.length === 0 && recentClubReports.length === 0 && (
-                <tr><td colSpan={5} className="px-6 py-6 text-center text-sm text-muted-foreground">No recent sessions.</td></tr>
-              )}
-              {recentLive.map((s) => {
-                const group = s.group_id ? groupById(s.group_id) : null;
-                const student = userById(s.student_id);
-                const label =
-                  s.status === "completed" ? "Completed"
-                  : s.status === "absent" ? "Absent"
-                  : s.status === "cancelled" ? "Cancelled"
-                  : s.status === "no_show" ? "No-show"
-                  : s.status === "delayed" ? "Delayed"
-                  : s.status.charAt(0).toUpperCase() + s.status.slice(1);
-                const tone =
-                  s.status === "completed" ? "success"
-                  : s.status === "absent" || s.status === "no_show" ? "danger"
-                  : s.status === "delayed" ? "warning"
-                  : "default";
-                // Performance Sessions origin: workshop → Workshop, spotlight → Spotlight Session,
-                // and any other value (including course or missing) is the regular 1:1 performance session.
-                const origin = s.origin === "workshop" ? "Workshop" : s.origin === "spotlight" ? "Spotlight Session" : "Performance Session";
+        <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+          <SectionTitle>Recent Activity</SectionTitle>
+          <span className="text-xs font-medium text-muted-foreground">Session ledger · latest first</span>
+        </div>
 
-                return (
-                  <tr
-                    key={s.id}
-                    onClick={() => setViewing(s)}
-                    className="cursor-pointer border-b border-border transition-colors hover:bg-secondary/40 last:border-0"
-                  >
-                    <td className="px-6 py-4 text-foreground">
-                      <span className="inline-flex items-center gap-1.5">
-                        {group && (
-                          <span className="inline-flex h-5 items-center rounded-md bg-accent/15 px-1.5 text-[10px] font-bold text-accent">
-                            G · {group.name}
-                          </span>
-                        )}
-                        {group ? group.name : student?.name ?? "—"}
+        <div className="overflow-hidden rounded-3xl border border-border bg-card">
+          <div className="hidden grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_auto_auto] items-center gap-4 border-b border-border px-5 py-2.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground md:grid">
+            <span>Student / Group</span>
+            <span>Date</span>
+            <span className="justify-self-start">Origin</span>
+            <span className="justify-self-end">Status</span>
+          </div>
+
+          {recentLive.length === 0 && recentClubReports.length === 0 && (
+            <div className="px-5 py-8 text-center text-sm text-muted-foreground">No recent sessions.</div>
+          )}
+
+          <ul className="divide-y divide-border">
+            {recentLive.map((s, i) => {
+              const group = s.group_id ? groupById(s.group_id) : null;
+              const student = userById(s.student_id);
+              const label =
+                s.status === "completed" ? "Completed"
+                : s.status === "absent" ? "Absent"
+                : s.status === "cancelled" ? "Cancelled"
+                : s.status === "no_show" ? "No-show"
+                : s.status === "delayed" ? "Delayed"
+                : s.status.charAt(0).toUpperCase() + s.status.slice(1);
+              const tone =
+                s.status === "completed" ? "success"
+                : s.status === "absent" || s.status === "no_show" ? "danger"
+                : s.status === "delayed" ? "warning"
+                : "default";
+              const rail =
+                tone === "success" ? GREEN : tone === "danger" ? CRIMSON : tone === "warning" ? YELLOW : "var(--violet-500)";
+              const origin = s.origin === "workshop" ? "Workshop" : s.origin === "spotlight" ? "Spotlight Session" : "Performance Session";
+
+              return (
+                <li
+                  key={s.id}
+                  onClick={() => setViewing(s)}
+                  className="verbo-act-row verbo-td-in relative grid cursor-pointer grid-cols-1 items-center gap-x-4 gap-y-1.5 py-3.5 pl-5 pr-5 hover:bg-secondary/40 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_auto_auto]"
+                  style={{ animationDelay: `${Math.min(i, 8) * 34}ms` }}
+                >
+                  <span
+                    aria-hidden
+                    className="verbo-act-rail absolute left-0 top-1/2 h-8 w-[3px] -translate-y-1/2 rounded-r-full"
+                    style={{ background: rail }}
+                  />
+                  <div className="flex min-w-0 items-center gap-1.5">
+                    {group && (
+                      <span className="inline-flex h-5 shrink-0 items-center rounded-md bg-accent/15 px-1.5 text-[10px] font-bold text-accent">
+                        G
                       </span>
-                    </td>
-                    <td className="px-6 py-4 text-muted-foreground">{fmt(s.date_time)}</td>
-                    <td className="px-6 py-4">
-                      <span className="inline-flex rounded-md bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">{origin}</span>
-                    </td>
-                    <td className="px-6 py-4"><Pill tone={tone as any}>{label}</Pill></td>
-                    <td className="px-6 py-4 text-muted-foreground">{s.student_rating ? `${s.student_rating}★` : "—"}</td>
-                  </tr>
-                );
-              })}
-              {recentClubReports.map((r) => {
-                const ev = eventById.get(r.event_id);
-                const title = ev?.title ?? "Club event";
-                const dateISO = ev?.date ?? r.submitted_at;
-                const originLabel = clubReportOriginLabel[r.event_type] ?? "Club";
-                return (
-                  <tr
-                    key={`clubreport-${r.event_id}`}
-                    className="border-b border-border last:border-0"
-                  >
-                    <td className="px-6 py-4 text-foreground">{title}</td>
-                    <td className="px-6 py-4 text-muted-foreground">{fmt(dateISO)}</td>
-                    <td className="px-6 py-4">
-                      <span className="inline-flex rounded-md bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">{originLabel}</span>
-                    </td>
-                    <td className="px-6 py-4"><Pill tone="success">Completed</Pill></td>
-                    <td className="px-6 py-4 text-muted-foreground">—</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </Card>
+                    )}
+                    <span className="truncate text-sm font-semibold text-foreground">
+                      {group ? group.name : student?.name ?? "—"}
+                    </span>
+                    {s.student_rating ? (
+                      <span className="ml-1 shrink-0 text-[11px] font-semibold text-amber-500">{s.student_rating}★</span>
+                    ) : null}
+                  </div>
+                  <div className="truncate text-xs font-medium tabular-nums text-muted-foreground">{fmt(s.date_time)}</div>
+                  <div className="justify-self-start">
+                    <span className="inline-flex rounded-md bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">{origin}</span>
+                  </div>
+                  <div className="justify-self-start md:justify-self-end"><Pill tone={tone as any}>{label}</Pill></div>
+                </li>
+              );
+            })}
+
+            {recentClubReports.map((r, i) => {
+              const ev = eventById.get(r.event_id);
+              const title = ev?.title ?? "Club event";
+              const dateISO = ev?.date ?? r.submitted_at;
+              const originLabel = clubReportOriginLabel[r.event_type] ?? "Club";
+              return (
+                <li
+                  key={`clubreport-${r.event_id}`}
+                  className="verbo-act-row verbo-td-in relative grid grid-cols-1 items-center gap-x-4 gap-y-1.5 py-3.5 pl-5 pr-5 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_auto_auto]"
+                  style={{ animationDelay: `${Math.min(recentLive.length + i, 8) * 34}ms` }}
+                >
+                  <span
+                    aria-hidden
+                    className="verbo-act-rail absolute left-0 top-1/2 h-8 w-[3px] -translate-y-1/2 rounded-r-full"
+                    style={{ background: GREEN }}
+                  />
+                  <div className="truncate text-sm font-semibold text-foreground">{title}</div>
+                  <div className="truncate text-xs font-medium tabular-nums text-muted-foreground">{fmt(dateISO)}</div>
+                  <div className="justify-self-start">
+                    <span className="inline-flex rounded-md bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">{originLabel}</span>
+                  </div>
+                  <div className="justify-self-start md:justify-self-end"><Pill tone="success">Completed</Pill></div>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
       </section>
+
 
       <section>
-        <SectionTitle>My Recent Feedback</SectionTitle>
-        <Card className="!p-0">
-          <table className="w-full text-sm">
-            <thead className="text-left text-xs uppercase tracking-wider text-muted-foreground">
-              <tr className="border-b border-border">
-                <th className="px-6 py-3 font-medium">Student</th>
-                <th className="px-6 py-3 font-medium">Date</th>
-                <th className="px-6 py-3 font-medium">Rating</th>
-                <th className="px-6 py-3 font-medium">Comment</th>
-                <th className="px-6 py-3 font-medium">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {recentFeedback.length === 0 && (
-                <tr>
-                  <td colSpan={5} className="px-6 py-6 text-center text-sm text-muted-foreground">
-                    No feedback in the last 7 days.
-                  </td>
-                </tr>
-              )}
-              {recentFeedback.map((s) => {
-                const student = userById(s.student_id);
-                const status = s.review_status ?? "pending";
-                const resolved = status === "reviewed" || status === "discarded";
-                return (
-                  <tr
-                    key={`feedback-${s.id}`}
-                    className="border-b border-border transition-colors hover:bg-secondary/40 last:border-0"
+        <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+          <SectionTitle>My Recent Feedback</SectionTitle>
+          <span className="text-xs font-medium text-muted-foreground">
+            What students said · last 7 days
+          </span>
+        </div>
+
+        {recentFeedback.length === 0 ? (
+          <div className="rounded-3xl border border-dashed border-border px-6 py-10 text-center text-sm text-muted-foreground">
+            No feedback in the last 7 days.
+          </div>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {recentFeedback.map((s, i) => {
+              const student = userById(s.student_id);
+              const status = s.review_status ?? "pending";
+              const resolved = status === "reviewed" || status === "discarded";
+              const rating = s.student_rating ?? 0;
+              const accent = rating >= 4 ? GREEN : rating >= 3 ? YELLOW : CRIMSON;
+              const initials = (student?.name ?? "—")
+                .split(" ")
+                .slice(0, 2)
+                .map((p) => p[0])
+                .join("")
+                .toUpperCase();
+              return (
+                <article
+                  key={`feedback-${s.id}`}
+                  className="verbo-fb-card verbo-td-in relative flex flex-col gap-4 overflow-hidden rounded-3xl border border-border bg-card p-5"
+                  style={{ animationDelay: `${Math.min(i, 8) * 36}ms` }}
+                >
+                  <span
+                    aria-hidden
+                    className="pointer-events-none absolute inset-x-0 top-0 h-[3px]"
+                    style={{ background: accent, opacity: 0.85 }}
+                  />
+                  <span
+                    aria-hidden
+                    className="pointer-events-none absolute -right-3 -top-6 select-none font-serif text-[110px] leading-none text-foreground/[0.04]"
                   >
-                    <td className="px-6 py-4 text-foreground">{student?.name ?? "—"}</td>
-                    <td className="px-6 py-4 text-muted-foreground">{fmt(s.date_time)}</td>
-                    <td className="px-6 py-4">
-                      <span className="flex items-center gap-0.5">
-                        {Array.from({ length: 5 }).map((_, i) => (
-                          <Star
-                            key={i}
-                            className={`h-3.5 w-3.5 ${i < (s.student_rating ?? 0) ? "fill-current text-amber-500" : "text-muted-foreground/30"}`}
-                          />
-                        ))}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-foreground">
-                      {s.student_comment ? (
-                        <span className="italic">“{s.student_comment}”</span>
-                      ) : (
-                        <span className="text-muted-foreground">No written comment</span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4">
-                      {resolved ? (
-                        <Pill tone={status === "reviewed" ? "success" : "muted"}>
-                          {status === "reviewed" ? "Resolved" : "Discarded"}
-                        </Pill>
-                      ) : (
-                        <span className="text-muted-foreground">—</span>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </Card>
+                    &rdquo;
+                  </span>
+
+                  <div className="flex min-w-0 items-center gap-3">
+                    <span
+                      className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-xs font-bold text-white"
+                      style={{ background: accent }}
+                    >
+                      {initials}
+                    </span>
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-semibold text-foreground">
+                        {student?.name ?? "—"}
+                      </div>
+                      <div className="truncate text-[11px] font-medium text-muted-foreground">
+                        {fmt(s.date_time)}
+                      </div>
+                    </div>
+                    <span className="ml-auto flex shrink-0 items-center gap-0.5">
+                      {Array.from({ length: 5 }).map((_, k) => (
+                        <Star
+                          key={k}
+                          className={`h-3.5 w-3.5 ${k < rating ? "fill-current text-amber-500" : "text-muted-foreground/25"}`}
+                        />
+                      ))}
+                    </span>
+                  </div>
+
+                  <p
+                    className={`relative min-h-[48px] text-[15px] leading-snug ${s.student_comment ? "font-medium text-foreground" : "text-muted-foreground"}`}
+                    style={s.student_comment ? { letterSpacing: "-0.01em" } : undefined}
+                  >
+                    {s.student_comment ? `“${s.student_comment}”` : "No written comment"}
+                  </p>
+
+                  <div className="mt-auto flex items-center justify-between gap-2 border-t border-border/70 pt-3">
+                    <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      {rating}/5 rating
+                    </span>
+                    {resolved ? (
+                      <Pill tone={status === "reviewed" ? "success" : "muted"}>
+                        {status === "reviewed" ? "Resolved" : "Discarded"}
+                      </Pill>
+                    ) : (
+                      <span className="text-[11px] font-medium text-muted-foreground">Pending review</span>
+                    )}
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        )}
       </section>
+
 
       {evaluating && (
 
@@ -1144,14 +1198,15 @@ function TeacherDashboard() {
   );
 }
 
-function QuickAction({ to, icon: Icon, iconSrc, label }: { to: string; icon?: LucideIcon; iconSrc?: string; label: string }) {
+function QuickAction({ to, icon: Icon, iconSrc, label, delay = 0 }: { to: string; icon?: LucideIcon; iconSrc?: string; label: string; delay?: number }) {
   return (
     <Link
       to={to as any}
-      className="group flex items-center gap-4 rounded-2xl bg-card px-5 py-5 shadow-[0_8px_20px_-8px_rgba(243,137,52,0.18)] transition-shadow duration-200 hover:shadow-floating verbo-card-hover"
+      style={{ animationDelay: `${delay}ms` }}
+      className="verbo-td-in verbo-td-press group flex items-center gap-3 rounded-2xl bg-card px-4 py-4 shadow-[0_8px_20px_-8px_rgba(243,137,52,0.18)] transition-shadow duration-200 hover:shadow-floating verbo-card-hover sm:gap-4 sm:px-5 sm:py-5"
     >
       {iconSrc ? (
-        <img src={iconSrc} alt="" aria-hidden className="h-12 w-12 shrink-0 object-contain" />
+        <img src={iconSrc} alt="" aria-hidden className="h-10 w-10 shrink-0 object-contain sm:h-12 sm:w-12" />
       ) : (
         <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-accent/15 text-accent">
           {Icon ? <Icon className="h-6 w-6" /> : null}
