@@ -1301,7 +1301,7 @@ function StudentDetailModal({
     <Overlay onClose={onClose}>
       <div className="verbo-sdm relative flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-[28px] bg-card shadow-floating">
         {/* Header */}
-        <div className="flex items-start justify-between gap-3 px-5 py-5 sm:px-7 sm:py-6" style={{ background: "linear-gradient(135deg, #01304a 0%, #02466b 100%)" }}>
+        <div className="flex shrink-0 items-start justify-between gap-3 px-5 py-5 sm:px-7 sm:py-6" style={{ background: "linear-gradient(135deg, #01304a 0%, #02466b 100%)" }}>
           <div className="flex min-w-0 items-center gap-3.5">
             {avatar ? (
               <img src={avatar} alt={student.name} className="h-14 w-14 shrink-0 rounded-full object-cover ring-2 ring-white/25" />
@@ -1319,7 +1319,7 @@ function StudentDetailModal({
         </div>
 
         {/* Tabs */}
-        <div className="verbo-scroll-hidden flex gap-1 overflow-x-auto border-b border-border bg-card px-3 pt-2 sm:px-5">
+        <div className="verbo-scroll-hidden flex shrink-0 gap-1 overflow-x-auto border-b border-border bg-card px-3 pt-2 sm:px-5">
           {([["overview", "Overview"], ["performance", "Performance & Attendance"], ["progress", "Course Progress"], ["badges", "Badges"], ["reports", "Reports"], ["notes", "Admin Notes"]] as [Tab, string][]).map(([id, label]) => (
             <button
               key={id}
@@ -1333,7 +1333,7 @@ function StudentDetailModal({
         </div>
 
         {/* Body */}
-        <div className="verbo-scroll-hidden flex-1 overflow-y-auto px-5 py-6 sm:px-7">
+        <div className="verbo-scroll-hidden min-h-0 flex-1 overflow-y-auto px-5 py-6 sm:px-7">
           {tab === "overview" && (
             <div className="space-y-7">
               {/* Contract essentials */}

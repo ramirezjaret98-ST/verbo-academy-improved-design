@@ -825,3 +825,9 @@ Sin cambios de lógica ni rutas. `DATA_MODEL.md` sigue sincronizado.
 - Hover deepens the glow (4px halo at 12%, stronger drop), lifts the card `-2px`, thickens the accent rail to 4px, scales the icon chip to `1.06` and pauses the pulse so hover feedback stays legible. Gated behind `hover:hover`/`pointer:fine`.
 - Pulse and transforms fully neutralized under `prefers-reduced-motion`.
 - Visual only — no logic, data or route changes; `DATA_MODEL.md` remains synchronized.
+
+## Entry 053 — Student detail modal: tabs stay pinned on tall tabs
+- Con los tabs Badges y Course Progress, el contenido crecía por encima del alto del modal y empujaba el header y la barra de tabs fuera de vista.
+- Causa: el contenedor scrollable era `flex-1` sin `min-h-0`, así que el flex item no podía encogerse por debajo de su contenido.
+- Corregido: el cuerpo ahora es `min-h-0 flex-1 overflow-y-auto`, y el header y la barra de tabs llevan `shrink-0`, de modo que siempre quedan fijos y solo el contenido hace scroll.
+- Visual only — no logic, data or route changes; `DATA_MODEL.md` remains synchronized.
