@@ -696,3 +696,13 @@ Sin cambios de lógica ni rutas.
 - **Ilustración:** nuevo Verbot de etapa 0 (`stage_0_verbot.svg`, subido como asset CDN) anclado arriba a la derecha con el mismo encuadre que los Verbots de las bandas de asistencia.
 
 Sin cambios de lógica ni rutas.
+
+---
+
+## Entry 040 — Ajuste de opacidad del watermark en tarjeta de bienvenida
+**Archivo:** `src/routes/student.index.tsx`
+
+- **Watermark:** la ilustración `stage_0_verbot.svg` de la tarjeta de bienvenida pasa de opacidad implícita 100% a `opacity-[0.08]` (8%), con un tope máximo de 10% para mantener el concepto sin competir con el texto.
+- **Posición y encuadre:** sin cambios; solo se redujo la opacidad para que el Verbot actúe como marca de agua casi imperceptible.
+
+Sin cambios de lógica ni rutas.
