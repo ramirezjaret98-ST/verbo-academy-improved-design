@@ -301,9 +301,16 @@
     box-shadow: 0 4px 20px -2px rgba(1, 48, 74, 0.05);
     transition: transform 200ms ease, box-shadow 250ms ease;
   }
-  .verbo-card-hover:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 10px 25px -5px rgba(243, 137, 52, 0.25);
+  /* Hover lift gated to real pointers: touch devices otherwise keep a sticky
+     lifted state after a tap. */
+  @media (hover: hover) and (pointer: fine) {
+    .verbo-card-hover:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 10px 25px -5px rgba(243, 137, 52, 0.25);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .verbo-card-hover:hover { transform: none; }
   }
   .verbo-btn-glow {
     transition: transform 200ms ease, box-shadow 250ms ease, opacity 200ms ease;
@@ -1960,7 +1967,9 @@
   transform-origin: left center;
   opacity: 0.75;
 }
-.verbo-act-row:hover .verbo-act-rail { transform: scaleX(1.6); opacity: 1; }
+@media (hover: hover) and (pointer: fine) {
+  .verbo-act-row:hover .verbo-act-rail { transform: scaleX(1.6); opacity: 1; }
+}
 
 
 /* Feedback quote cards */
@@ -2049,7 +2058,6 @@
 
 .verbo-club-poster {
   transition: transform 260ms cubic-bezier(0.23, 1, 0.32, 1), box-shadow 260ms ease;
-  will-change: transform;
 }
 @media (hover: hover) and (pointer: fine) {
   .verbo-club-poster:hover { transform: translateY(-6px) scale(1.012); }
@@ -2086,4 +2094,23 @@
 @media (prefers-reduced-motion: reduce) {
   .verbo-kpi-fill { transition: none; }
   .verbo-kpi-card:hover { transform: none; }
+}
+
+/* ---------------------------------------------------------------------------
+   Teacher panel · shared card lift (Entry 079)
+   Replaces `transition-all` on card/tile buttons: only GPU-safe properties are
+   animated, the lift is gated to real pointers, and reduced motion keeps the
+   shadow/border feedback while dropping the movement.
+--------------------------------------------------------------------------- */
+.verbo-lift {
+  transition: transform 200ms cubic-bezier(0.23, 1, 0.32, 1),
+              box-shadow 200ms cubic-bezier(0.23, 1, 0.32, 1),
+              border-color 200ms ease;
+}
+@media (hover: hover) and (pointer: fine) {
+  .verbo-lift:hover { transform: translateY(-2px); }
+}
+.verbo-lift:active { transform: scale(0.985); }
+@media (prefers-reduced-motion: reduce) {
+  .verbo-lift:hover, .verbo-lift:active { transform: none; }
 }

@@ -100,7 +100,7 @@ function Page() {
               <button
                 key={s.id}
                 onClick={() => navigate({ to: "/teacher/tailored-content", search: { student: s.id } })}
-                className="group relative flex flex-col rounded-2xl border border-border bg-card p-5 text-left shadow-soft transition-all hover:-translate-y-1 hover:shadow-elevated"
+                className="group relative flex flex-col rounded-2xl border border-border bg-card p-5 text-left shadow-soft verbo-lift hover:shadow-elevated"
               >
                 <div className="flex items-center gap-3">
                   <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground">

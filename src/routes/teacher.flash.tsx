@@ -249,7 +249,7 @@ function ChallengeGrid({ list, onOpen }: { list: FlashChallenge[]; onOpen: (c: F
         <button
           key={c.id}
           onClick={() => onOpen(c)}
-          className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-5 text-left shadow-soft transition-all hover:-translate-y-0.5 hover:border-accent hover:shadow-elevated"
+          className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-5 text-left shadow-soft verbo-lift hover:border-accent hover:shadow-elevated"
         >
           <div className="flex items-start justify-between gap-2">
             <CategoryBadge name={c.category} />
