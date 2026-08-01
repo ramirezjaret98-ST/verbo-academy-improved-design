@@ -661,6 +661,17 @@ Sin cambios de lógica ni rutas.
 
 ---
 
+## Entry 038 — Refinamiento de tarjetas de próximas sesiones (`/student/index`)
+**Archivo:** `src/routes/student.index.tsx`
+
+- **Ancho:** el contenedor de la lista pasa de `max-w-xl` a `max-w-lg`, reduciendo ligeramente el ancho de cada tarjeta.
+- **Borde:** cambio de `border-[var(--navy-100)]` a `border-[var(--navy-200)]/40` — mantiene el borde fino pero añade una definición sutil para que la tarjeta se distinga del fondo.
+- **Watermark:** logo de Microsoft Teams (`teams-logo.webp`) posicionado como marca de agua a la derecha de cada tarjeta, al 5% de opacidad, centrado verticalmente y recortado por el `overflow-hidden` del contenedor. No interfiere con el contenido gracias a `z-0` y al bajo contraste.
+- **Jerarquía de capas:** el contenido interno envuelto en `relative z-10` para quedar por encima del watermark.
+- **Aplicación:** mismo tratamiento en tarjetas de sesión (`kind === "session"`) y tarjetas de club (`kind === "club"`) para mantener coherencia visual en la lista.
+
+Sin cambios de lógica ni rutas.
+
 ## Entry 037 — Ajustes del footer: fade sin bandas, títulos legibles y separación superior
 **Archivo:** `src/components/verbo/Footer.tsx`
 
