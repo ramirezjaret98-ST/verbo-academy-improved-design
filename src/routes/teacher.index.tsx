@@ -1020,70 +1020,100 @@ function TeacherDashboard() {
       </section>
 
       <section>
-        <SectionTitle>My Recent Feedback</SectionTitle>
-        <Card className="!p-0">
-          <table className="w-full text-sm">
-            <thead className="text-left text-xs uppercase tracking-wider text-muted-foreground">
-              <tr className="border-b border-border">
-                <th className="px-6 py-3 font-medium">Student</th>
-                <th className="px-6 py-3 font-medium">Date</th>
-                <th className="px-6 py-3 font-medium">Rating</th>
-                <th className="px-6 py-3 font-medium">Comment</th>
-                <th className="px-6 py-3 font-medium">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {recentFeedback.length === 0 && (
-                <tr>
-                  <td colSpan={5} className="px-6 py-6 text-center text-sm text-muted-foreground">
-                    No feedback in the last 7 days.
-                  </td>
-                </tr>
-              )}
-              {recentFeedback.map((s) => {
-                const student = userById(s.student_id);
-                const status = s.review_status ?? "pending";
-                const resolved = status === "reviewed" || status === "discarded";
-                return (
-                  <tr
-                    key={`feedback-${s.id}`}
-                    className="border-b border-border transition-colors hover:bg-secondary/40 last:border-0"
+        <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+          <SectionTitle>My Recent Feedback</SectionTitle>
+          <span className="text-xs font-medium text-muted-foreground">
+            What students said · last 7 days
+          </span>
+        </div>
+
+        {recentFeedback.length === 0 ? (
+          <div className="rounded-3xl border border-dashed border-border px-6 py-10 text-center text-sm text-muted-foreground">
+            No feedback in the last 7 days.
+          </div>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {recentFeedback.map((s, i) => {
+              const student = userById(s.student_id);
+              const status = s.review_status ?? "pending";
+              const resolved = status === "reviewed" || status === "discarded";
+              const rating = s.student_rating ?? 0;
+              const accent = rating >= 4 ? GREEN : rating >= 3 ? YELLOW : CRIMSON;
+              const initials = (student?.name ?? "—")
+                .split(" ")
+                .slice(0, 2)
+                .map((p) => p[0])
+                .join("")
+                .toUpperCase();
+              return (
+                <article
+                  key={`feedback-${s.id}`}
+                  className="verbo-fb-card verbo-td-in relative flex flex-col gap-4 overflow-hidden rounded-3xl border border-border bg-card p-5"
+                  style={{ animationDelay: `${Math.min(i, 8) * 36}ms` }}
+                >
+                  <span
+                    aria-hidden
+                    className="pointer-events-none absolute inset-x-0 top-0 h-[3px]"
+                    style={{ background: accent, opacity: 0.85 }}
+                  />
+                  <span
+                    aria-hidden
+                    className="pointer-events-none absolute -right-3 -top-6 select-none font-serif text-[110px] leading-none text-foreground/[0.04]"
                   >
-                    <td className="px-6 py-4 text-foreground">{student?.name ?? "—"}</td>
-                    <td className="px-6 py-4 text-muted-foreground">{fmt(s.date_time)}</td>
-                    <td className="px-6 py-4">
-                      <span className="flex items-center gap-0.5">
-                        {Array.from({ length: 5 }).map((_, i) => (
-                          <Star
-                            key={i}
-                            className={`h-3.5 w-3.5 ${i < (s.student_rating ?? 0) ? "fill-current text-amber-500" : "text-muted-foreground/30"}`}
-                          />
-                        ))}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-foreground">
-                      {s.student_comment ? (
-                        <span className="italic">“{s.student_comment}”</span>
-                      ) : (
-                        <span className="text-muted-foreground">No written comment</span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4">
-                      {resolved ? (
-                        <Pill tone={status === "reviewed" ? "success" : "muted"}>
-                          {status === "reviewed" ? "Resolved" : "Discarded"}
-                        </Pill>
-                      ) : (
-                        <span className="text-muted-foreground">—</span>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </Card>
+                    &rdquo;
+                  </span>
+
+                  <div className="flex min-w-0 items-center gap-3">
+                    <span
+                      className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-xs font-bold text-white"
+                      style={{ background: accent }}
+                    >
+                      {initials}
+                    </span>
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-semibold text-foreground">
+                        {student?.name ?? "—"}
+                      </div>
+                      <div className="truncate text-[11px] font-medium text-muted-foreground">
+                        {fmt(s.date_time)}
+                      </div>
+                    </div>
+                    <span className="ml-auto flex shrink-0 items-center gap-0.5">
+                      {Array.from({ length: 5 }).map((_, k) => (
+                        <Star
+                          key={k}
+                          className={`h-3.5 w-3.5 ${k < rating ? "fill-current text-amber-500" : "text-muted-foreground/25"}`}
+                        />
+                      ))}
+                    </span>
+                  </div>
+
+                  <p
+                    className={`relative min-h-[48px] text-[15px] leading-snug ${s.student_comment ? "font-medium text-foreground" : "text-muted-foreground"}`}
+                    style={s.student_comment ? { letterSpacing: "-0.01em" } : undefined}
+                  >
+                    {s.student_comment ? `“${s.student_comment}”` : "No written comment"}
+                  </p>
+
+                  <div className="mt-auto flex items-center justify-between gap-2 border-t border-border/70 pt-3">
+                    <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      {rating}/5 rating
+                    </span>
+                    {resolved ? (
+                      <Pill tone={status === "reviewed" ? "success" : "muted"}>
+                        {status === "reviewed" ? "Resolved" : "Discarded"}
+                      </Pill>
+                    ) : (
+                      <span className="text-[11px] font-medium text-muted-foreground">Pending review</span>
+                    )}
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        )}
       </section>
+
 
       {evaluating && (
 
