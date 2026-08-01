@@ -173,7 +173,7 @@ export function NotificationsBell({ variant = "light" }: { variant?: "light" | "
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label={hasUnread ? `Notifications, ${unreadCount} unread` : "Notifications"}
-        className={`relative flex h-9 w-9 cursor-pointer items-center justify-center rounded-full transition-colors ${
+        className={`verbo-notif-press relative flex h-9 w-9 cursor-pointer items-center justify-center rounded-full transition-colors ${
           isDark
             ? "text-[#94a3b8] hover:text-[#f38934]"
             : "text-muted-foreground hover:bg-secondary hover:text-foreground"
@@ -182,8 +182,9 @@ export function NotificationsBell({ variant = "light" }: { variant?: "light" | "
         <Bell className="h-4 w-4" />
         {hasUnread && (
           <span
+            key={unreadCount}
             aria-hidden="true"
-            className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-destructive-foreground"
+            className="verbo-notif-badge absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-destructive-foreground"
           >
             {unreadCount > 9 ? "9+" : unreadCount}
           </span>
@@ -194,7 +195,7 @@ export function NotificationsBell({ variant = "light" }: { variant?: "light" | "
         <div
           role="menu"
           aria-label="Notifications"
-          className="absolute right-0 top-full z-50 mt-2 w-80 overflow-hidden rounded-xl border border-border bg-card shadow-elevated"
+          className="verbo-notif-panel absolute right-0 top-full z-50 mt-2 w-[min(20rem,calc(100vw-2rem))] overflow-hidden rounded-xl border border-border bg-card shadow-elevated"
         >
           <div className="flex items-center justify-between border-b border-border px-4 py-3">
             <div className="text-sm font-semibold text-foreground">Notifications</div>
@@ -202,31 +203,35 @@ export function NotificationsBell({ variant = "light" }: { variant?: "light" | "
               type="button"
               onClick={markAll}
               disabled={!hasUnread}
-              className="text-xs font-medium text-accent transition-opacity hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-40"
+              className="verbo-notif-press text-xs font-medium text-accent transition-opacity hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-40"
             >
               Mark all as read
             </button>
           </div>
 
           {visible.length === 0 ? (
-            <div className="px-4 py-8 text-center text-sm text-muted-foreground">
+            <div className="verbo-soft-fade px-4 py-8 text-center text-sm text-muted-foreground">
               You're all caught up.
             </div>
           ) : (
-            <ul className="max-h-96 overflow-y-auto">
-              {visible.map((n) => (
-                <li key={n.id} className="border-b border-border last:border-b-0">
+            <ul className="max-h-[min(24rem,60vh)] overflow-y-auto">
+              {visible.map((n, i) => (
+                <li
+                  key={n.id}
+                  className="verbo-notif-row border-b border-border last:border-b-0"
+                  style={{ "--verbo-notif-i": Math.min(i, 6) } as React.CSSProperties}
+                >
                   <button
                     type="button"
                     onClick={() => onClickItem(n)}
-                    className={`flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-secondary/60 ${
+                    className={`verbo-notif-item verbo-notif-press flex w-full items-start gap-3 px-4 py-3 text-left transition-colors [@media(hover:hover)_and_(pointer:fine)]:hover:bg-secondary/60 ${
                       n.read ? "" : "bg-accent/5"
                     }`}
                   >
                     <span
                       aria-hidden="true"
-                      className={`mt-1.5 h-2 w-2 flex-shrink-0 rounded-full ${
-                        n.read ? "bg-transparent" : "bg-accent"
+                      className={`verbo-notif-dot mt-1.5 h-2 w-2 flex-shrink-0 rounded-full bg-accent ${
+                        n.read ? "scale-50 opacity-0" : "scale-100 opacity-100"
                       }`}
                     />
                     <div className="min-w-0 flex-1">
