@@ -912,3 +912,14 @@ Sin cambios de lógica ni rutas. `DATA_MODEL.md` sigue sincronizado.
 - Quick Actions: padding e iconos responsivos (10→12) y entrada escalonada por tarjeta.
 - `src/styles.css`: nuevas utilidades `verbo-td-in` (spring 320ms), `verbo-td-press`, `verbo-act-row` / `verbo-act-rail` y `verbo-fb-card`.
 - Visual only — no logic, data or route changes; `DATA_MODEL.md` remains synchronized.
+
+## Entry 064 — /teacher/financial: rediseño completo con sistema de color por "bucket"
+- Paleta dedicada `FIN`: violeta (Sessions Taught), rosa (Adjustments), ámbar (Bonus) y verde-teal (Total Earned), aplicada de forma consistente a iconos, rieles, barras y montos para que cada bloque sea identificable de un vistazo.
+- Iconografía renovada: `Wallet`/`GraduationCap`/`Scale`/`Medal`/`TrendingUp` en las secciones y iconos específicos por KPI (`Wifi`, `CalendarCheck2`, `ClipboardCheck`, `Smile`, `CalendarX2`, `RefreshCcwDot`).
+- Header: eyebrow "PAYMENTS · TEACHER PANEL", título 40px, pill de tier y selector de mes con press feedback; debajo, fila de señales (streak, KPIs bajo objetivo) sobre hairline.
+- Hero "Total Earned": cifra grande tabular + barra de distribución multicolor con leyenda de porcentaje por bucket.
+- Tarjetas de métrica: superficie hairline con riel superior de color, chip de icono tintado, chevron de estado y anillo de acento al estar expandidas (se eliminaron los gradientes sólidos).
+- Paneles de detalle unificados (`PanelShell`): cabecera tintada con icono, filas con entrada escalonada (26ms), colapso a una columna en móvil y estados vacíos consistentes.
+- Performance: gauge circular SVG (`CompositeGauge`) con animación de trazo y color según score, junto a un grid responsive de KPI tiles con barras animadas.
+- `src/styles.css`: nuevas utilidades `verbo-fin-panel` (entrada del acordeón), `verbo-kpi-tile` (hover elevado con gating `hover:hover`) y `verbo-bonus-glow` global, todas con soporte `prefers-reduced-motion`.
+- Visual only — no logic, data or route changes; `DATA_MODEL.md` remains synchronized.
