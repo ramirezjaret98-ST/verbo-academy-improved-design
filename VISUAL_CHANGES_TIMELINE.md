@@ -831,3 +831,11 @@ Sin cambios de lógica ni rutas. `DATA_MODEL.md` sigue sincronizado.
 - Causa: el contenedor scrollable era `flex-1` sin `min-h-0`, así que el flex item no podía encogerse por debajo de su contenido.
 - Corregido: el cuerpo ahora es `min-h-0 flex-1 overflow-y-auto`, y el header y la barra de tabs llevan `shrink-0`, de modo que siempre quedan fijos y solo el contenido hace scroll.
 - Visual only — no logic, data or route changes; `DATA_MODEL.md` remains synchronized.
+
+## Entry 054 — Admin teacher cards: status identity, tighter layout, frozen ice
+- Cada tarjeta ahora lleva su estatus como identidad visual (`--st`): riel de 3px a la izquierda, anillo del avatar, pastilla de estatus en mayúsculas y glow del mismo color en hover — Active teal `#0f766e`, Frozen ice `#38bdf8`, Removed gris `#94a3b8` con `grayscale(0.4)`.
+- Layout reorganizado: identidad (avatar 56px + nombre + email + pastilla de estatus + tags de producto) arriba, fila única de 4 métricas con divisores y números tabulares (Rating, Planning, Students, This month) en lugar del grid 2×2 de chips, y medidor de strikes de 3 segmentos con contador `n/3` abajo.
+- Frozen: la carta completa queda encerrada en hielo — capa `.verbo-ice` con `backdrop-filter: blur(1.6px)`, gradientes cruzados de escarcha/facetas, borde interior cian y etiqueta "FROZEN"; en hover el hielo se aclara ligeramente (0.92 → 0.72) para poder leer la carta.
+- Motion: entrada `translateY(8px) scale(0.985)` a 300ms `cubic-bezier(0.23, 1, 0.32, 1)` con stagger de 34ms (tope 11), hover `-3px` + zoom del avatar 1.04 gated por `hover:hover`/`pointer:fine`, press `scale(0.985)`; todo neutralizado bajo `prefers-reduced-motion`.
+- El glow rojo de "Needs review" (`.verbo-review-glow`) se mantiene intacto.
+- Visual only — no logic, data or route changes; `DATA_MODEL.md` remains synchronized.
