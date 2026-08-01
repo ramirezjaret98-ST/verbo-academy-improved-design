@@ -1570,3 +1570,50 @@
   .verbo-sdm, .verbo-sdm-section { animation-duration: 1ms; animation-delay: 0ms !important; }
   .verbo-sdm-action:hover, .verbo-sdm-action:active, .verbo-sdm-tab:active { transform: none; }
 }
+
+/* ---------------------------------------------------------------------------
+   Admin priority cards — accent glow + live pulse (Entry 052)
+--------------------------------------------------------------------------- */
+.verbo-priority-card {
+  transition: transform 200ms cubic-bezier(0.23, 1, 0.32, 1),
+    box-shadow 260ms ease, border-color 220ms ease;
+}
+.verbo-priority-card[data-live="true"] {
+  border-color: color-mix(in oklab, var(--pa) 26%, var(--border));
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--pa) 7%, transparent),
+    0 14px 30px -22px color-mix(in oklab, var(--pa) 80%, transparent);
+}
+/* Slow breathing halo so a live card reads as "still waiting on you" */
+@keyframes verbo-priority-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--pa) 6%, transparent),
+      0 14px 30px -22px color-mix(in oklab, var(--pa) 70%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 6px color-mix(in oklab, var(--pa) 12%, transparent),
+      0 18px 38px -20px color-mix(in oklab, var(--pa) 90%, transparent);
+  }
+}
+.verbo-priority-card[data-live="true"] {
+  animation: verbo-priority-pulse 2600ms ease-in-out infinite;
+}
+.verbo-priority-card__chip,
+.verbo-priority-card__rail {
+  transition: transform 220ms cubic-bezier(0.23, 1, 0.32, 1), width 200ms ease, opacity 220ms ease;
+}
+@media (hover: hover) and (pointer: fine) {
+  .verbo-priority-card:hover {
+    transform: translateY(-2px);
+    border-color: color-mix(in oklab, var(--pa) 45%, transparent);
+    box-shadow: 0 0 0 4px color-mix(in oklab, var(--pa) 12%, transparent),
+      0 20px 40px -18px color-mix(in oklab, var(--pa) 85%, transparent);
+    animation-play-state: paused;
+  }
+  .verbo-priority-card:hover .verbo-priority-card__chip { transform: scale(1.06); }
+  .verbo-priority-card:hover .verbo-priority-card__rail { width: 4px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .verbo-priority-card[data-live="true"] { animation: none; }
+  .verbo-priority-card:hover,
+  .verbo-priority-card:hover .verbo-priority-card__chip { transform: none; }
+}

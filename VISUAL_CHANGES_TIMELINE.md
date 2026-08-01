@@ -818,3 +818,10 @@ Sin cambios de lógica ni rutas. `DATA_MODEL.md` sigue sincronizado.
 - Rows (learning path, video link, payment history) upgraded to 12px-rounded panels with hover border/background feedback.
 - Motion (`.verbo-sdm*` in `src/styles.css`): modal enters at 240ms `cubic-bezier(0.23, 1, 0.32, 1)` from `scale(0.985)` + 8px, sections stagger in at 45ms steps (capped), all buttons carry `scale(0.97)` press feedback with a `-1px` hover lift and soft navy shadow gated behind `hover:hover`/`pointer:fine`; everything neutralized under `prefers-reduced-motion`.
 - Visual only — no logic, data or route changes; `DATA_MODEL.md` remains synchronized.
+
+## Entry 052 — Admin priority cards: accent glow + live pulse
+- The two priority cards (Action required / Worth a look) now carry their own accent color as `--pa` (crimson / gold) and, when they hold items (`data-live="true"`), a resting accent glow: a `0 0 0 3px` halo at 7% plus a `0 14px 30px -22px` drop at 80%, with the border tinted 26% toward the accent.
+- Added a slow 2600ms `ease-in-out` breathing pulse on live cards (halo 3px→6px, 6%→12%) so a card with pending work reads as still waiting on the admin; empty cards stay completely still.
+- Hover deepens the glow (4px halo at 12%, stronger drop), lifts the card `-2px`, thickens the accent rail to 4px, scales the icon chip to `1.06` and pauses the pulse so hover feedback stays legible. Gated behind `hover:hover`/`pointer:fine`.
+- Pulse and transforms fully neutralized under `prefers-reduced-motion`.
+- Visual only — no logic, data or route changes; `DATA_MODEL.md` remains synchronized.

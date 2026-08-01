@@ -415,15 +415,17 @@ function Overview() {
               key={c.key}
               type="button"
               onClick={() => setPanel(c.key)}
-              className="verbo-admin-press verbo-admin-lift group relative flex items-center gap-5 overflow-hidden rounded-2xl border border-border bg-card px-5 py-5 text-left"
+              data-live={live ? "true" : "false"}
+              style={{ "--pa": c.accent } as React.CSSProperties}
+              className="verbo-admin-press verbo-priority-card group relative flex items-center gap-5 overflow-hidden rounded-2xl border border-border bg-card px-5 py-5 text-left"
             >
               <span
-                className="absolute inset-y-0 left-0 w-[3px]"
+                className="verbo-priority-card__rail absolute inset-y-0 left-0 w-[3px]"
                 style={{ background: live ? c.accent : "color-mix(in oklab, var(--navy-700) 14%, transparent)" }}
                 aria-hidden
               />
               <span
-                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full"
+                className="verbo-priority-card__chip relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full"
                 style={{
                   background: live
                     ? `color-mix(in oklab, ${c.accent} 10%, transparent)`
@@ -434,6 +436,7 @@ function Overview() {
               >
                 <Icon className="h-5 w-5" strokeWidth={1.5} />
               </span>
+
 
               <span className="min-w-0 flex-1">
                 <span className="block text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
