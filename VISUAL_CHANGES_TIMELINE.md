@@ -937,3 +937,10 @@ Sin cambios de lógica ni rutas. `DATA_MODEL.md` sigue sincronizado.
 - Acciones convertidas en filas/columnas divididas por hairlines (1 col en móvil, 2 en sm, 4 en lg) en vez de tarjetas independientes: icono, etiqueta en 14px bold y descripción secundaria de 11px ("Set your weekly slots", "Claim open sessions", "Earnings & payouts", "Design VIP tracks") para que se entienda cada destino.
 - Hover: relleno sutil `bg-muted/50`, barra de acento inferior que crece desde la izquierda (`scale-x` 200ms ease-out), icono +5% y chevron desplazado 4px; se conserva la entrada escalonada y el press feedback existentes.
 - Visual only — no logic, data or route changes; `DATA_MODEL.md` remains synchronized.
+
+## Entry 067 — /teacher: legibilidad del ledger "Recent Activity"
+- La tabla se veía incompleta por el lado izquierdo: el riel de color estaba al 55% de opacidad y comprimido a `scaleY(0.35)`, así que aparecía como un guion suelto en vez de un indicador de fila.
+- El riel ahora ocupa la altura completa de la fila (`inset-y-1`), se muestra siempre al 75% de opacidad y en hover se engrosa (`scaleX(1.6)`) hasta opacidad total, con origen a la izquierda.
+- Se alineó el padding izquierdo de la cabecera y de todas las filas a `pl-6` (antes `px-5`/`pl-5`), de modo que el riel ya no compite con el nombre del alumno/grupo y las columnas quedan a plomo con sus encabezados.
+- Estado vacío alineado al mismo padding; `prefers-reduced-motion` conserva el riel visible sin transformación.
+- Visual only — no logic, data or route changes; `DATA_MODEL.md` remains synchronized.

@@ -1950,11 +1950,12 @@
 .verbo-act-row { transition: background-color 160ms ease; }
 .verbo-act-rail {
   transition: transform 220ms cubic-bezier(0.23, 1, 0.32, 1), opacity 220ms ease;
-  transform: scaleY(0.35);
-  opacity: 0.55;
-  transform-origin: center;
+  transform: scaleX(1);
+  transform-origin: left center;
+  opacity: 0.75;
 }
-.verbo-act-row:hover .verbo-act-rail { transform: scaleY(1); opacity: 1; }
+.verbo-act-row:hover .verbo-act-rail { transform: scaleX(1.6); opacity: 1; }
+
 
 /* Feedback quote cards */
 .verbo-fb-card {
@@ -1970,7 +1971,7 @@
   .verbo-td-in { animation: verbo-td-in 120ms ease both; animation-delay: 0ms !important; }
   .verbo-td-press:active { transform: none; }
   .verbo-fb-card:hover { transform: none; }
-  .verbo-act-rail { transform: scaleY(1); opacity: 1; transition: none; }
+  .verbo-act-rail { transform: none; opacity: 1; transition: none; }
 }
 
 /* ---- Teacher · My Balance (financial) ---- */
