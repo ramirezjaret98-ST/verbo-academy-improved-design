@@ -1528,3 +1528,45 @@
   .verbo-student-card:hover .verbo-student-card__groupdot { transform: none; }
   .verbo-student-card__bar { transition: none; }
 }
+
+/* ---------------------------------------------------------------------------
+   Student detail modal — hierarchy + motion (Entry 051)
+   Sections enter with a short stagger; press feedback on footer actions.
+--------------------------------------------------------------------------- */
+@keyframes verbo-sdm-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.985); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes verbo-sdm-section-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.verbo-sdm {
+  animation: verbo-sdm-in 240ms cubic-bezier(0.23, 1, 0.32, 1) both;
+  transform-origin: center;
+}
+.verbo-sdm-section {
+  animation: verbo-sdm-section-in 300ms cubic-bezier(0.23, 1, 0.32, 1) both;
+}
+.verbo-sdm-tab {
+  transition: color 160ms ease, background-color 160ms ease;
+}
+.verbo-sdm-tab:active { transform: scale(0.97); }
+.verbo-sdm-action {
+  transition: transform 160ms cubic-bezier(0.23, 1, 0.32, 1), box-shadow 200ms ease, filter 160ms ease;
+}
+.verbo-sdm-action:active { transform: scale(0.97); }
+@media (hover: hover) and (pointer: fine) {
+  .verbo-sdm-action:enabled:hover,
+  .verbo-sdm-action:not(:disabled):hover {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 18px -12px rgba(1, 48, 74, 0.55);
+  }
+}
+.verbo-sdm-row {
+  transition: background-color 160ms ease, border-color 160ms ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  .verbo-sdm, .verbo-sdm-section { animation-duration: 1ms; animation-delay: 0ms !important; }
+  .verbo-sdm-action:hover, .verbo-sdm-action:active, .verbo-sdm-tab:active { transform: none; }
+}

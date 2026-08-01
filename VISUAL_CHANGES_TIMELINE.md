@@ -809,3 +809,12 @@ Sin cambios de lógica ni rutas. `DATA_MODEL.md` sigue sincronizado.
 - Received / Expenses / Net are now three grouped bars per month (green / amber / navy, `maxBarSize 22`, `radius 6`, `barGap 4`, `barCategoryGap 22%`), with unselected months at 0.4 opacity and the selected month at full.
 - Added a zero `ReferenceLine` so a negative Net reads correctly, and switched the legend line swatches to dots to match the bar encoding.
 - Click-to-jump behaviour, data shape, tooltips and routes untouched — visual encoding only; `DATA_MODEL.md` remains synchronized.
+
+## Entry 051 — Student detail modal: visual hierarchy + motion pass
+- The Overview tab was one long flat list of label/value pairs. It is now split into six titled sections (Contract, Entitlements, Learning path, Logistics, Billing, Team), each introduced by a bold 13px uppercase heading followed by a hairline rule that runs to the edge, so section boundaries are unmistakable.
+- Typography weight ladder restored: micro-labels are 10px `font-semibold` uppercase at `0.14em` tracking in muted 80%, values are regular `text-foreground/90`, and key figures (Sessions, Next payment, payment amounts) are `15px font-semibold` with tabular numbers. Section headings sit above both.
+- Header rebalanced: 56px avatar with a 2px white ring, larger name, and a single uppercase meta line (product · plan · company) instead of the low-contrast run-on caption.
+- Shell: rounding raised to 28px, height to `90vh`, padding to `px-5 sm:px-7`; tabs scroll horizontally with hidden scrollbars on narrow viewports and gain a hover tint; body and tab strip use the invisible-scrollbar treatment.
+- Rows (learning path, video link, payment history) upgraded to 12px-rounded panels with hover border/background feedback.
+- Motion (`.verbo-sdm*` in `src/styles.css`): modal enters at 240ms `cubic-bezier(0.23, 1, 0.32, 1)` from `scale(0.985)` + 8px, sections stagger in at 45ms steps (capped), all buttons carry `scale(0.97)` press feedback with a `-1px` hover lift and soft navy shadow gated behind `hover:hover`/`pointer:fine`; everything neutralized under `prefers-reduced-motion`.
+- Visual only — no logic, data or route changes; `DATA_MODEL.md` remains synchronized.

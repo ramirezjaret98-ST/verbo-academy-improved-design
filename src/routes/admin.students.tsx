@@ -1299,30 +1299,32 @@ function StudentDetailModal({
 
   return (
     <Overlay onClose={onClose}>
-      <div className="relative flex max-h-[88vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-card shadow-floating">
+      <div className="verbo-sdm relative flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-[28px] bg-card shadow-floating">
         {/* Header */}
-        <div className="flex items-start justify-between border-b border-border px-6 py-5" style={{ background: "linear-gradient(135deg, #01304a 0%, #02466b 100%)" }}>
-          <div className="flex items-center gap-3">
+        <div className="flex items-start justify-between gap-3 px-5 py-5 sm:px-7 sm:py-6" style={{ background: "linear-gradient(135deg, #01304a 0%, #02466b 100%)" }}>
+          <div className="flex min-w-0 items-center gap-3.5">
             {avatar ? (
-              <img src={avatar} alt={student.name} className="h-12 w-12 rounded-full object-cover" />
+              <img src={avatar} alt={student.name} className="h-14 w-14 shrink-0 rounded-full object-cover ring-2 ring-white/25" />
             ) : (
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white/15 text-sm font-semibold text-white">{initials(student.name)}</div>
+              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-white/15 text-base font-semibold text-white ring-2 ring-white/20">{initials(student.name)}</div>
             )}
-            <div>
-              <h2 className="text-xl font-semibold tracking-tight text-white">{student.name}</h2>
-              <p className="text-xs text-white/70">{product?.name}{student.access_plan ? ` · ${student.access_plan}` : ""}{student.company ? ` · ${student.company}` : ""}</p>
+            <div className="min-w-0">
+              <h2 className="truncate text-xl font-semibold tracking-tight text-white sm:text-[1.4rem]">{student.name}</h2>
+              <p className="mt-0.5 truncate text-[11px] font-medium uppercase tracking-[0.12em] text-white/55">
+                {[product?.name, student.access_plan, student.company].filter(Boolean).join(" · ")}
+              </p>
             </div>
           </div>
-          <button onClick={onClose} aria-label="Close" className="rounded-md p-1 text-white/70 transition-colors hover:bg-white/10 hover:text-white"><X className="h-4 w-4" /></button>
+          <button onClick={onClose} aria-label="Close" className="verbo-sdm-action shrink-0 rounded-full p-1.5 text-white/70 hover:bg-white/10 hover:text-white"><X className="h-4 w-4" /></button>
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-1 border-b border-border px-6 pt-3">
+        <div className="verbo-scroll-hidden flex gap-1 overflow-x-auto border-b border-border bg-card px-3 pt-2 sm:px-5">
           {([["overview", "Overview"], ["performance", "Performance & Attendance"], ["progress", "Course Progress"], ["badges", "Badges"], ["reports", "Reports"], ["notes", "Admin Notes"]] as [Tab, string][]).map(([id, label]) => (
             <button
               key={id}
               onClick={() => setTab(id)}
-              className={`relative px-3 py-2 text-sm font-medium transition-colors ${tab === id ? "text-accent" : "text-muted-foreground hover:text-foreground"}`}
+              className={`verbo-sdm-tab relative shrink-0 whitespace-nowrap rounded-t-lg px-3 py-2.5 text-[13px] transition-colors ${tab === id ? "font-semibold text-accent" : "font-medium text-muted-foreground hover:bg-secondary/50 hover:text-foreground"}`}
             >
               {label}
               {tab === id && <span className="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-accent" />}
@@ -1331,89 +1333,97 @@ function StudentDetailModal({
         </div>
 
         {/* Body */}
-        <div className="flex-1 overflow-y-auto px-6 py-5 report-modal-scroll">
+        <div className="verbo-scroll-hidden flex-1 overflow-y-auto px-5 py-6 sm:px-7">
           {tab === "overview" && (
-            <div className="space-y-6">
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <Info label="Email" value={student.email} />
-                <Info label="CEFR Level" value={student.current_level ?? "—"} />
-                <Info label="Product" value={product?.name ?? "—"} />
-                <Info label="Focus" value={student.focus ?? "—"} />
-                <div>
-                  <div className="text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground">Access Plan</div>
-                  <div className="mt-0.5">
-                    {student.access_plan ? (
-                      <Tag style={accessPlanPillStyle(student.access_plan)}>{student.access_plan}</Tag>
-                    ) : (
-                      <span className="text-sm text-foreground">—</span>
-                    )}
+            <div className="space-y-7">
+              {/* Contract essentials */}
+              <Section title="Contract" index={0}>
+                <div className="grid grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols-2">
+                  <Info label="Email" value={student.email} />
+                  <Info label="CEFR Level" value={student.current_level ?? "—"} />
+                  <Info label="Product" value={product?.name ?? "—"} />
+                  <Info label="Focus" value={student.focus ?? "—"} />
+                  <div>
+                    <div className={infoLabelCls}>Access Plan</div>
+                    <div className="mt-1.5">
+                      {student.access_plan ? (
+                        <Tag style={accessPlanPillStyle(student.access_plan)}>{student.access_plan}</Tag>
+                      ) : (
+                        <span className="text-sm text-foreground">—</span>
+                      )}
+                    </div>
                   </div>
+                  <Info label="Current roadmap level" value={student.current_roadmap_level ?? "—"} />
+                  {(() => {
+                    const c = effectiveSessionCounts(student.id, { hired: student.hired_sessions, remaining: student.remaining_sessions });
+                    return <Info label="Sessions" value={`${c.remaining} remaining / ${c.hired} total`} emphasis />;
+                  })()}
+                  <Info label="Cadence" value={`${student.sessions_per_week ?? "—"}×/week · ${student.session_duration ?? "—"} min`} />
+                  <Info label="Reschedule policy" value={student.reschedule_policy ?? accessPlan?.reschedulePolicy ?? "—"} />
+                  <Info label="Next payment" value={nextPay ? nextPay.toLocaleDateString() : "—"} emphasis />
+                  {groupInfo && <Info label="Group" value={groupInfo.group.name} />}
+                  {(groupInfo?.group.company_client || student.company) && (
+                    <Info label="Company" value={groupInfo?.group.company_client ?? student.company ?? "—"} />
+                  )}
                 </div>
-                <Info label="Current roadmap level" value={student.current_roadmap_level ?? "—"} />
-                {(() => {
-                  const c = effectiveSessionCounts(student.id, { hired: student.hired_sessions, remaining: student.remaining_sessions });
-                  return <Info label="Sessions" value={`${c.remaining} remaining / ${c.hired} total`} />;
-                })()}
-                <Info label="Cadence" value={`${student.sessions_per_week ?? "—"}×/week · ${student.session_duration ?? "—"} min`} />
-                <Info label="Reschedule policy" value={student.reschedule_policy ?? accessPlan?.reschedulePolicy ?? "—"} />
-                <Info label="Next payment" value={nextPay ? nextPay.toLocaleDateString() : "—"} />
-                {groupInfo && <Info label="Group" value={groupInfo.group.name} />}
-                {(groupInfo?.group.company_client || student.company) && (
-                  <Info label="Company" value={groupInfo?.group.company_client ?? student.company ?? "—"} />
-                )}
-              </div>
+              </Section>
 
-              {/* Clubs access — add-on entitlements */}
-              <div>
-                <div className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Clubs access</div>
-                {(() => {
-                  const tags: React.ReactNode[] = [];
-                  const ins = student.addon_insights_per_month ?? 0;
-                  const bc = student.addon_bookclubs_per_month ?? 0;
-                  const sp = student.addon_spotlight_per_month ?? 0;
-                  if (ins > 0) tags.push(<Tag key="ins" className="bg-primary/10 text-primary">Insights · {ins}/month</Tag>);
-                  if (bc > 0) tags.push(<Tag key="bc" className="bg-accent/10 text-accent">Book Clubs · {bc}/month</Tag>);
-                  if (sp > 0) tags.push(<Tag key="sp" className="bg-secondary text-secondary-foreground">Spotlight · {sp}/month</Tag>);
-                  if (student.addon_workshops_enabled) tags.push(<Tag key="ws" className="bg-muted text-muted-foreground">Workshops</Tag>);
-                  return tags.length > 0
-                    ? <div className="flex flex-wrap gap-2">{tags}</div>
-                    : <p className="text-sm text-muted-foreground">No clubs access</p>;
-                })()}
-              </div>
-
-              {/* Contracted levels progress */}
-              {student.contracted_levels && student.contracted_levels.length > 0 && (
-                <div>
-                  <div className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Contracted levels</div>
-                  <div className="flex flex-wrap gap-2">
-                    {student.contracted_levels.map((lvl) => (
-                      <Tag key={lvl} className={lvl === student.current_roadmap_level ? "bg-accent/15 text-accent" : "bg-secondary text-secondary-foreground"}>{lvl}</Tag>
-                    ))}
+              {/* Entitlements */}
+              <Section title="Entitlements" index={1}>
+                <div className="space-y-5">
+                  <div>
+                    <div className={infoLabelCls}>Clubs access</div>
+                    <div className="mt-2">
+                      {(() => {
+                        const tags: React.ReactNode[] = [];
+                        const ins = student.addon_insights_per_month ?? 0;
+                        const bc = student.addon_bookclubs_per_month ?? 0;
+                        const sp = student.addon_spotlight_per_month ?? 0;
+                        if (ins > 0) tags.push(<Tag key="ins" className="bg-primary/10 text-primary">Insights · {ins}/month</Tag>);
+                        if (bc > 0) tags.push(<Tag key="bc" className="bg-accent/10 text-accent">Book Clubs · {bc}/month</Tag>);
+                        if (sp > 0) tags.push(<Tag key="sp" className="bg-secondary text-secondary-foreground">Spotlight · {sp}/month</Tag>);
+                        if (student.addon_workshops_enabled) tags.push(<Tag key="ws" className="bg-muted text-muted-foreground">Workshops</Tag>);
+                        return tags.length > 0
+                          ? <div className="flex flex-wrap gap-2">{tags}</div>
+                          : <p className="text-sm text-muted-foreground">No clubs access</p>;
+                      })()}
+                    </div>
                   </div>
+
+                  {student.contracted_levels && student.contracted_levels.length > 0 && (
+                    <div>
+                      <div className={infoLabelCls}>Contracted levels</div>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {student.contracted_levels.map((lvl) => (
+                          <Tag key={lvl} className={lvl === student.current_roadmap_level ? "bg-accent/15 text-accent" : "bg-secondary text-secondary-foreground"}>{lvl}</Tag>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
-              )}
+              </Section>
 
               {/* Learning Path — reopen a completed level for read-only review */}
               {student.contracted_levels && student.contracted_levels.length > 0 && (
-                <div>
-                  <div className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Learning Path · Reopen for Review</div>
-                  <p className="mb-2 text-xs text-muted-foreground">
-                    Grants the student read-only access to a completed level (they can review content and past scores but cannot redo activities).
-                  </p>
+                <Section
+                  title="Learning path"
+                  index={2}
+                  description="Reopening grants read-only access to a completed level — the student can review content and past scores but cannot redo activities."
+                >
                   <div className="space-y-2">
                     {student.contracted_levels.map((lvl) => {
                       const reopened = (student.reopened_levels ?? []).includes(lvl);
                       return (
-                        <div key={lvl} className="flex items-center justify-between gap-3 rounded-lg border border-border bg-background px-3 py-2">
-                          <div className="flex items-center gap-2 text-sm text-foreground">
-                            <RotateCcw className={`h-3.5 w-3.5 ${reopened ? "text-accent" : "text-muted-foreground"}`} />
-                            <span>{lvl}</span>
+                        <div key={lvl} className="verbo-sdm-row flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-background px-3.5 py-2.5 hover:border-accent/25">
+                          <div className="flex min-w-0 items-center gap-2 text-sm font-medium text-foreground">
+                            <RotateCcw className={`h-3.5 w-3.5 shrink-0 ${reopened ? "text-accent" : "text-muted-foreground"}`} />
+                            <span className="truncate">{lvl}</span>
                             {reopened && <Tag className="bg-accent/15 text-accent">Reopened for Review</Tag>}
                           </div>
                           <button
                             type="button"
                             onClick={() => { setLevelReopened(student.id, lvl, !reopened); forceTick((n) => n + 1); }}
-                            className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
+                            className={`verbo-sdm-action rounded-lg border px-3 py-1.5 text-xs font-semibold ${
                               reopened
                                 ? "border-border bg-secondary text-foreground hover:bg-muted"
                                 : "border-accent/30 bg-accent/10 text-accent hover:bg-accent/15"
@@ -1425,62 +1435,66 @@ function StudentDetailModal({
                       );
                     })}
                   </div>
-                </div>
+                </Section>
               )}
 
-
-              {/* Video call link */}
-              <div>
-                <div className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Video Call Link</div>
-                <div className="flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2">
+              {/* Logistics */}
+              <Section title="Logistics" index={3}>
+                <div className={infoLabelCls}>Video call link</div>
+                <div className="verbo-sdm-row mt-2 flex items-center gap-2 rounded-xl border border-border bg-background px-3.5 py-2.5 hover:border-primary/25">
                   <Video className="h-4 w-4 shrink-0 text-muted-foreground" />
                   <span className="flex-1 truncate text-sm text-foreground">{showLink ? student.video_call_link : maskedLink}</span>
-                  <button onClick={() => setShowLink((v) => !v)} className="rounded p-1 text-muted-foreground hover:text-foreground" aria-label="Toggle link">
+                  <button onClick={() => setShowLink((v) => !v)} className="verbo-sdm-action rounded-md p-1 text-muted-foreground hover:text-foreground" aria-label="Toggle link">
                     {showLink ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
-                  <button onClick={copyLink} className="rounded p-1 text-muted-foreground hover:text-foreground" aria-label="Copy link">
+                  <button onClick={copyLink} className="verbo-sdm-action rounded-md p-1 text-muted-foreground hover:text-foreground" aria-label="Copy link">
                     {copied ? <Check className="h-4 w-4 text-success" /> : <Copy className="h-4 w-4" />}
                   </button>
                 </div>
-              </div>
+              </Section>
 
-              {/* Payment history */}
-              <div>
-                <div className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Payment History</div>
-                {(() => {
-                  const payments = loadPayments()
-                    .filter((p) => p.entity_type === "individual" && p.entity_id === student.id)
-                    .sort((a, b) => new Date(b.paid_at).getTime() - new Date(a.paid_at).getTime())
-                    .slice(0, 5);
-                  if (payments.length === 0) {
-                    return <p className="text-sm text-muted-foreground">No payments recorded yet.</p>;
-                  }
-                  return (
-                    <div className="divide-y divide-border rounded-lg border border-border bg-background">
-                      {payments.map((p) => (
-                        <div key={p.id} className="flex items-center justify-between px-3 py-2">
-                          <span className="text-sm text-foreground">{new Date(p.paid_at).toLocaleDateString()}</span>
-                          <span className="text-sm font-semibold text-foreground">${p.amount.toLocaleString()} MXN</span>
-                        </div>
-                      ))}
+              {/* Billing */}
+              <Section title="Billing" index={4}>
+                <div className={infoLabelCls}>Payment history</div>
+                <div className="mt-2">
+                  {(() => {
+                    const payments = loadPayments()
+                      .filter((p) => p.entity_type === "individual" && p.entity_id === student.id)
+                      .sort((a, b) => new Date(b.paid_at).getTime() - new Date(a.paid_at).getTime())
+                      .slice(0, 5);
+                    if (payments.length === 0) {
+                      return <p className="text-sm text-muted-foreground">No payments recorded yet.</p>;
+                    }
+                    return (
+                      <div className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-background">
+                        {payments.map((p) => (
+                          <div key={p.id} className="verbo-sdm-row flex items-center justify-between px-3.5 py-2.5 hover:bg-secondary/40">
+                            <span className="text-sm text-muted-foreground">{new Date(p.paid_at).toLocaleDateString()}</span>
+                            <span className="text-sm font-semibold tabular-nums text-foreground">${p.amount.toLocaleString()} MXN</span>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
+                </div>
+              </Section>
+
+              {/* Team */}
+              <Section title="Team" index={5}>
+                <div className={infoLabelCls}>Assigned teacher(s)</div>
+                <div className="mt-2">
+                  {teacherHistory.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No sessions on record yet.</p>
+                  ) : (
+                    <div className="flex flex-wrap gap-2">
+                      {teacherHistory.map((t) => <Tag key={t.name} className="bg-secondary text-secondary-foreground">{t.name} · {t.count}</Tag>)}
                     </div>
-                  );
-                })()}
-              </div>
-
-              {/* Teachers */}
-              <div>
-                <div className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Assigned teacher(s)</div>
-                {teacherHistory.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No sessions on record yet.</p>
-                ) : (
-                  <div className="flex flex-wrap gap-2">
-                    {teacherHistory.map((t) => <Tag key={t.name} className="bg-secondary text-secondary-foreground">{t.name} · {t.count}</Tag>)}
-                  </div>
-                )}
-              </div>
+                  )}
+                </div>
+              </Section>
             </div>
           )}
+
 
           {tab === "performance" && <PerformanceTab student={student} />}
 
@@ -1532,25 +1546,25 @@ function StudentDetailModal({
         )}
 
         {/* Footer actions */}
-        <div className="flex flex-wrap items-center gap-2 border-t border-border bg-secondary/30 px-6 py-4">
-          <GhostButton onClick={onEdit} className="!py-1.5 !text-xs"><Pencil className="h-3.5 w-3.5" /> Edit profile</GhostButton>
-          <GhostButton onClick={() => { patch({ must_change_password: true }); alert("This user will be asked to set a new password the next time they log in."); }} className="!py-1.5 !text-xs"><KeyRound className="h-3.5 w-3.5" /> Require Password Reset</GhostButton>
+        <div className="flex flex-wrap items-center gap-2 border-t border-border bg-secondary/30 px-5 py-4 sm:px-7">
+          <GhostButton onClick={onEdit} className="verbo-sdm-action !py-1.5 !text-xs"><Pencil className="h-3.5 w-3.5" /> Edit profile</GhostButton>
+          <GhostButton onClick={() => { patch({ must_change_password: true }); alert("This user will be asked to set a new password the next time they log in."); }} className="verbo-sdm-action !py-1.5 !text-xs"><KeyRound className="h-3.5 w-3.5" /> Require Password Reset</GhostButton>
           <button
             onClick={() => setPanel((p) => (p === "reassign" ? "none" : "reassign"))}
-            className="inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-all hover:brightness-110"
+            className="verbo-sdm-action inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-all hover:brightness-110"
             style={{ backgroundColor: "#0f766e" }}
           >
             <Users className="h-3.5 w-3.5" /> Reassign teacher
           </button>
           <button
             onClick={() => setPanel((p) => (p === "freeze" ? "none" : "freeze"))}
-            className="inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-all hover:brightness-110"
+            className="verbo-sdm-action inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-all hover:brightness-110"
             style={{ backgroundColor: "#38bdf8" }}
           >
             <Snowflake className="h-3.5 w-3.5" /> Freeze
           </button>
           {student.status === "suspended" ? (
-            <GhostButton onClick={() => patch({ status: "active" })} className="!py-1.5 !text-xs"><Play className="h-3.5 w-3.5" /> Reactivate</GhostButton>
+            <GhostButton onClick={() => patch({ status: "active" })} className="verbo-sdm-action !py-1.5 !text-xs"><Play className="h-3.5 w-3.5" /> Reactivate</GhostButton>
           ) : (
             <button
               onClick={() => {
@@ -1562,7 +1576,7 @@ function StudentDetailModal({
                 }
               }}
               disabled={isGrouped && groupInfo?.member.status !== "active"}
-              className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-destructive px-3 py-1.5 text-xs font-semibold text-destructive-foreground shadow-sm transition-all hover:brightness-110 disabled:opacity-40"
+              className="verbo-sdm-action inline-flex items-center justify-center gap-1.5 rounded-lg bg-destructive px-3 py-1.5 text-xs font-semibold text-destructive-foreground shadow-sm transition-all hover:brightness-110 disabled:opacity-40"
             >
               <Ban className="h-3.5 w-3.5" /> Suspend
             </button>
@@ -1570,7 +1584,7 @@ function StudentDetailModal({
           <button
             onClick={() => blocked && patch({ insights_strikes: 0 })}
             disabled={!blocked}
-            className="inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-all enabled:hover:brightness-110 disabled:opacity-40"
+            className="verbo-sdm-action inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-all enabled:hover:brightness-110 disabled:opacity-40"
             style={{ backgroundColor: "#f38934" }}
           >
             <Unlock className="h-3.5 w-3.5" /> Unlock Insights ({strikes}/{MAX_INSIGHT_STRIKES})
@@ -1579,7 +1593,7 @@ function StudentDetailModal({
             <button
               onClick={() => bcBlocked && patch({ bookclub_strikes: 0 })}
               disabled={!bcBlocked}
-              className="inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-all enabled:hover:brightness-110 disabled:opacity-40"
+              className="verbo-sdm-action inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-all enabled:hover:brightness-110 disabled:opacity-40"
               style={{ backgroundColor: "#0f766e" }}
             >
               <Unlock className="h-3.5 w-3.5" /> Unlock Book Clubs ({bcStrikes}/{MAX_BOOKCLUB_STRIKES})
@@ -1588,7 +1602,7 @@ function StudentDetailModal({
           {!isGrouped && (
             <button
               onClick={markPaid}
-              className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-success px-3 py-1.5 text-xs font-semibold text-success-foreground shadow-sm transition-opacity hover:opacity-90"
+              className="verbo-sdm-action inline-flex items-center justify-center gap-1.5 rounded-lg bg-success px-3 py-1.5 text-xs font-semibold text-success-foreground shadow-sm transition-opacity hover:opacity-90"
             >
               <CreditCard className="h-3.5 w-3.5" /> Mark as paid
             </button>
@@ -1853,14 +1867,33 @@ function Stat({ label, value }: { label: string; value: string }) {
   );
 }
 
-function Info({ label, value }: { label: string; value: string }) {
+const infoLabelCls = "text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/80";
+
+function Info({ label, value, emphasis = false }: { label: string; value: string; emphasis?: boolean }) {
   return (
-    <div>
-      <div className="text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</div>
-      <div className="mt-0.5 text-sm text-foreground">{value}</div>
+    <div className="min-w-0">
+      <div className={infoLabelCls}>{label}</div>
+      <div className={`mt-1 break-words ${emphasis ? "text-[15px] font-semibold tabular-nums text-foreground" : "text-sm font-normal text-foreground/90"}`}>{value}</div>
     </div>
   );
 }
+
+/** Titled block: a hairline rule + heavier heading makes section edges obvious. */
+function Section({
+  title, description, index = 0, children,
+}: { title: string; description?: string; index?: number; children: React.ReactNode }) {
+  return (
+    <section className="verbo-sdm-section" style={{ animationDelay: `${Math.min(index, 6) * 45}ms` }}>
+      <div className="mb-3.5 flex items-center gap-3">
+        <h3 className="text-[13px] font-bold uppercase tracking-[0.1em] text-foreground">{title}</h3>
+        <span className="h-px flex-1 bg-border" />
+      </div>
+      {description && <p className="mb-3 max-w-prose text-xs leading-relaxed text-muted-foreground">{description}</p>}
+      {children}
+    </section>
+  );
+}
+
 
 // ===========================================================================
 // Shared building blocks
