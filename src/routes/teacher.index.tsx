@@ -932,11 +932,11 @@ function TeacherDashboard() {
       <section>
         <SectionTitle>Quick Actions</SectionTitle>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <QuickAction to="/teacher/availability" iconSrc={availabilityIconAsset.url} label="My Availability" />
-          <QuickAction to="/teacher/clubs" iconSrc={clubsIconAsset.url} label="Available Clubs" />
-          <QuickAction to="/teacher/financial" iconSrc={balanceIconAsset.url} label="My Balance" />
+          <QuickAction to="/teacher/availability" iconSrc={availabilityIconAsset.url} label="My Availability" delay={0} />
+          <QuickAction to="/teacher/clubs" iconSrc={clubsIconAsset.url} label="Available Clubs" delay={45} />
+          <QuickAction to="/teacher/financial" iconSrc={balanceIconAsset.url} label="My Balance" delay={90} />
           {hasVipStudent && (
-            <QuickAction to="/teacher/vip" icon={GraduationCap} label="Course Builder VIP" />
+            <QuickAction to="/teacher/vip" icon={GraduationCap} label="Course Builder VIP" delay={135} />
           )}
         </div>
       </section>
@@ -1198,14 +1198,15 @@ function TeacherDashboard() {
   );
 }
 
-function QuickAction({ to, icon: Icon, iconSrc, label }: { to: string; icon?: LucideIcon; iconSrc?: string; label: string }) {
+function QuickAction({ to, icon: Icon, iconSrc, label, delay = 0 }: { to: string; icon?: LucideIcon; iconSrc?: string; label: string; delay?: number }) {
   return (
     <Link
       to={to as any}
-      className="group flex items-center gap-4 rounded-2xl bg-card px-5 py-5 shadow-[0_8px_20px_-8px_rgba(243,137,52,0.18)] transition-shadow duration-200 hover:shadow-floating verbo-card-hover"
+      style={{ animationDelay: `${delay}ms` }}
+      className="verbo-td-in verbo-td-press group flex items-center gap-3 rounded-2xl bg-card px-4 py-4 shadow-[0_8px_20px_-8px_rgba(243,137,52,0.18)] transition-shadow duration-200 hover:shadow-floating verbo-card-hover sm:gap-4 sm:px-5 sm:py-5"
     >
       {iconSrc ? (
-        <img src={iconSrc} alt="" aria-hidden className="h-12 w-12 shrink-0 object-contain" />
+        <img src={iconSrc} alt="" aria-hidden className="h-10 w-10 shrink-0 object-contain sm:h-12 sm:w-12" />
       ) : (
         <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-accent/15 text-accent">
           {Icon ? <Icon className="h-6 w-6" /> : null}
