@@ -930,3 +930,10 @@ Sin cambios de lógica ni rutas. `DATA_MODEL.md` sigue sincronizado.
 - Sesiones impartidas: chip number-forward sobre `bg-card` con borde hairline — la cifra en 15px bold tabular y la etiqueta "SESSIONS TAUGHT" en 11px uppercase tracking amplio, para que el dato se lea antes que el texto.
 - `src/styles.css`: utilidad `.verbo-hdr-chip` con hover de 1px (gated a `hover:hover`) y respeto a `prefers-reduced-motion`.
 - Visual only — no logic, data or route changes; `DATA_MODEL.md` remains synchronized.
+
+## Entry 066 — /teacher: rediseño de la sección Quick Actions
+- La sección no destacaba: cuatro tarjetas blancas sueltas con sombra tenue que se leían como relleno. Se sustituyeron por un único panel unificado (`rounded-3xl`, hairline, sombra baja) que agrupa las acciones como una sola pieza.
+- Cabecera del panel en navy sólido (`bg-primary`) con punto de acento, título "QUICK ACTIONS" en 11px bold uppercase tracking amplio y microcopy "Jump straight in" al 60% — el bloque de color da el contraste que antes faltaba.
+- Acciones convertidas en filas/columnas divididas por hairlines (1 col en móvil, 2 en sm, 4 en lg) en vez de tarjetas independientes: icono, etiqueta en 14px bold y descripción secundaria de 11px ("Set your weekly slots", "Claim open sessions", "Earnings & payouts", "Design VIP tracks") para que se entienda cada destino.
+- Hover: relleno sutil `bg-muted/50`, barra de acento inferior que crece desde la izquierda (`scale-x` 200ms ease-out), icono +5% y chevron desplazado 4px; se conserva la entrada escalonada y el press feedback existentes.
+- Visual only — no logic, data or route changes; `DATA_MODEL.md` remains synchronized.

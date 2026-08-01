@@ -942,16 +942,25 @@ function TeacherDashboard() {
 
 
       <section>
-        <SectionTitle>Quick Actions</SectionTitle>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <QuickAction to="/teacher/availability" iconSrc={availabilityIconAsset.url} label="My Availability" delay={0} />
-          <QuickAction to="/teacher/clubs" iconSrc={clubsIconAsset.url} label="Available Clubs" delay={45} />
-          <QuickAction to="/teacher/financial" iconSrc={balanceIconAsset.url} label="My Balance" delay={90} />
-          {hasVipStudent && (
-            <QuickAction to="/teacher/vip" icon={GraduationCap} label="Course Builder VIP" delay={135} />
-          )}
+        <div className="overflow-hidden rounded-3xl border border-border bg-card shadow-[0_18px_40px_-28px_rgba(12,26,58,0.45)]">
+          <div className="flex flex-wrap items-center justify-between gap-2 bg-primary px-5 py-3">
+            <div className="flex items-center gap-2">
+              <span className="h-1.5 w-1.5 rounded-full bg-accent" />
+              <span className="text-[11px] font-bold uppercase tracking-[0.18em] text-primary-foreground">Quick Actions</span>
+            </div>
+            <span className="text-[11px] font-medium text-primary-foreground/60">Jump straight in</span>
+          </div>
+          <div className="grid divide-y divide-border sm:grid-cols-2 sm:divide-y-0 lg:grid-cols-4">
+            <QuickAction to="/teacher/availability" iconSrc={availabilityIconAsset.url} label="My Availability" hint="Set your weekly slots" delay={0} />
+            <QuickAction to="/teacher/clubs" iconSrc={clubsIconAsset.url} label="Available Clubs" hint="Claim open sessions" delay={45} />
+            <QuickAction to="/teacher/financial" iconSrc={balanceIconAsset.url} label="My Balance" hint="Earnings & payouts" delay={90} />
+            {hasVipStudent && (
+              <QuickAction to="/teacher/vip" icon={GraduationCap} label="Course Builder VIP" hint="Design VIP tracks" delay={135} />
+            )}
+          </div>
         </div>
       </section>
+
 
       <section>
         <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
@@ -1210,25 +1219,30 @@ function TeacherDashboard() {
   );
 }
 
-function QuickAction({ to, icon: Icon, iconSrc, label, delay = 0 }: { to: string; icon?: LucideIcon; iconSrc?: string; label: string; delay?: number }) {
+function QuickAction({ to, icon: Icon, iconSrc, label, hint, delay = 0 }: { to: string; icon?: LucideIcon; iconSrc?: string; label: string; hint?: string; delay?: number }) {
   return (
     <Link
       to={to as any}
       style={{ animationDelay: `${delay}ms` }}
-      className="verbo-td-in verbo-td-press group flex items-center gap-3 rounded-2xl bg-card px-4 py-4 shadow-[0_8px_20px_-8px_rgba(243,137,52,0.18)] transition-shadow duration-200 hover:shadow-floating verbo-card-hover sm:gap-4 sm:px-5 sm:py-5"
+      className="verbo-td-in verbo-td-press group relative flex items-center gap-3 overflow-hidden px-5 py-4 transition-colors duration-200 hover:bg-muted/50 sm:border-l sm:border-border sm:first:border-l-0 sm:[&:nth-child(3)]:border-l-0 lg:[&:nth-child(3)]:border-l"
     >
+      <span className="absolute inset-x-0 bottom-0 h-[2px] origin-left scale-x-0 bg-accent transition-transform duration-200 ease-out group-hover:scale-x-100" />
       {iconSrc ? (
-        <img src={iconSrc} alt="" aria-hidden className="h-10 w-10 shrink-0 object-contain sm:h-12 sm:w-12" />
+        <img src={iconSrc} alt="" aria-hidden className="h-10 w-10 shrink-0 object-contain transition-transform duration-200 ease-out group-hover:scale-105" />
       ) : (
-        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-accent/15 text-accent">
-          {Icon ? <Icon className="h-6 w-6" /> : null}
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-primary/15 text-primary transition-transform duration-200 ease-out group-hover:scale-105">
+          {Icon ? <Icon className="h-5 w-5" /> : null}
         </div>
       )}
-      <div className="min-w-0 text-sm font-semibold text-foreground">{label}</div>
-      <ChevronRight className="ml-auto h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200 group-hover:translate-x-0.5" />
+      <div className="min-w-0">
+        <div className="truncate text-sm font-bold leading-tight text-foreground">{label}</div>
+        {hint && <div className="truncate text-[11px] text-muted-foreground">{hint}</div>}
+      </div>
+      <ChevronRight className="ml-auto h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200 group-hover:translate-x-1" />
     </Link>
   );
 }
+
 
 
 function formatCountdown(ms: number) {
