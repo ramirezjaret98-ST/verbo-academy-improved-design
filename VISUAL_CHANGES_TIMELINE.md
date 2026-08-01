@@ -856,3 +856,12 @@ Sin cambios de lógica ni rutas. `DATA_MODEL.md` sigue sincronizado.
 - Removed: se lee como deshabilitada (`grayscale(1)`, opacidad 0.55, fondo mezclado con `--muted`) pero sigue siendo clickeable; en hover recupera color (grayscale 0.7 / opacidad 0.78) para indicar que se puede abrir.
 - Pulso neutralizado bajo `prefers-reduced-motion` (glow fijo en su lugar).
 - Visual only — no logic, data or route changes; `DATA_MODEL.md` remains synchronized.
+
+## Entry 057 — Student cards: status glows + frozen ice
+- Reutiliza el vocabulario visual de las tarjetas de teacher, sin componentes nuevos.
+- Frozen: capa de hielo `.verbo-ice` + etiqueta `FROZEN` sobre toda la tarjeta; se aclara en hover.
+- Active: glow verde ahora sí visible (hairline #16a34a 30% + halo `0 0 18px -2px` al 42%).
+- Crítico (suspendido, Insights/Book Clubs bloqueado, pago vencido): pulso rojo exagerado `verbo-review-glow-strong`, pausado en hover.
+- Pago próximo (≤3 días): pulso ámbar exagerado `verbo-warn-glow-strong` (1.6s), pausado en hover.
+- `prefers-reduced-motion`: pulsos sustituidos por glow fijo.
+- Visual only — no logic, data or route changes; `DATA_MODEL.md` remains synchronized.
