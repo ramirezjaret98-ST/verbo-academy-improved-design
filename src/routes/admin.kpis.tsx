@@ -9,7 +9,7 @@ import {
   computeTeacherKpis, ratingBand, ratingHistory,
   getBonusThreshold, setBonusThreshold,
 } from "@/lib/teacher-kpis";
-import { MetricCard, SectionTitle, HeroStatCard, AnimatedNumber, AccentModal, AccentModalFooter, GhostButton } from "@/components/verbo/ui";
+import { SectionTitle, AnimatedNumber, AccentModal, AccentModalFooter, GhostButton } from "@/components/verbo/ui";
 import { teacherTier } from "@/lib/teacher-tiers";
 import { FlaggedRow } from "@/routes/admin.teachers";
 import { BonusBadge } from "@/components/verbo/BonusBadge";
@@ -56,8 +56,6 @@ const TIER_COLORS: Record<string, { bg: string; fg: string }> = {
   Distinguished: { bg: "#7e22ce", fg: "#ffffff" },
   Signature: { bg: "#d97706", fg: "#ffffff" },
 };
-
-const REVIEW_PULSE = "#dc2626";
 
 function Page() {
   const { teacher: focusTeacher } = Route.useSearch();
