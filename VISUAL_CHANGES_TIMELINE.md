@@ -950,3 +950,9 @@ Sin cambios de lógica ni rutas. `DATA_MODEL.md` sigue sincronizado.
 - Ahora se renderizan como watermark: cifra en 104px bold tabular, blanca al 8% de opacidad, anclada a la derecha (`right-3`) y ocupando el 100% de la altura de la tarjeta (`-inset-y-4` para compensar el `py-4`), con `overflow-hidden` en la tarjeta y `pointer-events-none`.
 - El título pasa a ocupar la primera línea sin el número delante; el icono se mantiene por encima del watermark.
 - El valor sigue siendo dinámico (`p.count`) — visual only, no logic, data or route changes; `DATA_MODEL.md` remains synchronized.
+
+## Entry 069 — /teacher: Avg Rating con rampa continua de color
+- El número de "Avg Rating" usaba cuatro cortes fijos (verde/amarillo/naranja/carmesí), así que 3.4 y 2.6 se veían idénticos.
+- Ahora usa la misma rampa continua rojo → naranja → ámbar → verde del panel de KPIs (`scoreScaleColor`), mapeando el rating 0-5 a 0-100; sin rating, gris neutro `#94a3b8`.
+- El color alimenta a la vez la cifra y el `--verbo-focus-pulse-color` de la tarjeta, por lo que el glow acompaña al valor real.
+- Visual only — no logic, data or route changes; `DATA_MODEL.md` remains synchronized.

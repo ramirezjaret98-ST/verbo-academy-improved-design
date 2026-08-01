@@ -224,12 +224,8 @@ function TeacherDashboard() {
     belowTarget === 0 ? "none" : belowTarget >= 2 || anyCritical ? "red" : "yellow";
   const strikes = teacherUser ? activeStrikeCount(teacherUser.id) : 0;
   const sessionsTaught = mySessions.filter((s) => s.status === "completed").length;
-  const ratingGlow =
-    avgRating30 == null ? CRIMSON
-    : avgRating30 >= 4.0 ? GREEN
-    : avgRating30 >= 3.5 ? YELLOW
-    : avgRating30 >= 2.5 ? ORANGE
-    : CRIMSON;
+  const ratingGlow = ratingScaleColor(avgRating30);
+
   const compositeScore = kpis?.composite ?? 0;
   const performanceGlow =
     compositeScore >= 90 ? GREEN
@@ -1919,3 +1915,37 @@ function SubSkillModal({
   );
 }
 
+
+/**
+ * Continuous red → orange → amber → green ramp for a 0-100 score.
+ * Shared visual language with the KPI dashboard.
+ */
+function scoreScaleColor(pct: number) {
+  const stops: [number, [number, number, number]][] = [
+    [0, [220, 38, 38]],    // red
+    [45, [234, 88, 12]],   // orange
+    [65, [245, 158, 11]],  // amber
+    [82, [163, 191, 24]],  // yellow-green
+    [100, [63, 143, 16]],  // green
+  ];
+  const v = Math.max(0, Math.min(100, pct));
+  let a = stops[0]!;
+  let b = stops[stops.length - 1]!;
+  for (let i = 0; i < stops.length - 1; i++) {
+    if (v >= stops[i]![0] && v <= stops[i + 1]![0]) {
+      a = stops[i]!;
+      b = stops[i + 1]!;
+      break;
+    }
+  }
+  const span = b[0] - a[0] || 1;
+  const t = (v - a[0]) / span;
+  const ch = (i: number) => Math.round(a[1][i]! + (b[1][i]! - a[1][i]!) * t);
+  return `rgb(${ch(0)}, ${ch(1)}, ${ch(2)})`;
+}
+
+/** 0-5 star rating mapped onto the same continuous ramp. */
+function ratingScaleColor(rating: number | null | undefined) {
+  if (rating == null) return "#94a3b8";
+  return scoreScaleColor(Math.max(0, Math.min(100, (rating / 5) * 100)));
+}
