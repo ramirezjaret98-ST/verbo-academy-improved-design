@@ -499,34 +499,44 @@ function KpiTile({
   onOverride?: (metric: KpiMetric, currentValue: number) => void;
   override?: { admin_name: string; created_at: string; previous_value: number; new_value: number; justification: string };
 }) {
+  const color = barColor(value, invert);
   return (
-    <div className="rounded-xl border border-border/60 bg-secondary/20 p-2.5" style={{ boxShadow: `0 0 14px -6px ${barColor(value, invert)}66` }}>
-      <div className="flex items-start justify-between gap-1.5">
-        <span className="min-w-0 text-[11px] leading-tight text-muted-foreground">{label}</span>
-        {metric && canOverride && onOverride && (
-          <button
-            onClick={() => onOverride(metric, value)}
-            className="shrink-0 rounded-md p-0.5 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-            title={`Manually adjust ${label}`}
-            aria-label={`Manually adjust ${label}`}
-          >
-            <Pencil className="h-3 w-3" />
-          </button>
-        )}
-      </div>
-      <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-        <span
-          className="inline-flex items-center rounded-md px-2 py-0.5 text-xs font-bold text-white"
-          style={{ backgroundColor: barColor(value, invert) }}
-        >
-          {value}%
+    <div className="verbo-kpi-tile min-w-0" style={{ ["--mc" as string]: color } as React.CSSProperties}>
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="min-w-0 truncate text-[11.5px] font-medium leading-tight text-muted-foreground">{label}</span>
+        <span className="flex shrink-0 items-center gap-1">
+          <span className="font-display text-[15px] font-semibold leading-none tabular-nums" style={{ color }}>
+            {value}
+            <span className="text-[10px] font-light opacity-60">%</span>
+          </span>
+          {metric && canOverride && onOverride && (
+            <button
+              onClick={() => onOverride(metric, value)}
+              className="rounded-md p-0.5 text-muted-foreground/60 transition-colors hover:bg-secondary hover:text-foreground"
+              title={`Manually adjust ${label}`}
+              aria-label={`Manually adjust ${label}`}
+            >
+              <Pencil className="h-3 w-3" />
+            </button>
+          )}
         </span>
-        {override && <AdjustedBadge override={override} />}
       </div>
-      {sub && <div className="mt-1 text-[10px] leading-tight text-muted-foreground/70">{sub}</div>}
+      <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-secondary">
+        <div
+          className="verbo-kpi-tile__bar h-full rounded-full"
+          style={{ width: `${Math.max(3, Math.min(100, value))}%`, background: color }}
+        />
+      </div>
+      {(sub || override) && (
+        <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[10.5px] font-light leading-tight text-muted-foreground/80">
+          {sub}
+          {override && <AdjustedBadge override={override} />}
+        </div>
+      )}
     </div>
   );
 }
+
 
 function CompositeRing({ value }: { value: number }) {
   const size = 60;
