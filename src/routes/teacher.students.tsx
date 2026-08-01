@@ -5,7 +5,7 @@ import { ASSIGNMENTS, USERS, SESSIONS, type User } from "@/lib/mock-data";
 import { studentAttendance } from "@/lib/sessions-store";
 import {
   MAX_INSIGHT_STRIKES, MAX_BOOKCLUB_STRIKES,
-  getProduct,
+  getProduct, accessPlanPillStyle,
 } from "@/lib/student-model";
 import { hydrateStudents, subscribeStudents } from "@/lib/students-store";
 import { groupOfStudent, subscribeGroups, effectiveSessionCounts, sessionProgressFor } from "@/lib/groups-store";
