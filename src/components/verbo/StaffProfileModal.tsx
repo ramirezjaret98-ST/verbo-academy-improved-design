@@ -207,23 +207,23 @@ export function StaffProfileModal({ open, onOpenChange }: Props) {
 
         {/* Hero banner + avatar — kept outside the scroll container so the avatar overlap isn't clipped */}
         <div className="relative">
-          {/* Hero banner — soft brand blobs, no geometric pattern */}
+          {/* Hero banner — taller, calmer navy gradient with a single soft orange accent */}
           <div
-            className="relative h-24 w-full"
+            className="relative h-36 w-full"
             style={{
               background:
-                "radial-gradient(circle at 12% 20%, rgba(1,48,74,0.95), transparent 62%), radial-gradient(circle at 42% 95%, rgba(10,74,110,0.9), transparent 60%), radial-gradient(circle at 74% 15%, rgba(243,137,52,0.85), transparent 58%), radial-gradient(circle at 95% 90%, rgba(95,202,22,0.8), transparent 55%), linear-gradient(120deg, #01304a 0%, #0a4a6e 60%, #f38934 100%)",
+                "radial-gradient(circle at 85% 20%, color-mix(in oklab, var(--orange-500) 55%, transparent), transparent 46%), linear-gradient(135deg, var(--navy-700) 0%, var(--navy-600) 55%, var(--navy-500) 100%)",
             }}
           />
 
           {/* Avatar overlaps the banner bottom edge */}
-          <div className="absolute -bottom-12 left-1/2 -translate-x-1/2">
+          <div className="absolute -bottom-10 left-1/2 -translate-x-1/2">
             <div className="relative">
-              <div className="h-24 w-24 overflow-hidden rounded-full border-4 border-background shadow-elevated">
+              <div className="h-20 w-20 overflow-hidden rounded-full border-4 border-background shadow-floating">
                 {avatar ? (
                   <img src={avatar} alt={user.name} className="h-full w-full object-cover" />
                 ) : (
-                  <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-[#01304a] to-[#0a4a6e] text-3xl font-semibold text-white">
+                  <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-navy-700 to-navy-500 text-2xl font-semibold text-primary-foreground">
                     {initial}
                   </div>
                 )}
@@ -232,13 +232,13 @@ export function StaffProfileModal({ open, onOpenChange }: Props) {
                 type="button"
                 onClick={() => fileRef.current?.click()}
                 aria-label="Change profile photo"
-                className="absolute -right-1 bottom-1 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-[#f38934] text-white shadow-md transition-transform hover:scale-105"
+                className="verbo-profile-press absolute -right-1 bottom-1 flex h-7 w-7 cursor-pointer items-center justify-center rounded-full bg-orange-500 text-white shadow-md hover:bg-orange-600"
               >
-                <Pencil className="h-3.5 w-3.5" />
+                <Pencil className="h-3 w-3" />
               </button>
               <span
                 title={online ? "Online" : "Offline"}
-                className={`absolute bottom-2 left-1 h-4 w-4 rounded-full border-2 border-background ${
+                className={`absolute bottom-1.5 left-1 h-3.5 w-3.5 rounded-full border-2 border-background ${
                   online ? "bg-emerald-500" : "bg-zinc-400"
                 }`}
               />
