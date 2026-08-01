@@ -523,10 +523,22 @@ function TeacherDashboard() {
             {user.name}
           </h1>
         </div>
-        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
-          <Pill>{rankLabel(user)}</Pill>
-          <Pill>{sessionsTaught} sessions taught</Pill>
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2.5">
+          {/* Tier: solid navy badge — the single highest-signal credential on this page */}
+          <span className="verbo-hdr-chip inline-flex items-center gap-1.5 rounded-full bg-primary py-1.5 pl-2 pr-3.5 text-primary-foreground shadow-[0_8px_20px_-12px_rgba(11,31,59,0.9)]">
+            <span className="grid h-5 w-5 place-items-center rounded-full bg-primary-foreground/15">
+              <Trophy className="h-3 w-3" />
+            </span>
+            <span className="text-[12px] font-bold tracking-[0.01em]">{rankLabel(user)}</span>
+            <span className="text-[10px] font-semibold uppercase tracking-[0.14em] opacity-60">tier</span>
+          </span>
+          {/* Sessions taught: number-forward stat chip so the figure reads before the label */}
+          <span className="verbo-hdr-chip inline-flex items-baseline gap-1.5 rounded-full border border-border bg-card py-1.5 pl-3.5 pr-3.5">
+            <span className="text-[15px] font-bold tabular-nums leading-none text-foreground">{sessionsTaught}</span>
+            <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">sessions taught</span>
+          </span>
         </div>
+
       </header>
 
       {!hydrated ? (

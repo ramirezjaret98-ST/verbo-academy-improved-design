@@ -923,3 +923,10 @@ Sin cambios de lógica ni rutas. `DATA_MODEL.md` sigue sincronizado.
 - Performance: gauge circular SVG (`CompositeGauge`) con animación de trazo y color según score, junto a un grid responsive de KPI tiles con barras animadas.
 - `src/styles.css`: nuevas utilidades `verbo-fin-panel` (entrada del acordeón), `verbo-kpi-tile` (hover elevado con gating `hover:hover`) y `verbo-bonus-glow` global, todas con soporte `prefers-reduced-motion`.
 - Visual only — no logic, data or route changes; `DATA_MODEL.md` remains synchronized.
+
+## Entry 065 — /teacher: jerarquía de los chips de tier y sesiones en el header
+- Los dos `Pill` genéricos del header (mismo gris, misma tipografía) no comunicaban su importancia; se sustituyeron por dos chips con peso visual propio, sin tocar la fuente de datos ni el componente `Pill` compartido.
+- Tier: badge sólido navy (`bg-primary`) con icono `Trophy` en un círculo translúcido, nombre del rango en 12px bold y sufijo "TIER" en 10px uppercase al 60% de opacidad, con sombra suave para elevarlo del fondo.
+- Sesiones impartidas: chip number-forward sobre `bg-card` con borde hairline — la cifra en 15px bold tabular y la etiqueta "SESSIONS TAUGHT" en 11px uppercase tracking amplio, para que el dato se lea antes que el texto.
+- `src/styles.css`: utilidad `.verbo-hdr-chip` con hover de 1px (gated a `hover:hover`) y respeto a `prefers-reduced-motion`.
+- Visual only — no logic, data or route changes; `DATA_MODEL.md` remains synchronized.
