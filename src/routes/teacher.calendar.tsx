@@ -199,66 +199,86 @@ function Page() {
               <div
                 key={ev.id}
                 className={cn(
-                  "verbo-card-hover group relative flex flex-wrap items-center justify-between gap-4 overflow-hidden rounded-2xl border border-border bg-card p-4 pl-6 transition-shadow hover:shadow-floating",
-                  !isNext && "shadow-soft",
+                  "verbo-lift group relative flex flex-wrap items-center gap-5 overflow-hidden rounded-[26px] border bg-card/80 p-4 pr-5 backdrop-blur-[2px] transition-[box-shadow,border-color] duration-300 ease-out",
+                  isNext ? "border-transparent" : "border-border/70 shadow-soft",
                 )}
-                style={isNext ? { boxShadow: `0 0 22px -4px color-mix(in srgb, ${theme.solid} 28%, transparent)` } : undefined}
+                style={{
+                  borderColor: isNext ? `color-mix(in srgb, ${theme.solid} 40%, transparent)` : undefined,
+                  boxShadow: isNext
+                    ? `0 18px 40px -24px color-mix(in srgb, ${theme.solid} 60%, transparent)`
+                    : undefined,
+                }}
               >
-                {/* Status accent rail */}
-                <div className="absolute inset-y-0 left-0 w-1.5" style={{ background: theme.background }} aria-hidden />
-                <div className="flex items-center gap-4">
-                  {/* Date block — the date/time is now the protagonist */}
-                  <div
-                    className="flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-xl text-white"
-                    style={{ background: theme.background, color: theme.textTone === "dark" ? "#01304a" : undefined }}
+                {/* Ambient tint wash — replaces the hard status rail */}
+                <div
+                  className="pointer-events-none absolute inset-0 opacity-[0.07] transition-opacity duration-300 ease-out group-hover:opacity-[0.13]"
+                  style={{ background: `linear-gradient(100deg, ${theme.solid} 0%, transparent 58%)` }}
+                  aria-hidden
+                />
+
+                {/* Date block — quiet, typographic, no filled chip */}
+                <div className="relative flex w-[68px] shrink-0 flex-col items-center">
+                  <span className="text-[10px] font-medium uppercase tracking-[0.22em] text-muted-foreground">{month}</span>
+                  <span
+                    className="font-display text-[34px] font-semibold leading-[1] tracking-[-0.04em]"
+                    style={{ color: theme.solid }}
                   >
-                    <span className="text-[10px] font-semibold uppercase tracking-[0.14em] opacity-80">{month}</span>
-                    <span className="text-xl font-bold leading-none">{day}</span>
+                    {day}
+                  </span>
+                  <span className="mt-0.5 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">{weekday}</span>
+                </div>
+
+                <div className="relative h-12 w-px shrink-0 bg-border/80" aria-hidden />
+
+                <div className="relative min-w-0 flex-1">
+                  <div className="text-[15px] font-semibold leading-tight tracking-[-0.01em] text-foreground">
+                    {ev.title}
                   </div>
-                  <div>
-                    <div className="text-base font-semibold leading-tight tracking-tight text-foreground">
-                      {ev.title}
-                    </div>
-                    <div className="mt-1 flex flex-wrap items-center gap-2">
-                      <span className="text-sm font-semibold text-foreground">{weekday} · {time}</span>
-                      {ev.subtitle && <span className="text-xs text-muted-foreground">{ev.subtitle}</span>}
-                    </div>
-                    <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                      <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold text-white" style={{ background: kindMeta.color }}>
-                        {kindMeta.label}
-                      </span>
-                      <span
-                        className="rounded-full border px-2 py-0.5 text-[10px] font-semibold"
-                        style={{ color: theme.solid, borderColor: `${theme.solid}55`, background: `${theme.solid}14` }}
-                      >
-                        {meta.label}
-                      </span>
-                      {isNext && needsPlan && (
-                        <span
-                          className="rounded-full px-2 py-0.5 text-[10px] font-semibold text-white"
-                          style={{ background: theme.solid, color: theme.textTone === "dark" ? "#01304a" : undefined }}
-                        >
-                          Plan now
-                        </span>
-                      )}
-                    </div>
+                  <div className="mt-0.5 text-sm font-medium tabular-nums text-muted-foreground">
+                    {time}
+                    {ev.subtitle ? <span className="text-muted-foreground/70"> · {ev.subtitle}</span> : null}
+                  </div>
+                  <div className="mt-2 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[10px] font-medium uppercase tracking-[0.1em]">
+                    <span className="inline-flex items-center gap-1.5 text-muted-foreground">
+                      <span className="h-1.5 w-1.5 rounded-full" style={{ background: kindMeta.color }} />
+                      {kindMeta.label}
+                    </span>
+                    <span className="text-border">|</span>
+                    <span className="inline-flex items-center gap-1.5" style={{ color: theme.solid }}>
+                      <span className="h-1.5 w-1.5 rounded-full" style={{ background: theme.solid }} />
+                      {meta.label}
+                    </span>
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
+
+                <div className="relative flex items-center gap-3">
+                  {isNext && needsPlan && (
+                    <span className="hidden text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground sm:inline">
+                      Plan now
+                    </span>
+                  )}
                   {actionable ? (
                     <button
                       type="button"
                       onClick={() => (ended && ev.status === "ready" ? goReport(ev.session!.id) : setPlanning(ev.session!))}
-                      className="inline-flex cursor-pointer items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-white shadow-soft transition-[box-shadow,filter] duration-200 ease-out hover:shadow-floating hover:brightness-110"
-                      style={{ background: theme.background, color: theme.textTone === "dark" ? "#01304a" : undefined }}
+                      className="group/cta inline-flex cursor-pointer items-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold text-white transition-[box-shadow,transform] duration-200 ease-out hover:-translate-y-px active:translate-y-0 active:scale-[0.98]"
+                      style={{
+                        background: theme.background,
+                        color: theme.textTone === "dark" ? "#01304a" : undefined,
+                        boxShadow: `0 10px 24px -10px color-mix(in srgb, ${theme.solid} 85%, transparent), 0 0 0 1px color-mix(in srgb, ${theme.solid} 35%, transparent)`,
+                      }}
                     >
-                      {ended && ev.status === "ready" ? (<><FileEdit className="h-4 w-4" /> Fill Session Report</>) : "Plan"}
+                      {ended && ev.status === "ready" ? (<><FileEdit className="h-4 w-4" /> Fill Session Report</>) : "Plan session"}
+                      <ArrowRight className="h-4 w-4 transition-transform duration-200 ease-out group-hover/cta:translate-x-0.5" />
                     </button>
                   ) : (
-                    <GhostButton disabled className="cursor-not-allowed opacity-50">—</GhostButton>
+                    <span className="rounded-full border border-dashed border-border px-4 py-2 text-xs font-medium text-muted-foreground">
+                      No action
+                    </span>
                   )}
                 </div>
               </div>
+
             );
           })}
         </div>
