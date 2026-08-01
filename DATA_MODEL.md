@@ -613,6 +613,8 @@ El propio comentario del archivo aclara: **no es una tabla de pagos paralela**, 
 ### `TeacherKpis` / `RatingBand` / `RatingPoint` (`src/lib/teacher-kpis.ts`)
 `TeacherKpis`: `rating, ratingNormalized, connectionPunctuality, planningPunctuality, completionRate, teacherAbsenceRate, cancellationScore, activeStrikes, penaltyState, responsiveness, baseComposite, composite, onboarding, bonusEligible, bonusStatus`.
 
+`RatingBand` asigna una etiqueta y paleta de chip a cada rango de `rating` (1-5 estrellas). La banda "Regular" (`rating >= 2.5`) usa fondo amarillo fuerte `#f59e0b` con texto blanco `#ffffff`; las demás bandas mantienen chips pastel con texto oscuro.
+
 **Fórmula del composite (final)**:
 1. `baseComposite` = promedio de 5 señales: `connectionPunctuality, planningPunctuality, completionRate, ratingNormalized, cancellationScore`.
 2. `completionRate` fusiona la vieja "Report punctuality": por cada sesión en el denominador (mismo criterio de `sessionCompletionRate`), crédito = 1.0 si completed + reporte a tiempo, 0.7 si completed + reporte tarde, 0 si no completed. `report_punctuality` del profesor se usa como proxy de "share on-time" hasta que exista timestamp por sesión.
