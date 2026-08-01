@@ -18,7 +18,7 @@ import {
   computeTeacherKpis, ratingBand, getBonusThreshold,
 } from "@/lib/teacher-kpis";
 import { addFinancialIssue } from "@/lib/financial-issues-store";
-import { Card, SectionTitle, Pill, AccentModal, AccentModalFooter } from "@/components/verbo/ui";
+import { SectionTitle, Pill, AccentModal, AccentModalFooter } from "@/components/verbo/ui";
 import { BonusBadge } from "@/components/verbo/BonusBadge";
 import { overridesForMonth } from "@/lib/teacher-kpi-overrides-store";
 import { monthKeyOf } from "@/lib/teacher-kpi-history-store";
@@ -675,83 +675,63 @@ function FinancialIssueModal({ onClose, onSubmit }: { onClose: () => void; onSub
   );
 }
 
-function SummaryCard({
-  label, value, sub, expanded, onClick, gradient,
-}: { label: string; value: string; sub: string; expanded: boolean; onClick: () => void; gradient: string }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`group rounded-2xl p-6 text-left shadow-soft transition-all hover:-translate-y-0.5 hover:shadow-md text-white ${gradient} ${expanded ? "ring-2 ring-white/70 scale-[1.01]" : ""}`}
-    >
-      <div className="flex items-start justify-between gap-2">
-        <div className="text-xs font-medium uppercase tracking-wider text-white/70">{label}</div>
-        {expanded ? <ChevronUp className="h-4 w-4 text-white/80" /> : <ChevronDown className="h-4 w-4 text-white/80" />}
-      </div>
-      <div className="mt-3 text-3xl font-bold tracking-tight text-white">{value}</div>
-      <div className="mt-1 text-xs text-white/70">{sub}</div>
-    </button>
-  );
-}
-
-function TotalCard({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="card-gradient-lime rounded-2xl p-6 text-white shadow-soft">
-      <div className="text-xs font-semibold uppercase tracking-wider text-white/80">{label}</div>
-      <div className="mt-3 text-3xl font-bold tracking-tight text-white">{value}</div>
-      <div className="mt-1 text-xs text-white/70">This month</div>
-    </div>
-  );
-}
-
-function KpiBar({ label, value, sub }: { label: string; value: number; sub?: string }) {
+function KpiBar({ label, value, sub, index = 0 }: { label: string; value: number; sub?: string; index?: number }) {
   const color = signalColor(value);
   return (
-    <div>
-      <div className="mb-1 flex justify-between text-xs">
-        <span className="text-muted-foreground">
+    <div className="verbo-td-in" style={{ animationDelay: `${index * 40}ms` }}>
+      <div className="mb-1.5 flex items-baseline justify-between gap-3 text-xs">
+        <span className="min-w-0 truncate font-medium text-foreground">
           {label}
-          {sub && <span className="ml-2 text-[10px] text-muted-foreground/70">{sub}</span>}
+          {sub && <span className="ml-2 text-[10px] font-normal text-muted-foreground">{sub}</span>}
         </span>
-        <span className="font-semibold text-foreground">{value}%</span>
+        <span className="shrink-0 text-sm font-bold tabular-nums" style={{ color }}>{value}%</span>
       </div>
-      <div className="h-2 w-full overflow-hidden rounded-full bg-secondary">
+      <div className="h-2 w-full overflow-hidden rounded-full bg-foreground/[0.06]">
         <div
-          className="h-full rounded-full transition-all"
-          style={{ width: `${value}%`, backgroundColor: color, boxShadow: `0 0 8px ${color}66` }}
+          className="h-full rounded-full"
+          style={{
+            width: `${value}%`,
+            backgroundColor: color,
+            boxShadow: `0 0 10px ${color}55`,
+            transition: "width 900ms cubic-bezier(0.23,1,0.32,1), background-color 300ms ease",
+          }}
         />
       </div>
     </div>
   );
 }
 
-function KpiMiniCard({ signal }: { signal: KpiSignal }) {
+function KpiMiniCard({ signal, index = 0 }: { signal: KpiSignal; index?: number }) {
   const color = signalColor(signal.value);
-  const Icon = KPI_ICONS[signal.key] ?? Gauge;
+  const Icon = KPI_ICONS[signal.key] ?? ClipboardCheck;
   return (
     <div
-      className="rounded-xl border p-4 transition-all hover:-translate-y-0.5 hover:shadow-soft"
-      style={{ borderColor: `${color}40`, backgroundColor: `${color}0F` }}
+      className="verbo-td-in verbo-kpi-tile group relative flex flex-col overflow-hidden rounded-3xl border bg-card p-4"
+      style={{ borderColor: `${color}3D`, animationDelay: `${300 + index * 45}ms` }}
     >
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <span
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg"
-            style={{ backgroundColor: `${color}1F`, color }}
-          >
-            <Icon className="h-4 w-4" />
-          </span>
-          <span className="text-xs font-medium leading-tight text-foreground">{signal.label}</span>
-        </div>
-        <span className="text-2xl font-bold tabular-nums leading-none" style={{ color }}>{signal.value}%</span>
+      <span aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[3px]" style={{ background: color }} />
+      <div className="flex items-start gap-2.5">
+        <span
+          className="grid h-9 w-9 shrink-0 place-items-center rounded-xl transition-transform duration-200 ease-out group-hover:scale-105"
+          style={{ backgroundColor: `${color}1A`, color }}
+        >
+          <Icon className="h-[18px] w-[18px]" />
+        </span>
+        <span className="min-w-0 flex-1 text-xs font-semibold leading-tight text-foreground">{signal.label}</span>
+        <span className="shrink-0 text-2xl font-bold leading-none tabular-nums" style={{ color }}>{signal.value}%</span>
       </div>
-      <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-secondary">
+      <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-foreground/[0.06]">
         <div
-          className="h-full rounded-full transition-all"
-          style={{ width: `${signal.value}%`, backgroundColor: color, boxShadow: `0 0 8px ${color}66` }}
+          className="h-full rounded-full"
+          style={{
+            width: `${signal.value}%`,
+            backgroundColor: color,
+            boxShadow: `0 0 10px ${color}55`,
+            transition: "width 900ms cubic-bezier(0.23,1,0.32,1)",
+          }}
         />
       </div>
-      {signal.sub && <div className="mt-2 text-[10px] text-muted-foreground">{signal.sub}</div>}
+      {signal.sub && <div className="mt-2 text-[10px] font-medium text-muted-foreground">{signal.sub}</div>}
     </div>
   );
 }
