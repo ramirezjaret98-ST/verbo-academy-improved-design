@@ -658,3 +658,16 @@ Sin cambios de lógica ni rutas.
 - **Sign in:** sin footer, sin top bar.
 
 Sin cambios de lógica ni rutas.
+
+---
+
+## Entry 037 — Ajustes del footer: fade sin bandas, títulos legibles y separación superior
+**Archivo:** `src/components/verbo/Footer.tsx`
+
+- **Degradado:** el fade de 4 paradas se sustituye por una rampa de 14 paradas con curva suavizada (`FADE_STOPS`), eliminando las rayas horizontales visibles.
+- **Velo de blur:** capa adicional `backdrop-blur-[2px]` en el tercio superior con `mask-image` vertical, para que ningún borde de parada pueda leerse como línea.
+- **Títulos de columna:** pasan de `text-white/35` a navy de marca (`color-mix(in oklab, var(--navy-700) 78%, transparent)`) para no perderse en la zona clara del degradado. Los enlaces se mantienen igual.
+- **Tagline:** mismo tratamiento navy al 70% por la misma razón de contraste.
+- **Separación:** `mt-20 md:mt-28` en el `<footer>` para que no se funda con la última sección de la página (especialmente en los paneles).
+
+Sin cambios de lógica ni rutas.
