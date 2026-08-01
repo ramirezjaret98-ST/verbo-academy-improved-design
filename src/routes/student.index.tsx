@@ -879,7 +879,7 @@ function StudentDashboard() {
                       No upcoming sessions scheduled.
                     </div>
                   ) : (
-                    <div className="mx-auto flex w-full max-w-xl flex-col gap-3">
+                    <div className="mx-auto flex w-full max-w-lg flex-col gap-3">
                       {dayEvents.map((ev) => {
                         if (ev.kind === "session") {
                           const s = ev.session;
@@ -893,10 +893,16 @@ function StudentDashboard() {
                           return (
                             <div
                               key={`s-${s.id}`}
-                              className="relative w-full overflow-hidden rounded-2xl border border-[var(--navy-100)] bg-[var(--navy-50)] shadow-elevated verbo-card-hover"
+                              className="relative w-full overflow-hidden rounded-2xl border border-[var(--navy-200)]/40 bg-[var(--navy-50)] shadow-elevated verbo-card-hover"
                             >
                               <div className="absolute inset-x-0 top-0 z-10 h-px" style={{ background: stripeColor }} />
-                              <div className="p-3">
+                              <img
+                                src={teamsLogo.url}
+                                alt=""
+                                aria-hidden
+                                className="pointer-events-none absolute -right-3 top-1/2 z-0 h-[155%] w-auto -translate-y-1/2 select-none object-contain opacity-[0.05]"
+                              />
+                              <div className="relative z-10 p-3">
                                 <div className="flex items-start justify-between gap-4">
                                   <div className="flex items-center gap-3">
                                     <div className="relative">
@@ -975,13 +981,19 @@ function StudentDashboard() {
                           now >= start - 5 * 60 * 1000 && now <= start + club.duration_minutes * 60 * 1000;
                         const stripeColor =
                           club.type === "book" ? EVENT_KIND_META.book_club.color : EVENT_KIND_META.insight.color;
-                        return (
-                          <div
-                            key={`c-${club.id}`}
-                            className="relative w-full overflow-hidden rounded-2xl border border-[var(--navy-100)] bg-[var(--navy-50)] shadow-elevated verbo-card-hover"
-                          >
-                            <div className="absolute inset-x-0 top-0 z-10 h-px" style={{ background: stripeColor }} />
-                            <div className="p-3">
+                          return (
+                            <div
+                              key={`c-${club.id}`}
+                              className="relative w-full overflow-hidden rounded-2xl border border-[var(--navy-200)]/40 bg-[var(--navy-50)] shadow-elevated verbo-card-hover"
+                            >
+                              <div className="absolute inset-x-0 top-0 z-10 h-px" style={{ background: stripeColor }} />
+                              <img
+                                src={teamsLogo.url}
+                                alt=""
+                                aria-hidden
+                                className="pointer-events-none absolute -right-3 top-1/2 z-0 h-[155%] w-auto -translate-y-1/2 select-none object-contain opacity-[0.05]"
+                              />
+                              <div className="relative z-10 p-3">
                               <div className="flex items-start justify-between gap-4">
                                 <div className="flex items-center gap-3">
                                   <TeacherAvatar userId={club.teacher_id ?? undefined} name={clubHost ?? "Verbo Team"} />
