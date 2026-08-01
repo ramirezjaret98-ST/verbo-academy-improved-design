@@ -629,17 +629,20 @@ function CompositeGauge({ value }: { value: number }) {
   return (
     <div className="relative grid h-24 w-24 shrink-0 place-items-center">
       <svg viewBox="0 0 80 80" className="h-24 w-24 -rotate-90">
-        <circle cx="40" cy="40" r={r} fill="none" stroke="currentColor" strokeWidth="7" className="text-foreground/[0.07]" />
+        <circle cx="40" cy="40" r={r} fill="none" stroke="currentColor" strokeWidth="4" className="text-foreground/[0.06]" />
         <circle
-          cx="40" cy="40" r={r} fill="none" stroke={color} strokeWidth="7" strokeLinecap="round"
+          cx="40" cy="40" r={r} fill="none" stroke={color} strokeWidth="4" strokeLinecap="round"
           strokeDasharray={circ}
           strokeDashoffset={circ - (Math.max(0, Math.min(100, value)) / 100) * circ}
           style={{ transition: "stroke-dashoffset 900ms cubic-bezier(0.23,1,0.32,1), stroke 300ms ease" }}
         />
       </svg>
-      <span className="absolute text-2xl font-bold tabular-nums" style={{ color }}>{value}%</span>
+      <span className="absolute text-[28px] font-bold leading-none tracking-tight text-foreground tabular-nums">
+        {value}<span className="text-sm font-light text-muted-foreground">%</span>
+      </span>
     </div>
   );
+
 }
 
 // --- Financial issue modal --------------------------------------------------
