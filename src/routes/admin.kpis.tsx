@@ -153,95 +153,88 @@ function Page() {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">KPIs</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Punctuality, reliability and student ratings — with a composite score driving bonus eligibility.
-        </p>
-      </div>
+      {/* Page header + controls share one responsive row */}
+      <header className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-4 lg:flex lg:flex-wrap lg:items-end lg:justify-between">
+        <div className="min-w-0">
+          <h1 className="font-display text-[26px] font-semibold leading-none tracking-[-0.02em] text-foreground sm:text-3xl">
+            KPIs
+          </h1>
+          <p className="mt-2 max-w-xl text-sm font-light leading-relaxed text-muted-foreground">
+            Punctuality, reliability and student ratings — with a composite score driving bonus eligibility.
+          </p>
+        </div>
 
-      {/* Summary cards */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {(
-          [
-            {
-              label: "Avg rating (all teachers)",
-              value: `${overallAvg}★`,
-              icon: Star,
-              color: "#01304a",
-            },
-            {
-              label: "Sessions tracked",
-              value: SESSIONS.length,
-              icon: CalendarClock,
-              color: "#3ebbad",
-            },
-            {
-              label: "Teachers",
-              value: teachers.length,
-              icon: GraduationCap,
-              color: "#7e22ce",
-            },
-            {
-              label: "Avg composite score",
-              value: avgComposite,
-              suffix: "%",
-              icon: TrendingUp,
-              color: "#d97706",
-            },
-          ] as { label: string; value: number | string; icon: LucideIcon; color: string; suffix?: string }[]
-        ).map((m) => {
-          const Icon = m.icon;
-          return (
-            <HeroStatCard
-              key={m.label}
-              className="!min-h-[132px] !items-start border border-border bg-card"
-              style={{ boxShadow: `0 0 24px -8px ${m.color}66` }}
-            >
-              <div className="absolute right-6 top-6 flex h-11 w-11 items-center justify-center rounded-xl">
-                <Icon className="h-7 w-7" style={{ color: m.color }} strokeWidth={1.75} />
-              </div>
-              <div className="relative w-full">
-                <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{m.label}</div>
-                <div className="mt-2 text-5xl font-bold leading-none text-foreground">
-                  {typeof m.value === "number" ? <AnimatedNumber value={m.value} suffix={m.suffix} /> : m.value}
-                </div>
-              </div>
-            </HeroStatCard>
-          );
-        })}
-      </div>
-
-      {/* Controls */}
-      <div className="flex justify-end">
-        <div className="flex flex-col gap-3 rounded-xl border border-border bg-card p-4 shadow-sm sm:w-[30%]">
-          <label className="inline-flex cursor-pointer items-center gap-2.5 text-sm text-foreground">
+        <div className="col-span-2 flex flex-wrap items-center gap-2 lg:col-auto">
+          <label
+            className={`verbo-kpi-toggle inline-flex cursor-pointer select-none items-center gap-2 rounded-full border px-3.5 py-2 text-[12.5px] font-medium transition ${
+              onlyReview
+                ? "border-destructive/40 bg-destructive/10 text-destructive"
+                : "border-border bg-card text-muted-foreground hover:text-foreground"
+            }`}
+          >
             <input
               type="checkbox"
               checked={onlyReview}
               onChange={(e) => setOnlyReview(e.target.checked)}
-              className="h-4 w-4 cursor-pointer rounded border-input accent-[#f38934]"
+              className="h-3.5 w-3.5 cursor-pointer rounded border-input accent-[#dc2626]"
             />
-            Show only teachers needing review
-            {onlyReview && <span className="text-xs text-muted-foreground">({visibleRows.length})</span>}
+            Needs review only
+            {onlyReview && <span className="tabular-nums opacity-70">({visibleRows.length})</span>}
           </label>
-          <div className="flex items-center gap-2">
-            <SlidersHorizontal className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm font-medium text-foreground">Bonus threshold:</span>
-            <div className="flex items-center rounded-lg border border-input bg-background">
-              <input
-                type="number"
-                min={0}
-                max={100}
-                value={threshold}
-                onChange={(e) => updateThreshold(Number(e.target.value))}
-                className="w-16 bg-transparent px-2.5 py-1.5 text-sm text-foreground focus:outline-none"
-              />
-              <span className="pr-3 text-sm text-muted-foreground">%</span>
-            </div>
+
+          <div className="verbo-kpi-toggle inline-flex items-center gap-2 rounded-full border border-border bg-card px-3.5 py-1.5">
+            <SlidersHorizontal className="h-3.5 w-3.5 shrink-0 text-muted-foreground" strokeWidth={1.75} />
+            <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+              Bonus threshold
+            </span>
+            <input
+              type="number"
+              min={0}
+              max={100}
+              value={threshold}
+              onChange={(e) => updateThreshold(Number(e.target.value))}
+              className="w-11 bg-transparent text-right text-[13px] font-semibold tabular-nums text-foreground focus:outline-none"
+            />
+            <span className="text-[13px] font-light text-muted-foreground">%</span>
           </div>
         </div>
+      </header>
+
+      {/* Summary strip — hairlines and accents, no solid blocks */}
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {(
+          [
+            { label: "Avg rating", hint: "all teachers", value: `${overallAvg}★`, icon: Star, color: "#01304a" },
+            { label: "Sessions tracked", hint: "lifetime", value: SESSIONS.length, icon: CalendarClock, color: "#3ebbad" },
+            { label: "Teachers", hint: "active roster", value: teachers.length, icon: GraduationCap, color: "#7e22ce" },
+            { label: "Avg composite", hint: "across roster", value: avgComposite, suffix: "%", icon: TrendingUp, color: "#d97706" },
+          ] as { label: string; hint: string; value: number | string; icon: LucideIcon; color: string; suffix?: string }[]
+        ).map((m, i) => {
+          const Icon = m.icon;
+          return (
+            <div
+              key={m.label}
+              className="verbo-kpi-stat group relative flex min-w-0 items-center gap-4 overflow-hidden rounded-2xl border border-border/80 bg-card px-4 py-4"
+              style={{ ["--st" as string]: m.color, ["--verbo-card-i" as string]: i } as React.CSSProperties}
+            >
+              <span className="verbo-kpi-stat__rail" aria-hidden />
+              <span className="verbo-kpi-stat__chip grid h-10 w-10 shrink-0 place-items-center rounded-full">
+                <Icon className="h-[18px] w-[18px]" strokeWidth={1.5} />
+              </span>
+              <div className="min-w-0">
+                <div className="truncate text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                  {m.label}
+                </div>
+                <div className="mt-1 font-display text-[30px] font-semibold leading-none tracking-[-0.03em] tabular-nums text-foreground">
+                  {typeof m.value === "number" ? <AnimatedNumber value={m.value} suffix={m.suffix} /> : m.value}
+                </div>
+                <div className="mt-1 truncate text-[11px] font-light text-muted-foreground/80">{m.hint}</div>
+              </div>
+            </div>
+          );
+        })}
       </div>
+
 
       <section>
         <SectionTitle>Teacher performance</SectionTitle>
