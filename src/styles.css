@@ -1281,3 +1281,44 @@
   }
   .verbo-notif-press:active { transform: none; }
 }
+
+/* ---- Profile modal (Entry 042) ---- */
+@keyframes verbo-profile-section-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.verbo-profile-section {
+  animation: verbo-profile-section-in 280ms cubic-bezier(0.23, 1, 0.32, 1) both;
+  animation-delay: calc(var(--verbo-profile-i, 0) * 40ms);
+}
+
+.verbo-profile-press {
+  transition: transform 160ms cubic-bezier(0.23, 1, 0.32, 1), box-shadow 200ms ease;
+}
+.verbo-profile-press:active { transform: scale(0.97); }
+
+.verbo-profile-chip {
+  transition: background-color 200ms ease, border-color 200ms ease, color 200ms ease, transform 160ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+.verbo-profile-chip:active { transform: scale(0.97); }
+
+.verbo-profile-input {
+  transition: border-color 200ms ease, box-shadow 200ms ease, transform 160ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+.verbo-profile-input:focus {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px -6px color-mix(in oklab, var(--navy-700) 20%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .verbo-profile-section,
+  .verbo-profile-press,
+  .verbo-profile-chip,
+  .verbo-profile-input {
+    animation: none;
+    transition: none;
+  }
+  .verbo-profile-press:active,
+  .verbo-profile-chip:active { transform: none; }
+  .verbo-profile-input:focus { transform: none; box-shadow: none; }
+}
