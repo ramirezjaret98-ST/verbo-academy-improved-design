@@ -582,6 +582,7 @@ export function StaffProfileModal({ open, onOpenChange }: Props) {
             )}
           </div>
         </div>
+        </div>
       </DialogContent>
     </Dialog>
 
