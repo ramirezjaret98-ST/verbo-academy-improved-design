@@ -1745,3 +1745,14 @@
   .verbo-teacher-card:active,
   .verbo-teacher-card:hover .verbo-teacher-card__avatar { transform: none; }
 }
+
+/* Needs-review pulse pauses on hover so the card stays readable (Entry 056) */
+@media (hover: hover) and (pointer: fine) {
+  .verbo-teacher-card.verbo-review-glow:hover { animation-play-state: paused; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .verbo-teacher-card.verbo-review-glow {
+    animation: none;
+    box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.3), 0 0 22px 4px rgba(220, 38, 38, 0.4);
+  }
+}

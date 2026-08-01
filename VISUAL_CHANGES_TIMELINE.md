@@ -848,3 +848,11 @@ Sin cambios de lógica ni rutas. `DATA_MODEL.md` sigue sincronizado.
 - Modal a `rounded-[28px]`, header y tabs `shrink-0`, cuerpo `min-h-0 overflow-y-auto`, tabs con scroll horizontal sin scrollbar; footer separa acciones neutras (izquierda) de estatus/destructivas (derecha).
 - Motion: entrada del modal `verbo-sdm-in` (240ms, `cubic-bezier(0.23, 1, 0.32, 1)`), secciones escalonadas cada 45ms, press `scale(0.97)` y hover lift en acciones; todo neutralizado bajo `prefers-reduced-motion`.
 - Visual only — no logic, data or route changes; `DATA_MODEL.md` remains synchronized.
+
+## Entry 056 — Admin teacher cards: status glow replaces the "Needs review" pill
+- Eliminada la pastilla flotante "Needs review (n)" que se encimaba con el email y los tags; el estado ahora se comunica solo con el glow rojo de la tarjeta (el conteo queda en el `title` para hover/lectores).
+- Needs review: pulso rojo exagerado `verbo-review-glow-strong` (1.5s `ease-in-out`, halo 1px→4px y drop 10px→34px) con borde tintado al 45%; se pausa en hover para poder leer la tarjeta.
+- Active: glow verde en reposo, sutil — hairline teal al 12% + `0 10px 26px -22px` del mismo teal.
+- Removed: se lee como deshabilitada (`grayscale(1)`, opacidad 0.55, fondo mezclado con `--muted`) pero sigue siendo clickeable; en hover recupera color (grayscale 0.7 / opacidad 0.78) para indicar que se puede abrir.
+- Pulso neutralizado bajo `prefers-reduced-motion` (glow fijo en su lugar).
+- Visual only — no logic, data or route changes; `DATA_MODEL.md` remains synchronized.
