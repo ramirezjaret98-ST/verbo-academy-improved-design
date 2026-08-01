@@ -419,8 +419,8 @@ function StatPill({ icon, label, value, tone = "violet", progressPct }: {
       />
 
       <div className="flex items-start gap-3 pl-1">
-        <div className={`shrink-0 pt-0.5 ${t.icon}`}>
-          {React.cloneElement(icon as React.ReactElement, { className: "h-5 w-5", strokeWidth: 1.5 })}
+        <div className={`shrink-0 pt-0.5 ${t.icon} [&>svg]:h-5 [&>svg]:w-5`}>
+          {icon}
         </div>
         <div className="min-w-0 flex-1">
           <div className={`text-[10px] font-semibold uppercase tracking-[0.14em] ${t.label}`}>
