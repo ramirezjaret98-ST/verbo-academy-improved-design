@@ -243,7 +243,7 @@ function Page() {
       <div className="text-xs text-muted-foreground">Showing {filtered.length} of {teachers.length} teachers</div>
 
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
-        {filtered.map((t) => <TeacherCard key={t.id} teacher={t} onOpen={() => setDetailId(t.id)} />)}
+        {filtered.map((t, i) => <TeacherCard key={t.id} teacher={t} index={i} onOpen={() => setDetailId(t.id)} />)}
       </div>
 
       {filtered.length === 0 && (
@@ -282,7 +282,7 @@ function Page() {
 // ===========================================================================
 // TEACHER CARD
 // ===========================================================================
-function TeacherCard({ teacher: t, onOpen }: { teacher: User; onOpen: () => void }) {
+function TeacherCard({ teacher: t, index = 0, onOpen }: { teacher: User; index?: number; onOpen: () => void }) {
   const avatar = useAvatar(t.id);
   const status = teacherStatus(t);
   const products = qualifiedProducts(t);
@@ -298,66 +298,101 @@ function TeacherCard({ teacher: t, onOpen }: { teacher: User; onOpen: () => void
   return (
     <button
       onClick={onOpen}
-      className={`group relative flex flex-col rounded-2xl border border-border bg-card p-5 text-left shadow-soft transition-all hover:-translate-y-1 hover:shadow-elevated ${glow ? "verbo-review-glow" : ""} ${dim ? "opacity-60" : ""}`}
+      data-status={status}
+      style={{ "--verbo-card-i": index } as React.CSSProperties}
+      className={`verbo-teacher-card group relative flex flex-col overflow-hidden rounded-[22px] border border-border/80 bg-card p-5 pl-6 text-left ${glow ? "verbo-review-glow" : ""} ${dim ? "opacity-60" : ""}`}
     >
+      <span className="verbo-teacher-card__rail" aria-hidden />
+
+      {/* Identity */}
+      <div className="flex items-start gap-3.5">
+        <div className="verbo-teacher-card__avatar relative shrink-0">
+          {avatar ? (
+            <img src={avatar} alt={t.name} className="h-14 w-14 rounded-full object-cover ring-2 ring-[var(--st)]/25" />
+          ) : (
+            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-primary text-base font-semibold text-primary-foreground ring-2 ring-[var(--st)]/25">{initials(t.name)}</div>
+          )}
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <div className="truncate text-[15px] font-semibold tracking-tight text-foreground">{t.name}</div>
+              <div className="truncate text-[11px] text-muted-foreground">{t.email}</div>
+            </div>
+            <span className="verbo-teacher-card__status shrink-0 rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.1em]">
+              {meta.label}
+            </span>
+          </div>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {products.map((p) => <Tag key={p} className="bg-primary/10 text-primary">{getProduct(p)?.name ?? p}</Tag>)}
+            {products.length === 0 && <span className="text-[11px] text-muted-foreground">No products qualified</span>}
+          </div>
+        </div>
+      </div>
+
+      {/* Metrics */}
+      <div className="mt-4 grid grid-cols-4 divide-x divide-border/70 rounded-xl border border-border/70 bg-background/60 py-2.5">
+        <Metric value={rating != null ? rating.toFixed(1) : "—"} label="Rating" accent={<Star className="h-3 w-3 fill-current text-amber-500" />} />
+        <Metric value={`${t.plan_punctuality ?? 0}%`} label="Planning" />
+        <Metric value={String(active)} label="Students" />
+        <Metric value={`${t.hours_month ?? 0}h`} label="This month" />
+      </div>
+
+      {/* Strikes */}
+      <div className="mt-3.5 flex items-center gap-2.5">
+        <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/80">Strikes · 6 mo</span>
+        <div className="flex flex-1 gap-1">
+          {[0, 1, 2].map((i) => (
+            <span
+              key={i}
+              className={`h-1 flex-1 rounded-full transition-colors ${
+                i < Math.min(3, strikes)
+                  ? strikes >= 3 ? "bg-destructive" : "bg-amber-500"
+                  : "bg-border"
+              }`}
+            />
+          ))}
+        </div>
+        <span className={`text-[11px] font-semibold tabular-nums ${strikes >= 3 ? "text-destructive" : strikes >= 1 ? "text-amber-600" : "text-muted-foreground"}`}>
+          {Math.min(3, strikes)}/3
+        </span>
+      </div>
+
       {frozenByStrikes && (
-        <div className="mb-3 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-[11px] font-semibold text-destructive">
-          🚨 Frozen — 3 Unjustified Strikes. Urgent substitute needed for this teacher's groups.
+        <div className="relative z-20 mt-3.5 rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-[11px] font-semibold leading-snug text-destructive">
+          Frozen — 3 unjustified strikes. Urgent substitute needed for this teacher's groups.
         </div>
       )}
+
       {glow && (
-        <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full bg-destructive/10 px-2 py-0.5 text-[10px] font-semibold text-destructive">
-          <AlertTriangle className="h-3 w-3" /> Needs Review ({pending})
+        <span className="absolute right-4 top-[3.35rem] z-20 inline-flex items-center gap-1 rounded-full bg-destructive/10 px-2 py-0.5 text-[10px] font-semibold text-destructive">
+          <AlertTriangle className="h-3 w-3" /> Needs review ({pending})
         </span>
       )}
 
-      <div className="flex items-center gap-3">
-        {avatar ? (
-          <img src={avatar} alt={t.name} className="h-12 w-12 rounded-full object-cover" />
-        ) : (
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground">{initials(t.name)}</div>
-        )}
-        <div className="min-w-0">
-          <div className="truncate font-semibold text-foreground">{t.name}</div>
-          <div className="truncate text-xs text-muted-foreground">{t.email}</div>
-        </div>
-      </div>
-
-      <div className="mt-3 flex flex-wrap gap-1.5">
-        {products.map((p) => <Tag key={p} className="bg-primary/10 text-primary">{getProduct(p)?.name ?? p}</Tag>)}
-        {products.length === 0 && <span className="text-xs text-muted-foreground">No products qualified</span>}
-      </div>
-
-      <div className="mt-4 grid grid-cols-2 gap-2">
-        <Chip icon={<Star className="h-3.5 w-3.5 fill-current text-amber-500" />} label={rating != null ? rating.toFixed(1) : "—"} sub="rating" />
-        <Chip icon={<CheckCircle2 className="h-3.5 w-3.5 text-accent" />} label={`${t.plan_punctuality ?? 0}%`} sub="planning" />
-        <Chip icon={<Users className="h-3.5 w-3.5 text-muted-foreground" />} label={String(active)} sub="active students" />
-        <Chip icon={<Clock className="h-3.5 w-3.5 text-muted-foreground" />} label={`${t.hours_month ?? 0}h`} sub="this month" />
-      </div>
-
-      <div className="mt-4">
-        <div className="flex flex-wrap items-center gap-1.5">
-          <Tag className={meta.cls}>{meta.label}</Tag>
-          <Tag className={strikes >= 3 ? "bg-destructive/15 text-destructive" : strikes >= 1 ? "bg-warning/20 text-amber-700" : "bg-secondary text-muted-foreground"}>
-            {Math.min(3, strikes)}/3 Strikes (6 months)
-          </Tag>
-        </div>
-      </div>
+      {/* Frozen: the whole card reads as encased in ice */}
+      {status === "frozen" && (
+        <>
+          <span className="verbo-ice" aria-hidden />
+          <span className="verbo-ice__label" aria-hidden>Frozen</span>
+        </>
+      )}
     </button>
   );
 }
 
-function Chip({ icon, label, sub }: { icon: React.ReactNode; label: string; sub: string }) {
+function Metric({ value, label, accent }: { value: string; label: string; accent?: React.ReactNode }) {
   return (
-    <div className="flex items-center gap-2 rounded-lg border border-border bg-background px-2.5 py-1.5">
-      {icon}
-      <div className="min-w-0 leading-tight">
-        <div className="text-sm font-semibold text-foreground">{label}</div>
-        <div className="truncate text-[10px] text-muted-foreground">{sub}</div>
+    <div className="flex flex-col items-center justify-center gap-0.5 px-1">
+      <div className="flex items-center gap-1">
+        {accent}
+        <span className="text-[15px] font-semibold tabular-nums leading-none text-foreground">{value}</span>
       </div>
+      <span className="truncate text-[9.5px] font-medium uppercase tracking-[0.1em] text-muted-foreground/85">{label}</span>
     </div>
   );
 }
+
 
 function Tag({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10.5px] font-semibold ${className}`}>{children}</span>;
