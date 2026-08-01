@@ -626,3 +626,18 @@ Sin cambios de lógica ni rutas.
 - Todo el kit tiene su bloque `prefers-reduced-motion: reduce`.
 
 Sin cambios de lógica, rutas ni del flujo de autenticación.
+
+---
+
+## Entry 035 — Rediseño premium/minimalista de las tarjetas `StatPill`
+**Archivo:** `src/routes/student.sessions.tsx` (componente `StatPill`, ~líneas 343-446)
+
+- **Superficie:** se abandona el fondo de color sólido por `bg-card` con un degradado sutil del acente (`135deg`, 6% opacidad) que aporta identidad sin ruido.
+- **Acento estructural:** línea vertical de 3 px a la izquierda en el color de cada tono (violeta, rojo, ámbar, verde, navy).
+- **Iconografía:** iconos Lucide sin círculo de fondo, a 20 px (`[&>svg]:h-5 [&>svg]:w-5`), coloreados con el acento correspondiente.
+- **Tipografía:** etiqueta en `text-[10px]`, semibold, uppercase, `tracking-[0.14em]` y `text-muted-foreground`; valor en `text-sm`, semibold, `leading-snug` y `tracking-[-0.01em]`.
+- **Progreso:** barra reducida a `h-1`, track `bg-secondary`, relleno en color de acento con transición de ancho de 700 ms `ease-out`.
+- **Interacción:** hover eleva la tarjeta 0.5 px (`-translate-y-0.5`) y cambia a `shadow-elevated` con transición de 200 ms `ease-out`.
+- **Tono `dark`:** conserva el navy `#01304a` para la tarjeta de "Reschedule Policy".
+
+Sin cambios de lógica ni rutas.
