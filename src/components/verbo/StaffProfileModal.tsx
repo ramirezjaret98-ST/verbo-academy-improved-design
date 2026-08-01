@@ -287,56 +287,61 @@ export function StaffProfileModal({ open, onOpenChange }: Props) {
           </div>
 
           {/* Tags */}
-          <div className="mt-5">
-            <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              {isStudent ? "Personality tags" : "Specializes in"}
+          <div
+            className="verbo-profile-section mt-5 rounded-2xl border border-border/60 bg-card p-4 shadow-soft"
+            style={{ "--verbo-profile-i": 3 } as React.CSSProperties}
+          >
+            <div className="flex items-center justify-between">
+              <div className="text-xs font-semibold uppercase tracking-[0.14em] text-navy-700">
+                {isStudent ? "Personality tags" : "Specializes in"}
+              </div>
+              {isStudent && (
+                <div className="text-[11px] font-medium text-muted-foreground">
+                  {specializations.length}/{MAX_PERSONALITY_TAGS}
+                </div>
+              )}
             </div>
             {isStudent ? (
-              <>
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  {PERSONALITY_TAG_OPTIONS.map((tag) => {
-                    const active = specializations.includes(tag);
-                    return (
-                      <button
-                        key={tag}
-                        type="button"
-                        aria-pressed={active}
-                        onClick={() => togglePersonalityTag(user.id, tag)}
-                        className={`cursor-pointer rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
-                          active
-                            ? "bg-[#01304a] text-white"
-                            : "bg-[#01304a]/[0.06] text-muted-foreground hover:text-foreground"
-                        }`}
-                      >
-                        {tag}
-                      </button>
-                    );
-                  })}
-                </div>
-                <div className="mt-1.5 text-[11px] text-muted-foreground">
-                  {specializations.length}/{MAX_PERSONALITY_TAGS} selected
-                </div>
-              </>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {PERSONALITY_TAG_OPTIONS.map((tag) => {
+                  const active = specializations.includes(tag);
+                  return (
+                    <button
+                      key={tag}
+                      type="button"
+                      aria-pressed={active}
+                      onClick={() => togglePersonalityTag(user.id, tag)}
+                      className={`verbo-profile-chip cursor-pointer rounded-full px-3 py-1.5 text-xs font-medium ${
+                        active
+                          ? "bg-navy-700 text-primary-foreground"
+                          : "border border-border bg-secondary/50 text-muted-foreground hover:border-navy-200 hover:text-foreground"
+                      }`}
+                    >
+                      {tag}
+                    </button>
+                  );
+                })}
+              </div>
             ) : (
-              <div className="mt-2 flex flex-wrap items-center gap-2">
+              <div className="mt-3 flex flex-wrap items-center gap-2">
                 {specializations.map((tag) => (
                   <span
                     key={tag}
-                    className="inline-flex items-center gap-1.5 rounded-full bg-[#01304a]/[0.06] px-3 py-1.5 text-xs font-medium text-foreground"
+                    className="inline-flex items-center gap-1.5 rounded-full border border-border bg-secondary/50 px-3 py-1.5 text-xs font-medium text-foreground"
                   >
                     {tag}
                     <button
                       type="button"
                       aria-label={`Remove ${tag}`}
                       onClick={() => removeTag(tag)}
-                      className="cursor-pointer text-muted-foreground transition-colors hover:text-foreground"
+                      className="verbo-profile-press cursor-pointer rounded-full p-0.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
                     >
                       <X className="h-3 w-3" />
                     </button>
                   </span>
                 ))}
                 {specializations.length < MAX_SPECIALIZATIONS && (
-                  <span className="inline-flex items-center gap-1 rounded-full border border-dashed border-border px-2 py-1">
+                  <span className="inline-flex items-center gap-1 rounded-full border border-dashed border-border bg-secondary/30 px-2 py-1">
                     <input
                       value={tagDraft}
                       onChange={(e) => setTagDraft(e.target.value)}
@@ -345,13 +350,13 @@ export function StaffProfileModal({ open, onOpenChange }: Props) {
                       }}
                       placeholder="Add a focus area"
                       maxLength={40}
-                      className="w-32 bg-transparent px-1 text-xs text-foreground outline-none placeholder:text-muted-foreground"
+                      className="verbo-profile-input w-32 bg-transparent px-1 text-xs text-foreground outline-none placeholder:text-muted-foreground"
                     />
                     <button
                       type="button"
                       onClick={addTag}
                       aria-label="Add specialization"
-                      className="cursor-pointer text-muted-foreground transition-colors hover:text-foreground"
+                      className="verbo-profile-press cursor-pointer rounded-full p-1 text-muted-foreground transition-colors hover:text-foreground"
                     >
                       <Plus className="h-3.5 w-3.5" />
                     </button>
