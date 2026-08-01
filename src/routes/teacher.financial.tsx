@@ -1,9 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import {
-  ChevronLeft, ChevronRight, ChevronDown, ChevronUp,
-  Trophy, AlertTriangle, Star, Sparkles, MessageCircleWarning,
-  Plug, CalendarClock, CheckCircle2, ThumbsUp, XOctagon, Repeat2, Gauge,
+  ChevronLeft, ChevronRight, ChevronDown,
+  AlertTriangle, Star, MessageCircleWarning,
+  Wifi, CalendarCheck2, ClipboardCheck, Smile, CalendarX2, RefreshCcwDot,
+  GraduationCap, Scale, Medal, Wallet, TrendingUp, Info,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { USERS, userById } from "@/lib/mock-data";
