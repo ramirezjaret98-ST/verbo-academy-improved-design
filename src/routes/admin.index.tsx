@@ -5,7 +5,7 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from "recharts";
 import { USERS, SESSIONS, type User, type Session } from "@/lib/mock-data";
-import { Card, PrimaryButton, GhostButton, HeroStatCard, AnimatedNumber, AccentModal } from "@/components/verbo/ui";
+import { Card, PrimaryButton, GhostButton, AnimatedNumber, AccentModal } from "@/components/verbo/ui";
 import { SkeletonStatCards, useHydrated } from "@/components/verbo/skeletons";
 
 import { hydrateStudents } from "@/lib/students-store";
