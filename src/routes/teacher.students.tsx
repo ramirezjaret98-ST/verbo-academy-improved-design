@@ -168,11 +168,12 @@ function Page() {
               {g.label} <span className="text-muted-foreground/60">· {g.items.length}</span>
             </h2>
           )}
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
-            {g.items.map((s) => (
-              <StudentCard key={s.id} student={s} onOpen={() => setDetail(s)} />
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 2xl:grid-cols-3">
+            {g.items.map((s, i) => (
+              <StudentCard key={s.id} student={s} index={i} onOpen={() => setDetail(s)} />
             ))}
           </div>
+
         </section>
       ))}
 
