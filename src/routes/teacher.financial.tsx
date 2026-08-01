@@ -738,13 +738,13 @@ function KpiMiniCard({ signal, index = 0 }: { signal: KpiSignal; index?: number 
         <span
           aria-hidden
           className="verbo-kpi-fill pointer-events-none absolute inset-y-0 left-0"
-          style={{ width: `${pct}%`, background: color, opacity: 0.08 }}
+          style={{ width: `${pct}%`, background: color, opacity: 0.18 }}
         />
         {/* Giant ghost number over the filled area */}
         <span
           aria-hidden
           className="pointer-events-none absolute -left-1 top-1/2 -translate-y-1/2 select-none text-[64px] font-bold leading-none tracking-tighter tabular-nums"
-          style={{ color, opacity: 0.15 }}
+          style={{ color, opacity: 0.25 }}
         >
           {signal.value}
         </span>
@@ -752,9 +752,15 @@ function KpiMiniCard({ signal, index = 0 }: { signal: KpiSignal; index?: number 
           <div className="text-[26px] font-semibold leading-none tracking-tight text-foreground tabular-nums">
             {signal.value}<span className="text-sm font-light text-muted-foreground">%</span>
           </div>
-          {signal.sub && <div className="mt-1.5 text-[10px] font-light text-muted-foreground">{signal.sub}</div>}
         </div>
       </div>
+
+      {/* Subtext lives outside the card, below it */}
+      {signal.sub && (
+        <div className="px-1.5 pt-2 text-[10px] font-light leading-snug text-muted-foreground">
+          {signal.sub}
+        </div>
+      )}
     </div>
   );
 }
