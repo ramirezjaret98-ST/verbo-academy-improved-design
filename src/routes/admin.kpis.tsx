@@ -499,10 +499,11 @@ function scoreScaleColor(pct: number) {
   return `rgb(${ch(0)}, ${ch(1)}, ${ch(2)})`;
 }
 
-/** Tint used by the rating pill — same language as the bars. */
+/** Tint used by the rating pill — same continuous scale as the composite score. */
 function ratingColor(rating: number | null | undefined) {
   if (rating == null) return "#94a3b8";
-  return rating >= 4 ? "#3f8f10" : rating >= 2.5 ? "#b45309" : "#dc2626";
+  const pct = Math.max(0, Math.min(100, (rating / 5) * 100));
+  return scoreScaleColor(pct);
 }
 
 

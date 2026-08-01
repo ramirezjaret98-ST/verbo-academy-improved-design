@@ -889,3 +889,9 @@ Sin cambios de lógica ni rutas. `DATA_MODEL.md` sigue sincronizado.
 - "Avg rating" (normalizado /5) y "Avg composite" ahora pintan el número, el icono, el chip y el riel con el color de su propio valor; "Sessions tracked" y "Teachers" siguen con su acento fijo (no son métricas de desempeño).
 - Transición de color de 260ms para que el cambio de valor no salte.
 - Visual only — no logic, data or route changes; `DATA_MODEL.md` remains synchronized.
+
+## Entry 061 — /admin/kpis: rating pill usa la misma rampa de color que composite
+- El helper `ratingColor` dejó de devolver colores discretos (verde/café/rojo) y ahora normaliza el rating a 0-100 y reutiliza `scoreScaleColor`.
+- Resultado: un rating de 3.2/5 (64%) pinta el mismo ámbar/naranja que un composite del 64%, en lugar del café oscuro anterior.
+- El pill mantiene fondo sólido + texto blanco; solo cambia la tonalidad para alinearse visualmente con el score del card.
+- Visual only — no logic, data or route changes; `DATA_MODEL.md` remains synchronized.
