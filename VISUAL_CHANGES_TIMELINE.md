@@ -788,3 +788,9 @@ Sin cambios de lógica ni rutas. `DATA_MODEL.md` sigue sincronizado.
 - Tables: taller rows, tabular numbers, light-weight secondary text, `Type` rendered as an outline chip, `min-w-[720px]` with hidden-scrollbar horizontal scroll for small viewports.
 - Motion: reused `.verbo-admin-section` staggered entrance, `.verbo-admin-press` on buttons, `.verbo-admin-lift` on summary cards, and added `.verbo-money-row` (280ms staggered row entrance at 26ms steps + hover tint gated behind `hover:hover`/`pointer:fine`), all neutralized under `prefers-reduced-motion`.
 - Visual only — no logic, data or route changes; `DATA_MODEL.md` remains synchronized.
+
+## Entry 048 — Admin quick actions: identity chips + hover glow
+- Each quick action now carries its own identity: a 28px circular icon chip tinted with the action color (teal / orchid / navy / gold / green), a border tinted at 22% of that same color, and tighter pill geometry (`pl-1.5 pr-4`).
+- New `.verbo-quick-action` motion family in `src/styles.css`: hover scales the pill to `1.035`, lifts the border to 48% of the action color and adds a two-layer colored glow (`0 0 0 3px` halo + `0 10px 26px -12px` drop); the icon chip deepens to 20% tint and scales `1.06`.
+- Press feedback `scale(0.97)` at 180ms `cubic-bezier(0.23, 1, 0.32, 1)`; hover effects gated behind `hover:hover`/`pointer:fine` and all transforms neutralized under `prefers-reduced-motion`.
+- Visual only — no logic, data or route changes; `DATA_MODEL.md` remains synchronized.
