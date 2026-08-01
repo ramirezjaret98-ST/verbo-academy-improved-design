@@ -975,12 +975,13 @@ function TeacherDashboard() {
         </div>
 
         <div className="overflow-hidden rounded-3xl border border-border bg-card">
-          <div className="hidden grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_auto_auto] items-center gap-4 border-b border-border pl-6 pr-5 py-2.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground md:grid">
-            <span>Student / Group</span>
-            <span>Date</span>
+          <div className="hidden grid-cols-[minmax(0,1.5fr)_150px_170px_110px] items-center gap-x-4 border-b border-border pl-6 pr-5 py-2.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground md:grid">
+            <span className="justify-self-start">Student / Group</span>
+            <span className="justify-self-start">Date</span>
             <span className="justify-self-start">Origin</span>
-            <span className="justify-self-end">Status</span>
+            <span className="justify-self-start">Status</span>
           </div>
+
 
           {recentLive.length === 0 && recentClubReports.length === 0 && (
             <div className="px-6 py-8 text-center text-sm text-muted-foreground">No recent sessions.</div>
