@@ -779,3 +779,12 @@ Sin cambios de lógica ni rutas. `DATA_MODEL.md` sigue sincronizado.
 - Announcements: replaced the gradient/blob/watermark banner with a plain divider header (icon chip, eyebrow, title, active count).
 - Motion: `.verbo-admin-section` staggered 320ms ease-out entrance (60ms steps), `.verbo-admin-press` 0.985 press feedback, `.verbo-admin-lift` hover lift gated behind `hover:hover`/`pointer:fine`; all reduced to a 120ms fade under `prefers-reduced-motion`.
 - Visual only — no logic, data or route changes; `DATA_MODEL.md` remains synchronized.
+
+## Entry 047 — The Money Lab: minimal functional redesign + motion pass
+- Header restructured: `Financial` eyebrow + `The Money Lab` title over a hairline divider; the month selector became a rounded pill control with press feedback.
+- Summary strip: the five `HeroStatCard`s with colored glow shadows were replaced by flat bordered `bg-card` cards with a 3px colored top rule, tracked micro-labels, hairline icons and tabular numbers; the Net warning is now inline text instead of an amber box.
+- Chart: removed the red expense bars (the "red rectangle") — expenses now read as a dashed amber line and Net as a solid navy line over green income bars (rounded `8px`, `maxBarSize 34`, 0.35 opacity for unselected months). Softer dotted grid, wider tooltip radius/shadow, responsive height (`240px` → `280px`), plus a "Tap a bar to jump to that month" hint.
+- Income vs Expenses tables are now visually distinct: each is a section card with its own left accent rule (green / amber), a tinted header band with an icon chip, row count and a right-aligned running total. Solid status pills were left untouched as requested.
+- Tables: taller rows, tabular numbers, light-weight secondary text, `Type` rendered as an outline chip, `min-w-[720px]` with hidden-scrollbar horizontal scroll for small viewports.
+- Motion: reused `.verbo-admin-section` staggered entrance, `.verbo-admin-press` on buttons, `.verbo-admin-lift` on summary cards, and added `.verbo-money-row` (280ms staggered row entrance at 26ms steps + hover tint gated behind `hover:hover`/`pointer:fine`), all neutralized under `prefers-reduced-motion`.
+- Visual only — no logic, data or route changes; `DATA_MODEL.md` remains synchronized.
