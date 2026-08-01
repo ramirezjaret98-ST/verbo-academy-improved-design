@@ -865,3 +865,13 @@ Sin cambios de lógica ni rutas. `DATA_MODEL.md` sigue sincronizado.
 - Pago próximo (≤3 días): pulso ámbar exagerado `verbo-warn-glow-strong` (1.6s), pausado en hover.
 - `prefers-reduced-motion`: pulsos sustituidos por glow fijo.
 - Visual only — no logic, data or route changes; `DATA_MODEL.md` remains synchronized.
+
+## Entry 058 — /admin/kpis: rediseño completo (hairlines en vez de bloques sólidos)
+- Header + controles en una sola fila responsive: toggle "Needs review only" y "Bonus threshold" como píldoras con hairline (fuera la caja al 30%).
+- Summary strip: tarjetas con riel de acento 3px + chip de icono tintado (`color-mix` 10%) en lugar de glows sólidos; label 10px uppercase / valor 30px `font-display` tabular / hint 11px light.
+- Tarjeta de teacher: eliminado el header de color sólido; ahora riel de acento por tier + chip de tier tintado, nombre 19px semibold y email 11.5px light.
+- Rating pill tintada (no fondo sólido blanco sobre color); composite como número 34px en color de banda; bloque "Signals" con etiqueta de sección.
+- KpiTile: fuera el chip sólido blanco → número tabular + barra de 1px de progreso en color de umbral, con `sub` en 10.5px light.
+- Needs review reutiliza el pulso rojo exagerado `verbo-review-glow-strong` (pausa en hover) + línea de resumen "N sessions needing review".
+- Movimiento: entrada `verbo-kpi-in` escalonada 34ms, hover lift −3px con glow del acento, press `scale(0.99)`; todo bajo `prefers-reduced-motion`.
+- Visual only — no logic, data or route changes; `DATA_MODEL.md` remains synchronized.
