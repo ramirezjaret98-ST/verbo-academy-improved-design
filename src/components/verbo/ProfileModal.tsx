@@ -358,7 +358,7 @@ export function AchievementsGallery({
   const { user } = useAuth();
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-h-[82vh] w-[calc(100vw-2rem)] max-w-2xl overflow-y-auto rounded-[32px]">
         <DialogTitle className="text-lg font-semibold text-foreground">
           Verbo Achievements & Badges Gallery
         </DialogTitle>

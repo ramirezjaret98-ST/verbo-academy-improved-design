@@ -202,10 +202,11 @@ export function StaffProfileModal({ open, onOpenChange }: Props) {
   return (
     <>
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-xl gap-0 overflow-hidden rounded-[32px] border border-border/40 p-0 shadow-floating">
+      <DialogContent className="max-w-2xl gap-0 overflow-hidden rounded-[40px] border border-border/40 p-0 shadow-floating">
         <DialogTitle className="sr-only">My profile</DialogTitle>
 
-        {/* Hero banner + avatar — kept outside the scroll container so the avatar overlap isn't clipped */}
+        <div className="max-h-[66vh] overflow-y-auto">
+        {/* Hero banner + avatar — scrolls with the content */}
         <div className="relative">
           {/* Hero banner — taller, calmer navy gradient with a single soft orange accent */}
           <div
@@ -247,7 +248,7 @@ export function StaffProfileModal({ open, onOpenChange }: Props) {
           </div>
         </div>
 
-        <div className="max-h-[78vh] overflow-y-auto px-5 pb-6 pt-12 sm:px-6">
+        <div className="px-5 pb-6 pt-12 sm:px-6">
 
           {/* Identity */}
           <div className="verbo-profile-section text-center" style={{ "--verbo-profile-i": 0 } as React.CSSProperties}>
@@ -278,7 +279,7 @@ export function StaffProfileModal({ open, onOpenChange }: Props) {
                 return (
                   <div key={s.key} className="flex flex-col items-center gap-1.5 px-2 first:pl-0 last:pr-0">
                     <Icon className="h-4 w-4 text-orange-500" strokeWidth={1.5} />
-                    <div className="text-lg font-bold tracking-tight text-navy-700">{s.value}</div>
+                    <div className="text-center text-lg font-bold leading-tight tracking-tight text-navy-700">{s.value}</div>
                     <div className="text-center text-[11px] font-medium uppercase tracking-wider text-muted-foreground">{s.label}</div>
                   </div>
                 );
@@ -581,6 +582,7 @@ export function StaffProfileModal({ open, onOpenChange }: Props) {
               </form>
             )}
           </div>
+        </div>
         </div>
       </DialogContent>
     </Dialog>

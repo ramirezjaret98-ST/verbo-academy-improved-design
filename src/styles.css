@@ -640,6 +640,32 @@
   background-color: #94a3b8;
 }
 
+/* Global ultra-minimal, nearly invisible scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in oklab, var(--navy-700) 16%, transparent) transparent;
+}
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background-color: color-mix(in oklab, var(--navy-700) 14%, transparent);
+  border-radius: 9999px;
+  transition: background-color 200ms ease;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background-color: color-mix(in oklab, var(--navy-700) 30%, transparent);
+}
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+
+
 /* Glow pulse for overdue Session Report icon (Needs Your Attention). */
 @keyframes report-glow-pulse {
   0%, 100% {

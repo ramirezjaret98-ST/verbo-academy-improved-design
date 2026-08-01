@@ -746,3 +746,17 @@ Sin cambios de lógica ni rutas.
   - `prefers-reduced-motion`: se elimina movimiento y press.
 
 Sin cambios de lógica ni rutas.
+
+---
+
+## Entry 043 — Ajustes finos: scrollbar global, avatar en scroll, galería de badges y proporciones del modal de perfil
+
+**Archivos:** `src/styles.css`, `src/components/verbo/StaffProfileModal.tsx`, `src/components/verbo/ProfileModal.tsx`
+
+- **Scrollbar global ultra-minimalista:** `scrollbar-width: thin` + thumb `color-mix(navy-700 14%)` sobre track transparente, 6px, radio completo y hover al 30%. Casi invisible en reposo y sin romper la composición.
+- **Foto de perfil al hacer scroll:** el hero (banner + avatar) pasó a vivir **dentro** del contenedor con scroll, así el avatar se desplaza completo en vez de quedar cortado a la mitad contra el header.
+- **Galería "View all" de badges:** `max-h-[82vh]`, `w-[calc(100vw-2rem)]`, scroll interno y `rounded-[32px]`; ya no ocupa el 100% de la pantalla y siempre se puede cerrar.
+- **Valores de stats centrados:** `text-center` + `leading-tight` en el valor (p. ej. "Core Foundations"), alineado con su etiqueta.
+- **Proporciones del modal de perfil:** ancho `max-w-xl → max-w-2xl`, altura de scroll `78vh → 66vh` (−15%) y esquinas `rounded-[32px] → rounded-[40px]`.
+
+Sin cambios de lógica ni rutas. `DATA_MODEL.md` sigue sincronizado.
