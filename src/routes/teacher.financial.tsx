@@ -719,37 +719,46 @@ function KpiBar({ label, value, sub, index = 0 }: { label: string; value: number
 function KpiMiniCard({ signal, index = 0 }: { signal: KpiSignal; index?: number }) {
   const color = signalColor(signal.value);
   const Icon = KPI_ICONS[signal.key] ?? ClipboardCheck;
+  const pct = Math.max(0, Math.min(100, signal.value));
   return (
-    <div
-      className="verbo-td-in verbo-kpi-tile group relative flex flex-col overflow-hidden rounded-3xl border bg-card p-4"
-      style={{ borderColor: `${color}3D`, animationDelay: `${300 + index * 45}ms` }}
-    >
-      <span aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[3px]" style={{ background: color }} />
-      <div className="flex items-start gap-2.5">
-        <span
-          className="grid h-9 w-9 shrink-0 place-items-center rounded-xl transition-transform duration-200 ease-out group-hover:scale-105"
-          style={{ backgroundColor: `${color}1A`, color }}
-        >
-          <Icon className="h-[18px] w-[18px]" />
+    <div className="verbo-td-in" style={{ animationDelay: `${300 + index * 45}ms` }}>
+      {/* Label sits above the card — light, no pill */}
+      <div className="flex items-center gap-2 px-1.5 pb-2">
+        <Icon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+        <span className="min-w-0 truncate text-[11px] font-light uppercase tracking-[0.16em] text-muted-foreground">
+          {signal.label}
         </span>
-        <span className="min-w-0 flex-1 text-xs font-semibold leading-tight text-foreground">{signal.label}</span>
-        <span className="shrink-0 text-2xl font-bold leading-none tabular-nums" style={{ color }}>{signal.value}%</span>
       </div>
-      <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-foreground/[0.06]">
-        <div
-          className="h-full rounded-full"
-          style={{
-            width: `${signal.value}%`,
-            backgroundColor: color,
-            boxShadow: `0 0 10px ${color}55`,
-            transition: "width 900ms cubic-bezier(0.23,1,0.32,1)",
-          }}
+
+      <div
+        className="verbo-kpi-card group relative flex min-h-[92px] items-center overflow-hidden rounded-[26px] border border-border/70 bg-card px-5 py-4"
+        style={{ boxShadow: `0 20px 50px -32px ${color}` }}
+      >
+        {/* The whole card is the progress bar */}
+        <span
+          aria-hidden
+          className="verbo-kpi-fill pointer-events-none absolute inset-y-0 left-0"
+          style={{ width: `${pct}%`, background: color, opacity: 0.08 }}
         />
+        {/* Giant ghost number over the filled area */}
+        <span
+          aria-hidden
+          className="pointer-events-none absolute -left-1 top-1/2 -translate-y-1/2 select-none text-[64px] font-bold leading-none tracking-tighter tabular-nums"
+          style={{ color, opacity: 0.15 }}
+        >
+          {signal.value}
+        </span>
+        <div className="relative ml-auto text-right">
+          <div className="text-[26px] font-semibold leading-none tracking-tight text-foreground tabular-nums">
+            {signal.value}<span className="text-sm font-light text-muted-foreground">%</span>
+          </div>
+          {signal.sub && <div className="mt-1.5 text-[10px] font-light text-muted-foreground">{signal.sub}</div>}
+        </div>
       </div>
-      {signal.sub && <div className="mt-2 text-[10px] font-medium text-muted-foreground">{signal.sub}</div>}
     </div>
   );
 }
+
 
 function StatusPill({ status }: { status: string }) {
   const tone: "success" | "warning" | "danger" | "default" =
