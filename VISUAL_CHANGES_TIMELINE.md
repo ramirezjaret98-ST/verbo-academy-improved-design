@@ -1004,3 +1004,10 @@ Sin cambios de lógica ni rutas. `DATA_MODEL.md` sigue sincronizado.
 - Se aumenta la opacidad del relleno de color de fondo de cada tarjeta del 8% al 18% para que la señal cromática se perciba mejor sin lastimar.
 - Se aumenta la opacidad del número gigante "fantasma" del 15% al 25% para que contraste sobre el nuevo relleno más intenso.
 - Visual only — no logic, data or route changes; `DATA_MODEL.md` remains synchronized.
+
+## Entry 076 — BonusBadge: verde lima para el estado de bono
+- Se añaden tokens semánticos `--bonus` y `--bonus-foreground` en `src/styles.css` (valor `#84cc16`, lima) para distinguir visualmente el bono del verde de éxito genérico (`--success`).
+- Se exponen las utilidades `bg-bonus`, `text-bonus` y `bg-bonus/15` vía `--color-bonus` en `@theme inline`.
+- Se actualiza `src/components/verbo/BonusBadge.tsx`: el estado `eligible` ahora usa `bg-bonus/15` y `text-bonus` en lugar de `bg-success/15` y `text-success`.
+- Se actualiza `@keyframes verbo-bonus-glow` para que el pulso del glow use `var(--bonus)` en lugar del verde anterior.
+- Visual only — no logic, data or route changes; `DATA_MODEL.md` remains synchronized.
