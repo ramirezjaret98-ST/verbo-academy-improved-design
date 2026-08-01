@@ -794,3 +794,12 @@ Sin cambios de lógica ni rutas. `DATA_MODEL.md` sigue sincronizado.
 - New `.verbo-quick-action` motion family in `src/styles.css`: hover scales the pill to `1.035`, lifts the border to 48% of the action color and adds a two-layer colored glow (`0 0 0 3px` halo + `0 10px 26px -12px` drop); the icon chip deepens to 20% tint and scales `1.06`.
 - Press feedback `scale(0.97)` at 180ms `cubic-bezier(0.23, 1, 0.32, 1)`; hover effects gated behind `hover:hover`/`pointer:fine` and all transforms neutralized under `prefers-reduced-motion`.
 - Visual only — no logic, data or route changes; `DATA_MODEL.md` remains synchronized.
+
+## Entry 049 — Admin students: tier/group card redesign + motion pass
+- Cards rebuilt around a single identity signal: a 3px left tier rail colored by access plan (Core orange, Advance navy, Elite/Signature gold), with the solid plan pill moved to the top-right so tiers align across the grid.
+- Elite/Signature cards get a quiet diagonal gold wash (`sheen`) instead of a louder border; non-performance cards (Workshops/Insights) reuse the same shell with the primary accent and a leading type icon.
+- Group vs individual is now explicit in two places: a blue badge on the avatar and a dedicated line (`Users` chip with the group name, or a muted "Individual" chip); group cards also carry a faint blue field and blue-tinted border so members read as a set.
+- Sessions promoted into its own bordered panel: tracked micro-label, tabular `remaining/hired` in display type, 1px progress bar tinted with the tier color, and the roadmap level as a light caption underneath.
+- Identity row now shows product (and company for Enterprise) as a light subtitle; the status strip keeps status, Insights and Book Club strike tags.
+- Motion (`.verbo-student-card` family in `src/styles.css`): 300ms `cubic-bezier(0.23, 1, 0.32, 1)` entrance staggered 34ms (capped at 12 cards), hover lift `-3px` with a tier-colored halo + drop glow, rail thickening to 4px, avatar `1.04` / group dot `1.10` scale, `0.985` press feedback and a 420ms progress-bar width transition. Hover gated behind `hover:hover`/`pointer:fine`; all transforms neutralized under `prefers-reduced-motion`.
+- Visual only — no logic, data or route changes; `DATA_MODEL.md` remains synchronized.
