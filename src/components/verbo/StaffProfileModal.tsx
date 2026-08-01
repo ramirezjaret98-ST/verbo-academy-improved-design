@@ -279,7 +279,7 @@ export function StaffProfileModal({ open, onOpenChange }: Props) {
                 return (
                   <div key={s.key} className="flex flex-col items-center gap-1.5 px-2 first:pl-0 last:pr-0">
                     <Icon className="h-4 w-4 text-orange-500" strokeWidth={1.5} />
-                    <div className="text-lg font-bold tracking-tight text-navy-700">{s.value}</div>
+                    <div className="text-center text-lg font-bold leading-tight tracking-tight text-navy-700">{s.value}</div>
                     <div className="text-center text-[11px] font-medium uppercase tracking-wider text-muted-foreground">{s.label}</div>
                   </div>
                 );
