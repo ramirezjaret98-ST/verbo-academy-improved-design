@@ -684,3 +684,15 @@ Sin cambios de lógica ni rutas.
 - **Aplicación:** mismo tratamiento en tarjetas de sesión (`kind === "session"`) y tarjetas de club (`kind === "club"`) para mantener coherencia visual en la lista.
 
 Sin cambios de lógica ni rutas.
+
+---
+
+## Entry 039 — Tarjeta de bienvenida para alumnos nuevos (`/student/index`)
+**Archivo:** `src/routes/student.index.tsx`
+
+- **Condición:** cuando el alumno aún no tiene ninguna sesión contabilizada (`gradeable.length === 0`), la tarjeta de *Overall Attendance* se sustituye por una tarjeta de bienvenida. En cuanto se registra la primera sesión, vuelve la tarjeta de asistencia con su lógica y bandas de color existentes.
+- **Estilo:** mismo formato `HeroStatCard`, con fondo navy (`linear-gradient(135deg, #01304a, #002233)`) y borde interior blanco al 8%.
+- **Contenido:** en lugar del número y el `%`, el mensaje "Ready to get the ball rolling?" en blanco, con subtítulo "starts with your first session". Se conserva la etiqueta "Overall Attendance".
+- **Ilustración:** nuevo Verbot de etapa 0 (`stage_0_verbot.svg`, subido como asset CDN) anclado arriba a la derecha con el mismo encuadre que los Verbots de las bandas de asistencia.
+
+Sin cambios de lógica ni rutas.
