@@ -975,12 +975,13 @@ function TeacherDashboard() {
         </div>
 
         <div className="overflow-hidden rounded-3xl border border-border bg-card">
-          <div className="hidden grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_auto_auto] items-center gap-4 border-b border-border pl-6 pr-5 py-2.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground md:grid">
-            <span>Student / Group</span>
-            <span>Date</span>
+          <div className="hidden grid-cols-[minmax(0,1.5fr)_150px_170px_110px] items-center gap-x-4 border-b border-border pl-6 pr-5 py-2.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground md:grid">
+            <span className="justify-self-start">Student / Group</span>
+            <span className="justify-self-start">Date</span>
             <span className="justify-self-start">Origin</span>
-            <span className="justify-self-end">Status</span>
+            <span className="justify-self-start">Status</span>
           </div>
+
 
           {recentLive.length === 0 && recentClubReports.length === 0 && (
             <div className="px-6 py-8 text-center text-sm text-muted-foreground">No recent sessions.</div>
@@ -1010,7 +1011,7 @@ function TeacherDashboard() {
                 <li
                   key={s.id}
                   onClick={() => setViewing(s)}
-                  className="verbo-act-row verbo-td-in relative grid cursor-pointer grid-cols-1 items-center gap-x-4 gap-y-1.5 py-3.5 pl-6 pr-5 hover:bg-secondary/40 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_auto_auto]"
+                  className="verbo-act-row verbo-td-in relative grid cursor-pointer grid-cols-1 items-center gap-x-4 gap-y-1.5 py-3.5 pl-6 pr-5 hover:bg-secondary/40 md:grid-cols-[minmax(0,1.5fr)_150px_170px_110px]"
                   style={{ animationDelay: `${Math.min(i, 8) * 34}ms` }}
                 >
                   <span
@@ -1035,7 +1036,7 @@ function TeacherDashboard() {
                   <div className="justify-self-start">
                     <span className="inline-flex rounded-md bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">{origin}</span>
                   </div>
-                  <div className="justify-self-start md:justify-self-end"><Pill tone={tone as any}>{label}</Pill></div>
+                  <div className="justify-self-start"><Pill tone={tone as any}>{label}</Pill></div>
                 </li>
               );
             })}
@@ -1048,7 +1049,7 @@ function TeacherDashboard() {
               return (
                 <li
                   key={`clubreport-${r.event_id}`}
-                  className="verbo-act-row verbo-td-in relative grid grid-cols-1 items-center gap-x-4 gap-y-1.5 py-3.5 pl-6 pr-5 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_auto_auto]"
+                  className="verbo-act-row verbo-td-in relative grid grid-cols-1 items-center gap-x-4 gap-y-1.5 py-3.5 pl-6 pr-5 md:grid-cols-[minmax(0,1.5fr)_150px_170px_110px]"
                   style={{ animationDelay: `${Math.min(recentLive.length + i, 8) * 34}ms` }}
                 >
                   <span
@@ -1061,7 +1062,7 @@ function TeacherDashboard() {
                   <div className="justify-self-start">
                     <span className="inline-flex rounded-md bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">{originLabel}</span>
                   </div>
-                  <div className="justify-self-start md:justify-self-end"><Pill tone="success">Completed</Pill></div>
+                  <div className="justify-self-start"><Pill tone="success">Completed</Pill></div>
                 </li>
               );
             })}

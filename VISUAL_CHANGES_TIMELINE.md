@@ -962,3 +962,9 @@ Sin cambios de lógica ni rutas. `DATA_MODEL.md` sigue sincronizado.
 - Su icono usa el SVG animado aportado por el usuario, servido como asset (`src/assets/vip-tailored.svg.asset.json`), en la misma posición que los iconos de las otras acciones.
 - La entrada escalonada se recalibró: Tailored Content a 135ms y Course Builder VIP (condicional) a 180ms.
 - Visual/content only — no logic, data or route logic changes; `DATA_MODEL.md` remains synchronized.
+
+## Entry 071 — /teacher: alineación de cabeceras y columnas del ledger
+- La cabecera y cada fila eran grids independientes con columnas `auto`, así que los anchos se calculaban por separado y "Date", "Origin" y "Status" no coincidían con su contenido.
+- Se fijó una plantilla de columnas idéntica en cabecera y filas (`minmax(0,1.5fr) 150px 170px 110px`), de modo que cada título empieza exactamente donde empieza su contenido.
+- "Status" pasa a alinearse a la izquierda como el resto (antes `justify-self-end`), y la columna Date se estrechó para pegarse a su dato.
+- Visual only — no logic, data or route changes; `DATA_MODEL.md` remains synchronized.
