@@ -1931,3 +1931,44 @@
 .verbo-kpi-stat__value { transition: color 260ms ease; }
 .verbo-kpi-stat__chip,
 .verbo-kpi-stat__rail { transition: color 260ms ease, background 260ms ease, box-shadow 260ms ease, opacity 220ms ease; }
+
+/* ── Teacher dashboard (/teacher) ─────────────────────────────────── */
+@keyframes verbo-td-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: none; }
+}
+.verbo-td-in {
+  animation: verbo-td-in 320ms cubic-bezier(0.23, 1, 0.32, 1) both;
+}
+.verbo-td-press {
+  transition: transform 160ms cubic-bezier(0.23, 1, 0.32, 1),
+              box-shadow 220ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+.verbo-td-press:active { transform: scale(0.985); }
+
+/* Recent Activity rows: hairline rail that fills on hover */
+.verbo-act-row { transition: background-color 160ms ease; }
+.verbo-act-rail {
+  transition: transform 220ms cubic-bezier(0.23, 1, 0.32, 1), opacity 220ms ease;
+  transform: scaleY(0.35);
+  opacity: 0.55;
+  transform-origin: center;
+}
+.verbo-act-row:hover .verbo-act-rail { transform: scaleY(1); opacity: 1; }
+
+/* Feedback quote cards */
+.verbo-fb-card {
+  transition: transform 240ms cubic-bezier(0.23, 1, 0.32, 1),
+              box-shadow 240ms cubic-bezier(0.23, 1, 0.32, 1),
+              border-color 240ms ease;
+}
+@media (hover: hover) and (pointer: fine) {
+  .verbo-fb-card:hover { transform: translateY(-2px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .verbo-td-in { animation: verbo-td-in 120ms ease both; animation-delay: 0ms !important; }
+  .verbo-td-press:active { transform: none; }
+  .verbo-fb-card:hover { transform: none; }
+  .verbo-act-rail { transform: scaleY(1); opacity: 1; transition: none; }
+}
