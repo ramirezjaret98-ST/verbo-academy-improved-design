@@ -30,24 +30,31 @@ export function Footer({ nav = [] }: { nav?: FooterNavGroup[] }) {
         className="pointer-events-none absolute inset-0 -z-10"
         style={{
           background:
-            "linear-gradient(to top, var(--navy-700) 0%, var(--navy-700) 28%, color-mix(in oklab, var(--navy-700) 55%, transparent) 62%, transparent 100%)",
+            "linear-gradient(to top, var(--navy-700) 0%, var(--navy-700) 46%, color-mix(in oklab, var(--navy-700) 72%, transparent) 68%, color-mix(in oklab, var(--navy-700) 26%, transparent) 86%, transparent 100%)",
         }}
       />
 
       {/* Oversized wordmark watermark, anchored to the bottom edge. */}
       <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 -z-10 overflow-hidden">
         <div
-          className="translate-y-[22%] select-none text-center font-semibold leading-[0.78] tracking-[-0.04em] text-white/[0.06]"
-          style={{ fontSize: "clamp(6rem, 19vw, 18rem)" }}
+          className="translate-y-[26%] select-none text-center font-semibold leading-[0.78] tracking-[-0.05em] text-white/[0.055]"
+          style={{ fontSize: "clamp(6rem, 20vw, 19rem)" }}
         >
           VERBO
         </div>
       </div>
 
-      <div className="mx-auto max-w-7xl px-6 pb-40 pt-24">
+      <div className="mx-auto max-w-7xl px-6 pb-36 pt-28">
         <div className="flex flex-col gap-12 md:flex-row md:items-start md:justify-between">
           {/* Panel-specific navigation (never mixed across panels). */}
           <div className="flex flex-wrap gap-x-14 gap-y-10">
+            <div className="max-w-[15rem] pr-4">
+              <p className="text-[13px] font-light leading-relaxed text-white/55">
+                Corporate English training built around real conversations, real
+                progress and real people.
+              </p>
+            </div>
+
             {nav.map((group) => (
               <nav key={group.label} className="min-w-[9rem]">
                 <p className={colTitle}>{group.label}</p>
