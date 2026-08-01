@@ -687,6 +687,7 @@ function StudentDashboard() {
 
           </HeroStatCard>
         </div>
+        )}
 
 
       </section>
