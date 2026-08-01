@@ -1800,3 +1800,86 @@
     box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.3), 0 0 22px 4px rgba(245, 158, 11, 0.4);
   }
 }
+
+/* ── Admin KPIs: hairline cards, accent rails, quiet tints (Entry 058) ──── */
+@keyframes verbo-kpi-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.99); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.verbo-kpi-stat,
+.verbo-kpi-card {
+  --st: var(--muted-foreground);
+  animation: verbo-kpi-in 300ms cubic-bezier(0.23, 1, 0.32, 1) both;
+  animation-delay: calc(min(var(--verbo-card-i, 0), 11) * 34ms);
+  box-shadow: 0 1px 2px color-mix(in oklab, var(--navy-700) 8%, transparent);
+  transition: transform 200ms cubic-bezier(0.23, 1, 0.32, 1),
+    box-shadow 220ms ease, border-color 220ms ease;
+}
+.verbo-kpi-stat__rail,
+.verbo-kpi-card__rail {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--st);
+  opacity: 0.7;
+  transition: opacity 220ms ease, width 200ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+.verbo-kpi-stat__chip {
+  color: var(--st);
+  background: color-mix(in oklab, var(--st) 10%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--st) 20%, transparent);
+  transition: transform 200ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+.verbo-kpi-card__tier {
+  color: var(--st);
+  background: color-mix(in oklab, var(--st) 10%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--st) 22%, transparent);
+}
+.verbo-kpi-rating {
+  color: var(--rt);
+  background: color-mix(in oklab, var(--rt) 10%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--rt) 26%, transparent);
+  transition: transform 160ms cubic-bezier(0.23, 1, 0.32, 1), background 200ms ease;
+}
+.verbo-kpi-rating:active { transform: scale(0.97); }
+.verbo-kpi-tile__bar { transition: width 420ms cubic-bezier(0.23, 1, 0.32, 1); }
+.verbo-kpi-toggle { transition: transform 160ms cubic-bezier(0.23, 1, 0.32, 1), border-color 200ms ease; }
+.verbo-kpi-toggle:active { transform: scale(0.98); }
+.verbo-kpi-card:active { transform: scale(0.99); }
+@media (hover: hover) and (pointer: fine) {
+  .verbo-kpi-stat:hover,
+  .verbo-kpi-card:hover {
+    transform: translateY(-3px);
+    border-color: color-mix(in oklab, var(--st) 34%, transparent);
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--st) 7%, transparent),
+      0 16px 32px -20px color-mix(in oklab, var(--st) 70%, transparent);
+  }
+  .verbo-kpi-stat:hover .verbo-kpi-stat__rail,
+  .verbo-kpi-card:hover .verbo-kpi-card__rail { opacity: 1; width: 4px; }
+  .verbo-kpi-stat:hover .verbo-kpi-stat__chip { transform: scale(1.06); }
+  .verbo-kpi-rating:hover { background: color-mix(in oklab, var(--rt) 16%, transparent); }
+  .verbo-kpi-card.verbo-critical-glow:hover { animation-play-state: paused; }
+}
+/* Needs review reuses the exaggerated red pulse from the teacher cards */
+.verbo-kpi-card.verbo-critical-glow {
+  animation:
+    verbo-kpi-in 300ms cubic-bezier(0.23, 1, 0.32, 1) both,
+    verbo-review-glow-strong 1.5s ease-in-out 300ms infinite;
+  border-color: rgba(220, 38, 38, 0.45);
+}
+@media (prefers-reduced-motion: reduce) {
+  .verbo-kpi-stat,
+  .verbo-kpi-card { animation: verbo-kpi-in 120ms ease both; animation-delay: 0ms; }
+  .verbo-kpi-stat,
+  .verbo-kpi-card,
+  .verbo-kpi-stat:hover,
+  .verbo-kpi-card:hover,
+  .verbo-kpi-card:active { transform: none; }
+  .verbo-kpi-card.verbo-critical-glow {
+    animation: none;
+    box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.3), 0 0 22px 4px rgba(220, 38, 38, 0.4);
+  }
+  .verbo-kpi-tile__bar { transition: none; }
+}
