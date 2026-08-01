@@ -1756,3 +1756,47 @@
     box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.3), 0 0 22px 4px rgba(220, 38, 38, 0.4);
   }
 }
+
+/* ── Student cards: status glows + frozen ice (Entry 057) ──────────────── */
+@keyframes verbo-warn-glow-strong {
+  0%, 100% {
+    box-shadow: 0 0 0 1px rgba(217, 119, 6, 0.45), 0 0 10px 0 rgba(245, 158, 11, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.3), 0 0 34px 10px rgba(245, 158, 11, 0.55);
+  }
+}
+/* Active students get a green resting glow that is actually visible */
+.verbo-student-card[data-status="active"] {
+  box-shadow: 0 0 0 1px color-mix(in oklab, #16a34a 30%, transparent),
+    0 0 18px -2px color-mix(in oklab, #16a34a 42%, transparent),
+    0 10px 26px -22px color-mix(in oklab, #16a34a 85%, transparent);
+  border-color: color-mix(in oklab, #16a34a 34%, transparent);
+}
+.verbo-student-card.verbo-critical-glow {
+  animation:
+    verbo-student-card-in 300ms cubic-bezier(0.23, 1, 0.32, 1) both,
+    verbo-review-glow-strong 1.5s ease-in-out 300ms infinite;
+  border-color: rgba(220, 38, 38, 0.45);
+}
+.verbo-student-card.verbo-warn-glow {
+  animation:
+    verbo-student-card-in 300ms cubic-bezier(0.23, 1, 0.32, 1) both,
+    verbo-warn-glow-strong 1.6s ease-in-out 300ms infinite;
+  border-color: rgba(245, 158, 11, 0.45);
+}
+@media (hover: hover) and (pointer: fine) {
+  .verbo-student-card.verbo-critical-glow:hover,
+  .verbo-student-card.verbo-warn-glow:hover { animation-play-state: paused; }
+  .verbo-student-card:hover .verbo-ice { opacity: 0.72; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .verbo-student-card.verbo-critical-glow {
+    animation: none;
+    box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.3), 0 0 22px 4px rgba(220, 38, 38, 0.4);
+  }
+  .verbo-student-card.verbo-warn-glow {
+    animation: none;
+    box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.3), 0 0 22px 4px rgba(245, 158, 11, 0.4);
+  }
+}
