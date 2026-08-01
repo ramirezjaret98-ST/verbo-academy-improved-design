@@ -247,20 +247,20 @@ export function StaffProfileModal({ open, onOpenChange }: Props) {
           </div>
         </div>
 
-        <div className="max-h-[78vh] overflow-y-auto px-6 pb-6 pt-12">
+        <div className="max-h-[78vh] overflow-y-auto px-5 pb-6 pt-12 sm:px-6">
 
           {/* Identity */}
-          <div className="mt-3 text-center">
-            <h2 className="text-xl font-bold tracking-tight text-foreground">{user.name}</h2>
-            <p className="mt-0.5 text-sm font-light text-muted-foreground">{rankLabel(user)}</p>
+          <div className="verbo-profile-section text-center" style={{ "--verbo-profile-i": 0 } as React.CSSProperties}>
+            <h2 className="font-display text-2xl font-semibold tracking-tight text-foreground">{user.name}</h2>
+            <p className="mt-1 text-sm font-light text-muted-foreground">{rankLabel(user)}</p>
           </div>
 
           {/* Chips */}
-          <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+          <div className="verbo-profile-section mt-3 flex flex-wrap items-center justify-center gap-2" style={{ "--verbo-profile-i": 1 } as React.CSSProperties}>
             {chips.map((c) => (
               <span
                 key={c}
-                className="rounded-full bg-secondary px-3 py-1 text-xs font-medium text-foreground"
+                className="rounded-full border border-border bg-card px-3 py-1 text-xs font-medium text-foreground shadow-soft"
               >
                 {c}
               </span>
@@ -268,20 +268,22 @@ export function StaffProfileModal({ open, onOpenChange }: Props) {
           </div>
 
           {/* Stats */}
-          <div className="mt-5 grid grid-cols-3">
-            {stats.map((s, i) => {
-              const Icon = STAT_ICON[s.key];
-              return (
-                <div
-                  key={s.key}
-                  className={`flex flex-col items-center gap-1 px-2 ${i > 0 ? "border-l border-border" : ""}`}
-                >
-                  <Icon className="h-4 w-4 text-[#f38934]" />
-                  <div className="text-lg font-bold text-foreground">{s.value}</div>
-                  <div className="text-center text-xs text-muted-foreground">{s.label}</div>
-                </div>
-              );
-            })}
+          <div
+            className="verbo-profile-section mt-5 rounded-2xl border border-border/60 bg-card p-4 shadow-soft"
+            style={{ "--verbo-profile-i": 2 } as React.CSSProperties}
+          >
+            <div className="grid grid-cols-3 divide-x divide-border">
+              {stats.map((s) => {
+                const Icon = STAT_ICON[s.key];
+                return (
+                  <div key={s.key} className="flex flex-col items-center gap-1.5 px-2 first:pl-0 last:pr-0">
+                    <Icon className="h-4 w-4 text-orange-500" strokeWidth={1.5} />
+                    <div className="text-lg font-bold tracking-tight text-navy-700">{s.value}</div>
+                    <div className="text-center text-[11px] font-medium uppercase tracking-wider text-muted-foreground">{s.label}</div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
 
           {/* Tags */}
