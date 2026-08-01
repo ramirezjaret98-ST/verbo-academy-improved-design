@@ -1471,7 +1471,21 @@ function Overlay({ children, onClose }: { children: React.ReactNode; onClose: ()
   );
 }
 
+function TSection({ title, hint, index = 0, children }: { title: string; hint?: string; index?: number; children: React.ReactNode }) {
+  return (
+    <section className="verbo-sdm-section" style={{ animationDelay: `${index * 45}ms` }}>
+      <div className="mb-3 flex items-baseline gap-3">
+        <h3 className="text-[13px] font-bold tracking-tight text-foreground">{title}</h3>
+        {hint && <span className="text-[11px] text-muted-foreground">{hint}</span>}
+        <span className="h-px flex-1 bg-border" />
+      </div>
+      {children}
+    </section>
+  );
+}
+
 function Info({ label, value }: { label: string; value: string }) {
+
   return (
     <div>
       <div className="text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</div>
