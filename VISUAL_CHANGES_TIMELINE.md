@@ -1011,3 +1011,9 @@ Sin cambios de lógica ni rutas. `DATA_MODEL.md` sigue sincronizado.
 - Se actualiza `src/components/verbo/BonusBadge.tsx`: el estado `eligible` ahora usa `bg-bonus/15` y `text-bonus` en lugar de `bg-success/15` y `text-success`.
 - Se actualiza `@keyframes verbo-bonus-glow` para que el pulso del glow use `var(--bonus)` en lugar del verde anterior.
 - Visual only — no logic, data or route changes; `DATA_MODEL.md` remains synchronized.
+
+## Entry 077 — Rating pill "Regular": amarillo fuerte con letra blanca
+- Se actualiza `ratingBand()` en `src/lib/teacher-kpis.ts` para la banda `rating >= 2.5` ("Regular"): fondo `#f59e0b` (amarillo fuerte) y texto `#ffffff` (blanco), manteniendo el `dot` en el mismo amarillo.
+- El cambio aplica a todos los pills de rating que usan `ratingBand()` (`/teacher/financial`, `/admin/kpis`) de forma consistente, sin alterar la lógica de clasificación.
+- Se documenta la paleta de `RatingBand` en `DATA_MODEL.md`.
+- Visual only — no logic, data or route changes; `DATA_MODEL.md` updated.
