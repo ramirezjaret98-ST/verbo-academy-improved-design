@@ -2114,3 +2114,45 @@
 @media (prefers-reduced-motion: reduce) {
   .verbo-lift:hover, .verbo-lift:active { transform: none; }
 }
+
+/* ---------------------------------------------------------------------------
+   Teacher · Financial hover responsiveness (Entry 080)
+   Bucket cards: light zoom + colour-matched glow. KPI cards: the ghost number
+   stretches asymmetrically (wider than taller) from its left edge.
+--------------------------------------------------------------------------- */
+.verbo-fin-bucket {
+  transition: transform 200ms cubic-bezier(0.23, 1, 0.32, 1),
+              box-shadow 220ms cubic-bezier(0.23, 1, 0.32, 1),
+              border-color 200ms ease;
+}
+@media (hover: hover) and (pointer: fine) {
+  .verbo-fin-bucket:hover {
+    transform: scale(1.015);
+    box-shadow: 0 18px 44px -22px color-mix(in oklab, var(--bucket, var(--primary)) 75%, transparent),
+                0 0 0 1px color-mix(in oklab, var(--bucket, var(--primary)) 28%, transparent);
+    border-color: color-mix(in oklab, var(--bucket, var(--primary)) 45%, transparent);
+  }
+}
+.verbo-fin-bucket:active { transform: scale(0.985); }
+
+/* Ghost number owns its own transform (was a Tailwind -translate-y-1/2). */
+.verbo-kpi-ghost {
+  transform: translateY(-50%) scale(1, 1);
+  transform-origin: left center;
+  transition: transform 320ms cubic-bezier(0.23, 1, 0.32, 1), opacity 320ms ease;
+}
+@media (hover: hover) and (pointer: fine) {
+  .verbo-kpi-card:hover {
+    box-shadow: 0 22px 48px -26px color-mix(in oklab, var(--kpi, var(--primary)) 85%, transparent),
+                0 0 0 1px color-mix(in oklab, var(--kpi, var(--primary)) 22%, transparent);
+  }
+  .verbo-kpi-card:hover .verbo-kpi-ghost {
+    transform: translateY(-50%) scale(1.14, 1.04);
+    opacity: 0.32 !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .verbo-fin-bucket:hover, .verbo-fin-bucket:active { transform: none; }
+  .verbo-kpi-ghost { transition: opacity 160ms ease; }
+  .verbo-kpi-card:hover .verbo-kpi-ghost { transform: translateY(-50%); }
+}

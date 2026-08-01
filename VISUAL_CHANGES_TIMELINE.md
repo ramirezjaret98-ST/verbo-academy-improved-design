@@ -1029,3 +1029,9 @@ Sin cambios de lógica ni rutas. `DATA_MODEL.md` sigue sincronizado.
 - `.verbo-card-hover` y el rail de Recent Activity (`.verbo-act-row:hover .verbo-act-rail`) pasan a estar gateados por puntero fino, con reduced-motion en el primero.
 - Se elimina `will-change: transform` permanente de `.verbo-club-poster` (capa GPU permanente innecesaria por póster; el transform de hover ya promueve la capa cuando hace falta).
 - Sin cambios de lógica ni rutas; `DATA_MODEL.md` sigue sincronizado.
+
+## Entry 080 — /teacher/financial: hover responsivo en buckets y KPI cards
+- Nueva clase `.verbo-fin-bucket` en `src/styles.css`: zoom ligero (`scale(1.015)`) + glow del color propio del bucket vía `--bucket` (inyectado inline desde `FIN[key].base`), con hairline ring y press a `scale(0.985)`.
+- `.verbo-kpi-ghost`: el número gigante de las KPI mini cards ahora crece de forma asimétrica en hover (`scale(1.14, 1.04)`, origen `left center`) y sube su opacidad de 0.25 a 0.32; la tarjeta añade glow `--kpi` según el color del score.
+- Hover gateado a `(hover: hover) and (pointer: fine)` y fallback completo en `prefers-reduced-motion`.
+- Visual only — no logic, data or route changes; `DATA_MODEL.md` remains synchronized.

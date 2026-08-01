@@ -374,11 +374,12 @@ function MyBalancePage() {
               type="button"
               onClick={() => toggle(b.key)}
               aria-expanded={open}
-              className="verbo-td-in verbo-td-press group relative overflow-hidden rounded-3xl border bg-card p-5 text-left shadow-soft transition-[box-shadow,border-color] duration-200"
+              className="verbo-td-in verbo-td-press verbo-fin-bucket group relative overflow-hidden rounded-3xl border bg-card p-5 text-left shadow-soft"
               style={{
                 animationDelay: `${80 + i * 55}ms`,
                 borderColor: open ? b.c.base : "var(--border)",
                 boxShadow: open ? `0 12px 30px -16px ${b.c.base}` : undefined,
+                ["--bucket" as string]: b.c.base,
               }}
             >
               <span aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[3px]" style={{ background: b.c.base }} />
@@ -732,7 +733,7 @@ function KpiMiniCard({ signal, index = 0 }: { signal: KpiSignal; index?: number 
 
       <div
         className="verbo-kpi-card group relative flex min-h-[92px] items-center overflow-hidden rounded-[26px] border border-border/70 bg-card px-5 py-4"
-        style={{ boxShadow: `0 20px 50px -32px ${color}` }}
+        style={{ boxShadow: `0 20px 50px -32px ${color}`, ["--kpi" as string]: color }}
       >
         {/* The whole card is the progress bar */}
         <span
@@ -743,7 +744,7 @@ function KpiMiniCard({ signal, index = 0 }: { signal: KpiSignal; index?: number 
         {/* Giant ghost number over the filled area */}
         <span
           aria-hidden
-          className="pointer-events-none absolute -left-1 top-1/2 -translate-y-1/2 select-none text-[64px] font-bold leading-none tracking-tighter tabular-nums"
+          className="verbo-kpi-ghost pointer-events-none absolute -left-1 top-1/2 select-none text-[64px] font-bold leading-none tracking-tighter tabular-nums"
           style={{ color, opacity: 0.25 }}
         >
           {signal.value}
