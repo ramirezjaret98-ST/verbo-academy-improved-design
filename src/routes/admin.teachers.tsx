@@ -243,7 +243,7 @@ function Page() {
       <div className="text-xs text-muted-foreground">Showing {filtered.length} of {teachers.length} teachers</div>
 
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
-        {filtered.map((t) => <TeacherCard key={t.id} teacher={t} onOpen={() => setDetailId(t.id)} />)}
+        {filtered.map((t, i) => <TeacherCard key={t.id} teacher={t} index={i} onOpen={() => setDetailId(t.id)} />)}
       </div>
 
       {filtered.length === 0 && (
