@@ -748,11 +748,6 @@ function KpiMiniCard({ signal, index = 0 }: { signal: KpiSignal; index?: number 
         >
           {signal.value}
         </span>
-        <div className="relative ml-auto text-right">
-          <div className="text-[26px] font-semibold leading-none tracking-tight text-foreground tabular-nums">
-            {signal.value}<span className="text-sm font-light text-muted-foreground">%</span>
-          </div>
-        </div>
       </div>
 
       {/* Subtext lives outside the card, below it */}
