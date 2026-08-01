@@ -661,17 +661,6 @@ Sin cambios de lógica ni rutas.
 
 ---
 
-## Entry 038 — Refinamiento de tarjetas de próximas sesiones (`/student/index`)
-**Archivo:** `src/routes/student.index.tsx`
-
-- **Ancho:** el contenedor de la lista pasa de `max-w-xl` a `max-w-lg`, reduciendo ligeramente el ancho de cada tarjeta.
-- **Borde:** cambio de `border-[var(--navy-100)]` a `border-[var(--navy-200)]/40` — mantiene el borde fino pero añade una definición sutil para que la tarjeta se distinga del fondo.
-- **Watermark:** logo de Microsoft Teams (`teams-logo.webp`) posicionado como marca de agua a la derecha de cada tarjeta, al 5% de opacidad, centrado verticalmente y recortado por el `overflow-hidden` del contenedor. No interfiere con el contenido gracias a `z-0` y al bajo contraste.
-- **Jerarquía de capas:** el contenido interno envuelto en `relative z-10` para quedar por encima del watermark.
-- **Aplicación:** mismo tratamiento en tarjetas de sesión (`kind === "session"`) y tarjetas de club (`kind === "club"`) para mantener coherencia visual en la lista.
-
-Sin cambios de lógica ni rutas.
-
 ## Entry 037 — Ajustes del footer: fade sin bandas, títulos legibles y separación superior
 **Archivo:** `src/components/verbo/Footer.tsx`
 
@@ -680,5 +669,18 @@ Sin cambios de lógica ni rutas.
 - **Títulos de columna:** pasan de `text-white/35` a navy de marca (`color-mix(in oklab, var(--navy-700) 78%, transparent)`) para no perderse en la zona clara del degradado. Los enlaces se mantienen igual.
 - **Tagline:** mismo tratamiento navy al 70% por la misma razón de contraste.
 - **Separación:** `mt-20 md:mt-28` en el `<footer>` para que no se funda con la última sección de la página (especialmente en los paneles).
+
+Sin cambios de lógica ni rutas.
+
+---
+
+## Entry 038 — Refinamiento de tarjetas de próximas sesiones (`/student/index`)
+**Archivo:** `src/routes/student.index.tsx`
+
+- **Ancho:** el contenedor de la lista pasa de `max-w-xl` a `max-w-lg`, reduciendo ligeramente el ancho de cada tarjeta.
+- **Borde:** cambio de `border-[var(--navy-100)]` a `border-[var(--navy-200)]/40` — mantiene el borde fino pero añade una definición sutil para que la tarjeta se distinga del fondo.
+- **Watermark:** logo de Microsoft Teams (`teams-logo.webp`) posicionado como marca de agua a la derecha de cada tarjeta, al 5% de opacidad, centrado verticalmente y recortado por el `overflow-hidden` del contenedor. No interfiere con el contenido gracias a `z-0` y al bajo contraste.
+- **Jerarquía de capas:** el contenido interno envuelto en `relative z-10` para quedar por encima del watermark.
+- **Aplicación:** mismo tratamiento en tarjetas de sesión (`kind === "session"`) y tarjetas de club (`kind === "club"`) para mantener coherencia visual en la lista.
 
 Sin cambios de lógica ni rutas.
