@@ -68,7 +68,7 @@ export function ratingBand(rating: number | null): RatingBand {
   if (rating >= 4.5) return { label: "Excelencia", fg: "#065f46", bg: "#d1fae5", dot: "#047857" };
   if (rating >= 4.0) return { label: "Muy bueno", fg: "#15803d", bg: "#dcfce7", dot: "#22c55e" };
   if (rating >= 3.5) return { label: "Bueno", fg: "#4d7c0f", bg: "#ecfccb", dot: "#84cc16" };
-  if (rating >= 2.5) return { label: "Regular", fg: "#b45309", bg: "#fef3c7", dot: "#f59e0b" };
+  if (rating >= 2.5) return { label: "Regular", fg: "#ffffff", bg: "#f59e0b", dot: "#f59e0b" };
   return { label: "Critical", fg: "#dc2626", bg: "#fee2e2", dot: "#ef4444" };
 }
 
