@@ -257,7 +257,7 @@ function Page() {
               <button
                 key={c.id}
                 onClick={() => setOpen(c)}
-                className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-5 text-left shadow-soft transition-all hover:-translate-y-0.5 hover:border-accent hover:shadow-elevated"
+                className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-5 text-left shadow-soft verbo-lift hover:border-accent hover:shadow-elevated"
               >
                 <div className="flex items-start justify-between gap-2">
                   <CategoryBadge name={c.category} />
@@ -299,7 +299,7 @@ function Page() {
             <button
               key={d}
               onClick={() => { setDifficulty(d); setCategory("all"); }}
-              className={`group flex flex-col items-start gap-3 rounded-2xl bg-gradient-to-br ${gradient} p-6 text-left text-white shadow-soft transition-all hover:-translate-y-0.5 hover:shadow-elevated`}
+              className={`group flex flex-col items-start gap-3 rounded-2xl bg-gradient-to-br ${gradient} p-6 text-left text-white shadow-soft verbo-lift hover:shadow-elevated`}
             >
               <DifficultyDots difficulty={d} />
               <div>

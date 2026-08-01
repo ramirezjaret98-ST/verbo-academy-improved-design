@@ -1772,7 +1772,7 @@ function PerformanceEvaluationModal({
               <button
                 key={m.key}
                 onClick={() => setActiveMacro(m)}
-                className="group flex flex-col gap-3 rounded-xl border border-border bg-background p-4 text-left transition-all hover:border-[#01304a]/30 hover:shadow-md"
+                className="group flex flex-col gap-3 rounded-xl border border-border bg-background p-4 text-left transition-[border-color,box-shadow] duration-200 ease-out hover:border-[#01304a]/30 hover:shadow-md"
               >
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2.5">

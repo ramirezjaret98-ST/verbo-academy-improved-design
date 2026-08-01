@@ -113,7 +113,7 @@ function Page() {
             <button
               key={u.id}
               onClick={() => setUnitId(u.id)}
-              className="group flex flex-col gap-2 rounded-2xl border border-border bg-card p-5 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-accent hover:shadow-elevated"
+              className="group flex flex-col gap-2 rounded-2xl border border-border bg-card p-5 text-left shadow-sm verbo-lift hover:border-accent hover:shadow-elevated"
             >
               <div className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">{u.id}</div>
               <div className="text-base font-semibold tracking-tight text-foreground">{u.title}</div>
@@ -145,7 +145,7 @@ function Page() {
             <button
               key={lvl.id}
               onClick={() => setLevelId(lvl.id)}
-              className="group flex flex-col gap-3 rounded-2xl border border-border bg-card p-6 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-accent hover:shadow-elevated"
+              className="group flex flex-col gap-3 rounded-2xl border border-border bg-card p-6 text-left shadow-sm verbo-lift hover:border-accent hover:shadow-elevated"
             >
               <div className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">{lvl.id}</div>
               <div className="text-lg font-semibold tracking-tight text-foreground">{lvl.name}</div>
@@ -174,7 +174,7 @@ function Page() {
             <button
               key={pid}
               onClick={() => { setProductId(pid); setLevelId(null); setUnitId(null); }}
-              className="group flex flex-col items-start gap-4 rounded-2xl border border-border bg-card p-6 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-accent hover:shadow-elevated"
+              className="group flex flex-col items-start gap-4 rounded-2xl border border-border bg-card p-6 text-left shadow-sm verbo-lift hover:border-accent hover:shadow-elevated"
             >
               <span className="flex h-14 w-14 items-center justify-center rounded-xl text-white" style={{ backgroundImage: PRODUCT_ICON_GRADIENT[pid] }}>
                 <Icon className="h-7 w-7" />

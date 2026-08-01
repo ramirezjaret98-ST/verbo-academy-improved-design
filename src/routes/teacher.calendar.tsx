@@ -249,7 +249,7 @@ function Page() {
                     <button
                       type="button"
                       onClick={() => (ended && ev.status === "ready" ? goReport(ev.session!.id) : setPlanning(ev.session!))}
-                      className="inline-flex cursor-pointer items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-white shadow-soft transition-all hover:shadow-floating hover:brightness-110"
+                      className="inline-flex cursor-pointer items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-white shadow-soft transition-[box-shadow,filter] duration-200 ease-out hover:shadow-floating hover:brightness-110"
                       style={{ background: theme.background, color: theme.textTone === "dark" ? "#01304a" : undefined }}
                     >
                       {ended && ev.status === "ready" ? (<><FileEdit className="h-4 w-4" /> Fill Session Report</>) : "Plan"}

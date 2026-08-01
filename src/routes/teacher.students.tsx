@@ -357,7 +357,7 @@ function StudentCard({ student: s, onOpen, index = 0 }: { student: User; onOpen:
       {/* Compact 4-tile skill summary — clicking opens the shared Advanced
           Performance Analytics modal (same modal used by the student). */}
       <div
-        className={`mt-4 ml-1.5 rounded-2xl border p-2.5 transition-all ${anySkillLow ? "verbo-pay-glow border-destructive/40" : "border-border/70 bg-foreground/[0.015]"}`}
+        className={`mt-4 ml-1.5 rounded-2xl border p-2.5 transition-[border-color,background-color,box-shadow] duration-200 ease-out ${anySkillLow ? "verbo-pay-glow border-destructive/40" : "border-border/70 bg-foreground/[0.015]"}`}
       >
         <div className="mb-2 flex items-center justify-between gap-2 px-1">
           <span className="text-[10px] font-light uppercase tracking-[0.16em] text-muted-foreground">
@@ -562,7 +562,7 @@ function StudentDetailModal({
               <button
                 type="button"
                 onClick={() => setShowAnalytics(true)}
-                className={`w-full rounded-xl border border-l-4 p-4 text-left transition-all hover:bg-secondary/40 ${anySkillLow ? "border-destructive/40 border-l-destructive verbo-pay-glow" : "border-border border-l-violet-500"} bg-background`}
+                className={`w-full rounded-xl border border-l-4 p-4 text-left transition-[border-color,background-color,box-shadow] duration-200 ease-out hover:bg-secondary/40 ${anySkillLow ? "border-destructive/40 border-l-destructive verbo-pay-glow" : "border-border border-l-violet-500"} bg-background`}
               >
                 <div className="mb-2 flex items-center justify-between">
                   <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
