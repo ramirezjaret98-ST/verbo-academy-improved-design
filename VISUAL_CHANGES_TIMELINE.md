@@ -902,3 +902,13 @@ Sin cambios de lógica ni rutas. `DATA_MODEL.md` sigue sincronizado.
 - Ahora la animación de press aplica solo al icono interno `.verbo-eye` (`scale(0.88)` con `transform-origin: center`), manteniendo el feedback visual sin mover el botón.
 - Resultado: el ojo responde correctamente tanto en clics rápidos como en clics sostenidos, y alterna entre mostrar/ocultar la contraseña de forma confiable.
 - Visual only — no logic, data or route changes; `DATA_MODEL.md` remains synchronized.
+
+## Entry 063 — /teacher: rediseño completo del dashboard (Apple-design + animaciones)
+- Header: eyebrow "Good day," + nombre en 40px semibold con tracking -0.02em, grid `minmax(0,1fr)_auto` con pills de rango/sesiones a la derecha y hairline inferior en lugar del bloque anterior.
+- Stat cards: superficie `bg-card` con borde hairline (se eliminó el look de bloque sólido), eyebrow uppercase 10px, cifra 48px tabular, subtítulo contextual ("active roster", "next 7 days", "last 30 days · view trend"). Performance añade barra de progreso fina con el color del score. Entrada escalonada `verbo-td-in` (0/45/90/135ms) y press feedback `verbo-td-press`.
+- Action cards (Attention / Planning / Completion): generadas desde un array, altura reducida a 104px, conteo grande + título en la misma línea y pulse rojo solo cuando hay items pendientes.
+- Recent Activity: la tabla pasó a un "ledger" con cabecera de columnas 10px uppercase, filas con riel de color según estado (verde/rojo/ámbar/violeta), origen como chip y entrada escalonada de 34ms por fila; en pantallas medianas colapsa a una sola columna apilada.
+- My Recent Feedback: dejó de ser una tabla idéntica a Recent Activity — ahora es un grid de tarjetas tipo testimonial con comilla de fondo, avatar con iniciales coloreado por rating, estrellas, cita en 15px y footer con rating + estado de revisión.
+- Quick Actions: padding e iconos responsivos (10→12) y entrada escalonada por tarjeta.
+- `src/styles.css`: nuevas utilidades `verbo-td-in` (spring 320ms), `verbo-td-press`, `verbo-act-row` / `verbo-act-rail` y `verbo-fb-card`.
+- Visual only — no logic, data or route changes; `DATA_MODEL.md` remains synchronized.
