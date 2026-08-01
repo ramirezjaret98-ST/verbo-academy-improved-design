@@ -596,9 +596,49 @@ function StudentDashboard() {
           </HeroStatCard>
         </div>
 
-        {/* Overall Attendance */}
+        {/* Overall Attendance — replaced by a welcome card until the student
+         *  has their first counted session (0% would misrepresent a newcomer). */}
+        {gradeable.length === 0 ? (
         <div className="relative">
           <HeroStatCard
+            style={{
+              background: "linear-gradient(135deg, #01304a 0%, #002233 100%)",
+              boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.08)",
+            }}
+            decorative={
+              <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-[2rem]" aria-hidden>
+                <img
+                  src={verbotStageZero.url}
+                  alt=""
+                  aria-hidden
+                  className="absolute -top-4 right-0 h-[150%] w-auto select-none object-contain"
+                  style={{ filter: "drop-shadow(0 12px 20px rgba(0,0,0,0.28))" }}
+                />
+              </div>
+            }
+          >
+            <div className="relative flex w-full items-start justify-between gap-4">
+              <div className="pr-2">
+                <div className="text-xs font-semibold uppercase tracking-wider" style={{ color: "rgba(255,255,255,0.6)" }}>
+                  Overall Attendance
+                </div>
+                <div
+                  className="mt-3 max-w-[13ch] text-3xl font-bold leading-[1.1] tracking-[-0.02em]"
+                  style={{ color: "#ffffff" }}
+                >
+                  Ready to get the ball rolling?
+                </div>
+                <div className="mt-2 text-xs font-semibold" style={{ color: "rgba(255,255,255,0.6)" }}>
+                  starts with your first session
+                </div>
+              </div>
+            </div>
+          </HeroStatCard>
+        </div>
+        ) : (
+        <div className="relative">
+          <HeroStatCard
+
             style={{
               /* Soft wash of the attendance band instead of a full-bleed
                *  saturated fill: the band colour still reads, but the card
