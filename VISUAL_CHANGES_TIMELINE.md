@@ -803,3 +803,9 @@ Sin cambios de lógica ni rutas. `DATA_MODEL.md` sigue sincronizado.
 - Identity row now shows product (and company for Enterprise) as a light subtitle; the status strip keeps status, Insights and Book Club strike tags.
 - Motion (`.verbo-student-card` family in `src/styles.css`): 300ms `cubic-bezier(0.23, 1, 0.32, 1)` entrance staggered 34ms (capped at 12 cards), hover lift `-3px` with a tier-colored halo + drop glow, rail thickening to 4px, avatar `1.04` / group dot `1.10` scale, `0.985` press feedback and a 420ms progress-bar width transition. Hover gated behind `hover:hover`/`pointer:fine`; all transforms neutralized under `prefers-reduced-motion`.
 - Visual only — no logic, data or route changes; `DATA_MODEL.md` remains synchronized.
+
+## Entry 050 — Money Lab chart: one visual language (grouped bars)
+- The chart mixed two encodings at once (green bars for income + two monotone lines for expenses and Net), which made small values collapse onto the baseline and read as noise. Replaced the `ComposedChart` with a single `BarChart`.
+- Received / Expenses / Net are now three grouped bars per month (green / amber / navy, `maxBarSize 22`, `radius 6`, `barGap 4`, `barCategoryGap 22%`), with unselected months at 0.4 opacity and the selected month at full.
+- Added a zero `ReferenceLine` so a negative Net reads correctly, and switched the legend line swatches to dots to match the bar encoding.
+- Click-to-jump behaviour, data shape, tooltips and routes untouched — visual encoding only; `DATA_MODEL.md` remains synchronized.

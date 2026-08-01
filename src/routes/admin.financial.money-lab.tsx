@@ -6,7 +6,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import {
-  ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, ReferenceLine,
 } from "recharts";
 import { Pill } from "@/components/verbo/ui";
 import { USERS, type User } from "@/lib/mock-data";
@@ -352,10 +352,10 @@ function MoneyLabPage() {
               <span className="h-2 w-2 rounded-full" style={{ background: INCOME_ACCENT }} /> Received
             </span>
             <span className="inline-flex items-center gap-1.5">
-              <span className="h-[2px] w-4 rounded-full" style={{ background: EXPENSE_ACCENT }} /> Expenses
+              <span className="h-2 w-2 rounded-full" style={{ background: EXPENSE_ACCENT }} /> Expenses
             </span>
             <span className="inline-flex items-center gap-1.5">
-              <span className="h-[2px] w-4 rounded-full" style={{ background: NAVY }} /> Net
+              <span className="h-2 w-2 rounded-full" style={{ background: NAVY }} /> Net
             </span>
           </div>
         </div>
@@ -558,7 +558,7 @@ function TrendChart({
   return (
     <div className="h-[240px] w-full sm:h-[280px]">
       <ResponsiveContainer width="100%" height="100%">
-        <ComposedChart data={rows} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+        <BarChart data={rows} margin={{ top: 8, right: 8, left: 0, bottom: 0 }} barGap={4} barCategoryGap="22%">
           <CartesianGrid strokeDasharray="2 6" stroke="var(--border)" vertical={false} />
           <XAxis
             dataKey="label"
@@ -574,6 +574,7 @@ function TrendChart({
             width={72}
             tickFormatter={(v: number) => money(v)}
           />
+          <ReferenceLine y={0} stroke="var(--border)" />
           <Tooltip
             cursor={{ fill: "var(--muted-foreground)", fillOpacity: 0.06 }}
             contentStyle={{ borderRadius: 14, border: "1px solid var(--border)", fontSize: 12, boxShadow: "0 8px 24px -12px rgba(1,48,74,0.35)" }}
@@ -583,38 +584,45 @@ function TrendChart({
             dataKey="received"
             name="Received Income"
             fill="#5fca16"
-            radius={[8, 8, 0, 0]}
-            maxBarSize={34}
+            radius={[6, 6, 0, 0]}
+            maxBarSize={22}
             onClick={handleClick}
             cursor="pointer"
             animationDuration={480}
           >
             {rows.map((m) => (
-              <Cell key={m.mkey} fillOpacity={m.mkey === selectedMkey ? 1 : 0.35} />
+              <Cell key={m.mkey} fillOpacity={m.mkey === selectedMkey ? 1 : 0.4} />
             ))}
           </Bar>
-          <Line
-            type="monotone"
+          <Bar
             dataKey="expenses"
             name="Expenses"
-            stroke="#d97706"
-            strokeWidth={2}
-            strokeDasharray="4 4"
-            dot={{ r: 3, fill: "#d97706", strokeWidth: 0 }}
-            activeDot={{ r: 5 }}
-            animationDuration={620}
-          />
-          <Line
-            type="monotone"
+            fill="#d97706"
+            radius={[6, 6, 0, 0]}
+            maxBarSize={22}
+            onClick={handleClick}
+            cursor="pointer"
+            animationDuration={480}
+          >
+            {rows.map((m) => (
+              <Cell key={m.mkey} fillOpacity={m.mkey === selectedMkey ? 1 : 0.4} />
+            ))}
+          </Bar>
+          <Bar
             dataKey="net"
             name="Net"
-            stroke="#01304a"
-            strokeWidth={2}
-            dot={{ r: 3, fill: "#01304a", strokeWidth: 0 }}
-            activeDot={{ r: 6 }}
-            animationDuration={620}
-          />
-        </ComposedChart>
+            fill="#01304a"
+            radius={[6, 6, 0, 0]}
+            maxBarSize={22}
+            onClick={handleClick}
+            cursor="pointer"
+            animationDuration={480}
+          >
+            {rows.map((m) => (
+              <Cell key={m.mkey} fillOpacity={m.mkey === selectedMkey ? 1 : 0.4} />
+            ))}
+          </Bar>
+        </BarChart>
       </ResponsiveContainer>
     </div>
   );
