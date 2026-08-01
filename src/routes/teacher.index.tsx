@@ -39,6 +39,8 @@ import upcomingIconAsset from "@/assets/Upcoming_sessions.svg.asset.json";
 import starIconAsset from "@/assets/Star.svg.asset.json";
 import performanceIconAsset from "@/assets/performance.svg.asset.json";
 import availabilityIconAsset from "@/assets/availability.svg.asset.json";
+import tailoredIconAsset from "@/assets/vip-tailored.svg.asset.json";
+
 import clubsIconAsset from "@/assets/clubs.svg.asset.json";
 import balanceIconAsset from "@/assets/balance.svg.asset.json";
 
@@ -956,8 +958,10 @@ function TeacherDashboard() {
             <QuickAction to="/teacher/availability" iconSrc={availabilityIconAsset.url} label="My Availability" hint="Set your weekly slots" delay={0} />
             <QuickAction to="/teacher/clubs" iconSrc={clubsIconAsset.url} label="Available Clubs" hint="Claim open sessions" delay={45} />
             <QuickAction to="/teacher/financial" iconSrc={balanceIconAsset.url} label="My Balance" hint="Earnings & payouts" delay={90} />
+            <QuickAction to="/teacher/tailored-content" iconSrc={tailoredIconAsset.url} label="Tailored Content" hint="Prepare your personalized sessions" delay={135} />
             {hasVipStudent && (
-              <QuickAction to="/teacher/vip" icon={GraduationCap} label="Course Builder VIP" hint="Design VIP tracks" delay={135} />
+              <QuickAction to="/teacher/vip" icon={GraduationCap} label="Course Builder VIP" hint="Design VIP tracks" delay={180} />
+
             )}
           </div>
         </div>
