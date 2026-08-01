@@ -1358,3 +1358,43 @@
   width: 0;
   height: 0;
 }
+
+/* ── Admin overview: quiet entrance + press/lift feedback ───────────────── */
+@keyframes verbo-admin-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.verbo-admin-section {
+  animation: verbo-admin-in 320ms cubic-bezier(0.23, 1, 0.32, 1) both;
+  animation-delay: calc(var(--verbo-admin-i, 0) * 60ms);
+}
+.verbo-admin-press {
+  transition: transform 160ms cubic-bezier(0.23, 1, 0.32, 1),
+    box-shadow 200ms ease, border-color 200ms ease;
+}
+.verbo-admin-press:active {
+  transform: scale(0.985);
+}
+.verbo-admin-lift {
+  transition: transform 200ms cubic-bezier(0.23, 1, 0.32, 1),
+    box-shadow 200ms ease, border-color 200ms ease;
+}
+@media (hover: hover) and (pointer: fine) {
+  .verbo-admin-lift:hover {
+    transform: translateY(-2px);
+    border-color: color-mix(in oklab, var(--navy-700) 22%, transparent);
+    box-shadow: 0 10px 24px -18px color-mix(in oklab, var(--navy-700) 55%, transparent);
+  }
+  .verbo-admin-press:hover {
+    border-color: color-mix(in oklab, var(--navy-700) 22%, transparent);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .verbo-admin-section {
+    animation: verbo-admin-in 120ms ease both;
+    animation-delay: 0ms;
+  }
+  .verbo-admin-section { transform: none; }
+  .verbo-admin-lift:hover,
+  .verbo-admin-press:active { transform: none; }
+}

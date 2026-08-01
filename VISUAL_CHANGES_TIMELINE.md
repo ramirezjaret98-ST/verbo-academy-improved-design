@@ -771,3 +771,11 @@ Sin cambios de lógica ni rutas. `DATA_MODEL.md` sigue sincronizado.
 - Replaced the grey `bg-primary/10` rounded-square icon tile with a 48px circular chip on the card background, a hairline navy border and a 1px soft shadow.
 - Icon reduced to `h-5 w-5` with `strokeWidth 1.5`; hover scale softened to `1.03` at 200ms ease-out.
 - Purely presentational; no logic, data or route changes. `DATA_MODEL.md` remains synchronized.
+
+## Entry 046 — Admin overview: minimal, functional redesign + motion pass
+- Header restructured: eyebrow + `Admin` title over a hairline divider, with the five quick actions turned into compact pill buttons (icon tinted with each identity color) instead of five loud filled buttons.
+- Priority cards: the crimson gradient hero and the amber glow card are now two equal, quiet `bg-card` cards with a 3px accent rule, a tinted icon chip, and a large right-aligned count; accent goes neutral grey when the count is 0.
+- Summary strip: flat bordered cards, small tracked labels, 4xl tabular numbers, hairline icons; removed colored glow shadows. Avg composite folded into the same strip with a "Below target" note instead of a pulsing card.
+- Announcements: replaced the gradient/blob/watermark banner with a plain divider header (icon chip, eyebrow, title, active count).
+- Motion: `.verbo-admin-section` staggered 320ms ease-out entrance (60ms steps), `.verbo-admin-press` 0.985 press feedback, `.verbo-admin-lift` hover lift gated behind `hover:hover`/`pointer:fine`; all reduced to a 120ms fade under `prefers-reduced-motion`.
+- Visual only — no logic, data or route changes; `DATA_MODEL.md` remains synchronized.
