@@ -875,3 +875,11 @@ Sin cambios de lógica ni rutas. `DATA_MODEL.md` sigue sincronizado.
 - Needs review reutiliza el pulso rojo exagerado `verbo-review-glow-strong` (pausa en hover) + línea de resumen "N sessions needing review".
 - Movimiento: entrada `verbo-kpi-in` escalonada 34ms, hover lift −3px con glow del acento, press `scale(0.99)`; todo bajo `prefers-reduced-motion`.
 - Visual only — no logic, data or route changes; `DATA_MODEL.md` remains synchronized.
+
+## Entry 059 — /admin/kpis: tarjetas por secciones + rating pill sólido
+- La tarjeta deja de ser un lienzo blanco: ahora tres zonas con superficie propia — header tintado con el color del tier (gradiente 9%→4% + hairline del acento), bloque de composite sobre navy 4% con inset ring, y bloque "Signals" sobre navy 2.5% separado por hairline.
+- Título "Signals" con regla horizontal y peso más alto (`text-foreground/70`, tracking 0.16em) para marcar el corte de sección.
+- `KpiTile` con superficie card + inset ring del color del umbral; en hover de la tarjeta se tiñe 5%.
+- Rating pill: fondo sólido en el color de banda con texto blanco y sombra de color (antes tinte 10% con texto de color); hover oscurece 12%.
+- Barra de "needs review" ahora full-bleed con fondo destructive 6%.
+- Visual only — no logic, data or route changes; `DATA_MODEL.md` remains synchronized.

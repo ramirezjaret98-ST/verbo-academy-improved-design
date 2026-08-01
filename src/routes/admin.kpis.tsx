@@ -320,7 +320,7 @@ function TeacherKpiCard({
 
   return (
     <div
-      className={`verbo-kpi-card group relative flex flex-col overflow-hidden rounded-[22px] border border-border/80 bg-card p-5 pl-6${needsReview ? " verbo-critical-glow cursor-pointer" : ""}`}
+      className={`verbo-kpi-card group relative flex flex-col overflow-hidden rounded-[22px] border border-border/80 bg-card${needsReview ? " verbo-critical-glow cursor-pointer" : ""}`}
       style={{ ["--st" as string]: tierColor.bg, ["--verbo-card-i" as string]: index } as React.CSSProperties}
       onClick={needsReview ? onOpenReviews : undefined}
       role={needsReview ? "button" : undefined}
@@ -328,7 +328,8 @@ function TeacherKpiCard({
     >
       <span className="verbo-kpi-card__rail" aria-hidden />
 
-      {/* Identity — name leads, tier is a quiet tinted chip */}
+      {/* Header band — identity + rating live on a tinted surface */}
+      <div className="verbo-kpi-card__head px-5 pb-4 pl-6 pt-5">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="truncate font-display text-[19px] font-semibold leading-tight tracking-[-0.02em] text-foreground">
@@ -345,13 +346,13 @@ function TeacherKpiCard({
       <div className="mt-3.5 flex flex-wrap items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
         <button
           onClick={onOpenChart}
-          className="verbo-kpi-rating inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-[11.5px] font-semibold"
+          className="verbo-kpi-rating inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1 text-[11.5px] font-semibold text-white"
           style={{ ["--rt" as string]: ratingColor(displayRating) } as React.CSSProperties}
           title="View monthly rating trend"
         >
           <Star className="h-3 w-3 fill-current" />
           <span className="tabular-nums">{displayRating != null ? displayRating.toFixed(1) : "—"}</span>
-          <span className="font-light opacity-70">{band.label}</span>
+          <span className="font-light opacity-80">{band.label}</span>
           <TrendingUp className="h-3 w-3" strokeWidth={2} />
         </button>
 
@@ -381,10 +382,11 @@ function TeacherKpiCard({
           {monthOverrides.bonusStreak && <AdjustedBadge override={monthOverrides.bonusStreak} />}
         </div>
       </div>
+      </div>
 
       {/* Composite score — the headline number */}
       <div
-        className="mt-4 flex items-center gap-4 rounded-2xl border border-border/60 bg-background/50 p-4"
+        className="verbo-kpi-card__composite mx-5 mt-4 ml-6 flex items-center gap-4 rounded-2xl p-4"
         onClick={(e) => e.stopPropagation()}
       >
         <CompositeRing value={kpis.composite} />
@@ -426,9 +428,10 @@ function TeacherKpiCard({
       </div>
 
       {/* Signals */}
-      <div className="mt-4 border-t border-border/60 pt-3.5" onClick={(e) => e.stopPropagation()}>
-        <div className="mb-2.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/80">
-          Signals
+      <div className="verbo-kpi-card__signals mt-4 px-5 pb-5 pl-6 pt-4" onClick={(e) => e.stopPropagation()}>
+        <div className="mb-3 flex items-center gap-2.5">
+          <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-foreground/70">Signals</span>
+          <span className="h-px flex-1 bg-border" aria-hidden />
         </div>
         <div className="grid gap-x-4 gap-y-3 sm:grid-cols-2">
           <KpiTile label="Connection punctuality" value={kpis.connectionPunctuality} metric="connectionPunctuality" canOverride={canOverride} onOverride={onOverride} override={monthOverrides.connectionPunctuality} />
@@ -441,7 +444,7 @@ function TeacherKpiCard({
       </div>
 
       {needsReview && (
-        <div className="mt-4 flex items-center gap-2 border-t border-destructive/20 pt-3 text-[11.5px] font-medium text-destructive">
+        <div className="flex items-center gap-2 border-t border-destructive/20 bg-destructive/[0.06] px-5 py-3 pl-6 text-[11.5px] font-semibold text-destructive">
           <AlertTriangle className="h-3.5 w-3.5 shrink-0" strokeWidth={1.9} />
           {pending} session{pending === 1 ? "" : "s"} needing review
         </div>
