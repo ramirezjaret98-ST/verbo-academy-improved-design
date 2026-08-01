@@ -1967,7 +1967,9 @@
   transform-origin: left center;
   opacity: 0.75;
 }
-.verbo-act-row:hover .verbo-act-rail { transform: scaleX(1.6); opacity: 1; }
+@media (hover: hover) and (pointer: fine) {
+  .verbo-act-row:hover .verbo-act-rail { transform: scaleX(1.6); opacity: 1; }
+}
 
 
 /* Feedback quote cards */
