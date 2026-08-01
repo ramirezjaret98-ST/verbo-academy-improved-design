@@ -1421,3 +1421,36 @@
     transform: none;
   }
 }
+
+/* ── Admin quick actions: per-action identity + hover glow ──────────────── */
+.verbo-quick-action {
+  border-color: color-mix(in oklab, var(--qa) 22%, transparent);
+  box-shadow: 0 1px 2px color-mix(in oklab, var(--navy-700) 7%, transparent);
+  transition: transform 180ms cubic-bezier(0.23, 1, 0.32, 1),
+    box-shadow 200ms ease, border-color 200ms ease, background-color 200ms ease;
+}
+.verbo-quick-action__chip {
+  color: var(--qa);
+  background: color-mix(in oklab, var(--qa) 12%, transparent);
+  transition: background-color 200ms ease, transform 180ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+.verbo-quick-action:active {
+  transform: scale(0.97);
+}
+@media (hover: hover) and (pointer: fine) {
+  .verbo-quick-action:hover {
+    transform: scale(1.035);
+    border-color: color-mix(in oklab, var(--qa) 48%, transparent);
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--qa) 10%, transparent),
+      0 10px 26px -12px color-mix(in oklab, var(--qa) 65%, transparent);
+  }
+  .verbo-quick-action:hover .verbo-quick-action__chip {
+    background: color-mix(in oklab, var(--qa) 20%, transparent);
+    transform: scale(1.06);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .verbo-quick-action:hover,
+  .verbo-quick-action:active,
+  .verbo-quick-action:hover .verbo-quick-action__chip { transform: none; }
+}
