@@ -1319,7 +1319,7 @@ function StudentDetailModal({
         </div>
 
         {/* Tabs */}
-        <div className="verbo-scroll-hidden flex gap-1 overflow-x-auto border-b border-border bg-card px-3 pt-2 sm:px-5">
+        <div className="verbo-scroll-hidden flex shrink-0 gap-1 overflow-x-auto border-b border-border bg-card px-3 pt-2 sm:px-5">
           {([["overview", "Overview"], ["performance", "Performance & Attendance"], ["progress", "Course Progress"], ["badges", "Badges"], ["reports", "Reports"], ["notes", "Admin Notes"]] as [Tab, string][]).map(([id, label]) => (
             <button
               key={id}
