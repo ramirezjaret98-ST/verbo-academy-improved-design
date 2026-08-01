@@ -69,8 +69,10 @@ function signalTone(v: number): "good" | "mid" | "bad" {
 }
 function signalColor(v: number) {
   const t = signalTone(v);
-  return t === "good" ? "#22c55e" : t === "mid" ? "#f59e0b" : "#ef4444";
+  // Lime · soft amber · intense red — quieter on white surfaces than the old triad.
+  return t === "good" ? "#84cc16" : t === "mid" ? "#fbbf24" : "#dc2626";
 }
+
 
 const KPI_ICONS: Record<string, typeof Wifi> = {
   connection: Wifi,
