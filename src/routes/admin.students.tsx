@@ -459,17 +459,29 @@ function StudentCard({ student: s, onOpen, index = 0 }: { student: User; onOpen:
     );
   }
 
+  // Purely visual status signalling — same vocabulary as the teacher cards.
+  const isFrozen = s.status === "frozen";
+  const critical = s.status === "suspended" || blocked || bcBlocked || overdue;
+  const warn = !critical && payDue;
+
   return (
     <button
       onClick={onOpen}
       style={cardVars}
       data-group={groupInfo ? "true" : undefined}
       data-premium={isPremiumTier ? "true" : undefined}
-      className={`verbo-student-card group relative flex flex-col overflow-hidden rounded-[22px] border border-border/80 bg-card p-5 text-left ${overdue ? "verbo-pay-overdue-glow" : payDue ? "verbo-pay-glow" : ""}`}
+      data-status={s.status ?? "active"}
+      className={`verbo-student-card group relative flex flex-col overflow-hidden rounded-[22px] border border-border/80 bg-card p-5 text-left ${critical ? "verbo-critical-glow" : warn ? "verbo-warn-glow" : ""}`}
     >
       {/* Tier rail — the card's identity at a glance */}
       <span className="verbo-student-card__rail" aria-hidden />
       {isPremiumTier && <span className="verbo-student-card__sheen" aria-hidden />}
+      {isFrozen && (
+        <>
+          <span className="verbo-ice" aria-hidden />
+          <span className="verbo-ice__label" aria-hidden>Frozen</span>
+        </>
+      )}
 
       {payDue && (
         <span
