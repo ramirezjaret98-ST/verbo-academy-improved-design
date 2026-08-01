@@ -1348,3 +1348,13 @@
   .verbo-profile-chip:active { transform: none; }
   .verbo-profile-input:focus { transform: none; box-shadow: none; }
 }
+
+/* Fully hidden scrollbar (content still scrolls) — used inside modals */
+.verbo-scroll-hidden {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.verbo-scroll-hidden::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}

@@ -760,3 +760,9 @@ Sin cambios de lógica ni rutas.
 - **Proporciones del modal de perfil:** ancho `max-w-xl → max-w-2xl`, altura de scroll `78vh → 66vh` (−15%) y esquinas `rounded-[32px] → rounded-[40px]`.
 
 Sin cambios de lógica ni rutas. `DATA_MODEL.md` sigue sincronizado.
+
+## Entry 044 — Profile modal: rounder shell, larger avatar, hidden scrollbar
+- `DialogContent` rounding increased to `52px`; the scroll container inherits the radius so the hero banner no longer renders square corners.
+- Hero banner grew to `h-40`; avatar enlarged from `h-20 w-20` to `h-28 w-28`, with the edit button and presence dot rescaled and repositioned; content top padding to `pt-16`.
+- Added `.verbo-scroll-hidden` in `src/styles.css` and applied it to the modal scroll area so the scrollbar is fully invisible while scrolling still works.
+- No logic, data or route changes; `DATA_MODEL.md` remains synchronized.

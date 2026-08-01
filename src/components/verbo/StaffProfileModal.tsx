@@ -202,15 +202,15 @@ export function StaffProfileModal({ open, onOpenChange }: Props) {
   return (
     <>
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl gap-0 overflow-hidden rounded-[40px] border border-border/40 p-0 shadow-floating">
+      <DialogContent className="max-w-2xl gap-0 overflow-hidden rounded-[52px] border border-border/40 p-0 shadow-floating">
         <DialogTitle className="sr-only">My profile</DialogTitle>
 
-        <div className="max-h-[66vh] overflow-y-auto">
+        <div className="verbo-scroll-hidden max-h-[66vh] overflow-y-auto rounded-[inherit]">
         {/* Hero banner + avatar — scrolls with the content */}
         <div className="relative">
           {/* Hero banner — taller, calmer navy gradient with a single soft orange accent */}
           <div
-            className="relative h-36 w-full"
+            className="relative h-40 w-full"
             style={{
               background:
                 "radial-gradient(circle at 85% 20%, color-mix(in oklab, var(--orange-500) 55%, transparent), transparent 46%), linear-gradient(135deg, var(--navy-700) 0%, var(--navy-600) 55%, var(--navy-500) 100%)",
@@ -218,9 +218,10 @@ export function StaffProfileModal({ open, onOpenChange }: Props) {
           />
 
           {/* Avatar overlaps the banner bottom edge */}
-          <div className="absolute -bottom-10 left-1/2 -translate-x-1/2">
+          <div className="absolute -bottom-14 left-1/2 -translate-x-1/2">
             <div className="relative">
-              <div className="h-20 w-20 overflow-hidden rounded-full border-4 border-background shadow-floating">
+              <div className="h-28 w-28 overflow-hidden rounded-full border-4 border-background shadow-floating">
+
                 {avatar ? (
                   <img src={avatar} alt={user.name} className="h-full w-full object-cover" />
                 ) : (
@@ -233,22 +234,23 @@ export function StaffProfileModal({ open, onOpenChange }: Props) {
                 type="button"
                 onClick={() => fileRef.current?.click()}
                 aria-label="Change profile photo"
-                className="verbo-profile-press absolute -right-1 bottom-1 flex h-7 w-7 cursor-pointer items-center justify-center rounded-full bg-orange-500 text-white shadow-md hover:bg-orange-600"
+                className="verbo-profile-press absolute bottom-1 right-0 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-orange-500 text-white shadow-md hover:bg-orange-600"
               >
-                <Pencil className="h-3 w-3" />
+                <Pencil className="h-3.5 w-3.5" />
               </button>
               <span
                 title={online ? "Online" : "Offline"}
-                className={`absolute bottom-1.5 left-1 h-3.5 w-3.5 rounded-full border-2 border-background ${
+                className={`absolute bottom-2 left-1 h-4 w-4 rounded-full border-2 border-background ${
                   online ? "bg-emerald-500" : "bg-zinc-400"
                 }`}
               />
+
               <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onPickAvatar} />
             </div>
           </div>
         </div>
 
-        <div className="px-5 pb-6 pt-12 sm:px-6">
+        <div className="px-5 pb-6 pt-16 sm:px-6">
 
           {/* Identity */}
           <div className="verbo-profile-section text-center" style={{ "--verbo-profile-i": 0 } as React.CSSProperties}>
