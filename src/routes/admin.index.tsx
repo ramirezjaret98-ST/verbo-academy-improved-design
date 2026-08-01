@@ -622,34 +622,23 @@ function AnnouncementsSection() {
   const audienceLabel: Record<Audience, string> = { all: "All", students: "Students only", teachers: "Teachers only" };
 
   return (
-    <section>
-      <div className="relative mb-4 overflow-hidden rounded-2xl px-4 py-3 card-gradient-orange">
-        {/* Decorative blobs */}
-        <div
-          className="pointer-events-none absolute -right-10 -top-14 h-40 w-40 rounded-full blur-2xl"
-          style={{ background: "radial-gradient(circle, rgba(255,255,255,0.45), transparent 70%)" }}
+    <section className="verbo-admin-section" style={{ "--verbo-admin-i": 3 } as React.CSSProperties}>
+      <div className="mb-4 flex items-center gap-3 border-b border-border/70 pb-4">
+        <span
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border bg-background"
+          style={{ color: "#f38934" }}
           aria-hidden
-        />
-        <div
-          className="pointer-events-none absolute -bottom-16 -left-10 h-40 w-40 rounded-full blur-2xl"
-          style={{ background: "radial-gradient(circle, rgba(0,0,0,0.35), transparent 70%)", animationDelay: "0.1s" }}
-          aria-hidden
-        />
-        {/* Watermark */}
-        <div className="pointer-events-none absolute -right-4 -top-4 select-none" aria-hidden>
-          <Megaphone className="h-[92px] w-[92px] text-white/[0.14]" strokeWidth={1.5} />
+        >
+          <Megaphone className="h-4 w-4" strokeWidth={1.6} />
+        </span>
+        <div className="min-w-0">
+          <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">Comms</p>
+          <h2 className="text-base font-semibold tracking-[-0.01em] text-foreground">Announcements</h2>
         </div>
-        <div className="relative z-10 flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white shadow-sm">
-            <Megaphone className="h-5 w-5" style={{ color: "#f38934" }} />
-          </div>
-          <div>
-            <div className="text-xs font-semibold uppercase tracking-wider text-white/80">Comms</div>
-            <h2 className="text-base font-semibold tracking-tight text-white">Announcements</h2>
-          </div>
-        </div>
+        <span className="ml-auto text-xs font-light text-muted-foreground">{list.length} active</span>
       </div>
       <Card className="!p-0">
+
         {/* Composer */}
         <div className="space-y-4 border-b border-border p-6">
           <div>
