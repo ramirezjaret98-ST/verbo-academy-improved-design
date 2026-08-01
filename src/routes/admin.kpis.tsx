@@ -244,9 +244,10 @@ function Page() {
           </div>
         ) : (
           <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-            {visibleRows.map(({ t, kpis, pending }) => (
+            {visibleRows.map(({ t, kpis, pending }, i) => (
               <TeacherKpiCard
                 key={t.id}
+                index={i}
                 teacher={t}
                 kpis={kpis}
                 pending={pending}
@@ -464,6 +465,12 @@ function barColor(value: number, invert: boolean) {
 /** Same thresholds CompositeRing paints with. */
 function compositeColor(value: number) {
   return value >= 85 ? "#5fca16" : value >= 70 ? "#f59e0b" : "#ef4444";
+}
+
+/** Tint used by the rating pill — same language as the bars. */
+function ratingColor(rating: number | null | undefined) {
+  if (rating == null) return "#94a3b8";
+  return rating >= 4 ? "#3f8f10" : rating >= 2.5 ? "#b45309" : "#dc2626";
 }
 
 
