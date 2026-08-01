@@ -9,6 +9,7 @@ import verbotEmoji from "@/assets/Verbot_emoji.svg.asset.json";
 import verbotMolesto from "@/assets/Verbot_molesto.svg.asset.json";
 import verbotEnojado from "@/assets/Verbot_enojado.svg.asset.json";
 import verbotFurioso from "@/assets/Verbot_furioso.svg.asset.json";
+import verbotStageZero from "@/assets/stage_0_verbot.svg.asset.json";
 
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
