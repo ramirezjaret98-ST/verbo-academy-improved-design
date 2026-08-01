@@ -527,29 +527,39 @@ function MyBalancePage() {
           )}
         </div>
 
-        <div className="grid gap-4 lg:grid-cols-[240px_minmax(0,1fr)]">
+        <div className="grid gap-x-4 gap-y-6 lg:grid-cols-[260px_minmax(0,1fr)]">
           {/* Composite gauge */}
-          <div
-            className="flex items-center gap-5 rounded-3xl border bg-card p-5 lg:flex-col lg:items-center lg:justify-center lg:gap-3 lg:text-center"
-            style={{ borderColor: `${signalColor(kpis?.composite ?? 0)}55` }}
-          >
-            <CompositeGauge value={kpis?.composite ?? 0} />
-            <div className="min-w-0">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Composite Score</div>
-              <div className="mt-1 text-xs font-medium text-muted-foreground">Weighted average of your 6 KPIs</div>
-              {kpis?.onboarding && (
-                <span className="mt-2 inline-flex rounded-full bg-blue-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-blue-700">
-                  Onboarding
-                </span>
-              )}
+          <div>
+            <div className="px-1.5 pb-2 text-[11px] font-light uppercase tracking-[0.18em] text-muted-foreground">
+              Composite Score
+            </div>
+            <div
+              className="verbo-kpi-card relative flex items-center gap-5 overflow-hidden rounded-[26px] border border-border/70 bg-card p-5 lg:flex-col lg:items-center lg:justify-center lg:gap-4 lg:py-7 lg:text-center"
+              style={{ boxShadow: `0 20px 50px -32px ${signalColor(kpis?.composite ?? 0)}` }}
+            >
+              <span
+                aria-hidden
+                className="verbo-kpi-fill pointer-events-none absolute inset-y-0 left-0"
+                style={{ width: `${Math.max(0, Math.min(100, kpis?.composite ?? 0))}%`, background: signalColor(kpis?.composite ?? 0), opacity: 0.08 }}
+              />
+              <CompositeGauge value={kpis?.composite ?? 0} />
+              <div className="relative min-w-0">
+                <div className="text-xs font-light text-muted-foreground">Weighted average of your 6 KPIs</div>
+                {kpis?.onboarding && (
+                  <span className="mt-2 inline-flex text-[10px] font-medium uppercase tracking-[0.16em] text-blue-700">
+                    Onboarding
+                  </span>
+                )}
+              </div>
             </div>
           </div>
 
-          {/* KPI mini-cards */}
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 2xl:grid-cols-3">
+          {/* KPI cards */}
+          <div className="grid grid-cols-1 gap-x-4 gap-y-6 sm:grid-cols-2 xl:grid-cols-3">
             {signals.map((sig, i) => <KpiMiniCard key={sig.key} signal={sig} index={i} />)}
           </div>
         </div>
+
 
         <p
           className="flex items-start gap-2.5 rounded-2xl border p-3.5 text-xs leading-relaxed text-foreground"
