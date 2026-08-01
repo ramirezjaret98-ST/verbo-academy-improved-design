@@ -1035,3 +1035,11 @@ Sin cambios de lógica ni rutas. `DATA_MODEL.md` sigue sincronizado.
 - `.verbo-kpi-ghost`: el número gigante de las KPI mini cards ahora crece de forma asimétrica en hover (`scale(1.14, 1.04)`, origen `left center`) y sube su opacidad de 0.25 a 0.32; la tarjeta añade glow `--kpi` según el color del score.
 - Hover gateado a `(hover: hover) and (pointer: fine)` y fallback completo en `prefers-reduced-motion`.
 - Visual only — no logic, data or route changes; `DATA_MODEL.md` remains synchronized.
+
+## Entry 081 — /teacher/calendar: rediseño de las tarjetas de Upcoming Sessions
+- Se sustituye el rail de estado sólido y el chip de fecha relleno por una tarjeta calmada estilo Apple: radio `26px`, superficie `bg-card/80` con `backdrop-blur-[2px]` y un wash ambiental diagonal del color de estado al 7% (13% en hover).
+- La fecha pasa a ser tipográfica: mes en tracking amplio, día a `34px` semibold en el color del estado, weekday debajo; separada del contenido por un hairline vertical.
+- Jerarquía de texto: título 15px semibold, hora tabular en muted, y metadatos (tipo de evento + estado) reducidos a micro-etiquetas uppercase con puntos de color en lugar de pills rellenas.
+- CTA destacado: botón pill con gradiente del estado, doble sombra (glow proyectado + hairline ring), copy explícito "Plan session", flecha con desplazamiento en hover y lift de 1px con press a `scale(0.98)`. El estado no accionable pasa a un pill punteado "No action".
+- La tarjeta "next" gana borde teñido y sombra proyectada; el aviso "Plan now" se mueve junto al CTA como micro-label.
+- Visual only — no logic, data or route changes; `DATA_MODEL.md` remains synchronized.
