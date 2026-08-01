@@ -942,16 +942,25 @@ function TeacherDashboard() {
 
 
       <section>
-        <SectionTitle>Quick Actions</SectionTitle>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <QuickAction to="/teacher/availability" iconSrc={availabilityIconAsset.url} label="My Availability" delay={0} />
-          <QuickAction to="/teacher/clubs" iconSrc={clubsIconAsset.url} label="Available Clubs" delay={45} />
-          <QuickAction to="/teacher/financial" iconSrc={balanceIconAsset.url} label="My Balance" delay={90} />
-          {hasVipStudent && (
-            <QuickAction to="/teacher/vip" icon={GraduationCap} label="Course Builder VIP" delay={135} />
-          )}
+        <div className="overflow-hidden rounded-3xl border border-border bg-card shadow-[0_18px_40px_-28px_rgba(12,26,58,0.45)]">
+          <div className="flex flex-wrap items-center justify-between gap-2 bg-primary px-5 py-3">
+            <div className="flex items-center gap-2">
+              <span className="h-1.5 w-1.5 rounded-full bg-accent" />
+              <span className="text-[11px] font-bold uppercase tracking-[0.18em] text-primary-foreground">Quick Actions</span>
+            </div>
+            <span className="text-[11px] font-medium text-primary-foreground/60">Jump straight in</span>
+          </div>
+          <div className="grid divide-y divide-border sm:grid-cols-2 sm:divide-y-0 lg:grid-cols-4">
+            <QuickAction to="/teacher/availability" iconSrc={availabilityIconAsset.url} label="My Availability" hint="Set your weekly slots" delay={0} />
+            <QuickAction to="/teacher/clubs" iconSrc={clubsIconAsset.url} label="Available Clubs" hint="Claim open sessions" delay={45} />
+            <QuickAction to="/teacher/financial" iconSrc={balanceIconAsset.url} label="My Balance" hint="Earnings & payouts" delay={90} />
+            {hasVipStudent && (
+              <QuickAction to="/teacher/vip" icon={GraduationCap} label="Course Builder VIP" hint="Design VIP tracks" delay={135} />
+            )}
+          </div>
         </div>
       </section>
+
 
       <section>
         <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
