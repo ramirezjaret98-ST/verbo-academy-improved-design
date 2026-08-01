@@ -8,7 +8,7 @@ import {
 import {
   ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
 } from "recharts";
-import { Card, SectionTitle, HeroStatCard, Pill } from "@/components/verbo/ui";
+import { Pill } from "@/components/verbo/ui";
 import { USERS, type User } from "@/lib/mock-data";
 import { hydrateStudents } from "@/lib/students-store";
 import {
