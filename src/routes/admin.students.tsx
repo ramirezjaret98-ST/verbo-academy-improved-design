@@ -1333,7 +1333,7 @@ function StudentDetailModal({
         </div>
 
         {/* Body */}
-        <div className="verbo-scroll-hidden flex-1 overflow-y-auto px-5 py-6 sm:px-7">
+        <div className="verbo-scroll-hidden min-h-0 flex-1 overflow-y-auto px-5 py-6 sm:px-7">
           {tab === "overview" && (
             <div className="space-y-7">
               {/* Contract essentials */}
