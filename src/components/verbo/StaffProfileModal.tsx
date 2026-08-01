@@ -475,12 +475,15 @@ export function StaffProfileModal({ open, onOpenChange }: Props) {
           )}
 
           {/* Headline */}
-          <div className="mt-5">
+          <div
+            className="verbo-profile-section mt-5 rounded-2xl border border-border/60 bg-card p-4 shadow-soft"
+            style={{ "--verbo-profile-i": 6 } as React.CSSProperties}
+          >
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <span className="text-xs font-semibold uppercase tracking-[0.14em] text-navy-700">
                 About me
               </span>
-              <span className="text-[11px] text-muted-foreground">
+              <span className="text-[11px] font-medium text-muted-foreground">
                 {headline.length}/{MAX_HEADLINE_CHARS}
               </span>
             </div>
@@ -495,55 +498,61 @@ export function StaffProfileModal({ open, onOpenChange }: Props) {
                   ? "Write a short phrase about yourself…"
                   : "Write a short phrase your students will see…"
               }
-              className="mt-2 w-full resize-none rounded-2xl bg-secondary/60 px-4 py-2.5 text-sm leading-relaxed text-foreground outline-none transition-shadow focus:ring-2 focus:ring-ring"
+              className="verbo-profile-input mt-3 w-full resize-none rounded-xl border border-input bg-background px-4 py-2.5 text-sm leading-relaxed text-foreground outline-none focus:ring-2 focus:ring-ring"
             />
             {savedTick && (
-              <div className="mt-1 flex items-center gap-1.5 text-xs font-medium text-emerald-600">
+              <div className="mt-2 flex items-center gap-1.5 text-xs font-medium text-emerald-600">
                 <Check className="h-3.5 w-3.5" /> Saved
               </div>
             )}
           </div>
 
           {/* Password */}
-          <div className="mt-5 space-y-3">
+          <div
+            className="verbo-profile-section mt-5 rounded-2xl border border-border/60 bg-card p-4 shadow-soft"
+            style={{ "--verbo-profile-i": 7 } as React.CSSProperties}
+          >
+            <div className="text-xs font-semibold uppercase tracking-[0.14em] text-navy-700">
+              Security
+            </div>
             {!pwOpen ? (
-              <div className="flex flex-col gap-2 sm:flex-row">
+              <div className="mt-3 flex flex-col gap-2 sm:flex-row">
                 <button
                   type="button"
                   onClick={() => setPwOpen(true)}
-                  className="inline-flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-full bg-[#01304a] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#0a4a6e]"
+                  className="verbo-profile-press inline-flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-full bg-navy-700 px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-navy-800"
                 >
-                  <KeyRound className="h-4 w-4" /> Change password
+                  <KeyRound className="h-4 w-4" strokeWidth={1.5} /> Change password
                 </button>
                 <button
                   type="button"
-                  className="flex-1 cursor-pointer rounded-full bg-secondary px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-secondary/70"
+                  className="verbo-profile-press flex-1 cursor-pointer rounded-full border border-border bg-secondary px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-secondary/70"
                 >
                   Forgot password
                 </button>
               </div>
             ) : (
-              <form className="space-y-3" onSubmit={submitPassword}>
+              <form className="mt-3 space-y-3" onSubmit={submitPassword}>
                 <input
                   type="password"
                   placeholder="Current password"
                   value={current}
                   onChange={(e) => setCurrent(e.target.value)}
-                  className="w-full rounded-2xl bg-secondary/60 px-4 py-2.5 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring"
+                  className="verbo-profile-input w-full rounded-xl border border-input bg-background px-4 py-2.5 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring"
                 />
                 <input
                   type="password"
                   placeholder="New password"
                   value={next}
                   onChange={(e) => setNext(e.target.value)}
-                  className="w-full rounded-2xl bg-secondary/60 px-4 py-2.5 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring"
+                  className="verbo-profile-input w-full rounded-xl border border-input bg-background px-4 py-2.5 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring"
                 />
                 <input
                   type="password"
                   placeholder="Confirm new password"
                   value={confirm}
                   onChange={(e) => setConfirm(e.target.value)}
-                  className="w-full rounded-2xl bg-secondary/60 px-4 py-2.5 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring"
+                  className="verbo-profile-input w-full rounded-xl border border-input bg-background px-4 py-2.5 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring"
                 />
                 <p className="text-[11px] text-muted-foreground">
                   Use at least 4 characters, one uppercase letter and one number.
@@ -557,14 +566,14 @@ export function StaffProfileModal({ open, onOpenChange }: Props) {
                 <div className="flex gap-2">
                   <button
                     type="submit"
-                    className="flex-1 cursor-pointer rounded-full bg-[#f38934] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#e07a25]"
+                    className="verbo-profile-press flex-1 cursor-pointer rounded-full bg-orange-500 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-orange-600"
                   >
                     Update password
                   </button>
                   <button
                     type="button"
                     onClick={() => { setPwOpen(false); setPwError(null); }}
-                    className="cursor-pointer rounded-full bg-secondary px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-secondary/70"
+                    className="verbo-profile-press cursor-pointer rounded-full border border-border bg-secondary px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-secondary/70"
                   >
                     Cancel
                   </button>
