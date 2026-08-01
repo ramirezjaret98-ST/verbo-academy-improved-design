@@ -202,15 +202,15 @@ export function StaffProfileModal({ open, onOpenChange }: Props) {
   return (
     <>
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl gap-0 overflow-hidden rounded-[40px] border border-border/40 p-0 shadow-floating">
+      <DialogContent className="max-w-2xl gap-0 overflow-hidden rounded-[52px] border border-border/40 p-0 shadow-floating">
         <DialogTitle className="sr-only">My profile</DialogTitle>
 
-        <div className="max-h-[66vh] overflow-y-auto">
+        <div className="verbo-scroll-hidden max-h-[66vh] overflow-y-auto rounded-[inherit]">
         {/* Hero banner + avatar — scrolls with the content */}
         <div className="relative">
           {/* Hero banner — taller, calmer navy gradient with a single soft orange accent */}
           <div
-            className="relative h-36 w-full"
+            className="relative h-40 w-full"
             style={{
               background:
                 "radial-gradient(circle at 85% 20%, color-mix(in oklab, var(--orange-500) 55%, transparent), transparent 46%), linear-gradient(135deg, var(--navy-700) 0%, var(--navy-600) 55%, var(--navy-500) 100%)",
@@ -218,9 +218,10 @@ export function StaffProfileModal({ open, onOpenChange }: Props) {
           />
 
           {/* Avatar overlaps the banner bottom edge */}
-          <div className="absolute -bottom-10 left-1/2 -translate-x-1/2">
+          <div className="absolute -bottom-14 left-1/2 -translate-x-1/2">
             <div className="relative">
-              <div className="h-20 w-20 overflow-hidden rounded-full border-4 border-background shadow-floating">
+              <div className="h-28 w-28 overflow-hidden rounded-full border-4 border-background shadow-floating">
+
                 {avatar ? (
                   <img src={avatar} alt={user.name} className="h-full w-full object-cover" />
                 ) : (
