@@ -343,37 +343,58 @@ function Page() {
 type StatPillTone = "violet" | "red" | "amber" | "green" | "dark";
 
 const STAT_PILL_TONES: Record<StatPillTone, {
-  wrap: string; iconWrap: string; label: string; value: string; track: string; bar: string;
+  icon: string;
+  label: string;
+  value: string;
+  track: string;
+  bar: string;
+  accent: string;
+  tint: string;
 }> = {
   violet: {
-    wrap: "border-[#cb6ce6] bg-[#cb6ce6]",
-    iconWrap: "bg-white/15 text-white",
-    label: "text-white/60", value: "text-white",
-    track: "bg-white/20", bar: "bg-white",
+    icon: "text-[#9b4de6]",
+    label: "text-muted-foreground",
+    value: "text-foreground",
+    track: "bg-secondary",
+    bar: "bg-[#9b4de6]",
+    accent: "#9b4de6",
+    tint: "rgba(155, 77, 230, 0.06)",
   },
   red: {
-    wrap: "border-[#dc2626] bg-[#dc2626]",
-    iconWrap: "bg-white/15 text-white",
-    label: "text-white/60", value: "text-white",
-    track: "bg-white/20", bar: "bg-white",
+    icon: "text-[#e11d2d]",
+    label: "text-muted-foreground",
+    value: "text-foreground",
+    track: "bg-secondary",
+    bar: "bg-[#e11d2d]",
+    accent: "#e11d2d",
+    tint: "rgba(225, 29, 45, 0.06)",
   },
   amber: {
-    wrap: "border-[#d97706] bg-[#d97706]",
-    iconWrap: "bg-white/15 text-white",
-    label: "text-white/60", value: "text-white",
-    track: "bg-white/20", bar: "bg-white",
+    icon: "text-[#d97706]",
+    label: "text-muted-foreground",
+    value: "text-foreground",
+    track: "bg-secondary",
+    bar: "bg-[#d97706]",
+    accent: "#d97706",
+    tint: "rgba(217, 119, 6, 0.06)",
   },
   green: {
-    wrap: "border-[#3ea008] bg-[#3ea008]",
-    iconWrap: "bg-white/15 text-white",
-    label: "text-white/60", value: "text-white",
-    track: "bg-white/20", bar: "bg-white",
+    icon: "text-[#16a34a]",
+    label: "text-muted-foreground",
+    value: "text-foreground",
+    track: "bg-secondary",
+    bar: "bg-[#16a34a]",
+    accent: "#16a34a",
+    tint: "rgba(22, 163, 74, 0.06)",
   },
   dark: {
-    wrap: "border-[#01304a] bg-[#01304a]",
-    iconWrap: "bg-white/15 text-white",
-    label: "text-white/60", value: "text-white",
-    track: "bg-white/20", bar: "bg-white",
+    icon: "text-[#01304a]",
+    label: "text-muted-foreground",
+    value: "text-foreground",
+    track: "bg-secondary",
+    bar: "bg-[#01304a]",
+    accent: "#01304a",
+    tint: "rgba(1, 48, 74, 0.06)",
   },
 };
 
@@ -386,17 +407,36 @@ function StatPill({ icon, label, value, tone = "violet", progressPct }: {
 }) {
   const t = STAT_PILL_TONES[tone];
   return (
-    <div className={`rounded-2xl border px-4 py-3 ${t.wrap}`}>
-      <div className="flex items-start gap-3">
-        <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${t.iconWrap}`}>
-          {icon}
+    <div
+      className="group relative overflow-hidden rounded-2xl border border-border bg-card p-4 shadow-soft transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-elevated"
+      style={{ background: `linear-gradient(135deg, ${t.tint} 0%, var(--card) 60%)` }}
+    >
+      {/* Left accent line — subtle color identity */}
+      <div
+        className="pointer-events-none absolute left-0 top-0 h-full w-[3px]"
+        style={{ background: t.accent }}
+        aria-hidden="true"
+      />
+
+      <div className="flex items-start gap-3 pl-1">
+        <div className={`shrink-0 pt-0.5 ${t.icon}`}>
+          {React.cloneElement(icon as React.ReactElement, { className: "h-5 w-5", strokeWidth: 1.5 })}
         </div>
         <div className="min-w-0 flex-1">
-          <div className={`text-[10px] font-semibold uppercase tracking-wider ${t.label}`}>{label}</div>
-          <div className={`mt-0.5 text-xs font-semibold ${t.value}`}>{value}</div>
+          <div className={`text-[10px] font-semibold uppercase tracking-[0.14em] ${t.label}`}>
+            {label}
+          </div>
+          <div className={`mt-0.5 text-sm font-semibold leading-snug tracking-[-0.01em] ${t.value}`}>
+            {value}
+          </div>
           {progressPct !== undefined && (
-            <div className={`mt-2 h-1.5 w-full rounded-full ${t.track}`}>
-              <div className={`h-1.5 rounded-full transition-all ${t.bar}`} style={{ width: `${progressPct}%` }} />
+            <div className="mt-3">
+              <div className={`h-1 w-full overflow-hidden rounded-full ${t.track}`}>
+                <div
+                  className={`h-1 rounded-full transition-[width] duration-700 ease-out ${t.bar}`}
+                  style={{ width: `${progressPct}%` }}
+                />
+              </div>
             </div>
           )}
         </div>
