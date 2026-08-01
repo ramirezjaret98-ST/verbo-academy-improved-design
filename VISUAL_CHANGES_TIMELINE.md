@@ -998,3 +998,9 @@ Sin cambios de lógica ni rutas. `DATA_MODEL.md` sigue sincronizado.
 - El bloque "Overall Skills" pasa a 2xl rounding con superficie tenue, iconos y cifras que se tiñen de rojo cuando la macro está por debajo de 70%.
 - Responsiveness: grid 1 / 2 / 3 columnas con breakpoints `md` y `2xl`, header de la tarjeta en grid `auto_minmax(0,1fr)_auto` con `min-w-0` y `truncate` para que nombres y empresas largas no rompan el layout; badges con `max-w-full truncate`.
 - Visual only — no logic, data or route changes; `DATA_MODEL.md` remains synchronized.
+
+## Entry 075 — /teacher/financial: ajuste de subtítulos y opacidades en KPIs
+- Se eliminan los textos de contexto (`0/3 (last 6 months)`, `No penalty this month`) del interior de las tarjetas KPI; ahora viven debajo de cada card con padding pequeño (`pt-2`) y tipografía light en `text-muted-foreground`, sin romper la limpieza minimalista.
+- Se aumenta la opacidad del relleno de color de fondo de cada tarjeta del 8% al 18% para que la señal cromática se perciba mejor sin lastimar.
+- Se aumenta la opacidad del número gigante "fantasma" del 15% al 25% para que contraste sobre el nuevo relleno más intenso.
+- Visual only — no logic, data or route changes; `DATA_MODEL.md` remains synchronized.
