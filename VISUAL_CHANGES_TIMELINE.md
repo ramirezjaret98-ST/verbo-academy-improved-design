@@ -1043,3 +1043,7 @@ Sin cambios de lógica ni rutas. `DATA_MODEL.md` sigue sincronizado.
 - CTA destacado: botón pill con gradiente del estado, doble sombra (glow proyectado + hairline ring), copy explícito "Plan session", flecha con desplazamiento en hover y lift de 1px con press a `scale(0.98)`. El estado no accionable pasa a un pill punteado "No action".
 - La tarjeta "next" gana borde teñido y sombra proyectada; el aviso "Plan now" se mueve junto al CTA como micro-label.
 - Visual only — no logic, data or route changes; `DATA_MODEL.md` remains synchronized.
+
+## Entry 082 — Footer: espacio blanco generoso antes del footer
+- Se aumenta el margen superior del footer compartido (`src/components/verbo/Footer.tsx`) de `mt-20 md:mt-28` a `mt-36 md:mt-52` para separar la última sección del footer y evitar que las páginas con contenido mínimo se fusionen con el fade navy.
+- Visual only — no logic, data or route changes; `DATA_MODEL.md` remains synchronized.
