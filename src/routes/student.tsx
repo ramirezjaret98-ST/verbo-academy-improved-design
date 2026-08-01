@@ -62,7 +62,12 @@ function StudentLayout() {
           </div>
         </main>
 
-        <Footer />
+        <Footer
+          nav={[{
+            label: "Student",
+            items: items.flatMap((i) => ("to" in i ? [{ label: i.label, to: i.to }] : [])),
+          }]}
+        />
       </div>
 
     </RoleGuard>

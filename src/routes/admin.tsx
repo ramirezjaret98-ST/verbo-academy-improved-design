@@ -91,7 +91,12 @@ function Layout() {
             </PageTransition>
           </div>
         </main>
-        <Footer />
+        <Footer
+          nav={visibleGroups.map((g) => ({
+            label: g.label,
+            items: g.items.map((it) => ({ label: it.label, to: it.to })),
+          }))}
+        />
       </div>
 
     </RoleGuard>

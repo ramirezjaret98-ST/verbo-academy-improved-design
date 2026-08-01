@@ -49,7 +49,17 @@ function Layout() {
           </div>
         </main>
 
-        <Footer />
+        <Footer
+          nav={[
+            {
+              label: "Teacher",
+              items: items
+                .filter((i): i is NavItem => "to" in i)
+                .map((i) => ({ label: i.label, to: i.to })),
+            },
+            { label: "Academic", items: academicItems.map((i) => ({ label: i.label, to: i.to })) },
+          ]}
+        />
       </div>
 
     </RoleGuard>
