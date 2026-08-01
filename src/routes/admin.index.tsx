@@ -319,152 +319,178 @@ function Overview() {
   }
 
 
+  const quickActions = [
+    { label: "Register Student", icon: UserPlus, color: TEAL, onClick: () => navigate({ to: "/admin/students", search: { new: true } }) },
+    { label: "Register Teacher", icon: GraduationCap, color: ORCHID, onClick: () => navigate({ to: "/admin/teachers" }) },
+    { label: "Schedule Sessions", icon: CalendarPlus, color: NAVY_DEEP, onClick: () => navigate({ to: "/admin/sessions" }) },
+    { label: "Create Club Event", icon: Sparkles, color: GOLD, onClick: () => navigate({ to: "/admin/clubs", search: { new: true } }) },
+    { label: "View Metrics", icon: BarChart3, color: "#5fca16", onClick: () => setMetricsOpen(true) },
+  ] as const;
+
+  const summaryCards = [
+    { label: "Students", value: students.length, icon: Users2, color: TEAL },
+    { label: "Teachers", value: teachers.length, icon: GraduationCap, color: ORCHID },
+    { label: "Sessions scheduled", value: scheduled, icon: CalendarClock, color: NAVY_DEEP },
+    {
+      label: "Active levels",
+      value: new Set(students.flatMap((s) => s.contracted_levels ?? [])).size,
+      icon: Layers,
+      color: GOLD,
+    },
+    {
+      label: "Avg composite",
+      value: avgComposite,
+      suffix: "%",
+      icon: TrendingUp,
+      color: avgComposite < 60 ? RED : avgComposite < ALERT_COMPOSITE ? GOLD : "#94a3b8",
+      alert: avgComposite < ALERT_COMPOSITE,
+    },
+  ] as const;
+
   return (
-    <div className="space-y-8">
-      <div>
-        <h1 className="text-3xl font-semibold tracking-tight text-foreground">Admin overview</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Operational snapshot across the platform.</p>
-      </div>
+    <div className="space-y-10">
+      {/* Header + quick actions share one calm band */}
+      <header className="verbo-admin-section" style={{ "--verbo-admin-i": 0 } as React.CSSProperties}>
+        <div className="flex flex-col gap-5 border-b border-border/70 pb-6 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">Overview</p>
+            <h1 className="mt-1.5 font-display text-3xl font-semibold tracking-[-0.02em] text-foreground">Admin</h1>
+            <p className="mt-1.5 text-sm font-light text-muted-foreground">Operational snapshot across the platform.</p>
+          </div>
 
-      {/* 1 — Quick Actions */}
-      <div className="flex flex-wrap gap-3">
-        <PrimaryButton accentColor="#3ebbad" onClick={() => navigate({ to: "/admin/students", search: { new: true } })}>
-          <UserPlus className="h-4 w-4" /> Register Student
-        </PrimaryButton>
-        <PrimaryButton accentColor="#a34ac0" onClick={() => navigate({ to: "/admin/teachers" })}>
-          <GraduationCap className="h-4 w-4" /> Register Teacher
-        </PrimaryButton>
-        <PrimaryButton accentColor="#01304a" onClick={() => navigate({ to: "/admin/sessions" })}>
-          <CalendarPlus className="h-4 w-4" /> Schedule Sessions
-        </PrimaryButton>
-        <PrimaryButton accentColor="#d97706" onClick={() => navigate({ to: "/admin/clubs", search: { new: true } })}>
-          <Sparkles className="h-4 w-4" /> Create Club Event
-        </PrimaryButton>
-        <PrimaryButton accentColor="#5fca16" onClick={() => setMetricsOpen(true)}>
-          <BarChart3 className="h-4 w-4" /> View Metrics
-        </PrimaryButton>
-      </div>
-
-      {/* 2 — Urgency cards */}
-      <div className="space-y-4">
-        <div
-          role="button"
-          tabIndex={0}
-          onClick={() => setPanel("urgent")}
-          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setPanel("urgent"); } }}
-          className="block cursor-pointer text-left"
-        >
-          <HeroStatCard
-            className={`card-gradient-crimson !min-h-[92px] !py-4${urgentItems.length > 0 ? " verbo-focus-pulse" : ""}`}
-            style={urgentItems.length > 0 ? ({ ["--verbo-focus-pulse-color" as any]: CRIMSON } as React.CSSProperties) : undefined}
-          >
-            <div className="relative flex w-full items-center justify-between gap-3">
-              <div className="min-w-0">
-                <div className="text-xs font-semibold uppercase tracking-wider" style={{ color: "rgba(255,255,255,0.75)" }}>
-                  Action Required
-                </div>
-                <div className="mt-1 text-xl font-semibold leading-tight text-white">Needs Immediate Action</div>
-                <div className="mt-1 text-xs font-medium" style={{ color: "rgba(255,255,255,0.8)" }}>
-                  {urgentItems.length === 0
-                    ? "All caught up"
-                    : `${urgentItems.length} item${urgentItems.length === 1 ? "" : "s"} need immediate action`}
-                </div>
-              </div>
-              <AlertTriangle className="h-8 w-8 shrink-0 text-white/85" aria-hidden />
-            </div>
-          </HeroStatCard>
+          <div className="flex flex-wrap gap-2">
+            {quickActions.map((a) => {
+              const Icon = a.icon;
+              return (
+                <button
+                  key={a.label}
+                  type="button"
+                  onClick={a.onClick}
+                  className="verbo-admin-press group inline-flex items-center gap-2 rounded-full border border-border bg-card px-3.5 py-2 text-sm font-medium text-foreground shadow-[0_1px_2px_color-mix(in_oklab,var(--navy-700)_7%,transparent)]"
+                >
+                  <Icon className="h-4 w-4 shrink-0" strokeWidth={1.6} style={{ color: a.color }} aria-hidden />
+                  <span className="whitespace-nowrap">{a.label}</span>
+                </button>
+              );
+            })}
+          </div>
         </div>
+      </header>
 
-        <div
-          role="button"
-          tabIndex={0}
-          onClick={() => setPanel("watch")}
-          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setPanel("watch"); } }}
-          className="block cursor-pointer text-left"
-        >
-          <HeroStatCard
-            className="!min-h-[92px] !py-4 border border-border bg-card"
-            style={{ boxShadow: "0 0 24px -8px #d9770666" }}
-          >
-            <div className="relative flex w-full items-center justify-between gap-3">
-              <div className="min-w-0">
-                <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Secondary</div>
-                <div className="mt-1 text-xl font-semibold leading-tight text-foreground">Worth a Look</div>
-                <div className="mt-1 text-xs font-medium text-muted-foreground">
-                  {watchItems.length === 0
-                    ? "Nothing pending review"
-                    : `${watchItems.length} item${watchItems.length === 1 ? "" : "s"} to review when you can`}
-                </div>
-              </div>
-              <Eye className="h-8 w-8 shrink-0" style={{ color: "#d97706" }} aria-hidden />
-            </div>
-          </HeroStatCard>
-        </div>
+      {/* Priority — two equal, quiet cards; urgency reads through the accent rule */}
+      <div className="verbo-admin-section grid gap-4 md:grid-cols-2" style={{ "--verbo-admin-i": 1 } as React.CSSProperties}>
+        {([
+          {
+            key: "urgent" as const,
+            eyebrow: "Action required",
+            title: "Needs immediate action",
+            count: urgentItems.length,
+            empty: "All caught up",
+            body: `${urgentItems.length} item${urgentItems.length === 1 ? "" : "s"} need immediate action`,
+            icon: AlertTriangle,
+            accent: CRIMSON,
+          },
+          {
+            key: "watch" as const,
+            eyebrow: "Secondary",
+            title: "Worth a look",
+            count: watchItems.length,
+            empty: "Nothing pending review",
+            body: `${watchItems.length} item${watchItems.length === 1 ? "" : "s"} to review when you can`,
+            icon: Eye,
+            accent: GOLD,
+          },
+        ]).map((c) => {
+          const Icon = c.icon;
+          const live = c.count > 0;
+          return (
+            <button
+              key={c.key}
+              type="button"
+              onClick={() => setPanel(c.key)}
+              className="verbo-admin-press verbo-admin-lift group relative flex items-center gap-5 overflow-hidden rounded-2xl border border-border bg-card px-5 py-5 text-left"
+            >
+              <span
+                className="absolute inset-y-0 left-0 w-[3px]"
+                style={{ background: live ? c.accent : "color-mix(in oklab, var(--navy-700) 14%, transparent)" }}
+                aria-hidden
+              />
+              <span
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full"
+                style={{
+                  background: live
+                    ? `color-mix(in oklab, ${c.accent} 10%, transparent)`
+                    : "color-mix(in oklab, var(--navy-700) 5%, transparent)",
+                  color: live ? c.accent : "#94a3b8",
+                }}
+                aria-hidden
+              >
+                <Icon className="h-5 w-5" strokeWidth={1.5} />
+              </span>
+
+              <span className="min-w-0 flex-1">
+                <span className="block text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                  {c.eyebrow}
+                </span>
+                <span className="mt-1 block truncate text-base font-semibold tracking-[-0.01em] text-foreground">
+                  {c.title}
+                </span>
+                <span className="mt-0.5 block truncate text-xs font-light text-muted-foreground">
+                  {c.count === 0 ? c.empty : c.body}
+                </span>
+              </span>
+
+              <span
+                className="shrink-0 text-3xl font-semibold tabular-nums tracking-[-0.02em]"
+                style={{ color: live ? c.accent : "#cbd5e1" }}
+              >
+                {c.count}
+              </span>
+              <ChevronRight
+                className="h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200 ease-out group-hover:translate-x-0.5"
+                aria-hidden
+              />
+            </button>
+          );
+        })}
       </div>
 
-      {/* 3 — Summary cards */}
-
+      {/* Summary — one flat, scannable strip */}
       {!hydrated ? (
         <SkeletonStatCards count={5} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5" />
       ) : (
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-
-        {([
-          { label: "Students", value: students.length, icon: Users2, color: "#3ebbad" },
-          { label: "Teachers", value: teachers.length, icon: GraduationCap, color: "#a34ac0" },
-          { label: "Sessions scheduled", value: scheduled, icon: CalendarClock, color: "#01304a" },
-          {
-            label: "Active levels",
-            value: new Set(students.flatMap((s) => s.contracted_levels ?? [])).size,
-            icon: Layers,
-            color: "#d97706",
-          },
-        ] as const).map((m) => {
-          const Icon = m.icon;
-          return (
-            <HeroStatCard
-              key={m.label}
-              className="!min-h-[132px] !items-start border border-border bg-card"
-              style={{ boxShadow: `0 0 24px -8px ${m.color}66` }}
-            >
-              <div className="absolute right-6 top-6 flex h-11 w-11 items-center justify-center rounded-xl">
-                <Icon className="h-7 w-7" style={{ color: m.color }} strokeWidth={1.75} />
-              </div>
-              <div className="relative w-full">
-                <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{m.label}</div>
-                <div className="mt-2 text-5xl font-bold leading-none text-foreground">
-                  <AnimatedNumber value={m.value} />
-                </div>
-              </div>
-            </HeroStatCard>
-          );
-        })}
-        <HeroStatCard
-          className={`!min-h-[132px] !items-start border border-border bg-card${
-            avgComposite < ALERT_COMPOSITE ? " verbo-focus-pulse" : ""
-          }`}
-          style={
-            avgComposite < ALERT_COMPOSITE
-              ? ({ ["--verbo-focus-pulse-color" as any]: avgComposite < 60 ? "#dc2626" : "#d97706" } as React.CSSProperties)
-              : undefined
-          }
+        <div
+          className="verbo-admin-section grid gap-3 sm:grid-cols-2 lg:grid-cols-5"
+          style={{ "--verbo-admin-i": 2 } as React.CSSProperties}
         >
-          <div className="absolute right-6 top-6 flex h-11 w-11 items-center justify-center rounded-xl">
-            <TrendingUp
-              className="h-7 w-7"
-              style={{ color: avgComposite < 60 ? "#dc2626" : avgComposite < ALERT_COMPOSITE ? "#d97706" : "#94a3b8" }}
-              strokeWidth={1.75}
-            />
-          </div>
-          <div className="relative w-full">
-            <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Avg composite score</div>
-            <div className="mt-2 text-5xl font-bold leading-none text-foreground">
-              <AnimatedNumber value={avgComposite} suffix="%" />
-            </div>
-          </div>
-        </HeroStatCard>
-      </div>
+          {summaryCards.map((m) => {
+            const Icon = m.icon;
+            return (
+              <div
+                key={m.label}
+                className="verbo-admin-lift relative overflow-hidden rounded-2xl border border-border bg-card px-5 py-5"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                    {m.label}
+                  </div>
+                  <Icon className="h-4 w-4 shrink-0" strokeWidth={1.5} style={{ color: m.color }} aria-hidden />
+                </div>
+                <div className="mt-4 text-4xl font-semibold tabular-nums leading-none tracking-[-0.02em] text-foreground">
+                  <AnimatedNumber value={m.value} suffix={"suffix" in m ? m.suffix : undefined} />
+                </div>
+                {"alert" in m && m.alert ? (
+                  <div className="mt-2 text-[11px] font-medium" style={{ color: m.color }}>
+                    Below target
+                  </div>
+                ) : null}
+              </div>
+            );
+          })}
+        </div>
       )}
+
+
 
 
 
