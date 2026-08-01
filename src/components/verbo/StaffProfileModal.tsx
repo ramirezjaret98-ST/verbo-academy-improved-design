@@ -369,41 +369,44 @@ export function StaffProfileModal({ open, onOpenChange }: Props) {
           {/* Student-only: equipped badges + leaderboard identity */}
           {isStudent && (
             <>
-              <div className="mt-5">
+              <div
+                className="verbo-profile-section mt-5 rounded-2xl border border-border/60 bg-card p-4 shadow-soft"
+                style={{ "--verbo-profile-i": 4 } as React.CSSProperties}
+              >
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  <span className="text-xs font-semibold uppercase tracking-[0.14em] text-navy-700">
                     Equipped badges
                   </span>
                   <button
                     type="button"
                     onClick={() => setGallery(true)}
-                    className="cursor-pointer text-xs font-medium text-[#01304a] underline-offset-4 hover:underline"
+                    className="verbo-profile-press cursor-pointer text-xs font-medium text-navy-700 underline-offset-4 hover:underline"
                   >
-                    View all achievements →
+                    View all →
                   </button>
                 </div>
-                <div className="mt-2 grid grid-cols-3 gap-2">
+                <div className="mt-3 grid grid-cols-3 gap-2">
                   {slots.map((b, i) =>
                     !b ? (
                       <button
                         key={`empty-${i}`}
                         type="button"
                         onClick={() => setPickerSlot(i)}
-                        className="flex cursor-pointer flex-col items-center justify-center gap-1 rounded-2xl border border-dashed border-border bg-secondary/60 px-2 py-3 text-xs text-muted-foreground transition-colors hover:text-foreground"
+                        className="verbo-profile-press flex cursor-pointer flex-col items-center justify-center gap-1 rounded-2xl border border-dashed border-border bg-secondary/40 px-2 py-3 text-xs text-muted-foreground transition-colors hover:border-orange-300 hover:text-foreground"
                       >
-                        <Plus className="h-4 w-4" />
+                        <Plus className="h-4 w-4" strokeWidth={1.5} />
                         <span className="font-medium">Add</span>
                       </button>
                     ) : (
                       <div
                         key={b.id}
-                        className="group relative flex flex-col items-center rounded-2xl bg-secondary/60 px-2 py-3"
+                        className="group relative flex flex-col items-center rounded-2xl bg-secondary/40 px-2 py-3 transition-colors hover:bg-secondary/60"
                       >
                         <button
                           type="button"
                           aria-label={`Unequip ${b.name}`}
                           onClick={() => unequip(b.id)}
-                          className="absolute right-1 top-1 flex h-5 w-5 cursor-pointer items-center justify-center rounded-full bg-background text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100"
+                          className="verbo-profile-press absolute right-1 top-1 flex h-5 w-5 cursor-pointer items-center justify-center rounded-full bg-background text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100"
                         >
                           <X className="h-3 w-3" />
                         </button>
@@ -417,16 +420,19 @@ export function StaffProfileModal({ open, onOpenChange }: Props) {
                 </div>
               </div>
 
-              <div className="mt-5">
-                <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <div
+                className="verbo-profile-section mt-5 rounded-2xl border border-border/60 bg-card p-4 shadow-soft"
+                style={{ "--verbo-profile-i": 5 } as React.CSSProperties}
+              >
+                <div className="text-xs font-semibold uppercase tracking-[0.14em] text-navy-700">
                   Show on leaderboard as
                 </div>
-                <div className="mt-2 space-y-2">
-                  <label className="flex cursor-pointer items-start gap-2 rounded-2xl bg-secondary/60 px-3 py-2.5 text-sm">
+                <div className="mt-3 space-y-2">
+                  <label className="verbo-profile-press flex cursor-pointer items-start gap-3 rounded-xl border border-border bg-secondary/40 px-3 py-2.5 text-sm transition-colors hover:bg-secondary/60">
                     <input
                       type="radio"
                       name="lb-mode"
-                      className="mt-0.5"
+                      className="mt-0.5 accent-navy-700"
                       checked={lbMode === "real"}
                       onChange={() => {
                         setLbMode("real");
@@ -435,11 +441,11 @@ export function StaffProfileModal({ open, onOpenChange }: Props) {
                     />
                     <span className="font-medium text-foreground">My name and photo</span>
                   </label>
-                  <label className="flex cursor-pointer items-start gap-2 rounded-2xl bg-secondary/60 px-3 py-2.5 text-sm">
+                  <label className="verbo-profile-press flex cursor-pointer items-start gap-3 rounded-xl border border-border bg-secondary/40 px-3 py-2.5 text-sm transition-colors hover:bg-secondary/60">
                     <input
                       type="radio"
                       name="lb-mode"
-                      className="mt-0.5"
+                      className="mt-0.5 accent-navy-700"
                       checked={lbMode === "nickname"}
                       onChange={() => {
                         setLbMode("nickname");
@@ -458,7 +464,7 @@ export function StaffProfileModal({ open, onOpenChange }: Props) {
                             setLbNickname(v);
                             setLeaderboardIdentity(user.id, { mode: "nickname", nickname: v });
                           }}
-                          className="mt-2 w-full rounded-xl border border-input bg-background px-2.5 py-1.5 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring"
+                          className="verbo-profile-input mt-2 w-full rounded-xl border border-input bg-background px-2.5 py-1.5 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring"
                         />
                       )}
                     </div>
