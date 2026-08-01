@@ -2070,3 +2070,14 @@
   .verbo-propose-cta, .verbo-propose-sheen, .verbo-club-in { animation: none; }
   .verbo-club-poster:hover, .verbo-club-row:hover { transform: none; }
 }
+
+/* Teacher Financial · minimal KPI cards (Entry 073) */
+.verbo-kpi-fill { transition: width 900ms cubic-bezier(0.23, 1, 0.32, 1), background-color 300ms ease; }
+.verbo-kpi-card { transition: transform 240ms cubic-bezier(0.23, 1, 0.32, 1), box-shadow 240ms ease; }
+@media (hover: hover) and (pointer: fine) {
+  .verbo-kpi-card:hover { transform: translateY(-2px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .verbo-kpi-fill { transition: none; }
+  .verbo-kpi-card:hover { transform: none; }
+}

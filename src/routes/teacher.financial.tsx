@@ -69,8 +69,10 @@ function signalTone(v: number): "good" | "mid" | "bad" {
 }
 function signalColor(v: number) {
   const t = signalTone(v);
-  return t === "good" ? "#22c55e" : t === "mid" ? "#f59e0b" : "#ef4444";
+  // Lime · soft amber · intense red — quieter on white surfaces than the old triad.
+  return t === "good" ? "#84cc16" : t === "mid" ? "#fbbf24" : "#dc2626";
 }
+
 
 const KPI_ICONS: Record<string, typeof Wifi> = {
   connection: Wifi,
@@ -525,29 +527,39 @@ function MyBalancePage() {
           )}
         </div>
 
-        <div className="grid gap-4 lg:grid-cols-[240px_minmax(0,1fr)]">
+        <div className="grid gap-x-4 gap-y-6 lg:grid-cols-[260px_minmax(0,1fr)]">
           {/* Composite gauge */}
-          <div
-            className="flex items-center gap-5 rounded-3xl border bg-card p-5 lg:flex-col lg:items-center lg:justify-center lg:gap-3 lg:text-center"
-            style={{ borderColor: `${signalColor(kpis?.composite ?? 0)}55` }}
-          >
-            <CompositeGauge value={kpis?.composite ?? 0} />
-            <div className="min-w-0">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Composite Score</div>
-              <div className="mt-1 text-xs font-medium text-muted-foreground">Weighted average of your 6 KPIs</div>
-              {kpis?.onboarding && (
-                <span className="mt-2 inline-flex rounded-full bg-blue-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-blue-700">
-                  Onboarding
-                </span>
-              )}
+          <div>
+            <div className="px-1.5 pb-2 text-[11px] font-light uppercase tracking-[0.18em] text-muted-foreground">
+              Composite Score
+            </div>
+            <div
+              className="verbo-kpi-card relative flex items-center gap-5 overflow-hidden rounded-[26px] border border-border/70 bg-card p-5 lg:flex-col lg:items-center lg:justify-center lg:gap-4 lg:py-7 lg:text-center"
+              style={{ boxShadow: `0 20px 50px -32px ${signalColor(kpis?.composite ?? 0)}` }}
+            >
+              <span
+                aria-hidden
+                className="verbo-kpi-fill pointer-events-none absolute inset-y-0 left-0"
+                style={{ width: `${Math.max(0, Math.min(100, kpis?.composite ?? 0))}%`, background: signalColor(kpis?.composite ?? 0), opacity: 0.08 }}
+              />
+              <CompositeGauge value={kpis?.composite ?? 0} />
+              <div className="relative min-w-0">
+                <div className="text-xs font-light text-muted-foreground">Weighted average of your 6 KPIs</div>
+                {kpis?.onboarding && (
+                  <span className="mt-2 inline-flex text-[10px] font-medium uppercase tracking-[0.16em] text-blue-700">
+                    Onboarding
+                  </span>
+                )}
+              </div>
             </div>
           </div>
 
-          {/* KPI mini-cards */}
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 2xl:grid-cols-3">
+          {/* KPI cards */}
+          <div className="grid grid-cols-1 gap-x-4 gap-y-6 sm:grid-cols-2 xl:grid-cols-3">
             {signals.map((sig, i) => <KpiMiniCard key={sig.key} signal={sig} index={i} />)}
           </div>
         </div>
+
 
         <p
           className="flex items-start gap-2.5 rounded-2xl border p-3.5 text-xs leading-relaxed text-foreground"
@@ -617,17 +629,20 @@ function CompositeGauge({ value }: { value: number }) {
   return (
     <div className="relative grid h-24 w-24 shrink-0 place-items-center">
       <svg viewBox="0 0 80 80" className="h-24 w-24 -rotate-90">
-        <circle cx="40" cy="40" r={r} fill="none" stroke="currentColor" strokeWidth="7" className="text-foreground/[0.07]" />
+        <circle cx="40" cy="40" r={r} fill="none" stroke="currentColor" strokeWidth="4" className="text-foreground/[0.06]" />
         <circle
-          cx="40" cy="40" r={r} fill="none" stroke={color} strokeWidth="7" strokeLinecap="round"
+          cx="40" cy="40" r={r} fill="none" stroke={color} strokeWidth="4" strokeLinecap="round"
           strokeDasharray={circ}
           strokeDashoffset={circ - (Math.max(0, Math.min(100, value)) / 100) * circ}
           style={{ transition: "stroke-dashoffset 900ms cubic-bezier(0.23,1,0.32,1), stroke 300ms ease" }}
         />
       </svg>
-      <span className="absolute text-2xl font-bold tabular-nums" style={{ color }}>{value}%</span>
+      <span className="absolute text-[28px] font-bold leading-none tracking-tight text-foreground tabular-nums">
+        {value}<span className="text-sm font-light text-muted-foreground">%</span>
+      </span>
     </div>
   );
+
 }
 
 // --- Financial issue modal --------------------------------------------------
@@ -704,37 +719,46 @@ function KpiBar({ label, value, sub, index = 0 }: { label: string; value: number
 function KpiMiniCard({ signal, index = 0 }: { signal: KpiSignal; index?: number }) {
   const color = signalColor(signal.value);
   const Icon = KPI_ICONS[signal.key] ?? ClipboardCheck;
+  const pct = Math.max(0, Math.min(100, signal.value));
   return (
-    <div
-      className="verbo-td-in verbo-kpi-tile group relative flex flex-col overflow-hidden rounded-3xl border bg-card p-4"
-      style={{ borderColor: `${color}3D`, animationDelay: `${300 + index * 45}ms` }}
-    >
-      <span aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[3px]" style={{ background: color }} />
-      <div className="flex items-start gap-2.5">
-        <span
-          className="grid h-9 w-9 shrink-0 place-items-center rounded-xl transition-transform duration-200 ease-out group-hover:scale-105"
-          style={{ backgroundColor: `${color}1A`, color }}
-        >
-          <Icon className="h-[18px] w-[18px]" />
+    <div className="verbo-td-in" style={{ animationDelay: `${300 + index * 45}ms` }}>
+      {/* Label sits above the card — light, no pill */}
+      <div className="flex items-center gap-2 px-1.5 pb-2">
+        <Icon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+        <span className="min-w-0 truncate text-[11px] font-light uppercase tracking-[0.16em] text-muted-foreground">
+          {signal.label}
         </span>
-        <span className="min-w-0 flex-1 text-xs font-semibold leading-tight text-foreground">{signal.label}</span>
-        <span className="shrink-0 text-2xl font-bold leading-none tabular-nums" style={{ color }}>{signal.value}%</span>
       </div>
-      <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-foreground/[0.06]">
-        <div
-          className="h-full rounded-full"
-          style={{
-            width: `${signal.value}%`,
-            backgroundColor: color,
-            boxShadow: `0 0 10px ${color}55`,
-            transition: "width 900ms cubic-bezier(0.23,1,0.32,1)",
-          }}
+
+      <div
+        className="verbo-kpi-card group relative flex min-h-[92px] items-center overflow-hidden rounded-[26px] border border-border/70 bg-card px-5 py-4"
+        style={{ boxShadow: `0 20px 50px -32px ${color}` }}
+      >
+        {/* The whole card is the progress bar */}
+        <span
+          aria-hidden
+          className="verbo-kpi-fill pointer-events-none absolute inset-y-0 left-0"
+          style={{ width: `${pct}%`, background: color, opacity: 0.08 }}
         />
+        {/* Giant ghost number over the filled area */}
+        <span
+          aria-hidden
+          className="pointer-events-none absolute -left-1 top-1/2 -translate-y-1/2 select-none text-[64px] font-bold leading-none tracking-tighter tabular-nums"
+          style={{ color, opacity: 0.15 }}
+        >
+          {signal.value}
+        </span>
+        <div className="relative ml-auto text-right">
+          <div className="text-[26px] font-semibold leading-none tracking-tight text-foreground tabular-nums">
+            {signal.value}<span className="text-sm font-light text-muted-foreground">%</span>
+          </div>
+          {signal.sub && <div className="mt-1.5 text-[10px] font-light text-muted-foreground">{signal.sub}</div>}
+        </div>
       </div>
-      {signal.sub && <div className="mt-2 text-[10px] font-medium text-muted-foreground">{signal.sub}</div>}
     </div>
   );
 }
+
 
 function StatusPill({ status }: { status: string }) {
   const tone: "success" | "warning" | "danger" | "default" =
