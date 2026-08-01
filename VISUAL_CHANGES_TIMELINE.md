@@ -895,3 +895,10 @@ Sin cambios de lógica ni rutas. `DATA_MODEL.md` sigue sincronizado.
 - Resultado: un rating de 3.2/5 (64%) pinta el mismo ámbar/naranja que un composite del 64%, en lugar del café oscuro anterior.
 - El pill mantiene fondo sólido + texto blanco; solo cambia la tonalidad para alinearse visualmente con el score del card.
 - Visual only — no logic, data or route changes; `DATA_MODEL.md` remains synchronized.
+
+## Entry 062 — Login eye button: fix slow-click + micro-animation refinement
+- `src/routes/login.tsx`: botón del ojo ahora usa `onMouseDown={(e) => e.preventDefault()}` para evitar que el input pierda foco durante el clic; hit-area ampliada a `p-1.5`; `z-10` para asegurar que nada lo bloquee; `aria-pressed` añadido para accesibilidad.
+- `src/styles.css`: eliminado el `:active` que escalaba todo el botón (`transform: translateY(-50%) scale(0.88)`), porque el escalado combinado con `translateY(-50%)` desplazaba el botón hacia arriba ~13px y hacía que el cursor quedara fuera del área clickable en clics lentos.
+- Ahora la animación de press aplica solo al icono interno `.verbo-eye` (`scale(0.88)` con `transform-origin: center`), manteniendo el feedback visual sin mover el botón.
+- Resultado: el ojo responde correctamente tanto en clics rápidos como en clics sostenidos, y alterna entre mostrar/ocultar la contraseña de forma confiable.
+- Visual only — no logic, data or route changes; `DATA_MODEL.md` remains synchronized.
