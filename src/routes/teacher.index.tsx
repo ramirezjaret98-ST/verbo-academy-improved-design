@@ -934,90 +934,106 @@ function TeacherDashboard() {
       </section>
 
       <section>
-        <SectionTitle>Recent Activity</SectionTitle>
-        <Card className="!p-0">
-          <table className="w-full text-sm">
-            <thead className="text-left text-xs uppercase tracking-wider text-muted-foreground">
-              <tr className="border-b border-border">
-                <th className="px-6 py-3 font-medium">Student / Group</th>
-                <th className="px-6 py-3 font-medium">Date</th>
-                <th className="px-6 py-3 font-medium">Origin</th>
-                <th className="px-6 py-3 font-medium">Status</th>
-                <th className="px-6 py-3 font-medium">Rating</th>
-              </tr>
-            </thead>
-            <tbody>
-              {recentLive.length === 0 && recentClubReports.length === 0 && (
-                <tr><td colSpan={5} className="px-6 py-6 text-center text-sm text-muted-foreground">No recent sessions.</td></tr>
-              )}
-              {recentLive.map((s) => {
-                const group = s.group_id ? groupById(s.group_id) : null;
-                const student = userById(s.student_id);
-                const label =
-                  s.status === "completed" ? "Completed"
-                  : s.status === "absent" ? "Absent"
-                  : s.status === "cancelled" ? "Cancelled"
-                  : s.status === "no_show" ? "No-show"
-                  : s.status === "delayed" ? "Delayed"
-                  : s.status.charAt(0).toUpperCase() + s.status.slice(1);
-                const tone =
-                  s.status === "completed" ? "success"
-                  : s.status === "absent" || s.status === "no_show" ? "danger"
-                  : s.status === "delayed" ? "warning"
-                  : "default";
-                // Performance Sessions origin: workshop → Workshop, spotlight → Spotlight Session,
-                // and any other value (including course or missing) is the regular 1:1 performance session.
-                const origin = s.origin === "workshop" ? "Workshop" : s.origin === "spotlight" ? "Spotlight Session" : "Performance Session";
+        <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+          <SectionTitle>Recent Activity</SectionTitle>
+          <span className="text-xs font-medium text-muted-foreground">Session ledger · latest first</span>
+        </div>
 
-                return (
-                  <tr
-                    key={s.id}
-                    onClick={() => setViewing(s)}
-                    className="cursor-pointer border-b border-border transition-colors hover:bg-secondary/40 last:border-0"
-                  >
-                    <td className="px-6 py-4 text-foreground">
-                      <span className="inline-flex items-center gap-1.5">
-                        {group && (
-                          <span className="inline-flex h-5 items-center rounded-md bg-accent/15 px-1.5 text-[10px] font-bold text-accent">
-                            G · {group.name}
-                          </span>
-                        )}
-                        {group ? group.name : student?.name ?? "—"}
+        <div className="overflow-hidden rounded-3xl border border-border bg-card">
+          <div className="hidden grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_auto_auto] items-center gap-4 border-b border-border px-5 py-2.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground md:grid">
+            <span>Student / Group</span>
+            <span>Date</span>
+            <span className="justify-self-start">Origin</span>
+            <span className="justify-self-end">Status</span>
+          </div>
+
+          {recentLive.length === 0 && recentClubReports.length === 0 && (
+            <div className="px-5 py-8 text-center text-sm text-muted-foreground">No recent sessions.</div>
+          )}
+
+          <ul className="divide-y divide-border">
+            {recentLive.map((s, i) => {
+              const group = s.group_id ? groupById(s.group_id) : null;
+              const student = userById(s.student_id);
+              const label =
+                s.status === "completed" ? "Completed"
+                : s.status === "absent" ? "Absent"
+                : s.status === "cancelled" ? "Cancelled"
+                : s.status === "no_show" ? "No-show"
+                : s.status === "delayed" ? "Delayed"
+                : s.status.charAt(0).toUpperCase() + s.status.slice(1);
+              const tone =
+                s.status === "completed" ? "success"
+                : s.status === "absent" || s.status === "no_show" ? "danger"
+                : s.status === "delayed" ? "warning"
+                : "default";
+              const rail =
+                tone === "success" ? GREEN : tone === "danger" ? CRIMSON : tone === "warning" ? YELLOW : "var(--violet-500)";
+              const origin = s.origin === "workshop" ? "Workshop" : s.origin === "spotlight" ? "Spotlight Session" : "Performance Session";
+
+              return (
+                <li
+                  key={s.id}
+                  onClick={() => setViewing(s)}
+                  className="verbo-act-row verbo-td-in relative grid cursor-pointer grid-cols-1 items-center gap-x-4 gap-y-1.5 py-3.5 pl-5 pr-5 hover:bg-secondary/40 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_auto_auto]"
+                  style={{ animationDelay: `${Math.min(i, 8) * 34}ms` }}
+                >
+                  <span
+                    aria-hidden
+                    className="verbo-act-rail absolute left-0 top-1/2 h-8 w-[3px] -translate-y-1/2 rounded-r-full"
+                    style={{ background: rail }}
+                  />
+                  <div className="flex min-w-0 items-center gap-1.5">
+                    {group && (
+                      <span className="inline-flex h-5 shrink-0 items-center rounded-md bg-accent/15 px-1.5 text-[10px] font-bold text-accent">
+                        G
                       </span>
-                    </td>
-                    <td className="px-6 py-4 text-muted-foreground">{fmt(s.date_time)}</td>
-                    <td className="px-6 py-4">
-                      <span className="inline-flex rounded-md bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">{origin}</span>
-                    </td>
-                    <td className="px-6 py-4"><Pill tone={tone as any}>{label}</Pill></td>
-                    <td className="px-6 py-4 text-muted-foreground">{s.student_rating ? `${s.student_rating}★` : "—"}</td>
-                  </tr>
-                );
-              })}
-              {recentClubReports.map((r) => {
-                const ev = eventById.get(r.event_id);
-                const title = ev?.title ?? "Club event";
-                const dateISO = ev?.date ?? r.submitted_at;
-                const originLabel = clubReportOriginLabel[r.event_type] ?? "Club";
-                return (
-                  <tr
-                    key={`clubreport-${r.event_id}`}
-                    className="border-b border-border last:border-0"
-                  >
-                    <td className="px-6 py-4 text-foreground">{title}</td>
-                    <td className="px-6 py-4 text-muted-foreground">{fmt(dateISO)}</td>
-                    <td className="px-6 py-4">
-                      <span className="inline-flex rounded-md bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">{originLabel}</span>
-                    </td>
-                    <td className="px-6 py-4"><Pill tone="success">Completed</Pill></td>
-                    <td className="px-6 py-4 text-muted-foreground">—</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </Card>
+                    )}
+                    <span className="truncate text-sm font-semibold text-foreground">
+                      {group ? group.name : student?.name ?? "—"}
+                    </span>
+                    {s.student_rating ? (
+                      <span className="ml-1 shrink-0 text-[11px] font-semibold text-amber-500">{s.student_rating}★</span>
+                    ) : null}
+                  </div>
+                  <div className="truncate text-xs font-medium tabular-nums text-muted-foreground">{fmt(s.date_time)}</div>
+                  <div className="justify-self-start">
+                    <span className="inline-flex rounded-md bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">{origin}</span>
+                  </div>
+                  <div className="justify-self-start md:justify-self-end"><Pill tone={tone as any}>{label}</Pill></div>
+                </li>
+              );
+            })}
+
+            {recentClubReports.map((r, i) => {
+              const ev = eventById.get(r.event_id);
+              const title = ev?.title ?? "Club event";
+              const dateISO = ev?.date ?? r.submitted_at;
+              const originLabel = clubReportOriginLabel[r.event_type] ?? "Club";
+              return (
+                <li
+                  key={`clubreport-${r.event_id}`}
+                  className="verbo-act-row verbo-td-in relative grid grid-cols-1 items-center gap-x-4 gap-y-1.5 py-3.5 pl-5 pr-5 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_auto_auto]"
+                  style={{ animationDelay: `${Math.min(recentLive.length + i, 8) * 34}ms` }}
+                >
+                  <span
+                    aria-hidden
+                    className="verbo-act-rail absolute left-0 top-1/2 h-8 w-[3px] -translate-y-1/2 rounded-r-full"
+                    style={{ background: GREEN }}
+                  />
+                  <div className="truncate text-sm font-semibold text-foreground">{title}</div>
+                  <div className="truncate text-xs font-medium tabular-nums text-muted-foreground">{fmt(dateISO)}</div>
+                  <div className="justify-self-start">
+                    <span className="inline-flex rounded-md bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">{originLabel}</span>
+                  </div>
+                  <div className="justify-self-start md:justify-self-end"><Pill tone="success">Completed</Pill></div>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
       </section>
+
 
       <section>
         <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
