@@ -202,11 +202,11 @@ function Page() {
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {(
           [
-            { label: "Avg rating", hint: "all teachers", value: `${overallAvg}★`, icon: Star, color: "#01304a" },
+            { label: "Avg rating", hint: "all teachers", value: `${overallAvg}★`, icon: Star, color: scoreScaleColor((Number(overallAvg) / 5) * 100), dynamic: true },
             { label: "Sessions tracked", hint: "lifetime", value: SESSIONS.length, icon: CalendarClock, color: "#3ebbad" },
             { label: "Teachers", hint: "active roster", value: teachers.length, icon: GraduationCap, color: "#7e22ce" },
-            { label: "Avg composite", hint: "across roster", value: avgComposite, suffix: "%", icon: TrendingUp, color: "#d97706" },
-          ] as { label: string; hint: string; value: number | string; icon: LucideIcon; color: string; suffix?: string }[]
+            { label: "Avg composite", hint: "across roster", value: avgComposite, suffix: "%", icon: TrendingUp, color: scoreScaleColor(Number(avgComposite)), dynamic: true },
+          ] as { label: string; hint: string; value: number | string; icon: LucideIcon; color: string; suffix?: string; dynamic?: boolean }[]
         ).map((m, i) => {
           const Icon = m.icon;
           return (
@@ -223,7 +223,10 @@ function Page() {
                 <div className="truncate text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                   {m.label}
                 </div>
-                <div className="mt-1 font-display text-[30px] font-semibold leading-none tracking-[-0.03em] tabular-nums text-foreground">
+                <div
+                  className="verbo-kpi-stat__value mt-1 font-display text-[30px] font-semibold leading-none tracking-[-0.03em] tabular-nums text-foreground"
+                  style={m.dynamic ? { color: m.color } : undefined}
+                >
                   {typeof m.value === "number" ? <AnimatedNumber value={m.value} suffix={m.suffix} /> : m.value}
                 </div>
                 <div className="mt-1 truncate text-[11px] font-light text-muted-foreground/80">{m.hint}</div>
@@ -466,6 +469,34 @@ function barColor(value: number, invert: boolean) {
 /** Same thresholds CompositeRing paints with. */
 function compositeColor(value: number) {
   return value >= 85 ? "#5fca16" : value >= 70 ? "#f59e0b" : "#ef4444";
+}
+
+/**
+ * Continuous red → orange → amber → green ramp for a 0-100 score.
+ * Used by the summary strip so the number, icon and accent share one signal.
+ */
+function scoreScaleColor(pct: number) {
+  const stops: [number, [number, number, number]][] = [
+    [0, [220, 38, 38]],    // red
+    [45, [234, 88, 12]],   // orange
+    [65, [245, 158, 11]],  // amber
+    [82, [163, 191, 24]],  // yellow-green
+    [100, [63, 143, 16]],  // green
+  ];
+  const v = Math.max(0, Math.min(100, pct));
+  let a = stops[0]!;
+  let b = stops[stops.length - 1]!;
+  for (let i = 0; i < stops.length - 1; i++) {
+    if (v >= stops[i]![0] && v <= stops[i + 1]![0]) {
+      a = stops[i]!;
+      b = stops[i + 1]!;
+      break;
+    }
+  }
+  const span = b[0] - a[0] || 1;
+  const t = (v - a[0]) / span;
+  const ch = (i: number) => Math.round(a[1][i]! + (b[1][i]! - a[1][i]!) * t);
+  return `rgb(${ch(0)}, ${ch(1)}, ${ch(2)})`;
 }
 
 /** Tint used by the rating pill — same language as the bars. */

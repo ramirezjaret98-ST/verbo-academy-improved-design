@@ -883,3 +883,9 @@ Sin cambios de lógica ni rutas. `DATA_MODEL.md` sigue sincronizado.
 - Rating pill: fondo sólido en el color de banda con texto blanco y sombra de color (antes tinte 10% con texto de color); hover oscurece 12%.
 - Barra de "needs review" ahora full-bleed con fondo destructive 6%.
 - Visual only — no logic, data or route changes; `DATA_MODEL.md` remains synchronized.
+
+## Entry 060 — /admin/kpis: color dinámico en Avg rating y Avg composite
+- Nuevo helper `scoreScaleColor(0-100)`: rampa continua rojo (#dc2626) → naranja (#ea580c) → ámbar (#f59e0b) → amarillo-verde (#a3bf18) → verde (#3f8f10), interpolada en RGB.
+- "Avg rating" (normalizado /5) y "Avg composite" ahora pintan el número, el icono, el chip y el riel con el color de su propio valor; "Sessions tracked" y "Teachers" siguen con su acento fijo (no son métricas de desempeño).
+- Transición de color de 260ms para que el cambio de valor no salte.
+- Visual only — no logic, data or route changes; `DATA_MODEL.md` remains synchronized.
