@@ -9,7 +9,7 @@ export function Footer() {
         <Logo dark />
 
         <div className="flex flex-col items-center gap-1 text-white/60 md:flex-row md:gap-3">
-          <span>© 2026 Lumina Learning Platform. All rights reserved.</span>
+          <span>© 2026 Verbo Language Solutions. All rights reserved.</span>
           <Link
             to="/privacy"
             className="font-medium text-white/80 transition-colors duration-200 hover:text-[var(--orange-500)]"
