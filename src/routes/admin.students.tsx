@@ -337,10 +337,11 @@ function Page() {
       </div>
 
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
-        {filteredStudents.map((s) => (
-          <StudentCard key={s.id} student={s} onOpen={() => setDetail(s)} />
+        {filteredStudents.map((s, i) => (
+          <StudentCard key={s.id} student={s} index={i} onOpen={() => setDetail(s)} />
         ))}
       </div>
+
 
       {filteredStudents.length === 0 && (
         <div className="flex flex-col items-center justify-center rounded-2xl border border-border bg-card py-16 text-center shadow-sm">
