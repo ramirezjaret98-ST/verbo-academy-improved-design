@@ -968,3 +968,14 @@ Sin cambios de lógica ni rutas. `DATA_MODEL.md` sigue sincronizado.
 - Se fijó una plantilla de columnas idéntica en cabecera y filas (`minmax(0,1.5fr) 150px 170px 110px`), de modo que cada título empieza exactamente donde empieza su contenido.
 - "Status" pasa a alinearse a la izquierda como el resto (antes `justify-self-end`), y la columna Date se estrechó para pegarse a su dato.
 - Visual only — no logic, data or route changes; `DATA_MODEL.md` remains synchronized.
+
+## Entry 072 — /teacher/clubs: rediseño completo de la página
+- Masthead navy a pantalla completa con watermark "CLUBS" al 5% y jerarquía eyebrow → título 42px → descripción.
+- "Propose a Club Idea" pasa a CTA verde (`--success`) con glow pulsante (`verbo-propose-glow`), barrido de brillo (`verbo-propose-sheen`), hover -2px y `active:scale(0.97)`.
+- Nueva identidad cromática por tipo: Insight → violeta/índigo (#6d28d9), Book Club → borgoña (#9d2b52). Se eliminan los cuadros teal y los botones naranja.
+- Tabs convertidos en rail con subrayado deslizante (`scaleX`) y contadores por pestaña; los filtros son chips rellenos con el color del tipo.
+- Los clubes disponibles son ahora pósters de gradiente a sangre con icono-watermark que rota/escala en hover, barra de ocupación fina y CTA blanco; entrada escalonada de 55ms (`verbo-club-in`).
+- "My Clubs" pasa de tarjetas sueltas a un ledger único con rail de color por tipo que crece en hover y avatar-icono teñido.
+- Reschedule/Spotlight: cabecera de sección con icono, barra superior de acento (teal-oscuro / violeta), cita lateral para el contexto del alumno y CTA sólido.
+- Motion respeta `prefers-reduced-motion` y los hovers están tras `@media (hover: hover)`.
+- Visual only — no logic, data or route changes; `DATA_MODEL.md` remains synchronized.
