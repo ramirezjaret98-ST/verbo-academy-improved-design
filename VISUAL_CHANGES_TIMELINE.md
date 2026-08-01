@@ -706,3 +706,19 @@ Sin cambios de lógica ni rutas.
 - **Posición y encuadre:** sin cambios; solo se redujo la opacidad para que el Verbot actúe como marca de agua casi imperceptible.
 
 Sin cambios de lógica ni rutas.
+
+---
+
+## Entry 041 — Motion y responsiveness del panel de notificaciones
+**Archivos:** `src/components/verbo/NotificationsBell.tsx`, `src/styles.css`
+
+- **Apertura del panel:** entra desde la campana con `transform-origin: top right`, `scale(.96) translateY(-4px)` → estado final, 180ms `cubic-bezier(0.23,1,0.32,1)` (`.verbo-notif-panel`). Sin animación de salida para no introducir estado nuevo.
+- **Badge de no leídos:** aparece y se re-anima en cada cambio de conteo con `scale(.6)` → `1` en 200ms (`.verbo-notif-badge`).
+- **Punto de no leído / fondo de fila:** en vez de desaparecer de golpe al auto-marcar como leído, se desvanecen con `opacity`+`scale` y `background-color` en 260ms con 600ms de retardo (`.verbo-notif-dot`, `.verbo-notif-item`).
+- **Entrada de la lista:** stagger de 30ms tope 6 filas, `translateY(4px)` + fade, 200ms (`.verbo-notif-row`).
+- **Feedback táctil:** `:active { scale(0.985) }` a 140ms en campana, filas y "Mark all as read" (`.verbo-notif-press`); el tinte de hover se limita a `@media (hover:hover) and (pointer:fine)`.
+- **Responsiveness:** ancho del panel `w-[min(20rem,calc(100vw-2rem))]` y lista `max-h-[min(24rem,60vh)]` para evitar desbordes en móvil.
+- **Modal de resultado compartido:** la tarjeta ahora entra con `opacity 0 + scale(.97)` en 220ms (`.verbo-modal-card-in`), centrada.
+- **Reduced motion:** todas las animaciones caen a un fade de 120ms y se anula el press.
+
+Sin cambios de lógica ni rutas.
