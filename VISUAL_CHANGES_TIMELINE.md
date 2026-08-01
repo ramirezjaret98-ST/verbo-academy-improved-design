@@ -641,3 +641,20 @@ Sin cambios de lógica, rutas ni del flujo de autenticación.
 - **Tono `dark`:** conserva el navy `#01304a` para la tarjeta de "Reschedule Policy".
 
 Sin cambios de lógica ni rutas.
+
+---
+
+## Entry 036 — Rediseño del footer (fade navy + wordmark VERBO)
+**Archivos:** `src/components/verbo/Footer.tsx`, `src/lib/footer-links.ts` (nuevo), `src/routes/student.tsx`, `src/routes/teacher.tsx`, `src/routes/admin.tsx`
+
+- **Altura:** el footer pasa de una barra compacta a un bloque alto (~2x, `pt-28 pb-36`), proporcional al navbar.
+- **Fondo:** degradado vertical del navy de marca (`--navy-700`) que se desvanece hacia arriba hasta transparencia total, en lugar del bloque sólido con borde superior.
+- **Watermark:** palabra `VERBO` sobredimensionada (`clamp(6rem, 20vw, 19rem)`), `tracking-[-0.05em]`, al 5.5% de blanco, anclada al borde inferior y recortada por el propio footer.
+- **Tipografía:** todos los enlaces en light, uppercase, `tracking-[0.16em]`, 11 px; títulos de columna a 10 px con `tracking-[0.22em]` y 35% de blanco. Hover en naranja `--orange-500`.
+- **Estructura:** tagline corta a la izquierda, columnas de navegación específicas de cada panel (nunca mezcladas), columna "Company" (Official Website + FAQs placeholder) y columna "Connect" con enlaces de contacto sólo texto (WhatsApp, Instagram, Facebook, LinkedIn) — sin iconos.
+- **WhatsApp:** enlace del footer apunta a `https://wa.link/p2s15z`.
+- **Fila base:** logo, copyright y enlaces legales — "Terms & Conditions" como placeholder deshabilitado y "Privacy Policy" enlazando a `/privacy`.
+- **Homepage:** sólo enlaces públicos (T&C, Privacy Policy, Official Website, FAQs) y medios de contacto; ninguna ruta interna de paneles.
+- **Sign in:** sin footer, sin top bar.
+
+Sin cambios de lógica ni rutas.
