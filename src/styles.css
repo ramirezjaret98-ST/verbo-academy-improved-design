@@ -1971,7 +1971,7 @@
   .verbo-td-in { animation: verbo-td-in 120ms ease both; animation-delay: 0ms !important; }
   .verbo-td-press:active { transform: none; }
   .verbo-fb-card:hover { transform: none; }
-  .verbo-act-rail { transform: scaleY(1); opacity: 1; transition: none; }
+  .verbo-act-rail { transform: none; opacity: 1; transition: none; }
 }
 
 /* ---- Teacher · My Balance (financial) ---- */
