@@ -250,7 +250,7 @@ export function StaffProfileModal({ open, onOpenChange }: Props) {
           </div>
         </div>
 
-        <div className="px-5 pb-6 pt-12 sm:px-6">
+        <div className="px-5 pb-6 pt-16 sm:px-6">
 
           {/* Identity */}
           <div className="verbo-profile-section text-center" style={{ "--verbo-profile-i": 0 } as React.CSSProperties}>
