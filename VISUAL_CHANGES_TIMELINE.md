@@ -1022,3 +1022,10 @@ Sin cambios de lógica ni rutas. `DATA_MODEL.md` sigue sincronizado.
 - Se actualiza `FIN.bonus` en `src/routes/teacher.financial.tsx`: `base` pasa de `#d97706` (naranja) a `#84cc16` (verde lima), con `soft` y `ring` ajustados a `rgba(132,204,22,0.10)` y `rgba(132,204,22,0.28)` respectivamente.
 - Aplica al bucket colapsable, su panel expandido, el top accent de la tarjeta, el icono badge y el glow de sombra.
 - Visual only — no logic, data or route changes; `DATA_MODEL.md` remains synchronized.
+
+## Entry 079 — Auditoría de animaciones del panel Teacher
+- Se sustituye `transition-all` por transiciones acotadas en `teacher.calendar.tsx`, `teacher.vip.tsx`, `teacher.tailored-content.tsx`, `teacher.students.tsx`, `teacher.performance-sessions.tsx`, `teacher.flash.tsx`, `teacher.index.tsx` y `teacher.challenges.tsx` (evita animar propiedades no intencionadas fuera de GPU).
+- Nueva utilidad `.verbo-lift` en `src/styles.css`: lift de tarjetas con `transform`/`box-shadow`/`border-color`, hover restringido a `(hover: hover) and (pointer: fine)`, press a `scale(0.985)` y fallback de `prefers-reduced-motion`. Reemplaza los `hover:-translate-y-*` sin gating.
+- `.verbo-card-hover` y el rail de Recent Activity (`.verbo-act-row:hover .verbo-act-rail`) pasan a estar gateados por puntero fino, con reduced-motion en el primero.
+- Se elimina `will-change: transform` permanente de `.verbo-club-poster` (capa GPU permanente innecesaria por póster; el transform de hover ya promueve la capa cuando hace falta).
+- Sin cambios de lógica ni rutas; `DATA_MODEL.md` sigue sincronizado.
