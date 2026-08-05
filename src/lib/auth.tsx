@@ -63,6 +63,10 @@ function safeWrite(store: Storage | undefined, session: StoredSession) {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [ready, setReady] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const logoutTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (logoutTimer.current) clearTimeout(logoutTimer.current); }, []);
+
 
   useEffect(() => {
     hydrateAdminRoles();
