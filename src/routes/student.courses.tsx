@@ -1529,6 +1529,9 @@ export function ActivityRunner({
   useEffect(() => { setIndex(0); setFeedback(null); setAttemptBlocked(false); }, [activeCat]);
 
   const current = list[index];
+  // Already answered once (right or wrong) → inputs stay locked for every unit,
+  // not just milestones. Preview/read-only runs are unaffected by this flag.
+  const alreadyAttempted = !previewMode && !!current && wasAttempted(studentId, current.id);
 
   const check = () => {
     if (!current) return;
@@ -1539,11 +1542,25 @@ export function ActivityRunner({
     }
     const ok = evaluate(current, draft[current.id] ?? "");
     const score = ok ? 100 : 0;
-    if (!readOnly && !previewMode) recordActivityScore(studentId, current.id, score);
+    if (!readOnly && !previewMode) {
+      recordActivityScore(studentId, current.id, score);
+      incrementAttempts(studentId, unit.id);
+    }
     // Auto-complete unit when the mandatory rule is satisfied.
     if (!readOnly && !previewMode && unitPassed(studentId, unit.id)) setUnitCompleted(studentId, unit.id, true);
     setFeedback({ ok, score });
   };
+
+  /** Clears the unit attempt counter and every `attempted` flag so the student
+   *  can answer the whole unit again from scratch. */
+  const restartUnit = () => {
+    resetUnitActivityAttempts(studentId, unit.id);
+    setDraft({});
+    setFeedback(null);
+    setAttemptBlocked(false);
+    setIndex(0);
+  };
+
 
   const next = () => {
     setFeedback(null);
