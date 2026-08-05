@@ -81,6 +81,40 @@ const EXERCISE_TYPES: ExerciseType[] = [
   "fill_gaps", "drag_drop", "listen_select", "read_select", "record", "read_complete", "match",
 ];
 
+/* ---- Text sanitization ----
+ * Removes AI/Docs citation artifacts such as "[cite: 2]", "[cite:12]",
+ * "[citation: 4]" or "[1]" footnote markers glued to the text. Deliberately
+ * conservative: only bracket groups that are a citation keyword + number, or a
+ * bare number, are stripped — any other bracket content (e.g. "[blank]") stays.
+ */
+const CITATION_RE = /\s*\[\s*(?:cite|citation|source|ref)\s*:?\s*\d+(?:\s*[,;-]\s*\d+)*\s*\]/gi;
+const BARE_FOOTNOTE_RE = /\s*\[\s*\d+(?:\s*[,;-]\s*\d+)*\s*\]/g;
+
+/** Trims and strips citation artifacts from a text value. Idempotent. */
+export function sanitizeText(v: unknown): string {
+  if (typeof v !== "string") return "";
+  return v
+    .replace(CITATION_RE, "")
+    .replace(BARE_FOOTNOTE_RE, "")
+    .replace(/[ \t]{2,}/g, " ")
+    .trim();
+}
+
+/** Applies `sanitizeText` to every text field of an activity. No other field
+ *  is touched, and running it twice produces the same object content. */
+export function sanitizeActivity(a: Activity): Activity {
+  const out: Activity = { ...a };
+  out.name = sanitizeText(a.name);
+  if (a.paragraph !== undefined) out.paragraph = sanitizeText(a.paragraph);
+  if (a.answer !== undefined) out.answer = sanitizeText(a.answer);
+  if (a.prompt !== undefined) out.prompt = sanitizeText(a.prompt);
+  if (a.question !== undefined) out.question = sanitizeText(a.question);
+  if (a.feedback !== undefined) out.feedback = sanitizeText(a.feedback);
+  if (a.items) out.items = a.items.map((i) => ({ text: sanitizeText(i.text), key: sanitizeText(i.key) }));
+  if (a.options) out.options = a.options.map((o) => sanitizeText(o));
+  return out;
+}
+
 /**
  * Validates a raw JSON array of activities for bulk upload. Returns the valid
  * Activity objects plus a descriptive error per rejected item.
@@ -90,7 +124,8 @@ const EXERCISE_TYPES: ExerciseType[] = [
 export function validateBulkActivities(raw: unknown[], unitId: string): { valid: Activity[]; errs: string[] } {
   const valid: Activity[] = [];
   const errs: string[] = [];
-  const str = (v: unknown) => (typeof v === "string" ? v.trim() : "");
+  const str = (v: unknown) => sanitizeText(v);
+
 
   raw.forEach((item, i) => {
     const tag = `#${i}`;
@@ -185,9 +220,24 @@ const SEED: Activity[] = [
   { id: "act-seed-3", unit_id: "A1-U1", name: "Say it out loud", type: "record", category: "practice", answer: "Nice to meet you." },
 ];
 
+/** One-time cleanup of citation artifacts on activities already persisted in
+ *  localStorage. Runs at most once per page load and only writes when at least
+ *  one field actually changed, so it is fully idempotent. */
+let citationCleanupDone = false;
+function cleanupStoredActivities(stored: Activity[]): Activity[] {
+  if (citationCleanupDone) return stored;
+  citationCleanupDone = true;
+  const cleaned = stored.map((a) => sanitizeActivity(a));
+  if (JSON.stringify(cleaned) !== JSON.stringify(stored)) {
+    safeWrite(ACTIVITIES_KEY, cleaned);
+    return cleaned;
+  }
+  return stored;
+}
+
 export function loadActivities(): Activity[] {
   const stored = safeRead<Activity[] | null>(ACTIVITIES_KEY, null);
-  if (stored) return stored;
+  if (stored) return cleanupStoredActivities(stored);
   safeWrite(ACTIVITIES_KEY, SEED);
   return SEED;
 }
@@ -204,7 +254,7 @@ export function phaseOf(a: Activity): SessionPhase {
 
 export function addActivity(a: Activity) {
   const list = loadActivities();
-  list.push(a);
+  list.push(sanitizeActivity(a));
   saveActivities(list);
 }
 
@@ -213,9 +263,12 @@ export function addActivity(a: Activity) {
  *  listen_select) keeps the rest of its saved configuration. */
 export function updateActivity(id: string, patch: Partial<Omit<Activity, "id" | "unit_id">>) {
   saveActivities(
-    loadActivities().map((a) => (a.id === id ? { ...a, ...patch, id: a.id, unit_id: a.unit_id } : a)),
+    loadActivities().map((a) =>
+      a.id === id ? sanitizeActivity({ ...a, ...patch, id: a.id, unit_id: a.unit_id }) : a,
+    ),
   );
 }
+
 
 export function removeActivity(id: string) {
   saveActivities(loadActivities().filter((a) => a.id !== id));
