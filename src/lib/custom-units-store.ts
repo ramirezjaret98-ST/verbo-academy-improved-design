@@ -13,6 +13,8 @@ export interface CustomUnit {
   file_name?: string;
   created_at: string;
   kind: CustomUnitKind;
+  /** Explicit ordering within a (kind, student). Falls back to created_at. */
+  order?: number;
 }
 
 const KEY = "verbo:custom-units";
