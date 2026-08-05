@@ -123,10 +123,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { ok: true, role: match.role };
   };
 
+  /** Clears the session. Raises `isLoggingOut` synchronously (before `user`
+   *  becomes null) so protected screens can skip the "session expired" state
+   *  while the app navigates away; the flag lowers on the next tick pair, or
+   *  immediately on a new login. */
   const logout = () => {
+    if (logoutTimer.current) clearTimeout(logoutTimer.current);
+    setIsLoggingOut(true);
     setUser(null);
     safeRemove(localStorage);
     safeRemove(sessionStorage);
+    logoutTimer.current = setTimeout(() => setIsLoggingOut(false), 1200);
   };
 
   const updateProfile: AuthCtx["updateProfile"] = (updates) => {
