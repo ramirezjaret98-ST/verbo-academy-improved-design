@@ -10,7 +10,7 @@ import {
 import { loadSessions, subscribeSessions } from "@/lib/sessions-store";
 import { loadLessonPlans, subscribeLessonPlans } from "@/lib/lesson-plans-store";
 import {
-  ActivityModal, Field, ModalFooter, ModalShell, inputCls,
+  ActivityModal, BulkUploadUnitsModal, Field, ModalFooter, ModalShell, inputCls,
   type ModalAccent,
 } from "@/components/verbo/course-modals";
 import { Card, GhostButton, PrimaryButton, Pill } from "@/components/verbo/ui";
@@ -57,7 +57,7 @@ function Page() {
       return (
         <div className="space-y-4">
           <button
-            onClick={() => navigate({ to: "/teacher/vip", search: () => ({}) })}
+            onClick={() => navigate({ to: "/teacher/vip", search: () => ({ student: undefined }) })}
             className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
           >
             <ArrowLeft className="h-4 w-4" /> Back to VIP students
@@ -66,7 +66,7 @@ function Page() {
         </div>
       );
     }
-    return <StudentBuilder studentId={student.id} studentName={student.name} onBack={() => navigate({ to: "/teacher/vip", search: () => ({}) })} />;
+    return <StudentBuilder studentId={student.id} studentName={student.name} onBack={() => navigate({ to: "/teacher/vip", search: () => ({ student: undefined }) })} />;
   }
 
   return (
@@ -136,6 +136,7 @@ function StudentBuilder({ studentId, studentName, onBack }: {
   const [unitModal, setUnitModal] = useState<{ mode: "create" | "edit"; unit?: VipUnit } | null>(null);
   const [actModalUnit, setActModalUnit] = useState<{ unitId: string; unitTitle: string } | null>(null);
   const [actRev, setActRev] = useState(0);
+  const [bulkOpen, setBulkOpen] = useState(false);
 
   const units = useMemo(() => unitsForStudent(studentId), [studentId, actRev, unitModal]);
   const allActivities = useMemo(() => loadActivities(), [actRev, unitModal]);
@@ -162,9 +163,14 @@ function StudentBuilder({ studentId, studentName, onBack }: {
             Units are marked done via the Session Report of the linked Performance Session.
           </p>
         </div>
-        <PrimaryButton onClick={() => setUnitModal({ mode: "create" })}>
-          <Plus className="h-3.5 w-3.5" /> Add Unit
-        </PrimaryButton>
+        <div className="flex items-center gap-2">
+          <GhostButton onClick={() => setBulkOpen(true)}>
+            <Upload className="h-3.5 w-3.5" /> Bulk Upload
+          </GhostButton>
+          <PrimaryButton onClick={() => setUnitModal({ mode: "create" })}>
+            <Plus className="h-3.5 w-3.5" /> Add Unit
+          </PrimaryButton>
+        </div>
       </div>
 
       <Card className="!p-0">
@@ -254,6 +260,15 @@ function StudentBuilder({ studentId, studentName, onBack }: {
         })}
       </Card>
 
+      {bulkOpen && (
+        <BulkUploadUnitsModal
+          kind="vip"
+          studentId={studentId}
+          unitLabel="VIP unit"
+          onClose={() => { setBulkOpen(false); setActRev((r) => r + 1); }}
+          onImported={() => setActRev((r) => r + 1)}
+        />
+      )}
       {unitModal && (
         <VipUnitModal
           editingUnit={unitModal.mode === "edit" ? unitModal.unit : undefined}

@@ -11,7 +11,7 @@ import {
 import { loadSessions, subscribeSessions } from "@/lib/sessions-store";
 import { loadLessonPlans, subscribeLessonPlans } from "@/lib/lesson-plans-store";
 import {
-  Field, ModalFooter, ModalShell, inputCls,
+  BulkUploadUnitsModal, Field, ModalFooter, ModalShell, inputCls,
   type ModalAccent,
 } from "@/components/verbo/course-modals";
 import { Card, GhostButton, PrimaryButton, Pill } from "@/components/verbo/ui";
@@ -57,7 +57,7 @@ function Page() {
       return (
         <div className="space-y-4">
           <button
-            onClick={() => navigate({ to: "/teacher/tailored-content", search: () => ({}) })}
+            onClick={() => navigate({ to: "/teacher/tailored-content", search: () => ({ student: undefined }) })}
             className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
           >
             <ArrowLeft className="h-4 w-4" /> Back to Elite students
@@ -70,7 +70,7 @@ function Page() {
       <StudentBuilder
         studentId={student.id}
         studentName={student.name}
-        onBack={() => navigate({ to: "/teacher/tailored-content", search: () => ({}) })}
+        onBack={() => navigate({ to: "/teacher/tailored-content", search: () => ({ student: undefined }) })}
       />
     );
   }
@@ -138,6 +138,7 @@ function StudentBuilder({ studentId, studentName, onBack }: {
 }) {
   const [unitModal, setUnitModal] = useState<{ mode: "create" | "edit"; unit?: TailoredUnit } | null>(null);
   const [rev, setRev] = useState(0);
+  const [bulkOpen, setBulkOpen] = useState(false);
 
   const units = useMemo(() => tailoredUnitsForStudent(studentId), [studentId, rev, unitModal]);
   const doneMap = useMemo(() => tailoredUnitDoneMap(), [studentId, rev, unitModal]);
@@ -163,9 +164,14 @@ function StudentBuilder({ studentId, studentName, onBack }: {
             Units are marked done via the Session Report of the linked Performance Session.
           </p>
         </div>
-        <PrimaryButton onClick={() => setUnitModal({ mode: "create" })}>
-          <Plus className="h-3.5 w-3.5" /> Add Unit
-        </PrimaryButton>
+        <div className="flex items-center gap-2">
+          <GhostButton onClick={() => setBulkOpen(true)}>
+            <Upload className="h-3.5 w-3.5" /> Bulk Upload
+          </GhostButton>
+          <PrimaryButton onClick={() => setUnitModal({ mode: "create" })}>
+            <Plus className="h-3.5 w-3.5" /> Add Unit
+          </PrimaryButton>
+        </div>
       </div>
 
       <Card className="!p-0">
@@ -249,6 +255,15 @@ function StudentBuilder({ studentId, studentName, onBack }: {
         })}
       </Card>
 
+      {bulkOpen && (
+        <BulkUploadUnitsModal
+          kind="tailored"
+          studentId={studentId}
+          unitLabel="Tailored unit"
+          onClose={() => { setBulkOpen(false); setRev((r) => r + 1); }}
+          onImported={() => setRev((r) => r + 1)}
+        />
+      )}
       {unitModal && (
         <TailoredUnitModal
           editingUnit={unitModal.mode === "edit" ? unitModal.unit : undefined}

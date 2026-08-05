@@ -279,6 +279,9 @@ Tipo unificado que almacena **todas** las unidades "a medida" creadas por el mae
 | file_name | string | opcional | |
 | created_at | string | requerido | |
 | kind | `"vip" \| "tailored"` | requerido | discrimina el origen (VIP Course Builder vs Tailored Content) |
+| order | number | opcional | posición dentro de (kind, student). `addCustomUnit` asigna el consecutivo actual; el ordenamiento usa `order` cuando ambas unidades lo tienen y si no `created_at` |
+
+**Bulk upload**: `validateBulkUnits(raw, kind, studentId)` valida un arreglo JSON (`title` requerido; `file_url` opcional default `""`; `file_name` y `order` opcionales) sanitizando `title`/`file_name` con `sanitizeText()`, reportando errores por índice `#i` sin lanzar excepciones; `addCustomUnitsBulk(units)` anexa todas las unidades con un solo write + un solo evento `CUSTOM_UNITS_EVENT`. UI: `BulkUploadUnitsModal` en `course-modals.tsx`, usado desde `/teacher/vip` y `/teacher/tailored-content`.
 
 **Migración de una sola corrida (idempotente)**: al primer `safeRead()` se leen las keys viejas `verbo:vip-courses` y `verbo:tailored-content`, se les asigna `kind: "vip"` / `kind: "tailored"` y se mezclan en `verbo:custom-units` omitiendo ids ya presentes. Las keys viejas **no se borran**. Usa un flag de módulo (`migrated`), mismo patrón que `cleanupStoredActivities` en `activities-store.ts`.
 

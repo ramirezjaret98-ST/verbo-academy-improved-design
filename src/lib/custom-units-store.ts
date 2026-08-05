@@ -2,6 +2,8 @@
 // Both VIP Course Builder units and Tailored Content units are stored here
 // as a single CustomUnit type, distinguished by `kind`.
 // vip-courses-store.ts and tailored-content-store.ts are thin wrappers.
+import { sanitizeText } from "./activities-store";
+
 
 export type CustomUnitKind = "vip" | "tailored";
 
@@ -13,6 +15,8 @@ export interface CustomUnit {
   file_name?: string;
   created_at: string;
   kind: CustomUnitKind;
+  /** Explicit ordering within a (kind, student). Falls back to created_at. */
+  order?: number;
 }
 
 const KEY = "verbo:custom-units";
@@ -71,7 +75,10 @@ export function loadCustomUnits(kind: CustomUnitKind): CustomUnit[] {
 export function customUnitsForStudent(kind: CustomUnitKind, studentId: string): CustomUnit[] {
   return safeRead()
     .filter((u) => u.kind === kind && u.student_id === studentId)
-    .sort((a, b) => a.created_at.localeCompare(b.created_at));
+    .sort((a, b) => {
+      if (typeof a.order === "number" && typeof b.order === "number") return a.order - b.order;
+      return a.created_at.localeCompare(b.created_at);
+    });
 }
 
 export function addCustomUnit(
@@ -82,6 +89,8 @@ export function addCustomUnit(
   fileName?: string,
 ): CustomUnit {
   const prefix = kind === "vip" ? "VIP" : "TC";
+  const all = safeRead();
+  const order = all.filter((u) => u.kind === kind && u.student_id === studentId).length;
   const unit: CustomUnit = {
     id: `${prefix}-${studentId}-${Date.now()}`,
     student_id: studentId,
@@ -90,9 +99,61 @@ export function addCustomUnit(
     file_name: fileName,
     created_at: new Date().toISOString(),
     kind,
+    order,
   };
-  safeWrite([...safeRead(), unit]);
+  safeWrite([...all, unit]);
   return unit;
+}
+
+/** Appends already-validated units in a single write + single event. */
+export function addCustomUnitsBulk(units: CustomUnit[]): void {
+  if (units.length === 0) return;
+  safeWrite([...safeRead(), ...units]);
+}
+
+/**
+ * Validates a raw JSON array of custom units for bulk upload. Mirrors the
+ * style of validateBulkActivities(): per-index errors, never throws.
+ */
+export function validateBulkUnits(
+  raw: unknown[],
+  kind: CustomUnitKind,
+  studentId: string,
+): { valid: CustomUnit[]; errs: string[] } {
+  const valid: CustomUnit[] = [];
+  const errs: string[] = [];
+  const str = (v: unknown) => sanitizeText(v);
+  const prefix = kind === "vip" ? "VIP" : "TC";
+  const base = safeRead().filter((u) => u.kind === kind && u.student_id === studentId).length;
+  let seq = 0;
+  const ts = Date.now();
+
+  raw.forEach((item, i) => {
+    const tag = `#${i}`;
+    if (!item || typeof item !== "object" || Array.isArray(item)) {
+      errs.push(`${tag}: el item no es un objeto.`);
+      return;
+    }
+    const o = item as Record<string, unknown>;
+    const title = str(o.title);
+    if (!title) { errs.push(`${tag}: falta title.`); return; }
+    const fileUrl = typeof o.file_url === "string" ? o.file_url.trim() : "";
+    const fileName = o.file_name !== undefined ? str(o.file_name) : undefined;
+    const order = typeof o.order === "number" && Number.isFinite(o.order) ? o.order : base + seq;
+    seq += 1;
+    valid.push({
+      id: `${prefix}-${studentId}-${ts}-${i}-${Math.random().toString(36).slice(2, 7)}`,
+      student_id: studentId,
+      title,
+      file_url: fileUrl,
+      file_name: fileName,
+      created_at: new Date().toISOString(),
+      kind,
+      order,
+    });
+  });
+
+  return { valid, errs };
 }
 
 export function updateCustomUnit(
