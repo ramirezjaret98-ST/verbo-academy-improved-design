@@ -1,75 +1,49 @@
 // VIP Course Builder store — per-student, teacher-authored units.
-// Unlike Performance Sessions, VIP courses have NO skeleton, NO capsule/video,
-// and no fixed unit count: the teacher adds units on demand.
+// Storage is now unified in custom-units-store.ts under kind: "vip".
+// The public API below is unchanged; it only delegates.
 
-export interface VipUnit {
-  id: string; // e.g. VIP-<studentId>-<timestamp>
-  student_id: string;
-  title: string;
-  file_url: string; // downloadable material (upload placeholder)
-  file_name?: string;
-  created_at: string;
-}
+import {
+  type CustomUnit,
+  type CustomUnitCompletion,
+  addCustomUnit,
+  clearCompletionForSession,
+  customUnitsForStudent,
+  loadCustomUnits,
+  markCompletion,
+  readCompletionMap,
+  removeCustomUnit,
+  subscribeCompletion,
+  subscribeCustomUnits,
+  updateCustomUnit,
+} from "./custom-units-store";
+
+export type VipUnit = CustomUnit;
 
 const KEY = "verbo:vip-courses";
 export const VIP_UNITS_EVENT = "verbo:vip-courses-updated";
-const EVENT = VIP_UNITS_EVENT;
-
-function safeRead(): VipUnit[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = localStorage.getItem(KEY);
-    return raw ? (JSON.parse(raw) as VipUnit[]) : [];
-  } catch { return []; }
-}
-function safeWrite(list: VipUnit[]) {
-  if (typeof window === "undefined") return;
-  try {
-    localStorage.setItem(KEY, JSON.stringify(list));
-    window.dispatchEvent(new CustomEvent(EVENT));
-  } catch { /* noop */ }
-}
 
 export function loadVipUnits(): VipUnit[] {
-  return safeRead();
+  return loadCustomUnits("vip");
 }
 
 export function unitsForStudent(studentId: string): VipUnit[] {
-  return safeRead()
-    .filter((u) => u.student_id === studentId)
-    .sort((a, b) => a.created_at.localeCompare(b.created_at));
+  return customUnitsForStudent("vip", studentId);
 }
 
 export function addVipUnit(studentId: string, title: string, fileUrl: string, fileName?: string): VipUnit {
-  const unit: VipUnit = {
-    id: `VIP-${studentId}-${Date.now()}`,
-    student_id: studentId,
-    title,
-    file_url: fileUrl,
-    file_name: fileName,
-    created_at: new Date().toISOString(),
-  };
-  safeWrite([...safeRead(), unit]);
-  return unit;
+  return addCustomUnit("vip", studentId, title, fileUrl, fileName);
 }
 
 export function updateVipUnit(id: string, patch: Partial<Omit<VipUnit, "id" | "student_id" | "created_at">>) {
-  safeWrite(safeRead().map((u) => (u.id === id ? { ...u, ...patch } : u)));
+  updateCustomUnit("vip", id, patch);
 }
 
 export function removeVipUnit(id: string) {
-  safeWrite(safeRead().filter((u) => u.id !== id));
+  removeCustomUnit("vip", id);
 }
 
 export function subscribeVipUnits(cb: () => void): () => void {
-  if (typeof window === "undefined") return () => {};
-  const onStorage = (e: StorageEvent) => { if (e.key === KEY) cb(); };
-  window.addEventListener(EVENT, cb);
-  window.addEventListener("storage", onStorage);
-  return () => {
-    window.removeEventListener(EVENT, cb);
-    window.removeEventListener("storage", onStorage);
-  };
+  return subscribeCustomUnits(cb, VIP_UNITS_EVENT, KEY);
 }
 
 // Count of Completed sessions for this student — read from the real sessions
@@ -78,69 +52,28 @@ export function completedSessionCount(studentId: string, sessions: { student_id:
   return sessions.filter((s) => s.student_id === studentId && s.status === "completed").length;
 }
 
-/* -------------------- Per-unit completion (VIP) ----------------------
- * A VIP unit is "done" when a completed Performance Session is linked to
- * it via the LessonPlan.vip_unit_id field. Keyed by unit id so unlock
- * order = creation order of units.
- */
-export interface VipUnitCompletion {
-  session_id: string;
-  completed_at: string; // ISO
-}
+/* -------------------- Per-unit completion (VIP) ---------------------- */
+export type VipUnitCompletion = CustomUnitCompletion;
 
 const COMPLETION_KEY = "verbo:vip-unit-completion";
 const COMPLETION_EVENT = "verbo:vip-unit-completion-updated";
 
-function readCompletion(): Record<string, VipUnitCompletion> {
-  if (typeof window === "undefined") return {};
-  try {
-    const raw = localStorage.getItem(COMPLETION_KEY);
-    return raw ? (JSON.parse(raw) as Record<string, VipUnitCompletion>) : {};
-  } catch { return {}; }
-}
-function writeCompletion(map: Record<string, VipUnitCompletion>) {
-  if (typeof window === "undefined") return;
-  try {
-    localStorage.setItem(COMPLETION_KEY, JSON.stringify(map));
-    window.dispatchEvent(new CustomEvent(COMPLETION_EVENT));
-  } catch { /* noop */ }
-}
-
 export function vipUnitDoneMap(): Record<string, VipUnitCompletion> {
-  return readCompletion();
+  return readCompletionMap(COMPLETION_KEY);
 }
 
 export function isVipUnitDone(unitId: string): boolean {
-  return !!readCompletion()[unitId];
+  return !!readCompletionMap(COMPLETION_KEY)[unitId];
 }
 
 export function markVipUnitDone(unitId: string, sessionId: string) {
-  const map = readCompletion();
-  // If this session had previously closed a different unit, drop that
-  // stale record so re-linking a plan doesn't leave phantom completions.
-  for (const [uid, rec] of Object.entries(map)) {
-    if (rec.session_id === sessionId && uid !== unitId) delete map[uid];
-  }
-  map[unitId] = { session_id: sessionId, completed_at: new Date().toISOString() };
-  writeCompletion(map);
+  markCompletion(COMPLETION_KEY, COMPLETION_EVENT, unitId, sessionId);
 }
 
 export function clearVipUnitDoneForSession(sessionId: string) {
-  const map = readCompletion();
-  let changed = false;
-  for (const [uid, rec] of Object.entries(map)) {
-    if (rec.session_id === sessionId) { delete map[uid]; changed = true; }
-  }
-  if (changed) writeCompletion(map);
+  clearCompletionForSession(COMPLETION_KEY, COMPLETION_EVENT, sessionId);
 }
 
 export function subscribeVipUnitCompletion(cb: () => void): () => void {
-  if (typeof window === "undefined") return () => {};
-  const onStorage = (e: StorageEvent) => { if (e.key === COMPLETION_KEY) cb(); };
-  window.addEventListener(COMPLETION_EVENT, cb);
-  window.addEventListener("storage", onStorage);
-  return () => {
-    window.removeEventListener(COMPLETION_EVENT, cb);
-    window.removeEventListener("storage", onStorage);
-  };
+  return subscribeCompletion(COMPLETION_KEY, COMPLETION_EVENT, cb);
 }
