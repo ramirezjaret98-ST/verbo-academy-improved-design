@@ -2543,12 +2543,17 @@ function useLeaderboardRows(): LeaderboardRow[] {
   }, []);
   return useMemo(() => {
     void tick;
+    // Tie-break key: the student's REAL name (falling back to the stable id),
+    // never displayName — otherwise the order would shift with the purely
+    // visual nickname/real-name preference even at identical scores.
+    const sortKey = new Map<string, string>();
     return USERS
       .filter((u) => u.role === "student")
       .map<LeaderboardRow>((u) => {
         const id = getLeaderboardIdentity(u.id);
         const useReal = id.mode === "real" || !id.nickname.trim();
         const displayName = useReal ? u.name : id.nickname.trim();
+        sortKey.set(u.id, u.name || u.id);
         return {
           userId: u.id,
           displayName,
@@ -2559,8 +2564,10 @@ function useLeaderboardRows(): LeaderboardRow[] {
       })
       .sort((a, b) =>
         b.completed - a.completed
-        || a.displayName.localeCompare(b.displayName),
+        || (sortKey.get(a.userId) ?? a.userId).localeCompare(sortKey.get(b.userId) ?? b.userId)
+        || a.userId.localeCompare(b.userId),
       );
+
   }, [tick]);
 }
 
