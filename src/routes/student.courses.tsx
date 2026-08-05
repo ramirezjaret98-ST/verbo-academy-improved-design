@@ -1691,15 +1691,24 @@ export function ActivityRunner({
                 </button>
               </div>
             ) : !feedback ? (
-              <div className="flex justify-end">
+              <div className="flex items-center justify-end gap-3">
+                {!readOnly && alreadyAttempted && (
+                  <button
+                    onClick={restartUnit}
+                    className="inline-flex items-center justify-center gap-2 rounded-xl border border-border px-5 py-3 text-sm font-semibold text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                  >
+                    Restart unit activities
+                  </button>
+                )}
                 <button
-                  onClick={readOnly ? next : check}
-                  disabled={!readOnly && !(draft[current.id] ?? "").trim() && current.type !== "record"}
+                  onClick={readOnly || alreadyAttempted ? next : check}
+                  disabled={!readOnly && !alreadyAttempted && !(draft[current.id] ?? "").trim() && current.type !== "record"}
                   className="inline-flex items-center justify-center gap-2 rounded-xl bg-accent px-6 py-3 text-sm font-semibold text-accent-foreground shadow-[0_8px_24px_-6px_rgba(243,137,52,0.5)] transition-all hover:bg-[#d9731f] disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none"
                 >
-                  {readOnly ? "Next" : "Check Answer"}
+                  {readOnly || alreadyAttempted ? "Next" : "Check Answer"}
                 </button>
               </div>
+
             ) : (
               <div className={`flex items-center justify-between gap-4 rounded-xl px-5 py-4 ${feedback.ok ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" : "bg-rose-500/10 text-rose-700 dark:text-rose-300"}`}>
                 <div className="flex items-center gap-3">
