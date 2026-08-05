@@ -266,35 +266,36 @@ Nombres de nivel confirmados por producto:
 
 ⚠️ **No existe ningún campo de gating/progreso** (`Completed`/`Current`/`Locked`, "Contracted Levels") en este archivo — se buscó explícitamente y no aparece. Si esa lógica existe en producción, vive en otro archivo (componente de UI o store de inscripciones) no cubierto en esta lectura.
 
-### `VipUnit` / `VipUnitCompletion` (`src/lib/vip-courses-store.ts`)
+### `CustomUnit` (`src/lib/custom-units-store.ts`)
 
-**`VipUnit`**: unidad de curso "a medida" creada por el maestro para un alumno VIP.
+Tipo unificado que almacena **todas** las unidades "a medida" creadas por el maestro para un alumno, sin importar su origen. Persistido bajo la key `verbo:custom-units`.
 
 | campo | tipo | requerido/opcional | notas |
 |---|---|---|---|
-| id | string | requerido | patrón `VIP-<studentId>-<timestamp>` |
+| id | string | requerido | patrón `VIP-<studentId>-<timestamp>` o `TC-<studentId>-<timestamp>` |
 | student_id | string | requerido | FK → estudiante |
 | title | string | requerido | |
 | file_url | string | requerido | material descargable |
 | file_name | string | opcional | |
 | created_at | string | requerido | |
+| kind | `"vip" \| "tailored"` | requerido | discrimina el origen (VIP Course Builder vs Tailored Content) |
+
+**Migración de una sola corrida (idempotente)**: al primer `safeRead()` se leen las keys viejas `verbo:vip-courses` y `verbo:tailored-content`, se les asigna `kind: "vip"` / `kind: "tailored"` y se mezclan en `verbo:custom-units` omitiendo ids ya presentes. Las keys viejas **no se borran**. Usa un flag de módulo (`migrated`), mismo patrón que `cleanupStoredActivities` en `activities-store.ts`.
+
+Las completions siguen en keys separadas por origen (`verbo:vip-unit-completion`, `verbo:tailored-content-completion`) con helpers compartidos en este mismo archivo.
+
+### `VipUnit` / `VipUnitCompletion` (`src/lib/vip-courses-store.ts`)
+
+⚠️ **Ahora son alias/wrappers**: `VipUnit = CustomUnit` y `VipUnitCompletion = CustomUnitCompletion`. Todas las funciones exportadas (`loadVipUnits`, `unitsForStudent`, `addVipUnit`, `updateVipUnit`, `removeVipUnit`, `subscribeVipUnits`, `completedSessionCount`, `vipUnitDoneMap`, `isVipUnitDone`, `markVipUnitDone`, `clearVipUnitDoneForSession`, `subscribeVipUnitCompletion`) conservan nombre y firma, pero delegan al store unificado filtrando por `kind: "vip"`. `subscribeVipUnits` sigue escuchando el evento legacy `verbo:vip-courses-updated` además del nuevo `verbo:custom-units-updated`.
 
 **`VipUnitCompletion`**: `{ session_id: string; completed_at: string }`, clave = `unitId`. Se vincula a `LessonPlan.vip_unit_id` (ver §2).
 
 ### `TailoredUnit` / `TailoredUnitCompletion` (`src/lib/tailored-content-store.ts`)
 
-**`TailoredUnit`**: unidad "a medida" creada por el maestro para un alumno con `access_plan === "Elite"`. Mecanismo paralelo e independiente de `VipUnit` (no comparte storage, keys ni identificadores).
-
-| campo | tipo | requerido/opcional | notas |
-|---|---|---|---|
-| id | string | requerido | patrón `TC-<studentId>-<timestamp>` |
-| student_id | string | requerido | FK → estudiante Elite |
-| title | string | requerido | |
-| file_url | string | requerido | material descargable |
-| file_name | string | opcional | |
-| created_at | string | requerido | |
+⚠️ **Ahora son alias/wrappers**: `TailoredUnit = CustomUnit` y `TailoredUnitCompletion = CustomUnitCompletion`. Todas las funciones exportadas (`loadTailoredUnits`, `tailoredUnitsForStudent`, `addTailoredUnit`, `updateTailoredUnit`, `removeTailoredUnit`, `subscribeTailoredUnits`, `tailoredUnitDoneMap`, `isTailoredUnitDone`, `markTailoredUnitDone`, `clearTailoredUnitDoneForSession`, `subscribeTailoredUnitCompletion`) conservan nombre y firma, pero delegan al store unificado filtrando por `kind: "tailored"`. Sigue aplicando a alumnos con `access_plan === "Elite"`.
 
 **`TailoredUnitCompletion`**: `{ session_id: string; completed_at: string }`, clave = `unitId`. Se vincula a `LessonPlan.tailored_unit_id`. Al marcar Completed el Session Report de la sesión vinculada, la unidad queda done y la siguiente (por `created_at`) se desbloquea automáticamente.
+
 
 ### `Activity` (`src/lib/activities-store.ts`)
 
