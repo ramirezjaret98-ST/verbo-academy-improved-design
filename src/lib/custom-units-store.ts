@@ -2,6 +2,8 @@
 // Both VIP Course Builder units and Tailored Content units are stored here
 // as a single CustomUnit type, distinguished by `kind`.
 // vip-courses-store.ts and tailored-content-store.ts are thin wrappers.
+import { sanitizeText } from "./activities-store";
+
 
 export type CustomUnitKind = "vip" | "tailored";
 
