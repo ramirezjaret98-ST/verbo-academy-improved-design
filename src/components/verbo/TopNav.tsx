@@ -435,7 +435,7 @@ export function TopNav({ items, variant = "light" }: { items: NavEntry[]; varian
           )}
           <button
             type="button"
-            onClick={() => { void navigate({ to: "/" }).then(() => logout()); }}
+            onClick={() => { logout(); void navigate({ to: "/" }); }}
             className="Btn"
             aria-label="Sign out"
           >
