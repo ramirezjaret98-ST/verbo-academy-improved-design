@@ -28,6 +28,12 @@ import {
   loadActivities,
   validateBulkActivities,
 } from "@/lib/activities-store";
+import {
+  type CustomUnit,
+  type CustomUnitKind,
+  validateBulkUnits,
+  addCustomUnitsBulk,
+} from "@/lib/custom-units-store";
 
 export const inputCls =
   "h-10 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground shadow-sm transition-colors focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30";
@@ -552,6 +558,108 @@ export function BulkUploadModal({ unitId, unitTitle, onClose, onImported, zClass
         {!imported && (
           <PrimaryButton accentColor="#5fca16" onClick={doImport} disabled={parsed.length === 0}>
             Import {parsed.length} Activities
+          </PrimaryButton>
+        )}
+      </ModalFooter>
+    </ModalShell>
+  );
+}
+
+export function BulkUploadUnitsModal({ kind, studentId, unitLabel, onClose, onImported, zClass }: {
+  kind: CustomUnitKind;
+  studentId: string;
+  unitLabel: string;
+  onClose: () => void;
+  onImported: () => void;
+  zClass?: string;
+}) {
+  const [fileName, setFileName] = useState("");
+  const [parsed, setParsed] = useState<CustomUnit[]>([]);
+  const [errors, setErrors] = useState<string[]>([]);
+  const [imported, setImported] = useState(false);
+
+  const handleFile = (file?: File) => {
+    if (!file) return;
+    setFileName(file.name);
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const data = JSON.parse(String(reader.result));
+        if (!Array.isArray(data)) throw new Error("not an array");
+        const { valid, errs } = validateBulkUnits(data, kind, studentId);
+        setParsed(valid);
+        setErrors(errs);
+      } catch {
+        setParsed([]);
+        setErrors(["The file is not valid JSON — it must be an array of units."]);
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  const doImport = () => {
+    addCustomUnitsBulk(parsed);
+    setImported(true);
+    onImported();
+  };
+
+  return (
+    <ModalShell
+      title="Bulk Upload Units"
+      subtitle={`Upload a .json file with ${unitLabel}s for this student — one array of unit objects.`}
+      onClose={onClose}
+      width="max-w-2xl"
+      zClass={zClass}
+    >
+      {imported ? (
+        <div className="p-6">
+          <div className="rounded-lg border border-dashed border-emerald-500/60 bg-emerald-500/10 p-6 text-center text-sm font-semibold text-emerald-700 dark:text-emerald-300">
+            {parsed.length} units imported successfully.
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-4 p-6">
+          <Field label="Units file (.json)">
+            <label className="flex h-24 w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-secondary/40 text-sm text-muted-foreground transition-colors hover:bg-secondary">
+              <Upload className="h-4 w-4" />
+              {fileName || "Click to upload a .json file"}
+              <input
+                type="file"
+                accept="application/json,.json"
+                className="sr-only"
+                onChange={(e) => handleFile(e.target.files?.[0])}
+              />
+            </label>
+          </Field>
+
+          {errors.length > 0 && (
+            <div className="space-y-1 rounded-lg border border-dashed border-destructive/60 bg-destructive/5 p-3 text-[11px] leading-relaxed text-destructive">
+              <div className="font-semibold">{errors.length} item(s) with errors — they will not be imported.</div>
+              {errors.slice(0, 20).map((e, i) => <div key={i}>{e}</div>)}
+            </div>
+          )}
+
+          {parsed.length > 0 && (
+            <div className="space-y-2 rounded-lg border border-border bg-secondary/30 p-3">
+              <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Ready to import</div>
+              {parsed.map((u) => (
+                <div key={u.id} className="rounded-lg bg-background px-3 py-2">
+                  <div className="truncate text-xs font-medium text-foreground">{u.title}</div>
+                  {u.file_name && (
+                    <div className="truncate text-[11px] text-muted-foreground">{u.file_name}</div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      <ModalFooter>
+        <GhostButton onClick={onClose}>{imported ? "Close" : "Cancel"}</GhostButton>
+        {!imported && (
+          <PrimaryButton accentColor="#5fca16" onClick={doImport} disabled={parsed.length === 0}>
+            Import {parsed.length} Units
           </PrimaryButton>
         )}
       </ModalFooter>
