@@ -57,7 +57,7 @@ function Page() {
       return (
         <div className="space-y-4">
           <button
-            onClick={() => navigate({ to: "/teacher/vip", search: {} })}
+            onClick={() => navigate({ to: "/teacher/vip", search: () => ({}) })}
             className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
           >
             <ArrowLeft className="h-4 w-4" /> Back to VIP students
@@ -66,7 +66,7 @@ function Page() {
         </div>
       );
     }
-    return <StudentBuilder studentId={student.id} studentName={student.name} onBack={() => navigate({ to: "/teacher/vip", search: {} })} />;
+    return <StudentBuilder studentId={student.id} studentName={student.name} onBack={() => navigate({ to: "/teacher/vip", search: () => ({}) })} />;
   }
 
   return (

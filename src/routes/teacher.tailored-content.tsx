@@ -57,7 +57,7 @@ function Page() {
       return (
         <div className="space-y-4">
           <button
-            onClick={() => navigate({ to: "/teacher/tailored-content", search: {} })}
+            onClick={() => navigate({ to: "/teacher/tailored-content", search: () => ({}) })}
             className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
           >
             <ArrowLeft className="h-4 w-4" /> Back to Elite students
@@ -70,7 +70,7 @@ function Page() {
       <StudentBuilder
         studentId={student.id}
         studentName={student.name}
-        onBack={() => navigate({ to: "/teacher/tailored-content", search: {} })}
+        onBack={() => navigate({ to: "/teacher/tailored-content", search: () => ({}) })}
       />
     );
   }
