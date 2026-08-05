@@ -112,6 +112,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (isUserDeactivated(match.id)) {
       return { ok: false, error: "Account deactivated. Contact your administrator." };
     }
+    if (logoutTimer.current) clearTimeout(logoutTimer.current);
+    setIsLoggingOut(false);
     setUser(match);
     if (remember) {
       safeRemove(sessionStorage);
