@@ -319,7 +319,7 @@ Nombres de nivel confirmados por producto:
 
 
 **`MatchItem`**: `{ text: string; key: string }`.
-**`ActivityScore`**: `{ best: number; attempts: number; lastAt: string }`, clave = `` `${studentId}::${activityId}` `` — ✅ scoped por alumno desde 2026-07-11 (fix bug de progreso compartido).
+**`ActivityScore`**: `{ best: number; attempts: number; lastAt: string; attempted: boolean }`, clave = `` `${studentId}::${activityId}` `` — ✅ scoped por alumno desde 2026-07-11 (fix bug de progreso compartido). `attempted` (2026-08-05) se pone en `true` en cada `recordActivityScore` sin importar si la respuesta fue correcta, para distinguir "contestada y fallada (best = 0)" de "nunca intentada"; registros legacy sin el campo caen a `attempts > 0` vía `wasAttempted`. `resetUnitActivityAttempts(studentId, unitId)` reusa `resetAttempts` y limpia `attempted` en todas las actividades de la unidad (conserva `best`).
 Mapas relacionados sin interfaz formal, todos con clave compuesta `` `${studentId}::${unitId}` ``: `Completion` (→ `boolean`), `Attempts` (→ `number`).
 
 **`UnitAccessEvent`** (`src/lib/activities-store.ts`, key `verbo:unit-access-log`): historial append-only de overrides de acceso por unidad, aplica a **cualquier** unitId (no solo milestones 10/20/30).
