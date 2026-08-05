@@ -1655,14 +1655,20 @@ export function ActivityRunner({
                 </span>
                 {current.name}
               </h3>
-              {readOnly && (
+              {readOnly ? (
                 <div className="mt-2 rounded-lg bg-secondary/50 p-2 text-[11px] text-muted-foreground">
                   Best score: <span className="font-semibold text-foreground">{bestScoreFor(studentId, current.id)}/100</span> — review only.
                 </div>
-              )}
+              ) : alreadyAttempted && !feedback ? (
+                <div className="mt-2 rounded-lg bg-secondary/50 p-2 text-[11px] text-muted-foreground">
+                  Already answered — best score:{" "}
+                  <span className="font-semibold text-foreground">{bestScoreFor(studentId, current.id)}/100</span>. Restart the unit to try again.
+                </div>
+              ) : null}
               <div key={`${current.id}-${feedback ? (feedback.ok ? "ok" : "ko") : "idle"}`} className={`mt-6 ${feedback && !feedback.ok ? "verbo-shake" : ""}`}>
-                <ExerciseBody activity={current} value={draft[current.id] ?? ""} onChange={(v) => setDraft((d) => ({ ...d, [current.id]: v }))} disabled={readOnly} />
+                <ExerciseBody activity={current} value={draft[current.id] ?? ""} onChange={(v) => setDraft((d) => ({ ...d, [current.id]: v }))} disabled={readOnly || alreadyAttempted} />
               </div>
+
             </div>
           ) : (
             <div className="flex h-full flex-col items-center justify-center px-6 text-center">
