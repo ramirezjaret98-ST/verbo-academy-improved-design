@@ -101,11 +101,15 @@ import {
   isMilestoneUnit,
   levelIsComplete,
   loadActivityScores,
+  incrementAttempts,
   recordActivityScore,
+  resetUnitActivityAttempts,
   setUnitCompleted,
   unitCategoryProgress,
   unitNumberOf,
   unitPassed,
+  wasAttempted,
+
 } from "@/lib/activities-store";
 import {
   loadEvents,
@@ -1525,6 +1529,9 @@ export function ActivityRunner({
   useEffect(() => { setIndex(0); setFeedback(null); setAttemptBlocked(false); }, [activeCat]);
 
   const current = list[index];
+  // Already answered once (right or wrong) → inputs stay locked for every unit,
+  // not just milestones. Preview/read-only runs are unaffected by this flag.
+  const alreadyAttempted = !previewMode && !!current && wasAttempted(studentId, current.id);
 
   const check = () => {
     if (!current) return;
@@ -1535,11 +1542,25 @@ export function ActivityRunner({
     }
     const ok = evaluate(current, draft[current.id] ?? "");
     const score = ok ? 100 : 0;
-    if (!readOnly && !previewMode) recordActivityScore(studentId, current.id, score);
+    if (!readOnly && !previewMode) {
+      recordActivityScore(studentId, current.id, score);
+      incrementAttempts(studentId, unit.id);
+    }
     // Auto-complete unit when the mandatory rule is satisfied.
     if (!readOnly && !previewMode && unitPassed(studentId, unit.id)) setUnitCompleted(studentId, unit.id, true);
     setFeedback({ ok, score });
   };
+
+  /** Clears the unit attempt counter and every `attempted` flag so the student
+   *  can answer the whole unit again from scratch. */
+  const restartUnit = () => {
+    resetUnitActivityAttempts(studentId, unit.id);
+    setDraft({});
+    setFeedback(null);
+    setAttemptBlocked(false);
+    setIndex(0);
+  };
+
 
   const next = () => {
     setFeedback(null);
@@ -1578,7 +1599,9 @@ export function ActivityRunner({
           {orderedCats.map((c) => {
             const active = c === activeCat;
             const mandatory = isMandatoryCategory(c);
-            const best = activities.filter((a) => (a.category ?? "uncategorized") === c).reduce((m, a) => Math.max(m, bestScoreFor(studentId, a.id)), 0);
+            const catActivities = activities.filter((a) => (a.category ?? "uncategorized") === c);
+            const best = catActivities.reduce((m, a) => Math.max(m, bestScoreFor(studentId, a.id)), 0);
+            const catAttempted = catActivities.some((a) => wasAttempted(studentId, a.id));
             const ok = mandatory && best >= 60;
             return (
               <button
@@ -1591,7 +1614,21 @@ export function ActivityRunner({
               >
                 <span>{categoryLabel(c)}</span>
                 {mandatory ? (
-                  <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${active ? "bg-white/20 text-white" : ok ? "bg-success/15 text-success" : "bg-muted text-muted-foreground"}`}>{best}/100</span>
+                  <span
+                    title={catAttempted && !ok ? "Already answered — best score so far" : undefined}
+                    className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${
+                      active
+                        ? "bg-white/20 text-white"
+                        : ok
+                        ? "bg-success/15 text-success"
+                        : catAttempted
+                        ? "bg-rose-500/15 text-rose-600 dark:text-rose-300"
+                        : "bg-muted text-muted-foreground"
+                    }`}
+                  >
+                    {catAttempted && !ok ? `Answered · ${best}/100` : `${best}/100`}
+                  </span>
+
                 ) : (
                   <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-medium ${active ? "bg-white/20 text-white" : "bg-secondary text-muted-foreground"}`}>Optional</span>
                 )}
@@ -1618,14 +1655,20 @@ export function ActivityRunner({
                 </span>
                 {current.name}
               </h3>
-              {readOnly && (
+              {readOnly ? (
                 <div className="mt-2 rounded-lg bg-secondary/50 p-2 text-[11px] text-muted-foreground">
                   Best score: <span className="font-semibold text-foreground">{bestScoreFor(studentId, current.id)}/100</span> — review only.
                 </div>
-              )}
+              ) : alreadyAttempted && !feedback ? (
+                <div className="mt-2 rounded-lg bg-secondary/50 p-2 text-[11px] text-muted-foreground">
+                  Already answered — best score:{" "}
+                  <span className="font-semibold text-foreground">{bestScoreFor(studentId, current.id)}/100</span>. Restart the unit to try again.
+                </div>
+              ) : null}
               <div key={`${current.id}-${feedback ? (feedback.ok ? "ok" : "ko") : "idle"}`} className={`mt-6 ${feedback && !feedback.ok ? "verbo-shake" : ""}`}>
-                <ExerciseBody activity={current} value={draft[current.id] ?? ""} onChange={(v) => setDraft((d) => ({ ...d, [current.id]: v }))} disabled={readOnly} />
+                <ExerciseBody activity={current} value={draft[current.id] ?? ""} onChange={(v) => setDraft((d) => ({ ...d, [current.id]: v }))} disabled={readOnly || alreadyAttempted} />
               </div>
+
             </div>
           ) : (
             <div className="flex h-full flex-col items-center justify-center px-6 text-center">
@@ -1648,15 +1691,24 @@ export function ActivityRunner({
                 </button>
               </div>
             ) : !feedback ? (
-              <div className="flex justify-end">
+              <div className="flex items-center justify-end gap-3">
+                {!readOnly && alreadyAttempted && (
+                  <button
+                    onClick={restartUnit}
+                    className="inline-flex items-center justify-center gap-2 rounded-xl border border-border px-5 py-3 text-sm font-semibold text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                  >
+                    Restart unit activities
+                  </button>
+                )}
                 <button
-                  onClick={readOnly ? next : check}
-                  disabled={!readOnly && !(draft[current.id] ?? "").trim() && current.type !== "record"}
+                  onClick={readOnly || alreadyAttempted ? next : check}
+                  disabled={!readOnly && !alreadyAttempted && !(draft[current.id] ?? "").trim() && current.type !== "record"}
                   className="inline-flex items-center justify-center gap-2 rounded-xl bg-accent px-6 py-3 text-sm font-semibold text-accent-foreground shadow-[0_8px_24px_-6px_rgba(243,137,52,0.5)] transition-all hover:bg-[#d9731f] disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none"
                 >
-                  {readOnly ? "Next" : "Check Answer"}
+                  {readOnly || alreadyAttempted ? "Next" : "Check Answer"}
                 </button>
               </div>
+
             ) : (
               <div className={`flex items-center justify-between gap-4 rounded-xl px-5 py-4 ${feedback.ok ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" : "bg-rose-500/10 text-rose-700 dark:text-rose-300"}`}>
                 <div className="flex items-center gap-3">
