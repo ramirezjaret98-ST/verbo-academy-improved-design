@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { USERS, type User, type Role } from "./mock-data";
 import { isMemberBlocked } from "./groups-store";
 import { hydrateAdminRoles, isUserDeactivated } from "./admin-roles";
@@ -7,7 +7,13 @@ interface AuthCtx {
   user: User | null;
   /** False until the stored session has been restored on the client. */
   ready: boolean;
+  /** True during an intentional sign-out, from the moment `logout()` is called
+   *  until the app finishes navigating away from the protected area. Protected
+   *  UI (guards, screens) must use it to tell a deliberate logout apart from a
+   *  session that actually expired. */
+  isLoggingOut: boolean;
   login: (email: string, password: string, remember: boolean) => { ok: true; role: Role } | { ok: false; error: string };
+
   logout: () => void;
   updateProfile: (
     updates: { name?: string; currentPassword?: string; newPassword?: string; forceChange?: boolean },
