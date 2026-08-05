@@ -81,6 +81,40 @@ const EXERCISE_TYPES: ExerciseType[] = [
   "fill_gaps", "drag_drop", "listen_select", "read_select", "record", "read_complete", "match",
 ];
 
+/* ---- Text sanitization ----
+ * Removes AI/Docs citation artifacts such as "[cite: 2]", "[cite:12]",
+ * "[citation: 4]" or "[1]" footnote markers glued to the text. Deliberately
+ * conservative: only bracket groups that are a citation keyword + number, or a
+ * bare number, are stripped — any other bracket content (e.g. "[blank]") stays.
+ */
+const CITATION_RE = /\s*\[\s*(?:cite|citation|source|ref)\s*:?\s*\d+(?:\s*[,;-]\s*\d+)*\s*\]/gi;
+const BARE_FOOTNOTE_RE = /\s*\[\s*\d+(?:\s*[,;-]\s*\d+)*\s*\]/g;
+
+/** Trims and strips citation artifacts from a text value. Idempotent. */
+export function sanitizeText(v: unknown): string {
+  if (typeof v !== "string") return "";
+  return v
+    .replace(CITATION_RE, "")
+    .replace(BARE_FOOTNOTE_RE, "")
+    .replace(/[ \t]{2,}/g, " ")
+    .trim();
+}
+
+/** Applies `sanitizeText` to every text field of an activity. No other field
+ *  is touched, and running it twice produces the same object content. */
+export function sanitizeActivity(a: Activity): Activity {
+  const out: Activity = { ...a };
+  out.name = sanitizeText(a.name);
+  if (a.paragraph !== undefined) out.paragraph = sanitizeText(a.paragraph);
+  if (a.answer !== undefined) out.answer = sanitizeText(a.answer);
+  if (a.prompt !== undefined) out.prompt = sanitizeText(a.prompt);
+  if (a.question !== undefined) out.question = sanitizeText(a.question);
+  if (a.feedback !== undefined) out.feedback = sanitizeText(a.feedback);
+  if (a.items) out.items = a.items.map((i) => ({ text: sanitizeText(i.text), key: sanitizeText(i.key) }));
+  if (a.options) out.options = a.options.map((o) => sanitizeText(o));
+  return out;
+}
+
 /**
  * Validates a raw JSON array of activities for bulk upload. Returns the valid
  * Activity objects plus a descriptive error per rejected item.
@@ -90,7 +124,8 @@ const EXERCISE_TYPES: ExerciseType[] = [
 export function validateBulkActivities(raw: unknown[], unitId: string): { valid: Activity[]; errs: string[] } {
   const valid: Activity[] = [];
   const errs: string[] = [];
-  const str = (v: unknown) => (typeof v === "string" ? v.trim() : "");
+  const str = (v: unknown) => sanitizeText(v);
+
 
   raw.forEach((item, i) => {
     const tag = `#${i}`;
