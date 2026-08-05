@@ -1170,8 +1170,8 @@ function UnitStone({
 function getYouTubeEmbed(url: string): string | null {
   try {
     const u = new URL(url);
-    if (u.hostname.includes("youtube.com")) return `https://www.youtube.com/embed/${u.searchParams.get("v")}`;
-    if (u.hostname.includes("youtu.be")) return `https://www.youtube.com/embed/${u.pathname.slice(1)}`;
+    if (u.hostname.includes("youtube.com")) return `https://www.youtube-nocookie.com/embed/${u.searchParams.get("v")}?rel=0&modestbranding=1`;
+    if (u.hostname.includes("youtu.be")) return `https://www.youtube-nocookie.com/embed/${u.pathname.slice(1)}?rel=0&modestbranding=1`;
   } catch { /* noop */ }
   return null;
 }
