@@ -101,11 +101,15 @@ import {
   isMilestoneUnit,
   levelIsComplete,
   loadActivityScores,
+  incrementAttempts,
   recordActivityScore,
+  resetUnitActivityAttempts,
   setUnitCompleted,
   unitCategoryProgress,
   unitNumberOf,
   unitPassed,
+  wasAttempted,
+
 } from "@/lib/activities-store";
 import {
   loadEvents,
