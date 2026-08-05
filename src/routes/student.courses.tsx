@@ -1599,7 +1599,9 @@ export function ActivityRunner({
           {orderedCats.map((c) => {
             const active = c === activeCat;
             const mandatory = isMandatoryCategory(c);
-            const best = activities.filter((a) => (a.category ?? "uncategorized") === c).reduce((m, a) => Math.max(m, bestScoreFor(studentId, a.id)), 0);
+            const catActivities = activities.filter((a) => (a.category ?? "uncategorized") === c);
+            const best = catActivities.reduce((m, a) => Math.max(m, bestScoreFor(studentId, a.id)), 0);
+            const catAttempted = catActivities.some((a) => wasAttempted(studentId, a.id));
             const ok = mandatory && best >= 60;
             return (
               <button
@@ -1612,7 +1614,21 @@ export function ActivityRunner({
               >
                 <span>{categoryLabel(c)}</span>
                 {mandatory ? (
-                  <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${active ? "bg-white/20 text-white" : ok ? "bg-success/15 text-success" : "bg-muted text-muted-foreground"}`}>{best}/100</span>
+                  <span
+                    title={catAttempted && !ok ? "Already answered — best score so far" : undefined}
+                    className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${
+                      active
+                        ? "bg-white/20 text-white"
+                        : ok
+                        ? "bg-success/15 text-success"
+                        : catAttempted
+                        ? "bg-rose-500/15 text-rose-600 dark:text-rose-300"
+                        : "bg-muted text-muted-foreground"
+                    }`}
+                  >
+                    {catAttempted && !ok ? `Answered · ${best}/100` : `${best}/100`}
+                  </span>
+
                 ) : (
                   <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-medium ${active ? "bg-white/20 text-white" : "bg-secondary text-muted-foreground"}`}>Optional</span>
                 )}
