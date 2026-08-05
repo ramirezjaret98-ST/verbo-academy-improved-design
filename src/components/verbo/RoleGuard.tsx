@@ -6,10 +6,15 @@ import { SessionExpiredScreen, FrozenAccountScreen, isAccountFrozen } from "@/co
 import { SkeletonAppShell } from "@/components/verbo/skeletons";
 
 export function RoleGuard({ allow, children }: { allow: Role; children: ReactNode }) {
-  const { user, ready } = useAuth();
+  const { user, ready, isLoggingOut } = useAuth();
   // Wait for the stored session to be restored before judging the session.
   // Show the app-shell skeleton instead of a blank frame while that happens.
   if (!ready) return <SkeletonAppShell />;
+
+  // Intentional sign-out: the session is gone on purpose and a navigation to a
+  // public route is already in flight — keep the shell until it lands instead
+  // of flashing the expiry screen.
+  if (isLoggingOut) return <SkeletonAppShell />;
 
   // No valid session: surface the timeout screen instead of a silent redirect.
   if (!user) return <SessionExpiredScreen />;

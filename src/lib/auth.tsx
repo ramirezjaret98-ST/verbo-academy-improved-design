@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { USERS, type User, type Role } from "./mock-data";
 import { isMemberBlocked } from "./groups-store";
 import { hydrateAdminRoles, isUserDeactivated } from "./admin-roles";
@@ -7,7 +7,13 @@ interface AuthCtx {
   user: User | null;
   /** False until the stored session has been restored on the client. */
   ready: boolean;
+  /** True during an intentional sign-out, from the moment `logout()` is called
+   *  until the app finishes navigating away from the protected area. Protected
+   *  UI (guards, screens) must use it to tell a deliberate logout apart from a
+   *  session that actually expired. */
+  isLoggingOut: boolean;
   login: (email: string, password: string, remember: boolean) => { ok: true; role: Role } | { ok: false; error: string };
+
   logout: () => void;
   updateProfile: (
     updates: { name?: string; currentPassword?: string; newPassword?: string; forceChange?: boolean },
@@ -57,6 +63,10 @@ function safeWrite(store: Storage | undefined, session: StoredSession) {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [ready, setReady] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const logoutTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (logoutTimer.current) clearTimeout(logoutTimer.current); }, []);
+
 
   useEffect(() => {
     hydrateAdminRoles();
@@ -102,6 +112,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (isUserDeactivated(match.id)) {
       return { ok: false, error: "Account deactivated. Contact your administrator." };
     }
+    if (logoutTimer.current) clearTimeout(logoutTimer.current);
+    setIsLoggingOut(false);
     setUser(match);
     if (remember) {
       safeRemove(sessionStorage);
@@ -113,10 +125,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { ok: true, role: match.role };
   };
 
+  /** Clears the session. Raises `isLoggingOut` synchronously (before `user`
+   *  becomes null) so protected screens can skip the "session expired" state
+   *  while the app navigates away; the flag lowers on the next tick pair, or
+   *  immediately on a new login. */
   const logout = () => {
+    if (logoutTimer.current) clearTimeout(logoutTimer.current);
+    setIsLoggingOut(true);
     setUser(null);
     safeRemove(localStorage);
     safeRemove(sessionStorage);
+    logoutTimer.current = setTimeout(() => setIsLoggingOut(false), 1200);
   };
 
   const updateProfile: AuthCtx["updateProfile"] = (updates) => {
@@ -153,7 +172,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
 
-  return <Ctx.Provider value={{ user, ready, login, logout, updateProfile }}>{children}</Ctx.Provider>;
+  return <Ctx.Provider value={{ user, ready, isLoggingOut, login, logout, updateProfile }}>{children}</Ctx.Provider>;
 }
 
 export function useAuth() {
