@@ -54,7 +54,7 @@ export function Preloader() {
           background:
             "radial-gradient(ellipse at 50% 100%, #01304a 0%, #051a26 55%, #02121c 100%)",
           transform: exiting ? "translateY(-100%)" : "translateY(0)",
-          transition: "transform 1100ms cubic-bezier(0.85, 0, 0.15, 1)",
+          transition: "transform 500ms cubic-bezier(0.85, 0, 0.15, 1)",
           WebkitFontSmoothing: "antialiased",
           MozOsxFontSmoothing: "grayscale",
         }}
@@ -77,7 +77,7 @@ export function Preloader() {
           background:
             "radial-gradient(ellipse at 50% 0%, #01304a 0%, #051a26 55%, #02121c 100%)",
           transform: exiting ? "translateY(100%)" : "translateY(0)",
-          transition: "transform 1100ms cubic-bezier(0.85, 0, 0.15, 1)",
+          transition: "transform 500ms cubic-bezier(0.85, 0, 0.15, 1)",
           WebkitFontSmoothing: "antialiased",
           MozOsxFontSmoothing: "grayscale",
         }}
@@ -98,7 +98,7 @@ export function Preloader() {
         className="absolute inset-0 flex items-center justify-center px-6"
         style={{
           opacity: exiting ? 0 : 1,
-          transition: "opacity 500ms ease",
+          transition: "opacity 220ms ease",
         }}
       >
         <h2
