@@ -305,18 +305,26 @@ export function resetAttempts(studentId: string, unitId: string) {
 }
 
 /* ---- Per-activity best scores (scoped per student) ---- */
-export interface ActivityScore { best: number; attempts: number; lastAt: string }
+export interface ActivityScore {
+  best: number;
+  attempts: number;
+  lastAt: string;
+  /** True as soon as the student submits ANY answer, right or wrong. Lets the
+   *  UI tell "answered incorrectly (best = 0)" apart from "never attempted". */
+  attempted: boolean;
+}
 export function loadActivityScores(_studentId: string): Record<string, ActivityScore> {
   return safeRead<Record<string, ActivityScore>>(SCORES_KEY, {});
 }
 export function recordActivityScore(studentId: string, activityId: string, score: number): ActivityScore {
   const all = safeRead<Record<string, ActivityScore>>(SCORES_KEY, {});
   const k = scopedKey(studentId, activityId);
-  const cur = all[k] ?? { best: 0, attempts: 0, lastAt: "" };
+  const cur = all[k] ?? { best: 0, attempts: 0, lastAt: "", attempted: false };
   const next: ActivityScore = {
     best: Math.max(cur.best, Math.round(score)),
     attempts: cur.attempts + 1,
     lastAt: new Date().toISOString(),
+    attempted: true,
   };
   all[k] = next;
   safeWrite(SCORES_KEY, all);
@@ -326,6 +334,36 @@ export function bestScoreFor(studentId: string, activityId: string): number {
   const all = safeRead<Record<string, ActivityScore>>(SCORES_KEY, {});
   return all[scopedKey(studentId, activityId)]?.best ?? 0;
 }
+/** Whether the student already submitted an answer for this activity.
+ *  Legacy records without the flag fall back to their attempt counter. */
+export function wasAttempted(studentId: string, activityId: string): boolean {
+  const all = safeRead<Record<string, ActivityScore>>(SCORES_KEY, {});
+  const s = all[scopedKey(studentId, activityId)];
+  if (!s) return false;
+  return s.attempted ?? s.attempts > 0;
+}
+
+/**
+ * Restarts a unit for a student: clears the unit attempt counter (reusing
+ * `resetAttempts`) and clears the `attempted` flag of every activity in the
+ * unit so they can be answered again from scratch. Best scores are preserved.
+ */
+export function resetUnitActivityAttempts(studentId: string, unitId: string) {
+  resetAttempts(studentId, unitId);
+  const ids = new Set(activitiesForUnit(unitId).map((a) => a.id));
+  const all = safeRead<Record<string, ActivityScore>>(SCORES_KEY, {});
+  let changed = false;
+  for (const id of ids) {
+    const k = scopedKey(studentId, id);
+    const s = all[k];
+    if (s && (s.attempted ?? s.attempts > 0)) {
+      all[k] = { ...s, attempted: false };
+      changed = true;
+    }
+  }
+  if (changed) safeWrite(SCORES_KEY, all);
+}
+
 
 /* ---- Milestone units (10 / 20 / 30) ---- */
 export function unitNumberOf(unitId: string): number {
