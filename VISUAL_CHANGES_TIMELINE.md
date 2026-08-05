@@ -1047,3 +1047,9 @@ Sin cambios de lógica ni rutas. `DATA_MODEL.md` sigue sincronizado.
 ## Entry 082 — Footer: espacio blanco generoso antes del footer
 - Se aumenta el margen superior del footer compartido (`src/components/verbo/Footer.tsx`) de `mt-20 md:mt-28` a `mt-36 md:mt-52` para separar la última sección del footer y evitar que las páginas con contenido mínimo se fusionen con el fade navy.
 - Visual only — no logic, data or route changes; `DATA_MODEL.md` remains synchronized.
+
+## Entry 083 — Preloader más corto y skeleton app shell con la geometría real
+- `src/components/verbo/Preloader.tsx`: la intro pasa de 2600/3700 ms a 900/1400 ms y las transiciones de los paneles de 1100 ms a 500 ms (slogan 500 → 220 ms). Se añade un latch de módulo (`introPlayed`) para que la animación solo se reproduzca en el arranque real de la app: cualquier navegación cliente posterior a "/" (logout, logo, redirects) renderiza el preloader ya en estado `done`.
+- `src/components/verbo/skeletons.tsx`: `SkeletonAppShell` se reconstruye sin sidebar — barra superior fija de 64px + `main` con el mismo `mx-auto w-full max-w-7xl pt-24 pb-10 px-6` que usan `student.tsx`/`teacher.tsx`/`admin.tsx`, sobre el fondo `#f4f6f8` real.
+- `SkeletonStatCards` ahora replica `HeroStatCard`: `rounded-[2rem]`, `min-h-[168px]`, `px-6 py-6` y un círculo de 52px a la derecha donde el contenido real dibuja el `StatRing`/icono.
+- Visual only — no logic, data or route changes; `DATA_MODEL.md` remains synchronized.
