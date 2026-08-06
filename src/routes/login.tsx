@@ -1,7 +1,6 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useAuth } from "@/lib/auth";
-import { USERS } from "@/lib/mock-data";
 import { Logo } from "@/components/verbo/Logo";
 import { PhotoPlaceholder } from "@/components/verbo/ui";
 import logoSrc from "@/assets/verbo-logo.png";
@@ -104,16 +103,15 @@ function LoginPage() {
     if (submitting) return;
     setError("");
     setBtnState("loading");
-    later(() => {
-      const res = login(email.trim(), password, remember);
+    later(async () => {
+      const res = await login(email.trim(), password, remember);
       if (!res.ok) {
         setError(res.error);
         setBtnState("error");
         later(() => setBtnState("idle"), 900);
         return;
       }
-      const match = USERS.find((u) => u.email.toLowerCase() === email.trim().toLowerCase());
-      const dest = match?.must_change_password
+      const dest = res.must_change_password
         ? "/change-password"
         : res.role === "admin"
           ? "/admin"
