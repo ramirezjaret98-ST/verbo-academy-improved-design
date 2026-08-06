@@ -24,7 +24,9 @@ import {
   type BadgeMetric,
   BADGE_METRIC_META,
   loadBadges,
-  persistBadges,
+  addBadge,
+  updateBadge,
+  deleteBadge,
   subscribeBadges,
   newBadgeId,
 } from "@/lib/badges-store";
@@ -624,28 +626,44 @@ function ruleSummary(b: BadgeDef): string {
 function BadgesManager() {
   const [badges, setBadges] = useState<BadgeDef[]>(loadBadges);
   const [modal, setModal] = useState<{ mode: "create" | "edit"; badge?: BadgeDef } | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     setBadges(loadBadges());
     return subscribeBadges(() => setBadges(loadBadges()));
   }, []);
 
-  const save = (b: BadgeDef) => {
-    setBadges((prev) => {
-      const exists = prev.some((x) => x.id === b.id);
-      const next = exists ? prev.map((x) => (x.id === b.id ? b : x)) : [...prev, b];
-      persistBadges(next);
-      return next;
-    });
+  const save = async (b: BadgeDef) => {
+    setError(null);
+    setSaving(true);
+    try {
+      const exists = badges.some((x) => x.id === b.id);
+      if (exists) {
+        await updateBadge(b);
+      } else {
+        await addBadge(b);
+      }
+      setModal(null);
+    } catch {
+      setError("Couldn't save the badge. Try again.");
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const remove = (id: string) => {
+  const remove = async (id: string) => {
     if (!confirm("Delete this badge?")) return;
-    setBadges((prev) => {
-      const next = prev.filter((b) => b.id !== id);
-      persistBadges(next);
-      return next;
-    });
+    setError(null);
+    setDeletingId(id);
+    try {
+      await deleteBadge(id);
+    } catch {
+      setError("Couldn't delete the badge. Try again.");
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   return (
@@ -659,6 +677,8 @@ function BadgesManager() {
           <Plus className="h-3.5 w-3.5" /> Add badge
         </GhostButton>
       </div>
+
+      {error && <p className="text-xs text-red-600">{error}</p>}
 
       {badges.length === 0 ? (
         <Card><div className="py-10 text-center text-sm text-muted-foreground">No badges yet.</div></Card>
@@ -688,7 +708,8 @@ function BadgesManager() {
                   </button>
                   <button
                     onClick={() => remove(b.id)}
-                    className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-destructive"
+                    disabled={deletingId === b.id}
+                    className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-destructive disabled:opacity-50"
                     aria-label="Delete badge"
                   >
                     <Trash2 className="h-4 w-4" />
@@ -704,8 +725,9 @@ function BadgesManager() {
         <BadgeModal
           existing={badges}
           editing={modal.mode === "edit" ? modal.badge : undefined}
+          saving={saving}
           onClose={() => setModal(null)}
-          onSave={(b) => { save(b); setModal(null); }}
+          onSave={save}
         />
       )}
     </div>
@@ -715,11 +737,13 @@ function BadgesManager() {
 function BadgeModal({
   existing,
   editing,
+  saving,
   onClose,
   onSave,
 }: {
   existing: BadgeDef[];
   editing?: BadgeDef;
+  saving: boolean;
   onClose: () => void;
   onSave: (b: BadgeDef) => void;
 }) {
@@ -812,8 +836,10 @@ function BadgeModal({
         </Field>
       </div>
       <ModalFooter>
-        <GhostButton onClick={onClose}>Cancel</GhostButton>
-        <PrimaryButton disabled={!name.trim()} onClick={handleSave}>Save changes</PrimaryButton>
+        <GhostButton onClick={onClose} disabled={saving}>Cancel</GhostButton>
+        <PrimaryButton disabled={!name.trim() || saving} onClick={handleSave}>
+          {saving ? "Saving…" : "Save changes"}
+        </PrimaryButton>
       </ModalFooter>
     </ModalShell>
   );
