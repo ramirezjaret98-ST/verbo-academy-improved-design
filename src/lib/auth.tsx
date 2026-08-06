@@ -1,7 +1,9 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
-import { USERS, type User, type Role } from "./mock-data";
+import { USERS, userById, type User, type Role } from "./mock-data";
 import { isMemberBlocked } from "./groups-store";
 import { hydrateAdminRoles, isUserDeactivated } from "./admin-roles";
+import { supabase } from "@/integrations/supabase/client";
+import type { Database } from "@/integrations/supabase/types";
 
 interface AuthCtx {
   user: User | null;
@@ -12,12 +14,16 @@ interface AuthCtx {
    *  UI (guards, screens) must use it to tell a deliberate logout apart from a
    *  session that actually expired. */
   isLoggingOut: boolean;
-  login: (email: string, password: string, remember: boolean) => { ok: true; role: Role } | { ok: false; error: string };
+  login: (
+    email: string,
+    password: string,
+    remember: boolean,
+  ) => Promise<{ ok: true; role: Role; must_change_password: boolean } | { ok: false; error: string }>;
 
   logout: () => void;
   updateProfile: (
     updates: { name?: string; currentPassword?: string; newPassword?: string; forceChange?: boolean },
-  ) => { ok: true } | { ok: false; error: string };
+  ) => Promise<{ ok: true } | { ok: false; error: string }>;
 }
 
 /** Password complexity rule shared by forced-change and normal profile flow.
@@ -30,34 +36,48 @@ export function validatePasswordComplexity(pwd: string): string | null {
 }
 
 const Ctx = createContext<AuthCtx | null>(null);
-const KEY = "verbo.auth.user.v2";
-const LEGACY_KEYS = ["verbo.auth.user"];
 
-/** Persisted session envelope. `expiresAt` is null for session-only storage. */
-type StoredSession = { user: User; expiresAt: number | null };
+type AppUserRow = Database["public"]["Tables"]["app_users"]["Row"];
 
-const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
-
-function safeRead(store: Storage | undefined): StoredSession | null {
-  if (!store) return null;
-  try {
-    const raw = store.getItem(KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as StoredSession | User;
-    // Tolerate the legacy shape (bare user object) written by older builds.
-    if (parsed && typeof parsed === "object" && "user" in parsed) return parsed as StoredSession;
-    return { user: parsed as User, expiresAt: null };
-  } catch {
+/** Builds the frontend `User` object from the real Supabase Auth session.
+ *
+ *  Every other store still lives in `localStorage`/`mock-data.ts` and is
+ *  keyed by the OLD demo ids ("u1".."u8", not a real UUID) — see
+ *  `app_users.legacy_id`, set for every demo account during the auth
+ *  migration (2026-08-06). To avoid breaking every not-yet-migrated store at
+ *  once, the `User.id` this app exposes stays the LEGACY id (matching what
+ *  ASSIGNMENTS/SESSIONS/GROUPS/etc. already use), not the raw Supabase UUID.
+ *  Once a given store is migrated to Supabase for real, it should look the
+ *  user up by email or by a dedicated `auth_id` field rather than assuming
+ *  `user.id` is a UUID. */
+async function buildUser(authId: string, email: string): Promise<User | null> {
+  const { data: row, error } = await supabase
+    .from("app_users")
+    .select("*")
+    .eq("id", authId)
+    .maybeSingle();
+  if (error || !row) {
+    console.error("[auth] failed to load app_users profile for session", error);
     return null;
   }
-}
-
-function safeRemove(store: Storage | undefined) {
-  try { store?.removeItem(KEY); } catch {}
-}
-
-function safeWrite(store: Storage | undefined, session: StoredSession) {
-  try { store?.setItem(KEY, JSON.stringify(session)); } catch {}
+  const typedRow = row as AppUserRow;
+  const canonical = typedRow.legacy_id ? userById(typedRow.legacy_id) : undefined;
+  const base: User = canonical ?? {
+    id: typedRow.legacy_id ?? typedRow.id,
+    name: typedRow.name,
+    email: typedRow.email,
+    password: "",
+    role: typedRow.role,
+  };
+  return {
+    ...base,
+    id: typedRow.legacy_id ?? typedRow.id,
+    name: typedRow.name,
+    email: typedRow.email,
+    role: typedRow.role,
+    admin_type: typedRow.admin_type ?? undefined,
+    must_change_password: typedRow.must_change_password,
+  };
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -65,64 +85,94 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const logoutTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // The real Supabase Auth user id behind the currently logged-in session.
+  // Kept separately from `user.id` (which stays the legacy demo id) so
+  // profile writes (`updateProfile`) hit the right `app_users` row.
+  const authIdRef = useRef<string | null>(null);
   useEffect(() => () => { if (logoutTimer.current) clearTimeout(logoutTimer.current); }, []);
 
-
   useEffect(() => {
+    let cancelled = false;
     hydrateAdminRoles();
-    // Drop legacy-shaped sessions so stale role/admin_type fields don't leak in.
-    for (const k of LEGACY_KEYS) {
-      try { localStorage.removeItem(k); } catch {}
-    }
 
-    const restore = (store: Storage): User | null => {
-      const stored = safeRead(store);
-      if (!stored) return null;
-      if (stored.expiresAt !== null && Date.now() > stored.expiresAt) {
-        safeRemove(store);
-        return null;
+    const applySession = async (sessionUser: { id: string; email?: string | null } | null | undefined) => {
+      if (!sessionUser) {
+        authIdRef.current = null;
+        if (!cancelled) setUser(null);
+        return;
       }
-      // Re-hydrate from the canonical USERS list so shape changes (new roles,
-      // admin_type, etc.) always take effect without forcing a re-login.
-      const canonical = USERS.find((u) => u.id === stored.user.id);
-      if (!canonical) {
-        safeRemove(store);
-        return null;
+      const built = await buildUser(sessionUser.id, sessionUser.email ?? "");
+      if (cancelled) return;
+      if (!built) {
+        authIdRef.current = null;
+        setUser(null);
+        return;
       }
-      const merged: User = { ...canonical, ...(stored.user.password ? { password: stored.user.password } : {}) };
-      safeWrite(store, { user: merged, expiresAt: stored.expiresAt });
-      return merged;
+      if (
+        (built.role === "student" && isMemberBlocked(built.id)) ||
+        isUserDeactivated(built.id)
+      ) {
+        authIdRef.current = null;
+        setUser(null);
+        void supabase.auth.signOut();
+        return;
+      }
+      authIdRef.current = sessionUser.id;
+      setUser(built);
     };
 
-    const restored = restore(localStorage) ?? restore(sessionStorage);
-    if (restored) setUser(restored);
-    setReady(true);
+    (async () => {
+      const { data } = await supabase.auth.getSession();
+      await applySession(data.session?.user ?? null);
+      if (!cancelled) setReady(true);
+    })();
+
+    const { data: subscription } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_OUT") {
+        authIdRef.current = null;
+        setUser(null);
+      }
+      // TOKEN_REFRESHED / USER_UPDATED don't require rebuilding the profile;
+      // SIGNED_IN is handled directly by `login()` below.
+    });
+
+    return () => {
+      cancelled = true;
+      subscription.subscription.unsubscribe();
+    };
   }, []);
 
-  const login: AuthCtx["login"] = (email, password, remember) => {
+  const login: AuthCtx["login"] = async (email, password, _remember) => {
+    // NOTE: Supabase's client (src/integrations/supabase/client.ts) always
+    // persists the session to localStorage with auto-refresh — the
+    // "Remember me" checkbox no longer changes storage duration the way the
+    // old mock system did (sessionStorage vs. a 30-day localStorage entry).
+    // Every real login now behaves like "remembered". Flagged for Jaret;
+    // revisit if a real distinction is needed later.
     hydrateAdminRoles();
-    const match = USERS.find(
-      (u) => u.email.toLowerCase() === email.toLowerCase() && u.password === password,
-    );
-    if (!match) return { ok: false, error: "Invalid credentials. Contact your administrator." };
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error || !data.user) {
+      return { ok: false, error: "Invalid credentials. Contact your administrator." };
+    }
+    const built = await buildUser(data.user.id, data.user.email ?? email);
+    if (!built) {
+      await supabase.auth.signOut();
+      return { ok: false, error: "Invalid credentials. Contact your administrator." };
+    }
     // Group members in Pending Removal or Archived status lose platform access.
-    if (match.role === "student" && isMemberBlocked(match.id)) {
+    if (built.role === "student" && isMemberBlocked(built.id)) {
+      await supabase.auth.signOut();
       return { ok: false, error: "Access revoked. Contact your administrator." };
     }
-    if (isUserDeactivated(match.id)) {
+    if (isUserDeactivated(built.id)) {
+      await supabase.auth.signOut();
       return { ok: false, error: "Account deactivated. Contact your administrator." };
     }
     if (logoutTimer.current) clearTimeout(logoutTimer.current);
     setIsLoggingOut(false);
-    setUser(match);
-    if (remember) {
-      safeRemove(sessionStorage);
-      safeWrite(localStorage, { user: match, expiresAt: Date.now() + THIRTY_DAYS_MS });
-    } else {
-      safeRemove(localStorage);
-      safeWrite(sessionStorage, { user: match, expiresAt: null });
-    }
-    return { ok: true, role: match.role };
+    authIdRef.current = data.user.id;
+    setUser(built);
+    return { ok: true, role: built.role, must_change_password: !!built.must_change_password };
   };
 
   /** Clears the session. Raises `isLoggingOut` synchronously (before `user`
@@ -132,45 +182,67 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = () => {
     if (logoutTimer.current) clearTimeout(logoutTimer.current);
     setIsLoggingOut(true);
+    authIdRef.current = null;
     setUser(null);
-    safeRemove(localStorage);
-    safeRemove(sessionStorage);
+    void supabase.auth.signOut();
     logoutTimer.current = setTimeout(() => setIsLoggingOut(false), 1200);
   };
 
-  const updateProfile: AuthCtx["updateProfile"] = (updates) => {
-    if (!user) return { ok: false, error: "No active session." };
+  const updateProfile: AuthCtx["updateProfile"] = async (updates) => {
+    if (!user || !authIdRef.current) return { ok: false, error: "No active session." };
+    const authId = authIdRef.current;
 
     if (updates.newPassword) {
-      if (!updates.forceChange && updates.currentPassword !== user.password) {
-        return { ok: false, error: "Current password is incorrect." };
+      if (!updates.forceChange) {
+        if (!updates.currentPassword) {
+          return { ok: false, error: "Current password is incorrect." };
+        }
+        // Re-verify the current password by attempting a fresh sign-in
+        // before allowing the change (Supabase's updateUser doesn't ask for
+        // the current password itself once a session is active).
+        const { error: reauthError } = await supabase.auth.signInWithPassword({
+          email: user.email,
+          password: updates.currentPassword,
+        });
+        if (reauthError) {
+          return { ok: false, error: "Current password is incorrect." };
+        }
       }
       const complexityError = validatePasswordComplexity(updates.newPassword);
       if (complexityError) {
         return { ok: false, error: complexityError };
+      }
+      const { error: pwError } = await supabase.auth.updateUser({ password: updates.newPassword });
+      if (pwError) {
+        return { ok: false, error: "Couldn't update the password. Try again." };
+      }
+    }
+
+    const patch: { name?: string; must_change_password?: boolean } = {};
+    if (updates.name) patch.name = updates.name.trim();
+    if (updates.newPassword) patch.must_change_password = false;
+
+    if (Object.keys(patch).length > 0) {
+      const { error: updateError } = await supabase.from("app_users").update(patch).eq("id", authId);
+      if (updateError) {
+        return { ok: false, error: "Couldn't save the profile. Try again." };
       }
     }
 
     const next: User = {
       ...user,
       ...(updates.name ? { name: updates.name.trim() } : {}),
-      ...(updates.newPassword ? { password: updates.newPassword, must_change_password: false } : {}),
+      ...(updates.newPassword ? { must_change_password: false } : {}),
     };
 
-    // Keep the in-memory mock DB in sync so a re-login reflects the change.
+    // Keep the in-memory mock DB in sync for any code still reading USERS
+    // directly (e.g. admin lists of the demo roster).
     const idx = USERS.findIndex((u) => u.id === user.id);
-    if (idx !== -1) USERS[idx] = next;
+    if (idx !== -1) USERS[idx] = { ...USERS[idx], ...next };
 
     setUser(next);
-    // Write back into whichever storage currently holds the active session,
-    // preserving the original expiry.
-    const local = safeRead(localStorage);
-    const target = local ? localStorage : sessionStorage;
-    const existing = local ?? safeRead(sessionStorage);
-    safeWrite(target, { user: next, expiresAt: existing?.expiresAt ?? null });
     return { ok: true };
   };
-
 
   return <Ctx.Provider value={{ user, ready, isLoggingOut, login, logout, updateProfile }}>{children}</Ctx.Provider>;
 }
