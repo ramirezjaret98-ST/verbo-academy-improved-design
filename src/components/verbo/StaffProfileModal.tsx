@@ -77,6 +77,7 @@ export function StaffProfileModal({ open, onOpenChange }: Props) {
   const [confirm, setConfirm] = useState("");
   const [pwError, setPwError] = useState<string | null>(null);
   const [pwDone, setPwDone] = useState(false);
+  const [pwSubmitting, setPwSubmitting] = useState(false);
 
   // Student-only extras
   const [gallery, setGallery] = useState(false);
@@ -162,15 +163,18 @@ export function StaffProfileModal({ open, onOpenChange }: Props) {
     });
   };
 
-  const submitPassword = (e: React.FormEvent) => {
+  const submitPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setPwError(null);
     setPwDone(false);
+    if (pwSubmitting) return;
     if (!current) return setPwError("Enter your current password.");
     if (next !== confirm) return setPwError("New passwords do not match.");
     const complexity = validatePasswordComplexity(next);
     if (complexity) return setPwError(complexity);
-    const res = updateProfile({ currentPassword: current, newPassword: next });
+    setPwSubmitting(true);
+    const res = await updateProfile({ currentPassword: current, newPassword: next });
+    setPwSubmitting(false);
     if (!res.ok) return setPwError(res.error);
     setPwDone(true);
     setCurrent("");
@@ -569,9 +573,10 @@ export function StaffProfileModal({ open, onOpenChange }: Props) {
                 <div className="flex gap-2">
                   <button
                     type="submit"
-                    className="verbo-profile-press flex-1 cursor-pointer rounded-full bg-orange-500 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-orange-600"
+                    disabled={pwSubmitting}
+                    className="verbo-profile-press flex-1 cursor-pointer rounded-full bg-orange-500 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    Update password
+                    {pwSubmitting ? "Updating…" : "Update password"}
                   </button>
                   <button
                     type="button"
