@@ -35,8 +35,8 @@ function ChangePasswordPage() {
     if (complexityError) return setError(complexityError);
     if (!matches) return setError("Passwords do not match.");
     setSubmitting(true);
-    setTimeout(() => {
-      const res = updateProfile({ newPassword: next, forceChange: true });
+    setTimeout(async () => {
+      const res = await updateProfile({ newPassword: next, forceChange: true });
       if (!res.ok) {
         setError(res.error);
         setSubmitting(false);
