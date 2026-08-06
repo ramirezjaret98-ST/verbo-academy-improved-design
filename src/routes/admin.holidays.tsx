@@ -21,6 +21,8 @@ function Page() {
   const [date, setDate] = useState("");
   const [label, setLabel] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const grouped = useMemo(() => {
     const map = new Map<number, typeof holidays>();
@@ -32,14 +34,33 @@ function Page() {
     return Array.from(map.entries()).sort((a, b) => a[0] - b[0]);
   }, [holidays]);
 
-  const submit = () => {
+  const submit = async () => {
     setError(null);
     if (!date) { setError("Pick a date."); return; }
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) { setError("Invalid date format."); return; }
     if (!label.trim()) { setError("Add a label so teachers know what this holiday is."); return; }
-    addHoliday({ date, label });
-    setDate("");
-    setLabel("");
+    setSaving(true);
+    try {
+      await addHoliday({ date, label });
+      setDate("");
+      setLabel("");
+    } catch {
+      setError("Couldn't save the holiday. Try again.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const remove = async (id: string) => {
+    setError(null);
+    setDeletingId(id);
+    try {
+      await removeHoliday(id);
+    } catch {
+      setError("Couldn't delete the holiday. Try again.");
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   return (
@@ -74,7 +95,7 @@ function Page() {
               className="mt-1 block h-10 w-full rounded-lg border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
             />
           </div>
-          <PrimaryButton onClick={submit}><Plus className="h-4 w-4" /> Add Holiday</PrimaryButton>
+          <PrimaryButton onClick={submit} disabled={saving}><Plus className="h-4 w-4" /> {saving ? "Adding…" : "Add Holiday"}</PrimaryButton>
         </div>
         {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
       </Card>
@@ -106,7 +127,7 @@ function Page() {
                         <td className="px-3 py-2 text-foreground">{fmt(h.date)}</td>
                         <td className="px-3 py-2 text-foreground">{h.label}</td>
                         <td className="px-3 py-2 text-right">
-                          <GhostButton onClick={() => removeHoliday(h.id)} className="!px-2">
+                          <GhostButton onClick={() => remove(h.id)} disabled={deletingId === h.id} className="!px-2">
                             <Trash2 className="h-4 w-4" />
                           </GhostButton>
                         </td>
