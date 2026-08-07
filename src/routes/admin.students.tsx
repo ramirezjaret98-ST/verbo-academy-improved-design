@@ -31,7 +31,11 @@ import {
 import { groupsByStudentId, groupOfStudent, removeMember, subscribeGroups, effectiveSessionCounts, sessionProgressFor } from "@/lib/groups-store";
 import { studentAttendance } from "@/lib/sessions-store";
 import { logPayment, expectedAmountForStudent, loadPayments } from "@/lib/payments-log";
-import { setLevelReopened } from "@/lib/students-store";
+import {
+  setLevelReopened,
+  patchStudentProfile,
+  type StudentProfileFields,
+} from "@/lib/students-store";
 import { RotateCcw, Unlock as UnlockIcon, Lock as LockIcon, Trophy } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { loadCourses, subscribeCourses, type CourseLevel } from "@/lib/product-courses-store";
@@ -68,9 +72,6 @@ const REGISTERED_KEY = "verbo:registered-students";
 function readProfileOverrides(): Record<string, Partial<User>> {
   if (typeof window === "undefined") return {};
   try { return JSON.parse(localStorage.getItem(PROFILE_KEY) || "{}"); } catch { return {}; }
-}
-function writeProfileOverrides(map: Record<string, Partial<User>>) {
-  if (typeof window !== "undefined") localStorage.setItem(PROFILE_KEY, JSON.stringify(map));
 }
 function readRegisteredStudents(): User[] {
   if (typeof window === "undefined") return [];
@@ -204,14 +205,17 @@ function Page() {
   const persist = (updated: User) => {
     const idx = USERS.findIndex((u) => u.id === updated.id);
     if (idx >= 0) USERS[idx] = updated; else USERS.push(updated);
-    const overrides = readProfileOverrides();
-    const { id, name, role, ...rest } = updated;
-    overrides[updated.id] = { name, ...rest };
-    writeProfileOverrides(overrides);
     // keep registered list fresh if this is a locally-created student
     const registered = readRegisteredStudents();
     const rIdx = registered.findIndex((u) => u.id === updated.id);
     if (rIdx >= 0) { registered[rIdx] = updated; writeRegisteredStudents(registered); }
+    // patchStudentProfile owns the Supabase write for the DB-backed profile
+    // fields (with a localStorage-override fallback for locally-registered
+    // students without a real app_users row). It only ever sends the in-scope
+    // student profile columns, so the extra keys still present on `rest`
+    // (password, challenge state, …) never reach the DB.
+    const { id, name, role, ...rest } = updated;
+    patchStudentProfile(updated.id, rest as Partial<StudentProfileFields>);
     forceTick((n) => n + 1);
   };
 
