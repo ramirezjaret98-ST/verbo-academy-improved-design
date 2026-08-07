@@ -55,25 +55,22 @@ export function completedSessionCount(studentId: string, sessions: { student_id:
 /* -------------------- Per-unit completion (VIP) ---------------------- */
 export type VipUnitCompletion = CustomUnitCompletion;
 
-const COMPLETION_KEY = "verbo:vip-unit-completion";
-const COMPLETION_EVENT = "verbo:vip-unit-completion-updated";
-
 export function vipUnitDoneMap(): Record<string, VipUnitCompletion> {
-  return readCompletionMap(COMPLETION_KEY);
+  return readCompletionMap("vip");
 }
 
 export function isVipUnitDone(unitId: string): boolean {
-  return !!readCompletionMap(COMPLETION_KEY)[unitId];
+  return !!readCompletionMap("vip")[unitId];
 }
 
 export function markVipUnitDone(unitId: string, sessionId: string) {
-  markCompletion(COMPLETION_KEY, COMPLETION_EVENT, unitId, sessionId);
+  markCompletion("vip", unitId, sessionId);
 }
 
 export function clearVipUnitDoneForSession(sessionId: string) {
-  clearCompletionForSession(COMPLETION_KEY, COMPLETION_EVENT, sessionId);
+  clearCompletionForSession("vip", sessionId);
 }
 
 export function subscribeVipUnitCompletion(cb: () => void): () => void {
-  return subscribeCompletion(COMPLETION_KEY, COMPLETION_EVENT, cb);
+  return subscribeCompletion("vip", cb);
 }

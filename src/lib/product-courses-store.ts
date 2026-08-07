@@ -1,14 +1,32 @@
 // Product-based course catalog — the source of truth for the Admin > Courses
-// 3-level navigation: Product > Commercial Level > Units.
-// Persisted to localStorage and broadcast via a custom event so any open
-// tab/route updates in real-time. VIP is intentionally excluded here.
-
-import syllabusData from "./syllabus-data.json";
+// 3-level navigation: Product > Commercial Level > Units. VIP is intentionally
+// excluded here — it's driven by custom-units-store.ts's "vip" kind instead.
+//
+// Backed by Supabase (`public.product_courses` + `public.course_levels` +
+// `public.course_units`). Level *names* (e.g. "Kickstart") and the set of
+// products/levels themselves are NOT stored in the DB — there's no UI to
+// rename a level or add/remove a product, so PRODUCT_META/PRODUCT_ORDER/
+// LEVEL_NAMES stay as static frontend constants exactly like before.
+// `course_levels.code` and `course_units.code` are the compound text ids
+// ("GO-L1", "GO-L1-U1") every other part of the app already keys units by
+// (activities, lesson plans, unit-unlock-seen, etc. — none of them are
+// migrated yet and all still expect that exact string shape).
+//
+// Only the per-unit content (title/video_url/pdf_url/block/vocabulary/
+// grammar_point/teaser) is dynamic; it's seeded once from the real syllabus
+// content (Lote 7 migration, see `schema_rls_design_supabase_2026-08-05.md`
+// / project memory for the seeding SQL). RLS: `select("*")` on all three
+// tables is open to everyone; writes are admin-only — a single global cache
+// hydrated once + kept in sync via Postgres Realtime covers every caller
+// (same pattern as holidays/badges). Writes stay optimistic and synchronous
+// in their public signature, same as every other store migrated so far.
+import { supabase } from "@/integrations/supabase/client";
+import type { Database } from "@/integrations/supabase/types";
 
 export type ProductId = "go" | "enterprise" | "international";
 
 export interface CourseUnit {
-  id: string; // e.g. GO-L1-U1
+  id: string; // e.g. GO-L1-U1 — matches `course_units.code`
   title: string;
   video_url: string;
   pdf_url: string;
@@ -19,69 +37,8 @@ export interface CourseUnit {
   teaser?: string;
 }
 
-interface SyllabusUnit {
-  id: string;
-  title: string;
-  block: string;
-  vocabulary: string[];
-  grammar_point: string;
-}
-const SYLLABUS = syllabusData as Record<string, SyllabusUnit[]>;
-
-const PLACEHOLDER_TITLE_RE = /^(Unit|Review) \d+$/;
-
-/**
- * Merge syllabus data (titles, blocks, vocabulary, grammar points) from the
- * shipped `syllabus-data.json` into a courses tree loaded from localStorage
- * (or a fresh seed). Preserves any hand-edited titles, video_url and pdf_url.
- * Returns true when something changed.
- */
-function applySyllabus(courses: ProductCourse[]): boolean {
-  let changed = false;
-  for (const product of courses) {
-    for (const level of product.levels) {
-      const syllabusUnits = SYLLABUS[level.id];
-      if (!syllabusUnits) continue;
-      const byId = new Map(level.units.map((u) => [u.id, u]));
-      for (const s of syllabusUnits) {
-        const existing = byId.get(s.id);
-        if (existing) {
-          if (PLACEHOLDER_TITLE_RE.test(existing.title) && existing.title !== s.title) {
-            existing.title = s.title;
-            changed = true;
-          }
-          if (existing.block !== s.block) { existing.block = s.block; changed = true; }
-          if (JSON.stringify(existing.vocabulary ?? []) !== JSON.stringify(s.vocabulary)) {
-            existing.vocabulary = [...s.vocabulary]; changed = true;
-          }
-          if (existing.grammar_point !== s.grammar_point) {
-            existing.grammar_point = s.grammar_point; changed = true;
-          }
-        } else {
-          level.units.push({
-            id: s.id,
-            title: s.title,
-            video_url: "",
-            pdf_url: "",
-            block: s.block,
-            vocabulary: [...s.vocabulary],
-            grammar_point: s.grammar_point,
-          });
-          changed = true;
-        }
-      }
-      level.units.sort((a, b) => {
-        const na = parseInt(a.id.match(/-U(\d+)$/)?.[1] ?? "0", 10);
-        const nb = parseInt(b.id.match(/-U(\d+)$/)?.[1] ?? "0", 10);
-        return na - nb;
-      });
-    }
-  }
-  return changed;
-}
-
 export interface CourseLevel {
-  id: string; // e.g. GO-L1
+  id: string; // e.g. GO-L1 — matches `course_levels.code`
   name: string;
   units: CourseUnit[];
 }
@@ -99,7 +56,8 @@ export const PRODUCT_META: Record<ProductId, { label: string; description: strin
 
 export const PRODUCT_ORDER: ProductId[] = ["go", "enterprise", "international"];
 
-// Placeholder commercial level names — editable later.
+// Placeholder commercial level names — editable later (would need a `name`
+// column on `course_levels` if this ever becomes admin-editable).
 const LEVEL_NAMES: Record<ProductId, string[]> = {
   go: ["Kickstart", "Everyday Flow", "Confident Voice", "Culture Master"],
   enterprise: ["Core Foundations", "Strategic Fluency", "Executive Presence", "Global Leadership"],
@@ -108,70 +66,127 @@ const LEVEL_NAMES: Record<ProductId, string[]> = {
 
 export const UNITS_PER_LEVEL = 30;
 
-export const COURSES_KEY = "verbo:product-courses";
 export const COURSES_EVENT = "verbo:product-courses-updated";
 
-function seed(): ProductCourse[] {
-  return PRODUCT_ORDER.map((product) => ({
-    product,
-    levels: LEVEL_NAMES[product].map((name, i) => ({
-      id: `${PRODUCT_META[product].label.toUpperCase()}-L${i + 1}`,
-      name,
-      units: [],
-    })),
-  }));
+type UnitRow = Database["public"]["Tables"]["course_units"]["Row"];
+
+function levelIdFor(product: ProductId, index: number): string {
+  return `${PRODUCT_META[product].label.toUpperCase()}-L${index + 1}`;
+}
+
+function unitNumFrom(id: string): number {
+  const m = id.match(/-U(\d+)$/);
+  return m ? parseInt(m[1], 10) : 0;
+}
+
+function sortByUnitNum(units: CourseUnit[]): CourseUnit[] {
+  return [...units].sort((a, b) => unitNumFrom(a.id) - unitNumFrom(b.id));
+}
+
+function fromUnitRow(row: UnitRow): CourseUnit {
+  return {
+    id: row.code,
+    title: row.title,
+    video_url: row.video_url ?? "",
+    pdf_url: row.pdf_url ?? "",
+    block: row.block ?? undefined,
+    vocabulary: row.vocabulary ?? undefined,
+    grammar_point: row.grammar_point ?? undefined,
+    teaser: row.teaser ?? undefined,
+  };
+}
+
+// course_levels.code ("GO-L1") <-> its numeric row id, needed for writes.
+let levelDbIdByCode = new Map<string, number>();
+let unitsByLevelCode = new Map<string, CourseUnit[]>();
+let hydrated = false;
+let hydratePromise: Promise<void> | null = null;
+const listeners = new Set<() => void>();
+
+function notify() {
+  listeners.forEach((cb) => cb());
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent(COURSES_EVENT));
+  }
+}
+
+async function hydrate(): Promise<void> {
+  if (hydrated) return;
+  if (hydratePromise) return hydratePromise;
+  hydratePromise = (async () => {
+    const [levelsRes, unitsRes] = await Promise.all([
+      supabase.from("course_levels").select("*"),
+      supabase.from("course_units").select("*").order("position"),
+    ]);
+    if (levelsRes.error) {
+      console.error("[product-courses-store] failed to load course_levels", levelsRes.error);
+    }
+    if (unitsRes.error) {
+      console.error("[product-courses-store] failed to load course_units", unitsRes.error);
+    }
+    const codeById = new Map<number, string>();
+    const dbIdByCode = new Map<string, number>();
+    for (const l of levelsRes.data ?? []) {
+      codeById.set(l.id, l.code);
+      dbIdByCode.set(l.code, l.id);
+    }
+    const grouped = new Map<string, CourseUnit[]>();
+    for (const row of unitsRes.data ?? []) {
+      const levelCode = codeById.get(row.course_level_id);
+      if (!levelCode) continue;
+      const list = grouped.get(levelCode) ?? [];
+      list.push(fromUnitRow(row));
+      grouped.set(levelCode, list);
+    }
+    levelDbIdByCode = dbIdByCode;
+    unitsByLevelCode = grouped;
+    hydrated = true;
+  })();
+  await hydratePromise;
+  hydratePromise = null;
+  notify();
+}
+
+let realtimeStarted = false;
+function ensureRealtime() {
+  if (realtimeStarted || typeof window === "undefined") return;
+  realtimeStarted = true;
+  supabase
+    .channel("product-courses-store-changes")
+    .on("postgres_changes", { event: "*", schema: "public", table: "course_units" }, () => {
+      hydrated = false;
+      hydratePromise = null;
+      void hydrate();
+    })
+    .on("postgres_changes", { event: "*", schema: "public", table: "course_levels" }, () => {
+      hydrated = false;
+      hydratePromise = null;
+      void hydrate();
+    })
+    .subscribe();
+}
+
+if (typeof window !== "undefined") {
+  void hydrate();
+  ensureRealtime();
 }
 
 export function loadCourses(): ProductCourse[] {
-  if (typeof window === "undefined") {
-    const s = seed();
-    applySyllabus(s);
-    return s;
-  }
-  try {
-    const raw = localStorage.getItem(COURSES_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw) as ProductCourse[];
-      // One-time migration: rename Enterprise L4 to "Global Leadership".
-      let migrated = false;
-      for (const p of parsed) {
-        if (p.product === "enterprise") {
-          for (const l of p.levels) {
-            if (l.name === "Global Mastery") { l.name = "Global Leadership"; migrated = true; }
-          }
-        }
-      }
-      // Migration: merge real syllabus (titles/block/vocabulary/grammar_point)
-      // into existing units without touching hand-edited titles or media URLs.
-      if (applySyllabus(parsed)) migrated = true;
-      if (migrated) {
-        try { localStorage.setItem(COURSES_KEY, JSON.stringify(parsed)); } catch { /* noop */ }
-      }
-      return parsed;
-    }
-  } catch { /* noop */ }
-  const initial = seed();
-  applySyllabus(initial);
-  try { localStorage.setItem(COURSES_KEY, JSON.stringify(initial)); } catch { /* noop */ }
-  return initial;
-}
-
-export function persistCourses(courses: ProductCourse[]) {
-  if (typeof window === "undefined") return;
-  try {
-    localStorage.setItem(COURSES_KEY, JSON.stringify(courses));
-    window.dispatchEvent(new CustomEvent(COURSES_EVENT));
-  } catch { /* noop */ }
+  return PRODUCT_ORDER.map((product) => ({
+    product,
+    levels: LEVEL_NAMES[product].map((name, i) => {
+      const id = levelIdFor(product, i);
+      return { id, name, units: unitsByLevelCode.get(id) ?? [] };
+    }),
+  }));
 }
 
 export function subscribeCourses(cb: () => void): () => void {
-  if (typeof window === "undefined") return () => {};
-  const onStorage = (e: StorageEvent) => { if (e.key === COURSES_KEY) cb(); };
-  window.addEventListener(COURSES_EVENT, cb);
-  window.addEventListener("storage", onStorage);
+  listeners.add(cb);
+  void hydrate();
+  ensureRealtime();
   return () => {
-    window.removeEventListener(COURSES_EVENT, cb);
-    window.removeEventListener("storage", onStorage);
+    listeners.delete(cb);
   };
 }
 
@@ -184,6 +199,115 @@ export function buildSkeletonUnits(levelId: string, startAt = 1): CourseUnit[] {
     units.push({ id: `${levelId}-U${i}`, title, video_url: "", pdf_url: "" });
   }
   return units;
+}
+
+function unitToRow(levelDbId: number, unit: CourseUnit) {
+  return {
+    course_level_id: levelDbId,
+    code: unit.id,
+    title: unit.title,
+    video_url: unit.video_url || null,
+    pdf_url: unit.pdf_url || null,
+    block: unit.block ?? null,
+    vocabulary: unit.vocabulary ?? null,
+    grammar_point: unit.grammar_point ?? null,
+    teaser: unit.teaser ?? null,
+    position: unitNumFrom(unit.id),
+  };
+}
+
+/**
+ * Create or edit a single unit within a level. `originalId` is the unit's
+ * previous id (pass `null` when creating a brand-new unit, or the same id
+ * as `unit.id` for an in-place edit). When `originalId` differs from
+ * `unit.id` (the admin changed the unit number), the underlying row is
+ * renamed in place — `code` isn't a foreign key target anywhere in this
+ * table, so this is a plain single-row UPDATE, not a delete+insert.
+ */
+export function saveUnit(levelId: string, originalId: string | null, unit: CourseUnit): void {
+  const levelDbId = levelDbIdByCode.get(levelId);
+  if (levelDbId === undefined) {
+    console.error("[product-courses-store] unknown level id", levelId);
+    return;
+  }
+  const prevMap = unitsByLevelCode;
+  const list = unitsByLevelCode.get(levelId) ?? [];
+  const withoutOld = list.filter((u) => u.id !== originalId && u.id !== unit.id);
+  unitsByLevelCode = new Map(unitsByLevelCode).set(levelId, sortByUnitNum([...withoutOld, unit]));
+  notify();
+
+  void (async () => {
+    if (originalId && originalId !== unit.id) {
+      const { error } = await supabase
+        .from("course_units")
+        .update(unitToRow(levelDbId, unit))
+        .eq("course_level_id", levelDbId)
+        .eq("code", originalId);
+      if (error) {
+        console.error("[product-courses-store] failed to rename unit", error);
+        unitsByLevelCode = prevMap;
+        notify();
+      }
+      return;
+    }
+    const { error } = await supabase
+      .from("course_units")
+      .upsert(unitToRow(levelDbId, unit), { onConflict: "course_level_id,code" });
+    if (error) {
+      console.error("[product-courses-store] failed to save unit", error);
+      unitsByLevelCode = prevMap;
+      notify();
+    }
+  })();
+}
+
+export function deleteUnit(levelId: string, unitId: string): void {
+  const levelDbId = levelDbIdByCode.get(levelId);
+  if (levelDbId === undefined) return;
+  const prevMap = unitsByLevelCode;
+  const list = unitsByLevelCode.get(levelId) ?? [];
+  unitsByLevelCode = new Map(unitsByLevelCode).set(levelId, list.filter((u) => u.id !== unitId));
+  notify();
+
+  void (async () => {
+    const { error } = await supabase
+      .from("course_units")
+      .delete()
+      .eq("course_level_id", levelDbId)
+      .eq("code", unitId);
+    if (error) {
+      console.error("[product-courses-store] failed to delete unit", error);
+      unitsByLevelCode = prevMap;
+      notify();
+    }
+  })();
+}
+
+/** Bulk-adds skeleton (or bulk-uploaded) units in a single optimistic update
+ *  + a single background upsert, keyed by (level, code) so it's safe to
+ *  re-run against units that already exist. */
+export function addUnitsBulk(levelId: string, units: CourseUnit[]): void {
+  if (units.length === 0) return;
+  const levelDbId = levelDbIdByCode.get(levelId);
+  if (levelDbId === undefined) {
+    console.error("[product-courses-store] unknown level id", levelId);
+    return;
+  }
+  const prevMap = unitsByLevelCode;
+  const list = unitsByLevelCode.get(levelId) ?? [];
+  const merged = [...list.filter((u) => !units.some((n) => n.id === u.id)), ...units];
+  unitsByLevelCode = new Map(unitsByLevelCode).set(levelId, sortByUnitNum(merged));
+  notify();
+
+  void (async () => {
+    const rows = units.map((u) => unitToRow(levelDbId, u));
+    const { error } = await supabase.from("course_units").upsert(rows, { onConflict: "course_level_id,code" });
+    if (error) {
+      console.error("[product-courses-store] failed to bulk-add units", error);
+      unitsByLevelCode = prevMap;
+      notify();
+    }
+  })();
 }
 
 /** Resolve the real curriculum topic of a lesson plan's (level_id, unit_id).

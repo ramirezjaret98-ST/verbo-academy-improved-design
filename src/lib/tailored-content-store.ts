@@ -50,25 +50,22 @@ export function subscribeTailoredUnits(cb: () => void): () => void {
 /* -------------------- Per-unit completion (Tailored Content) --------- */
 export type TailoredUnitCompletion = CustomUnitCompletion;
 
-const COMPLETION_KEY = "verbo:tailored-content-completion";
-const COMPLETION_EVENT = "verbo:tailored-content-completion-updated";
-
 export function tailoredUnitDoneMap(): Record<string, TailoredUnitCompletion> {
-  return readCompletionMap(COMPLETION_KEY);
+  return readCompletionMap("tailored");
 }
 
 export function isTailoredUnitDone(unitId: string): boolean {
-  return !!readCompletionMap(COMPLETION_KEY)[unitId];
+  return !!readCompletionMap("tailored")[unitId];
 }
 
 export function markTailoredUnitDone(unitId: string, sessionId: string) {
-  markCompletion(COMPLETION_KEY, COMPLETION_EVENT, unitId, sessionId);
+  markCompletion("tailored", unitId, sessionId);
 }
 
 export function clearTailoredUnitDoneForSession(sessionId: string) {
-  clearCompletionForSession(COMPLETION_KEY, COMPLETION_EVENT, sessionId);
+  clearCompletionForSession("tailored", sessionId);
 }
 
 export function subscribeTailoredUnitCompletion(cb: () => void): () => void {
-  return subscribeCompletion(COMPLETION_KEY, COMPLETION_EVENT, cb);
+  return subscribeCompletion("tailored", cb);
 }
