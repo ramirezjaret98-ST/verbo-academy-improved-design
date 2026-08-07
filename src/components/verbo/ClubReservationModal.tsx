@@ -76,7 +76,7 @@ export function ClubReservationModal({
   const onReserve = async () => {
     setBusy(true);
     setError(null);
-    const res = reserveSeat(studentId, club.id);
+    const res = await reserveSeat(studentId, club.id);
     setBusy(false);
     if (!res.ok) { setError(res.reason); return; }
     toast.success("Seat reserved. See you there!");
@@ -84,7 +84,7 @@ export function ClubReservationModal({
   const onCancel = async () => {
     setBusy(true);
     setError(null);
-    const res = cancelSeat(studentId, club.id);
+    const res = await cancelSeat(studentId, club.id);
     setBusy(false);
     if (!res.ok) { setError(res.reason); return; }
     toast("Reservation cancelled.");

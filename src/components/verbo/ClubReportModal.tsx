@@ -68,7 +68,7 @@ export function ClubReportModal({
     // Calendar and Manage Clubs reflect immediately. Spotlight events don't
     // yet have a cross-app store; the club-reports entry alone tracks them.
     if (event.type === "book" || event.type === "insight") {
-      updateClub(event.id, { status: "completed" });
+      void updateClub(event.id, { status: "completed" });
     } else if (event.type === "spotlight") {
       updateSession(event.id, { status: "completed" });
     }
