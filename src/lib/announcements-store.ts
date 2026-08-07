@@ -1,7 +1,22 @@
 // Announcements — created by the admin in Overview, reflected as dismissible
-// banners at the top of the Student and Teacher panels. Persisted to
-// localStorage and broadcast so every open route stays in sync.
+// banners at the top of the Student and Teacher panels.
+//
+// Backed by Supabase: `public.announcements` (admin-write, open SELECT) and
+// `public.announcement_dismissals` (self-insert, self-or-admin SELECT — one
+// row per user per dismissed announcement). Both are kept as small global
+// caches hydrated once and refreshed via Postgres Realtime, matching the
+// pattern used across this migration.
+//
+// Note: the old localStorage version tracked dismissals per-BROWSER, not
+// per-user (there was no userId parameter). Since Supabase's dismissal table
+// requires a real `user_id`, `dismissAnnouncement`/`announcementsForRole` now
+// take the caller's (legacy) user id explicitly — this actually fixes a
+// latent bug where two different app users sharing a browser would dismiss
+// banners for each other.
 import { useSyncExternalStore } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import type { Database } from "@/integrations/supabase/types";
+import { hydrateUserIdBridge, legacyToUuid, uuidToLegacySync } from "@/lib/user-id-bridge";
 import type { Role } from "./mock-data";
 
 export type Audience = "all" | "students" | "teachers";
@@ -15,58 +30,103 @@ export interface Announcement {
 }
 
 export const ANNOUNCEMENT_MAX = 280;
-
-const KEY = "verbo:announcements";
-const DISMISS_KEY = "verbo:announcements-dismissed";
 export const ANN_EVENT = "verbo:announcements-updated";
 
-const SEED: Announcement[] = [
-  {
-    id: "a-welcome",
-    message: "Welcome to the new Verbo experience! Explore your dashboard and reach out to your coach anytime.",
-    audience: "all",
-    published_at: new Date().toISOString(),
-  },
-];
+type AnnRow = Database["public"]["Tables"]["announcements"]["Row"];
 
-function safeRead<T>(k: string, fallback: T): T {
-  if (typeof window === "undefined") return fallback;
-  try {
-    const v = localStorage.getItem(k);
-    return v ? (JSON.parse(v) as T) : fallback;
-  } catch {
-    return fallback;
-  }
+const SEED: Announcement[] = [];
+
+let cache: Announcement[] = SEED;
+let hydrated = false;
+let hydratePromise: Promise<void> | null = null;
+
+let dismissedCache = new Map<string, Set<string>>(); // legacy userId -> dismissed announcement ids
+let dismissedHydrated = false;
+let dismissedHydratePromise: Promise<void> | null = null;
+
+const listeners = new Set<() => void>();
+
+function notify() {
+  listeners.forEach((cb) => cb());
+  if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent(ANN_EVENT));
 }
 
-let cache: Announcement[] | null = null;
-function invalidate() {
-  cache = null;
+function mapRow(row: AnnRow): Announcement {
+  return {
+    id: String(row.id),
+    message: row.message,
+    audience: row.audience,
+    published_at: row.published_at,
+    expires_at: row.expires_at ?? undefined,
+  };
 }
 
-function write(list: Announcement[]) {
-  if (typeof window === "undefined") return;
-  try {
-    localStorage.setItem(KEY, JSON.stringify(list));
-    invalidate();
-    window.dispatchEvent(new CustomEvent(ANN_EVENT));
-  } catch {
-    /* noop */
-  }
+async function hydrate(): Promise<void> {
+  if (hydrated) return;
+  if (hydratePromise) return hydratePromise;
+  hydratePromise = (async () => {
+    const { data, error } = await supabase.from("announcements").select("*");
+    if (error) {
+      console.error("[announcements-store] failed to load", error);
+      hydrated = true;
+      return;
+    }
+    cache = (data ?? []).map(mapRow);
+    hydrated = true;
+  })();
+  await hydratePromise;
+  hydratePromise = null;
+  notify();
+}
+
+async function hydrateDismissals(): Promise<void> {
+  if (dismissedHydrated) return;
+  if (dismissedHydratePromise) return dismissedHydratePromise;
+  dismissedHydratePromise = (async () => {
+    await hydrateUserIdBridge();
+    const { data, error } = await supabase.from("announcement_dismissals").select("*");
+    if (error) {
+      console.error("[announcements-store] failed to load dismissals", error);
+      dismissedHydrated = true;
+      return;
+    }
+    const next = new Map<string, Set<string>>();
+    for (const row of data ?? []) {
+      const legacyId = uuidToLegacySync(row.user_id);
+      const set = next.get(legacyId) ?? new Set<string>();
+      set.add(String(row.announcement_id));
+      next.set(legacyId, set);
+    }
+    dismissedCache = next;
+    dismissedHydrated = true;
+  })();
+  await dismissedHydratePromise;
+  dismissedHydratePromise = null;
+  notify();
+}
+
+if (typeof window !== "undefined") {
+  void hydrate();
+  void hydrateDismissals();
+  supabase
+    .channel("announcements-changes")
+    .on("postgres_changes", { event: "*", schema: "public", table: "announcements" }, () => {
+      hydrated = false;
+      void hydrate();
+    })
+    .subscribe();
+  supabase
+    .channel("announcement-dismissals-changes")
+    .on("postgres_changes", { event: "*", schema: "public", table: "announcement_dismissals" }, () => {
+      dismissedHydrated = false;
+      void hydrateDismissals();
+    })
+    .subscribe();
 }
 
 export function loadAnnouncements(): Announcement[] {
-  if (typeof window === "undefined") return SEED;
-  const raw = localStorage.getItem(KEY);
-  if (raw) {
-    try {
-      return JSON.parse(raw) as Announcement[];
-    } catch {
-      /* noop */
-    }
-  }
-  write(SEED);
-  return SEED;
+  if (!hydrated) void hydrate();
+  return cache;
 }
 
 function notExpired(a: Announcement): boolean {
@@ -86,68 +146,91 @@ export function activeAnnouncements(): Announcement[] {
 export function publishAnnouncement(message: string, audience: Audience, expires_at?: string) {
   const trimmed = message.trim().slice(0, ANNOUNCEMENT_MAX);
   if (!trimmed) return;
+  const tempId = `temp-${Date.now()}`;
   const item: Announcement = {
-    id: `a-${Date.now()}`,
+    id: tempId,
     message: trimmed,
     audience,
     published_at: new Date().toISOString(),
     expires_at: expires_at || undefined,
   };
-  write([item, ...loadAnnouncements()]);
+  cache = [item, ...cache];
+  notify();
+
+  void (async () => {
+    const { data, error } = await supabase
+      .from("announcements")
+      .insert({ message: trimmed, audience, expires_at: expires_at || null })
+      .select("*")
+      .single();
+    if (error || !data) {
+      console.error("[announcements-store] failed to publish", error);
+      cache = cache.filter((a) => a.id !== tempId);
+      notify();
+      return;
+    }
+    cache = cache.map((a) => (a.id === tempId ? mapRow(data) : a));
+    notify();
+  })();
 }
 
 export function endAnnouncement(id: string) {
-  write(loadAnnouncements().filter((a) => a.id !== id));
+  const prev = cache;
+  cache = cache.filter((a) => a.id !== id);
+  notify();
+  const numericId = Number(id);
+  if (!Number.isFinite(numericId)) return;
+  void (async () => {
+    const { error } = await supabase.from("announcements").delete().eq("id", numericId);
+    if (error) {
+      console.error("[announcements-store] failed to end announcement", error);
+      cache = prev;
+      notify();
+    }
+  })();
 }
 
 // ---- Per-user dismissals (banner close button) ----------------------------
-function readDismissed(): string[] {
-  return safeRead<string[]>(DISMISS_KEY, []);
+function readDismissed(userId: string): Set<string> {
+  if (!dismissedHydrated) void hydrateDismissals();
+  return dismissedCache.get(userId) ?? new Set<string>();
 }
 
-export function dismissAnnouncement(id: string) {
-  if (typeof window === "undefined") return;
-  const next = Array.from(new Set([...readDismissed(), id]));
-  try {
-    localStorage.setItem(DISMISS_KEY, JSON.stringify(next));
-    window.dispatchEvent(new CustomEvent(ANN_EVENT));
-  } catch {
-    /* noop */
-  }
+export function dismissAnnouncement(id: string, userId: string) {
+  const set = new Set(readDismissed(userId));
+  set.add(id);
+  dismissedCache.set(userId, set);
+  notify();
+
+  const numericId = Number(id);
+  if (!Number.isFinite(numericId)) return;
+  void (async () => {
+    const uuid = await legacyToUuid(userId);
+    if (!uuid) return;
+    const { error } = await supabase
+      .from("announcement_dismissals")
+      .insert({ announcement_id: numericId, user_id: uuid });
+    if (error) console.error("[announcements-store] failed to save dismissal", error);
+  })();
 }
 
 // Active announcements targeting a role, minus those the user dismissed.
-export function announcementsForRole(role: Role): Announcement[] {
+export function announcementsForRole(role: Role, userId: string): Announcement[] {
   const want: Audience = role === "student" ? "students" : "teachers";
-  const dismissed = new Set(readDismissed());
+  const dismissed = readDismissed(userId);
   return activeAnnouncements().filter(
     (a) => (a.audience === "all" || a.audience === want) && !dismissed.has(a.id),
   );
 }
 
 // ---- React bindings -------------------------------------------------------
-function subscribe(cb: () => void): () => void {
-  if (typeof window === "undefined") return () => {};
-  const onEvent = () => {
-    invalidate();
-    cb();
-  };
-  const onStorage = (e: StorageEvent) => {
-    if (e.key === KEY || e.key === DISMISS_KEY) onEvent();
-  };
-  window.addEventListener(ANN_EVENT, onEvent);
-  window.addEventListener("storage", onStorage);
-  return () => {
-    window.removeEventListener(ANN_EVENT, onEvent);
-    window.removeEventListener("storage", onStorage);
-  };
-}
-
-function getSnapshot(): Announcement[] {
-  if (cache === null) cache = loadAnnouncements();
-  return cache;
-}
-
 export function useAnnouncements(): Announcement[] {
-  return useSyncExternalStore(subscribe, getSnapshot, () => SEED);
+  return useSyncExternalStore(
+    (cb) => {
+      listeners.add(cb);
+      return () => listeners.delete(cb);
+    },
+    () => cache,
+    () => SEED,
+  );
 }

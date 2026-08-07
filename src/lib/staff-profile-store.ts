@@ -3,19 +3,26 @@
 // (headline phrase, specializations) plus a lightweight presence heartbeat
 // used to show the online/offline dot on the profile modal.
 //
+// Backed by Supabase: `public.staff_profiles` (headline/specializations,
+// keyed by user_id) and `public.user_presence` (last_seen_at, keyed by
+// user_id) — both open-SELECT / self-or-admin-write, so each is kept as a
+// small global cache hydrated once and refreshed via Postgres Realtime.
+// Writes stay synchronous-looking (optimistic update, background persist) so
+// existing call sites don't need to change.
+//
 // All derived values (stats, tenure label, online state) are computed here;
 // components only read and dispatch.
 // ============================================================================
 import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import type { Database } from "@/integrations/supabase/types";
+import { hydrateUserIdBridge, legacyToUuid, uuidToLegacySync } from "@/lib/user-id-bridge";
 import { USERS, type User } from "./mock-data";
 import { avgRating, assignedStudents } from "./teacher-model";
 import { activeTenureDays, teacherTier } from "./teacher-tiers";
 import { computeCurrentProgress } from "./product-courses-store";
 
-
-const KEY = "verbo:staff-profiles";
-const PRESENCE_KEY = "verbo:staff-presence";
-const EVT = "verbo:staff-profiles-updated";
+export const EVT = "verbo:staff-profiles-updated";
 
 export const MAX_HEADLINE_CHARS = 200;
 export const MAX_SPECIALIZATIONS = 6;
@@ -29,36 +36,102 @@ export interface StaffProfile {
   specializations: string[];
 }
 
-type Map = Record<string, StaffProfile>;
-type PresenceMap = Record<string, number>;
+type ProfileRow = Database["public"]["Tables"]["staff_profiles"]["Row"];
+type PresenceRow = Database["public"]["Tables"]["user_presence"]["Row"];
 
 const EMPTY: StaffProfile = { headline: "", specializations: [] };
 
-function read(): Map {
-  if (typeof window === "undefined") return {};
-  try { return JSON.parse(localStorage.getItem(KEY) || "{}"); } catch { return {}; }
+let profileCache = new Map<string, StaffProfile>(); // legacy userId -> profile
+let profileHydrated = false;
+let profileHydratePromise: Promise<void> | null = null;
+
+let presenceCache = new Map<string, number>(); // legacy userId -> last_seen_at (ms)
+let presenceHydrated = false;
+let presenceHydratePromise: Promise<void> | null = null;
+
+const listeners = new Set<() => void>();
+
+function notify() {
+  listeners.forEach((cb) => cb());
+  if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent(EVT));
 }
 
-function write(m: Map) {
-  localStorage.setItem(KEY, JSON.stringify(m));
-  window.dispatchEvent(new CustomEvent(EVT));
+async function hydrateProfiles(): Promise<void> {
+  if (profileHydrated) return;
+  if (profileHydratePromise) return profileHydratePromise;
+  profileHydratePromise = (async () => {
+    await hydrateUserIdBridge();
+    const { data, error } = await supabase.from("staff_profiles").select("*");
+    if (error) {
+      console.error("[staff-profile-store] failed to load profiles", error);
+      profileHydrated = true;
+      return;
+    }
+    const next = new Map<string, StaffProfile>();
+    for (const row of (data ?? []) as ProfileRow[]) {
+      next.set(uuidToLegacySync(row.user_id), {
+        headline: row.headline ?? "",
+        specializations: row.specializations ?? [],
+      });
+    }
+    profileCache = next;
+    profileHydrated = true;
+  })();
+  await profileHydratePromise;
+  profileHydratePromise = null;
+  notify();
 }
 
-function readPresence(): PresenceMap {
-  if (typeof window === "undefined") return {};
-  try { return JSON.parse(localStorage.getItem(PRESENCE_KEY) || "{}"); } catch { return {}; }
+async function hydratePresence(): Promise<void> {
+  if (presenceHydrated) return;
+  if (presenceHydratePromise) return presenceHydratePromise;
+  presenceHydratePromise = (async () => {
+    await hydrateUserIdBridge();
+    const { data, error } = await supabase.from("user_presence").select("*");
+    if (error) {
+      console.error("[staff-profile-store] failed to load presence", error);
+      presenceHydrated = true;
+      return;
+    }
+    const next = new Map<string, number>();
+    for (const row of (data ?? []) as PresenceRow[]) {
+      next.set(uuidToLegacySync(row.user_id), new Date(row.last_seen_at).getTime());
+    }
+    presenceCache = next;
+    presenceHydrated = true;
+  })();
+  await presenceHydratePromise;
+  presenceHydratePromise = null;
+  notify();
+}
+
+if (typeof window !== "undefined") {
+  void hydrateProfiles();
+  void hydratePresence();
+  supabase
+    .channel("staff-profiles-changes")
+    .on("postgres_changes", { event: "*", schema: "public", table: "staff_profiles" }, () => {
+      profileHydrated = false;
+      void hydrateProfiles();
+    })
+    .subscribe();
+  supabase
+    .channel("user-presence-changes")
+    .on("postgres_changes", { event: "*", schema: "public", table: "user_presence" }, () => {
+      presenceHydrated = false;
+      void hydratePresence();
+    })
+    .subscribe();
 }
 
 export function loadStaffProfile(userId: string | undefined): StaffProfile {
   if (!userId) return EMPTY;
-  const p = read()[userId];
-  return {
-    headline: p?.headline ?? "",
-    specializations: Array.isArray(p?.specializations) ? p.specializations : [],
-  };
+  if (!profileHydrated) void hydrateProfiles();
+  return profileCache.get(userId) ?? EMPTY;
 }
 
-/** Persists the profile after trimming/validating. Returns the stored value. */
+/** Persists the profile after trimming/validating. Returns the stored value
+ *  immediately (optimistic) — the Supabase write happens in the background. */
 export function saveStaffProfile(userId: string, patch: Partial<StaffProfile>): StaffProfile {
   const cur = loadStaffProfile(userId);
   const next: StaffProfile = {
@@ -68,19 +141,23 @@ export function saveStaffProfile(userId: string, patch: Partial<StaffProfile>): 
       .filter((s, i, arr) => s.length > 0 && arr.indexOf(s) === i)
       .slice(0, MAX_SPECIALIZATIONS),
   };
-  const m = read();
-  m[userId] = next;
-  write(m);
+  profileCache.set(userId, next);
+  notify();
+  void (async () => {
+    const uuid = await legacyToUuid(userId);
+    if (!uuid) return;
+    const { error } = await supabase
+      .from("staff_profiles")
+      .upsert({ user_id: uuid, headline: next.headline, specializations: next.specializations }, { onConflict: "user_id" });
+    if (error) console.error("[staff-profile-store] failed to save profile", error);
+  })();
   return next;
 }
 
 export function subscribeStaffProfiles(fn: () => void): () => void {
-  if (typeof window === "undefined") return () => {};
-  window.addEventListener(EVT, fn);
-  window.addEventListener("storage", fn);
+  listeners.add(fn);
   return () => {
-    window.removeEventListener(EVT, fn);
-    window.removeEventListener("storage", fn);
+    listeners.delete(fn);
   };
 }
 
@@ -99,16 +176,22 @@ export function useStaffProfile(userId: string | undefined): StaffProfile {
 // Presence
 // ----------------------------------------------------------------------------
 export function touchPresence(userId: string) {
-  if (typeof window === "undefined") return;
-  const m = readPresence();
-  m[userId] = Date.now();
-  localStorage.setItem(PRESENCE_KEY, JSON.stringify(m));
-  window.dispatchEvent(new CustomEvent(EVT));
+  presenceCache.set(userId, Date.now());
+  notify();
+  void (async () => {
+    const uuid = await legacyToUuid(userId);
+    if (!uuid) return;
+    const { error } = await supabase
+      .from("user_presence")
+      .upsert({ user_id: uuid, last_seen_at: new Date().toISOString() }, { onConflict: "user_id" });
+    if (error) console.error("[staff-profile-store] failed to save presence", error);
+  })();
 }
 
 export function isOnline(userId: string | undefined): boolean {
   if (!userId) return false;
-  const at = readPresence()[userId];
+  if (!presenceHydrated) void hydratePresence();
+  const at = presenceCache.get(userId);
   return typeof at === "number" && Date.now() - at < PRESENCE_TTL_MS;
 }
 
@@ -195,4 +278,3 @@ export function staffStats(u: User, rev = 0): StaffStat[] {
     { key: "rating", value: rankLabel(u), label: "Access" },
   ];
 }
-

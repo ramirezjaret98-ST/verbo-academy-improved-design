@@ -2,14 +2,18 @@
 // Student profile store — editable presentation data for students
 // (headline phrase + personality tags picked from a fixed catalog).
 //
-// Mirrors the shape of staff-profile-store.ts (read/write/subscribe over
-// localStorage + a hook), but uses its own storage key and its own rules:
-// personality tags come from a closed catalog and are capped.
+// Backed by Supabase (`public.student_profiles`, keyed by user_id). RLS is
+// open SELECT / self-or-admin write, so we keep a single global cache
+// hydrated once and refreshed via Postgres Realtime — mirrors
+// `staff-profile-store.ts`. Writes stay synchronous-looking (optimistic
+// update, background persist) so existing call sites don't need to change.
 // ============================================================================
 import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import type { Database } from "@/integrations/supabase/types";
+import { hydrateUserIdBridge, legacyToUuid, uuidToLegacySync } from "@/lib/user-id-bridge";
 
-const KEY = "verbo:student-profiles";
-const EVT = "verbo:student-profiles-updated";
+export const EVT = "verbo:student-profiles-updated";
 
 export const MAX_HEADLINE_CHARS = 200;
 export const MAX_PERSONALITY_TAGS = 5;
@@ -43,33 +47,65 @@ export interface StudentProfile {
   personalityTags: string[];
 }
 
-type Store = Record<string, StudentProfile>;
+type Row = Database["public"]["Tables"]["student_profiles"]["Row"];
 
 const EMPTY: StudentProfile = { headline: "", personalityTags: [] };
 
-function read(): Store {
-  if (typeof window === "undefined") return {};
-  try { return JSON.parse(localStorage.getItem(KEY) || "{}") as Store; } catch { return {}; }
+let cache = new Map<string, StudentProfile>(); // legacy userId -> profile
+let hydrated = false;
+let hydratePromise: Promise<void> | null = null;
+const listeners = new Set<() => void>();
+
+function notify() {
+  listeners.forEach((cb) => cb());
+  if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent(EVT));
 }
 
-function write(m: Store) {
-  if (typeof window === "undefined") return;
-  try {
-    localStorage.setItem(KEY, JSON.stringify(m));
-    window.dispatchEvent(new CustomEvent(EVT));
-  } catch { /* noop */ }
+async function hydrate(): Promise<void> {
+  if (hydrated) return;
+  if (hydratePromise) return hydratePromise;
+  hydratePromise = (async () => {
+    await hydrateUserIdBridge();
+    const { data, error } = await supabase.from("student_profiles").select("*");
+    if (error) {
+      console.error("[student-profile-store] failed to load", error);
+      hydrated = true;
+      return;
+    }
+    const next = new Map<string, StudentProfile>();
+    for (const row of (data ?? []) as Row[]) {
+      next.set(uuidToLegacySync(row.user_id), {
+        headline: row.headline ?? "",
+        personalityTags: row.personality_tags ?? [],
+      });
+    }
+    cache = next;
+    hydrated = true;
+  })();
+  await hydratePromise;
+  hydratePromise = null;
+  notify();
+}
+
+if (typeof window !== "undefined") {
+  void hydrate();
+  supabase
+    .channel("student-profiles-changes")
+    .on("postgres_changes", { event: "*", schema: "public", table: "student_profiles" }, () => {
+      hydrated = false;
+      void hydrate();
+    })
+    .subscribe();
 }
 
 export function loadStudentProfile(userId: string | undefined): StudentProfile {
   if (!userId) return EMPTY;
-  const p = read()[userId];
-  return {
-    headline: p?.headline ?? "",
-    personalityTags: Array.isArray(p?.personalityTags) ? p.personalityTags : [],
-  };
+  if (!hydrated) void hydrate();
+  return cache.get(userId) ?? EMPTY;
 }
 
-/** Persists the profile after trimming/validating. Returns the stored value. */
+/** Persists the profile after trimming/validating. Returns the stored value
+ *  immediately (optimistic) — the Supabase write happens in the background. */
 export function saveStudentProfile(userId: string, patch: Partial<StudentProfile>): StudentProfile {
   const cur = loadStudentProfile(userId);
   const allowed = new Set<string>(PERSONALITY_TAG_OPTIONS);
@@ -79,9 +115,16 @@ export function saveStudentProfile(userId: string, patch: Partial<StudentProfile
       .filter((t, i, arr) => allowed.has(t) && arr.indexOf(t) === i)
       .slice(-MAX_PERSONALITY_TAGS),
   };
-  const m = read();
-  m[userId] = next;
-  write(m);
+  cache.set(userId, next);
+  notify();
+  void (async () => {
+    const uuid = await legacyToUuid(userId);
+    if (!uuid) return;
+    const { error } = await supabase
+      .from("student_profiles")
+      .upsert({ user_id: uuid, headline: next.headline, personality_tags: next.personalityTags }, { onConflict: "user_id" });
+    if (error) console.error("[student-profile-store] failed to save", error);
+  })();
   return next;
 }
 
@@ -99,12 +142,9 @@ export function togglePersonalityTag(userId: string, tag: string): StudentProfil
 }
 
 export function subscribeStudentProfiles(fn: () => void): () => void {
-  if (typeof window === "undefined") return () => {};
-  window.addEventListener(EVT, fn);
-  window.addEventListener("storage", fn);
+  listeners.add(fn);
   return () => {
-    window.removeEventListener(EVT, fn);
-    window.removeEventListener("storage", fn);
+    listeners.delete(fn);
   };
 }
 

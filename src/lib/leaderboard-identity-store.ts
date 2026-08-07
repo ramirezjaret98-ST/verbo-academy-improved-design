@@ -1,11 +1,25 @@
 // Per-student leaderboard identity: whether they appear on the Challenges
 // leaderboard using their real name+avatar, or a chosen nickname with a
-// generic initials avatar. Persisted in localStorage, broadcast so the
-// leaderboard reflects edits from the ProfileModal without a reload.
+// generic initials avatar.
+//
+// Backed by Supabase (`public.leaderboard_identities`, one row per student —
+// `student_id` is its primary key). RLS allows open SELECT (any signed-in
+// user can peek at anyone's identity — needed for ProfilePeekCard and the
+// leaderboard itself) and self/admin write. Small table, so we keep a single
+// global in-memory cache (legacy id -> identity) hydrated once and kept in
+// sync via Postgres Realtime, mirroring the pattern used by
+// `holidays-store.ts`/`badges-store.ts`.
+//
+// Reads (`getLeaderboardIdentity`) stay synchronous off the cache. Writes
+// (`setLeaderboardIdentity`) update the cache optimistically and persist to
+// Supabase in the background — this keeps the exported API identical to the
+// old localStorage version, so call sites don't need to change.
 import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import type { Database } from "@/integrations/supabase/types";
+import { hydrateUserIdBridge, legacyToUuid, uuidToLegacySync } from "@/lib/user-id-bridge";
 
-const KEY = "verbo:leaderboard-identity";
-const EVT = "verbo:leaderboard-identity-updated";
+export const EVT = "verbo:leaderboard-identity-updated";
 
 export type LeaderboardIdentityMode = "real" | "nickname";
 
@@ -14,53 +28,98 @@ export interface LeaderboardIdentity {
   nickname: string;
 }
 
-type Map = Record<string, LeaderboardIdentity>;
+type Row = Database["public"]["Tables"]["leaderboard_identities"]["Row"];
 
-function read(): Map {
-  if (typeof window === "undefined") return {};
-  try { return JSON.parse(localStorage.getItem(KEY) || "{}"); } catch { return {}; }
+const DEFAULT_IDENTITY: LeaderboardIdentity = { mode: "real", nickname: "" };
+
+let cache = new Map<string, LeaderboardIdentity>(); // legacy studentId -> identity
+let hydrated = false;
+let hydratePromise: Promise<void> | null = null;
+const listeners = new Set<() => void>();
+
+function notify() {
+  listeners.forEach((cb) => cb());
+  if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent(EVT));
 }
 
-function write(m: Map) {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(KEY, JSON.stringify(m));
-  window.dispatchEvent(new CustomEvent(EVT));
+function applyRows(rows: Row[]) {
+  const next = new Map<string, LeaderboardIdentity>();
+  for (const row of rows) {
+    const legacyId = uuidToLegacySync(row.student_id);
+    next.set(legacyId, {
+      mode: row.mode === "nickname" ? "nickname" : "real",
+      nickname: row.nickname ?? "",
+    });
+  }
+  cache = next;
+}
+
+async function hydrate(): Promise<void> {
+  if (hydrated) return;
+  if (hydratePromise) return hydratePromise;
+  hydratePromise = (async () => {
+    await hydrateUserIdBridge();
+    const { data, error } = await supabase.from("leaderboard_identities").select("*");
+    if (error) {
+      console.error("[leaderboard-identity-store] failed to load", error);
+      hydrated = true;
+      return;
+    }
+    applyRows(data ?? []);
+    hydrated = true;
+  })();
+  await hydratePromise;
+  hydratePromise = null;
+  notify();
+}
+
+if (typeof window !== "undefined") {
+  void hydrate();
+  supabase
+    .channel("leaderboard-identities-changes")
+    .on("postgres_changes", { event: "*", schema: "public", table: "leaderboard_identities" }, () => {
+      hydrated = false;
+      void hydrate();
+    })
+    .subscribe();
 }
 
 export function getLeaderboardIdentity(userId: string): LeaderboardIdentity {
-  return read()[userId] ?? { mode: "real", nickname: "" };
+  if (!hydrated) void hydrate();
+  return cache.get(userId) ?? DEFAULT_IDENTITY;
 }
 
-export function setLeaderboardIdentity(userId: string, id: LeaderboardIdentity) {
-  const m = read();
-  m[userId] = id;
-  write(m);
+/** Optimistically updates the local cache and persists to Supabase in the
+ *  background (fire-and-forget, matching the old synchronous API). */
+export function setLeaderboardIdentity(userId: string, identity: LeaderboardIdentity) {
+  cache.set(userId, identity);
+  notify();
+  void (async () => {
+    const uuid = await legacyToUuid(userId);
+    if (!uuid) return;
+    const { error } = await supabase
+      .from("leaderboard_identities")
+      .upsert({ student_id: uuid, mode: identity.mode, nickname: identity.nickname }, { onConflict: "student_id" });
+    if (error) console.error("[leaderboard-identity-store] failed to save", error);
+  })();
 }
 
 export function useLeaderboardIdentity(userId: string | undefined): LeaderboardIdentity {
-  const [val, setVal] = useState<LeaderboardIdentity>({ mode: "real", nickname: "" });
+  const [val, setVal] = useState<LeaderboardIdentity>(DEFAULT_IDENTITY);
   useEffect(() => {
     if (!userId) return;
     const sync = () => setVal(getLeaderboardIdentity(userId));
     sync();
     window.addEventListener(EVT, sync);
-    window.addEventListener("storage", sync);
-    return () => {
-      window.removeEventListener(EVT, sync);
-      window.removeEventListener("storage", sync);
-    };
+    return () => window.removeEventListener(EVT, sync);
   }, [userId]);
   return val;
 }
 
 export function subscribeLeaderboardIdentity(cb: () => void): () => void {
-  if (typeof window === "undefined") return () => {};
-  const onStorage = (e: StorageEvent) => { if (e.key === KEY) cb(); };
-  window.addEventListener(EVT, cb);
-  window.addEventListener("storage", onStorage);
+  listeners.add(cb);
   return () => {
-    window.removeEventListener(EVT, cb);
-    window.removeEventListener("storage", onStorage);
+    listeners.delete(cb);
   };
 }
 
