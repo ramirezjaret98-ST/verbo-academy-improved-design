@@ -42,7 +42,7 @@ export interface CalendarEvent {
   title: string;
   subtitle?: string;
   status?: ExtSessionStatus | TimeStatus;
-  origin?: "course" | "workshop" | "spotlight";
+  origin?: "course" | "workshop" | "spotlight" | "group";
   // ---- Group indicator (Performance Sessions groups) ----
   // When true, the event pill renders a "G" badge instead of the default
   // "1:1" badge, and the title is the Group Name.

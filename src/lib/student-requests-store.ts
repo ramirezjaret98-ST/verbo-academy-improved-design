@@ -10,7 +10,7 @@
 // same 8h escalation) but carry a mandatory description text and consume the
 // monthly Spotlight cap on the student side.
 
-import { loadSessions, persistSessions, updateSession, type ExtSessionStatus } from "./sessions-store";
+import { loadSessions, createSession, updateSession, type ExtSessionStatus } from "./sessions-store";
 import { getStudentVideoLink } from "./students-store";
 
 export type StudentRequestKind = "reschedule" | "spotlight";
@@ -252,11 +252,9 @@ function requireHelpers() {
     addClaimedSession(req: StudentRequest) {
       const teacherId = req.claimed_by;
       if (!teacherId) return;
-      const now = new Date().toISOString();
       const link = getStudentVideoLink(req.student_id) || `https://teams.microsoft.com/l/meetup/${req.student_id}`;
       const status: ExtSessionStatus = "scheduled";
-      const newSession = {
-        id: `${req.kind === "spotlight" ? "sp" : "rs"}-${req.id}`,
+      createSession({
         student_id: req.student_id,
         teacher_id: teacherId,
         date_time: req.proposed_datetime,
@@ -265,16 +263,13 @@ function requireHelpers() {
         status,
         origin: req.kind === "spotlight" ? "spotlight" : undefined,
         notes: req.kind === "spotlight" ? `Spotlight Session — ${req.spotlight_context ?? ""}` : `Reschedule — original ${req.origin_session_id}`,
-      };
-      persistSessions([newSession as never, ...loadSessions()]);
+      });
       // For reschedules: mark the original session cancelled (Cancel-only path
       // already handled that; this branch is used when the student picked
       // "Reschedule").
       if (req.kind === "reschedule" && req.origin_session_id) {
         updateSession(req.origin_session_id, { status: "cancelled" as const });
       }
-      // Timestamp usage: swallow lint on unused var
-      void now;
     },
   };
 }
@@ -292,23 +287,22 @@ export function convertSessionToSpotlight(input: {
   // Mark the original session as Converted to Spotlight (no strike, no cancel).
   updateSession(orig.id, { status: "converted_to_spotlight" as const });
   // Create the Spotlight session in the same slot with the same teacher.
-  const spotlightSession = {
-    id: `sp-conv-${Date.now()}`,
+  const durationMinutes = Math.min(60, orig.duration_minutes);
+  createSession({
     student_id: orig.student_id,
     teacher_id: orig.teacher_id,
     date_time: orig.date_time,
-    duration_minutes: Math.min(60, orig.duration_minutes),
+    duration_minutes: durationMinutes,
     teams_link: orig.teams_link,
-    status: "scheduled" as const,
-    origin: "spotlight" as const,
+    status: "scheduled",
+    origin: "spotlight",
     notes: `Spotlight (converted) — ${input.spotlightContext}`,
-  };
-  persistSessions([spotlightSession as never, ...loadSessions()]);
+  });
   recordSpotlightConversion({
     student_id: orig.student_id,
     teacher_id: orig.teacher_id,
     proposed_datetime: orig.date_time,
-    duration_minutes: spotlightSession.duration_minutes,
+    duration_minutes: durationMinutes,
     spotlight_context: input.spotlightContext,
   });
 }

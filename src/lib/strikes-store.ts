@@ -12,7 +12,7 @@
 // imports appear.
 // ============================================================================
 import { USERS } from "./mock-data";
-import { loadSessions, persistSessions, type ExtSession } from "./sessions-store";
+import { loadSessions, updateSession, type ExtSession } from "./sessions-store";
 
 export type CancelReason = "illness" | "personal" | "major_issue" | "other";
 export type JustificationCause = "evidence_provided" | "force_majeure" | "illness";
@@ -127,15 +127,13 @@ export function cancelSessionByTeacher(input: {
   const needsSubstitute = startsAt - now < 24 * 60 * 60 * 1000;
 
   if (target) {
-    const next: ExtSession = {
-      ...target,
+    updateSession(input.sessionId, {
       status: "cancelled",
       absent_cause: "teacher",
       cancellation_reason: input.reason,
       cancellation_note: input.note,
       needs_substitute: needsSubstitute,
-    };
-    persistSessions(sessions.map((s) => (s.id === input.sessionId ? next : s)));
+    });
   }
 
   const strike: Strike = {
