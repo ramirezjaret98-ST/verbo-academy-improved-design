@@ -105,6 +105,7 @@ import {
   recordActivityScore,
   resetUnitActivityAttempts,
   setUnitCompleted,
+  subscribeActivities,
   unitCategoryProgress,
   unitNumberOf,
   unitPassed,
@@ -286,6 +287,7 @@ function Page() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view.kind === "unit" ? view.unitId : null, user?.id]);
   useEffect(() => subscribeEvents(() => setRev((r) => r + 1)), []);
+  useEffect(() => subscribeActivities(() => setRev((r) => r + 1)), []);
   useEffect(() => subscribeTailoredUnits(() => setRev((r) => r + 1)), []);
   useEffect(() => subscribeTailoredUnitCompletion(() => setRev((r) => r + 1)), []);
 
