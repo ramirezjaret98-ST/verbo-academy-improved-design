@@ -909,6 +909,7 @@ export type Database = {
         Row: {
           claimed_at: string | null
           cover_image: string | null
+          created_at: string
           date: string
           description: string | null
           duration_minutes: number
@@ -926,6 +927,7 @@ export type Database = {
         Insert: {
           claimed_at?: string | null
           cover_image?: string | null
+          created_at?: string
           date: string
           description?: string | null
           duration_minutes: number
@@ -943,6 +945,7 @@ export type Database = {
         Update: {
           claimed_at?: string | null
           cover_image?: string | null
+          created_at?: string
           date?: string
           description?: string | null
           duration_minutes?: number
