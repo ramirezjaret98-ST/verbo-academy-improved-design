@@ -128,6 +128,22 @@ export function customUnitsForStudent(kind: CustomUnitKind, studentId: string): 
     });
 }
 
+/** Finds a unit by id regardless of kind — used by lesson-plans-store to
+ *  resolve the single `custom_unit_id` FK column (which merges what the
+ *  frontend still models as two parallel fields, `vip_unit_id`/
+ *  `tailored_unit_id`) back to the right one, based on the unit's `kind`. */
+export function findCustomUnitById(id: string): CustomUnit | undefined {
+  return unitsCache.find((u) => u.id === id);
+}
+
+/** Awaits this store's hydration without subscribing — for other stores
+ *  (e.g. lesson-plans-store) that need `findCustomUnitById` to be reliable
+ *  before mapping their own rows, instead of racing the eager module-load
+ *  hydration below. Safe to call redundantly. */
+export function hydrateCustomUnits(): Promise<void> {
+  return hydrate();
+}
+
 export function addCustomUnit(
   kind: CustomUnitKind,
   studentId: string,
