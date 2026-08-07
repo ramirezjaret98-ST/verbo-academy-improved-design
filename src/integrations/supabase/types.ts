@@ -3114,17 +3114,23 @@ export type Database = {
         Args: never
         Returns: {
           access_plan: Database["public"]["Enums"]["access_plan"]
+          addon_bookclubs_per_month: number
           attendance_percentage: number
           avatar_url: string
+          bookclub_strikes: number
           company: string
           contracted_levels: string[]
           current_level: string
           current_roadmap_level: string
           email: string
+          focus: string
           hired_sessions: number
           id: string
+          insights_strikes: number
+          legacy_id: string
           name: string
           product: Database["public"]["Enums"]["product_id"]
+          product_type: Database["public"]["Enums"]["product_type"]
           remaining_sessions: number
           session_duration: number
           sessions_per_week: number
