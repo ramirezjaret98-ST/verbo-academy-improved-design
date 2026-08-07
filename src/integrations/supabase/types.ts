@@ -3106,6 +3106,18 @@ export type Database = {
           video_call_link: string
         }[]
       }
+      upsert_session_member_statuses: {
+        Args: {
+          p_members: Json
+          p_report_locked: boolean
+          p_report_submitted_at: string
+          p_session_id: number
+          p_set_report_locked: boolean
+          p_set_top_status: boolean
+          p_top_status: Database["public"]["Enums"]["ext_session_status"]
+        }
+        Returns: undefined
+      }
     }
     Enums: {
       access_plan: "Core" | "Advance" | "Elite" | "Signature"
