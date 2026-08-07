@@ -3080,6 +3080,10 @@ export type Database = {
           video_call_link: string
         }[]
       }
+      replace_teacher_availability: {
+        Args: { p_blocks: Json; p_confirmed_at: string; p_teacher_id: string }
+        Returns: undefined
+      }
       student_profile_for_teacher: {
         Args: never
         Returns: {
