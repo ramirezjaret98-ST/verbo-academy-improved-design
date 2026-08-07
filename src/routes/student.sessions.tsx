@@ -854,7 +854,7 @@ function SpotlightFormModal({ studentId, onClose }: { studentId: string; onClose
     });
     // Core freemium: consume the one-shot courtesy credit on real submit.
     if (studentUser?.access_plan === "Core" && !freemiumUsed(studentId, "spotlight")) {
-      markFreemiumUsed(studentId, "spotlight");
+      void markFreemiumUsed(studentId, "spotlight");
     }
     toast.success("Spotlight Request published. Teachers have been notified.");
     onClose();
@@ -893,7 +893,7 @@ function SpotlightFormModal({ studentId, onClose }: { studentId: string; onClose
               }
               // Core freemium: consume the one-shot courtesy credit.
               if (studentUser?.access_plan === "Core" && !freemiumUsed(studentId, "spotlight")) {
-                markFreemiumUsed(studentId, "spotlight");
+                void markFreemiumUsed(studentId, "spotlight");
               }
               toast.success("Session replaced with a Spotlight in the same slot.");
               onClose();

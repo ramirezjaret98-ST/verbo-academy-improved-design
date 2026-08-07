@@ -20,7 +20,7 @@ function StudentLayout() {
 
   // Register the daily visit once per mounted student session.
   useEffect(() => {
-    if (user?.role === "student") touchLoginStreak(user.id);
+    if (user?.role === "student") void touchLoginStreak(user.id);
   }, [user?.id, user?.role]);
 
 
