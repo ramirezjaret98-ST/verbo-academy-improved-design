@@ -5,8 +5,20 @@
 //
 // Also updates `clubs-store` spots_taken so admin/teacher surfaces reflect
 // reservations in real time.
+//
+// Backed by Supabase (`public.club_bookings`). RLS: a student can
+// insert/select/update/delete their own bookings; the club's assigned
+// teacher can also see bookings for their own clubs; admins see everything.
+// A plain `select("*")` already returns exactly that scoped set for the
+// calling session (including "every booking" for admin, which is what
+// `adminCalendarEvents()` in calendar-events.ts needs to look up an
+// arbitrary student's booking) — so we use the same global-cache pattern as
+// the rest of this migration instead of a per-student Map.
 import { useSyncExternalStore } from "react";
-import { loadClubs, persistClubs, type Club, type ClubType } from "./clubs-store";
+import { supabase } from "@/integrations/supabase/client";
+import type { Database } from "@/integrations/supabase/types";
+import { hydrateUserIdBridge, legacyToUuid, uuidToLegacySync } from "@/lib/user-id-bridge";
+import { loadClubs, updateClub, type Club, type ClubType } from "./clubs-store";
 import { groupsByStudentId } from "./groups-store";
 import { userById } from "./mock-data";
 import type { AccessPlanId } from "./student-model";
@@ -39,44 +51,74 @@ export interface ClubBooking {
   booked_at: string; // ISO
 }
 
-const KEY = "verbo:club-bookings";
-const EVENT = "verbo:club-bookings-updated";
+export const CLUB_BOOKINGS_EVENT = "verbo:club-bookings-updated";
 
 /** Cutoff window before start when reservations & cancellations close. */
 export const RESERVATION_CUTOFF_HOURS = 24;
 
-function safeRead(): ClubBooking[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = localStorage.getItem(KEY);
-    return raw ? (JSON.parse(raw) as ClubBooking[]) : [];
-  } catch { return []; }
-}
-function safeWrite(list: ClubBooking[]) {
-  if (typeof window === "undefined") return;
-  try {
-    localStorage.setItem(KEY, JSON.stringify(list));
-    cache = null;
-    window.dispatchEvent(new CustomEvent(EVENT));
-  } catch { /* noop */ }
+type Row = Database["public"]["Tables"]["club_bookings"]["Row"];
+
+let cache: ClubBooking[] = [];
+let hydrated = false;
+let hydratePromise: Promise<void> | null = null;
+const listeners = new Set<() => void>();
+
+function notify() {
+  listeners.forEach((cb) => cb());
+  if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent(CLUB_BOOKINGS_EVENT));
 }
 
-let cache: ClubBooking[] | null = null;
-function snapshot(): ClubBooking[] {
-  if (cache === null) cache = safeRead();
-  return cache;
+function mapRow(row: Row): ClubBooking {
+  return {
+    id: String(row.id),
+    student_id: uuidToLegacySync(row.student_id),
+    club_id: String(row.club_id),
+    club_type: row.club_type,
+    booked_at: row.booked_at,
+  };
+}
+
+async function hydrate(): Promise<void> {
+  if (hydrated) return;
+  if (hydratePromise) return hydratePromise;
+  hydratePromise = (async () => {
+    await hydrateUserIdBridge();
+    const { data, error } = await supabase.from("club_bookings").select("*");
+    if (error) {
+      console.error("[club-bookings-store] failed to load", error);
+      hydrated = true;
+      return;
+    }
+    cache = (data ?? []).map(mapRow);
+    hydrated = true;
+  })();
+  await hydratePromise;
+  hydratePromise = null;
+  notify();
+}
+
+if (typeof window !== "undefined") {
+  void hydrate();
+  supabase
+    .channel("club-bookings-changes")
+    .on("postgres_changes", { event: "*", schema: "public", table: "club_bookings" }, () => {
+      hydrated = false;
+      void hydrate();
+    })
+    .subscribe();
 }
 
 export function loadBookings(): ClubBooking[] {
-  return snapshot();
+  if (!hydrated) void hydrate();
+  return cache;
 }
 
 export function bookingsForStudent(studentId: string): ClubBooking[] {
-  return snapshot().filter((b) => b.student_id === studentId);
+  return loadBookings().filter((b) => b.student_id === studentId);
 }
 
 export function isBooked(studentId: string, clubId: string): boolean {
-  return snapshot().some((b) => b.student_id === studentId && b.club_id === clubId);
+  return loadBookings().some((b) => b.student_id === studentId && b.club_id === clubId);
 }
 
 function monthKey(iso: string): string {
@@ -87,7 +129,7 @@ function monthKey(iso: string): string {
 /** Bookings the student has made *this calendar month*, split by type. */
 export function bookingsThisMonth(studentId: string, type: ClubType): number {
   const now = monthKey(new Date().toISOString());
-  return snapshot().filter(
+  return loadBookings().filter(
     (b) => b.student_id === studentId && b.club_type === type && monthKey(b.booked_at) === now,
   ).length;
 }
@@ -137,7 +179,7 @@ function monthsElapsedSinceCycle(studentId: string): number {
 /** Total historical bookings for the student, by type — used for Elite's
  *  cumulative balance (unused seats carry forward). */
 export function totalBookingsForStudent(studentId: string, type: ClubType): number {
-  return snapshot().filter((b) => b.student_id === studentId && b.club_type === type).length;
+  return loadBookings().filter((b) => b.student_id === studentId && b.club_type === type).length;
 }
 
 /** How many more seats the student can consume RIGHT NOW for this kind.
@@ -211,25 +253,37 @@ export function cancelBlockedReason(club: Club): string | null {
   return null;
 }
 
-export function reserveSeat(studentId: string, clubId: string): { ok: true; booking: ClubBooking } | { ok: false; reason: string } {
-  const clubs = loadClubs();
-  const idx = clubs.findIndex((c) => c.id === clubId);
-  if (idx < 0) return { ok: false, reason: "Session not found." };
-  const club = clubs[idx];
+export async function reserveSeat(studentId: string, clubId: string): Promise<{ ok: true; booking: ClubBooking } | { ok: false; reason: string }> {
+  const club = loadClubs().find((c) => c.id === clubId);
+  if (!club) return { ok: false, reason: "Session not found." };
   if (isBooked(studentId, clubId)) return { ok: false, reason: "You're already booked." };
   const blocked = reserveBlockedReason(studentId, club);
   if (blocked) return { ok: false, reason: blocked };
-  const booking: ClubBooking = {
-    id: `cb${Date.now()}`,
-    student_id: studentId,
-    club_id: clubId,
-    club_type: club.type,
-    booked_at: new Date().toISOString(),
-  };
-  safeWrite([booking, ...snapshot()]);
-  // Bump spots_taken.
-  clubs[idx] = { ...club, spots_taken: (club.spots_taken ?? 0) + 1 };
-  persistClubs(clubs);
+
+  const studentUuid = await legacyToUuid(studentId);
+  const numericClubId = Number(clubId);
+  if (!studentUuid || !Number.isFinite(numericClubId)) {
+    return { ok: false, reason: "Something went wrong. Try again." };
+  }
+
+  const bookedAt = new Date().toISOString();
+  const { data, error } = await supabase
+    .from("club_bookings")
+    .insert({ student_id: studentUuid, club_id: numericClubId, club_type: club.type, booked_at: bookedAt })
+    .select("*")
+    .single();
+  if (error || !data) {
+    console.error("[club-bookings-store] failed to reserve seat", error);
+    return { ok: false, reason: "Something went wrong. Try again." };
+  }
+  const booking = mapRow(data);
+  cache = [booking, ...cache];
+  notify();
+
+  // Bump spots_taken — best-effort, the reservation itself already succeeded.
+  const updated = await updateClub(clubId, { spots_taken: (club.spots_taken ?? 0) + 1 });
+  if (!updated) console.error("[club-bookings-store] failed to bump spots_taken after reserving a seat");
+
   // Core freemium: consume the one-shot courtesy credit at confirmation.
   if (userById(studentId)?.access_plan === "Core") {
     const fkind = club.type === "book" ? "book" : "insight";
@@ -239,35 +293,47 @@ export function reserveSeat(studentId: string, clubId: string): { ok: true; book
 }
 
 
-export function cancelSeat(studentId: string, clubId: string): { ok: true } | { ok: false; reason: string } {
-  const clubs = loadClubs();
-  const idx = clubs.findIndex((c) => c.id === clubId);
-  if (idx < 0) return { ok: false, reason: "Session not found." };
-  const club = clubs[idx];
+export async function cancelSeat(studentId: string, clubId: string): Promise<{ ok: true } | { ok: false; reason: string }> {
+  const club = loadClubs().find((c) => c.id === clubId);
+  if (!club) return { ok: false, reason: "Session not found." };
   if (!isBooked(studentId, clubId)) return { ok: false, reason: "You don't have a seat here." };
   const blocked = cancelBlockedReason(club);
   if (blocked) return { ok: false, reason: blocked };
-  safeWrite(snapshot().filter((b) => !(b.student_id === studentId && b.club_id === clubId)));
-  clubs[idx] = { ...club, spots_taken: Math.max(0, (club.spots_taken ?? 0) - 1) };
-  persistClubs(clubs);
+
+  const studentUuid = await legacyToUuid(studentId);
+  const numericClubId = Number(clubId);
+  if (!studentUuid || !Number.isFinite(numericClubId)) {
+    return { ok: false, reason: "Something went wrong. Try again." };
+  }
+
+  const { error } = await supabase
+    .from("club_bookings")
+    .delete()
+    .eq("student_id", studentUuid)
+    .eq("club_id", numericClubId);
+  if (error) {
+    console.error("[club-bookings-store] failed to cancel seat", error);
+    return { ok: false, reason: "Something went wrong. Try again." };
+  }
+  cache = cache.filter((b) => !(b.student_id === studentId && b.club_id === clubId));
+  notify();
+
+  const updated = await updateClub(clubId, { spots_taken: Math.max(0, (club.spots_taken ?? 0) - 1) });
+  if (!updated) console.error("[club-bookings-store] failed to decrement spots_taken after cancelling a seat");
+
   return { ok: true };
 }
 
 // ---- React bindings -------------------------------------------------------
 function subscribe(cb: () => void): () => void {
-  if (typeof window === "undefined") return () => {};
-  const onEvent = () => { cache = null; cb(); };
-  const onStorage = (e: StorageEvent) => { if (e.key === KEY) onEvent(); };
-  window.addEventListener(EVENT, onEvent);
-  window.addEventListener("storage", onStorage);
+  listeners.add(cb);
   return () => {
-    window.removeEventListener(EVENT, onEvent);
-    window.removeEventListener("storage", onStorage);
+    listeners.delete(cb);
   };
 }
 const SERVER: ClubBooking[] = [];
 export function useBookings(): ClubBooking[] {
-  return useSyncExternalStore(subscribe, snapshot, () => SERVER);
+  return useSyncExternalStore(subscribe, () => cache, () => SERVER);
 }
 export function subscribeBookings(cb: () => void): () => void {
   return subscribe(cb);

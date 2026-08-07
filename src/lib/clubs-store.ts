@@ -2,6 +2,17 @@
 // Admin Overview snapshot, the Teacher Panel > Clubs tab (claim / release
 // flow) and the shared Calendar adapter. Everything reads and writes through
 // this store so a claim in one surface shows up everywhere else.
+//
+// Backed by Supabase (`public.clubs`, RLS: open SELECT, write restricted to
+// admin, the assigned teacher, or — for UPDATE only — any teacher claiming an
+// unassigned club). Global cache hydrated once + Postgres Realtime, same
+// pattern used across this migration. Mutations are genuine async
+// round-trips (NOT optimistic) — `claimClub` in particular is a real race
+// between teachers, so callers must await the actual database result rather
+// than trust an optimistic local update.
+import { supabase } from "@/integrations/supabase/client";
+import type { Database } from "@/integrations/supabase/types";
+import { hydrateUserIdBridge, legacyToUuid, uuidToLegacySync } from "@/lib/user-id-bridge";
 import { USERS } from "./mock-data";
 
 export type ClubType = "insight" | "book";
@@ -29,43 +40,13 @@ export interface Club {
    *  when the club is released back to "Created". Drives the 5-minute
    *  free-release window on the teacher side. */
   claimed_at?: string;
-  /** ISO timestamp of when the club was authored by Admin. Optional because
-   *  legacy/seed clubs predate this field — consumers should fall back to
-   *  `date` when it's missing. Used by the student-facing "New Club open"
-   *  notification to only surface recently opened clubs. */
+  /** ISO timestamp of when the club was authored by Admin. Used by the
+   *  student-facing "New Club open" notification to only surface recently
+   *  opened clubs — consumers fall back to `date` when it's missing. */
   created_at?: string;
 }
 
-export const CLUB_SEED: Club[] = [
-  { id: "c1", type: "insight", title: "Mastering Business Idioms", description: "Live workshop on professional idioms.", link: "https://teams.microsoft.com/l/meetup-1", material: "idioms-guide.pdf", teacher_id: "u2", date: "2026-05-28T17:00:00", duration_minutes: 60, spots_taken: 12, spots_total: 30, status: "upcoming" },
-  { id: "c2", type: "book", title: "The Alchemist — Chapter 3", description: "Discussion circle on themes and vocabulary.", link: "https://teams.microsoft.com/l/meetup-2", material: "alchemist-ch3.pdf", date: "2026-05-25T18:30:00", duration_minutes: 60, spots_taken: 4, spots_total: 4, status: "upcoming" },
-  { id: "c3", type: "insight", title: "Pronunciation Lab: TH Sounds", description: "Drills and pair practice.", link: "https://teams.microsoft.com/l/meetup-3", teacher_id: "u3", date: "2026-05-18T16:00:00", duration_minutes: 45, spots_taken: 22, spots_total: 25, status: "completed" },
-  { id: "c4", type: "book", title: "Atomic Habits — Intro", description: "Kickoff session for the new club cycle.", link: "https://teams.microsoft.com/l/meetup-4", date: "2026-06-02T17:30:00", duration_minutes: 60, spots_taken: 1, spots_total: 4, status: "upcoming" },
-];
-
-export function assignmentOf(c: Club): AssignmentStatus {
-  return c.teacher_id ? "assigned" : "created";
-}
-
-export function clubTeacherName(id?: string): string | null {
-  if (!id) return null;
-  return USERS.find((u) => u.id === id)?.name ?? null;
-}
-
-// Clubs still "Created" (no teacher assigned) and not finished/cancelled,
-// ordered by the nearest date first — early-warning list for the admin.
-export function upcomingCreatedClubs(clubs: Club[] = CLUB_SEED): Club[] {
-  return clubs
-    .filter((c) => !c.teacher_id && c.status !== "completed" && c.status !== "cancelled")
-    .sort((a, b) => +new Date(a.date) - +new Date(b.date));
-}
-
-// ---------------------------------------------------------------------------
-// Persistence (localStorage) + subscribe (cross-tab safe)
-// ---------------------------------------------------------------------------
-export const CLUBS_KEY = "verbo:clubs";
 export const CLUBS_EVENT = "verbo:clubs-updated";
-export const RELEASE_REQUESTS_KEY = "verbo:club-release-requests";
 export const RELEASE_REQUESTS_EVENT = "verbo:club-release-requests-updated";
 /** Free-release window after a claim, in milliseconds. */
 export const FREE_RELEASE_WINDOW_MS = 5 * 60 * 1000;
@@ -78,100 +59,318 @@ export interface ClubReleaseRequest {
   requested_at: string; // ISO
 }
 
-export function loadClubs(): Club[] {
-  if (typeof window === "undefined") return CLUB_SEED;
-  try {
-    const raw = localStorage.getItem(CLUBS_KEY);
-    if (raw) return JSON.parse(raw) as Club[];
-  } catch { /* noop */ }
-  try { localStorage.setItem(CLUBS_KEY, JSON.stringify(CLUB_SEED)); } catch { /* noop */ }
-  return CLUB_SEED;
+type ClubRow = Database["public"]["Tables"]["clubs"]["Row"];
+type ClubUpdate = Database["public"]["Tables"]["clubs"]["Update"];
+type ReleaseRow = Database["public"]["Tables"]["club_release_requests"]["Row"];
+
+let clubsCache: Club[] = [];
+let clubsHydrated = false;
+let clubsHydratePromise: Promise<void> | null = null;
+const clubListeners = new Set<() => void>();
+
+let requestsCache: ClubReleaseRequest[] = [];
+let requestsHydrated = false;
+let requestsHydratePromise: Promise<void> | null = null;
+const requestListeners = new Set<() => void>();
+
+function notifyClubs() {
+  clubListeners.forEach((cb) => cb());
+  if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent(CLUBS_EVENT));
+}
+function notifyRequests() {
+  requestListeners.forEach((cb) => cb());
+  if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent(RELEASE_REQUESTS_EVENT));
 }
 
-export function persistClubs(clubs: Club[]) {
-  if (typeof window === "undefined") return;
-  try {
-    localStorage.setItem(CLUBS_KEY, JSON.stringify(clubs));
-    window.dispatchEvent(new CustomEvent(CLUBS_EVENT));
-  } catch { /* noop */ }
-}
-
-export function subscribeClubs(cb: () => void): () => void {
-  if (typeof window === "undefined") return () => {};
-  const onStorage = (e: StorageEvent) => { if (e.key === CLUBS_KEY) cb(); };
-  window.addEventListener(CLUBS_EVENT, cb);
-  window.addEventListener("storage", onStorage);
-  return () => {
-    window.removeEventListener(CLUBS_EVENT, cb);
-    window.removeEventListener("storage", onStorage);
+function mapClubRow(row: ClubRow): Club {
+  return {
+    id: String(row.id),
+    type: row.type,
+    title: row.title,
+    description: row.description ?? "",
+    link: row.link ?? "",
+    material: row.material ?? undefined,
+    cover_image: row.cover_image ?? undefined,
+    teacher_id: row.teacher_id ? uuidToLegacySync(row.teacher_id) : undefined,
+    date: row.date,
+    duration_minutes: row.duration_minutes,
+    spots_taken: row.spots_taken,
+    spots_total: row.spots_total,
+    status: row.status,
+    teacher_payment: row.teacher_payment ?? undefined,
+    claimed_at: row.claimed_at ?? undefined,
+    created_at: row.created_at,
   };
 }
 
-export function updateClub(id: string, patch: Partial<Club>): Club | null {
-  const clubs = loadClubs();
-  const idx = clubs.findIndex((c) => c.id === id);
-  if (idx < 0) return null;
-  clubs[idx] = { ...clubs[idx], ...patch };
-  persistClubs(clubs);
-  return clubs[idx];
+function mapReleaseRow(row: ReleaseRow): ClubReleaseRequest {
+  return {
+    id: String(row.id),
+    club_id: String(row.club_id),
+    teacher_id: uuidToLegacySync(row.teacher_id),
+    reason: row.reason ?? "",
+    requested_at: row.requested_at,
+  };
+}
+
+async function hydrateClubs(): Promise<void> {
+  if (clubsHydrated) return;
+  if (clubsHydratePromise) return clubsHydratePromise;
+  clubsHydratePromise = (async () => {
+    await hydrateUserIdBridge();
+    const { data, error } = await supabase.from("clubs").select("*");
+    if (error) {
+      console.error("[clubs-store] failed to load clubs", error);
+      clubsHydrated = true;
+      return;
+    }
+    clubsCache = (data ?? []).map(mapClubRow);
+    clubsHydrated = true;
+  })();
+  await clubsHydratePromise;
+  clubsHydratePromise = null;
+  notifyClubs();
+}
+
+async function hydrateRequests(): Promise<void> {
+  if (requestsHydrated) return;
+  if (requestsHydratePromise) return requestsHydratePromise;
+  requestsHydratePromise = (async () => {
+    await hydrateUserIdBridge();
+    const { data, error } = await supabase.from("club_release_requests").select("*");
+    if (error) {
+      console.error("[clubs-store] failed to load release requests", error);
+      requestsHydrated = true;
+      return;
+    }
+    requestsCache = (data ?? []).map(mapReleaseRow);
+    requestsHydrated = true;
+  })();
+  await requestsHydratePromise;
+  requestsHydratePromise = null;
+  notifyRequests();
+}
+
+if (typeof window !== "undefined") {
+  void hydrateClubs();
+  void hydrateRequests();
+  supabase
+    .channel("clubs-changes")
+    .on("postgres_changes", { event: "*", schema: "public", table: "clubs" }, () => {
+      clubsHydrated = false;
+      void hydrateClubs();
+    })
+    .subscribe();
+  supabase
+    .channel("club-release-requests-changes")
+    .on("postgres_changes", { event: "*", schema: "public", table: "club_release_requests" }, () => {
+      requestsHydrated = false;
+      void hydrateRequests();
+    })
+    .subscribe();
+}
+
+export function assignmentOf(c: Club): AssignmentStatus {
+  return c.teacher_id ? "assigned" : "created";
+}
+
+export function clubTeacherName(id?: string): string | null {
+  if (!id) return null;
+  return USERS.find((u) => u.id === id)?.name ?? null;
+}
+
+// Clubs still "Created" (no teacher assigned) and not finished/cancelled,
+// ordered by the nearest date first — early-warning list for the admin.
+export function upcomingCreatedClubs(clubs: Club[] = clubsCache): Club[] {
+  return clubs
+    .filter((c) => !c.teacher_id && c.status !== "completed" && c.status !== "cancelled")
+    .sort((a, b) => +new Date(a.date) - +new Date(b.date));
+}
+
+export function loadClubs(): Club[] {
+  if (!clubsHydrated) void hydrateClubs();
+  return clubsCache;
+}
+
+export function subscribeClubs(cb: () => void): () => void {
+  clubListeners.add(cb);
+  return () => {
+    clubListeners.delete(cb);
+  };
+}
+
+/** Creates a new club event. Returns the created club, or null on failure. */
+export async function createClub(data: Omit<Club, "id" | "spots_taken" | "status">): Promise<Club | null> {
+  const teacherUuid = data.teacher_id ? await legacyToUuid(data.teacher_id) : null;
+  const { data: row, error } = await supabase
+    .from("clubs")
+    .insert({
+      type: data.type,
+      title: data.title,
+      description: data.description || null,
+      link: data.link || null,
+      material: data.material || null,
+      cover_image: data.cover_image || null,
+      teacher_id: teacherUuid,
+      date: data.date,
+      duration_minutes: data.duration_minutes,
+      spots_total: data.spots_total,
+      teacher_payment: data.teacher_payment ?? null,
+    })
+    .select("*")
+    .single();
+  if (error || !row) {
+    console.error("[clubs-store] failed to create club", error);
+    return null;
+  }
+  const club = mapClubRow(row);
+  clubsCache = [club, ...clubsCache];
+  notifyClubs();
+  return club;
+}
+
+/** Partial update — accepts the same patch shape the old localStorage
+ *  version did. A key present with value `undefined` (e.g.
+ *  `{ teacher_id: undefined }`) explicitly clears that column. */
+export async function updateClub(id: string, patch: Partial<Club>): Promise<Club | null> {
+  const numericId = Number(id);
+  if (!Number.isFinite(numericId)) return null;
+  const update: ClubUpdate = {};
+  if (patch.type !== undefined) update.type = patch.type;
+  if (patch.title !== undefined) update.title = patch.title;
+  if (patch.description !== undefined) update.description = patch.description || null;
+  if (patch.link !== undefined) update.link = patch.link || null;
+  if (patch.material !== undefined) update.material = patch.material || null;
+  if (patch.cover_image !== undefined) update.cover_image = patch.cover_image || null;
+  if (patch.date !== undefined) update.date = patch.date;
+  if (patch.duration_minutes !== undefined) update.duration_minutes = patch.duration_minutes;
+  if (patch.spots_taken !== undefined) update.spots_taken = patch.spots_taken;
+  if (patch.spots_total !== undefined) update.spots_total = patch.spots_total;
+  if (patch.status !== undefined) update.status = patch.status;
+  if (patch.teacher_payment !== undefined) update.teacher_payment = patch.teacher_payment ?? null;
+  if ("claimed_at" in patch) update.claimed_at = patch.claimed_at ?? null;
+  if ("teacher_id" in patch) {
+    update.teacher_id = patch.teacher_id ? await legacyToUuid(patch.teacher_id) : null;
+  }
+  const { data: row, error } = await supabase.from("clubs").update(update).eq("id", numericId).select("*").single();
+  if (error || !row) {
+    console.error("[clubs-store] failed to update club", error);
+    return null;
+  }
+  const club = mapClubRow(row);
+  clubsCache = clubsCache.map((c) => (c.id === id ? club : c));
+  notifyClubs();
+  return club;
+}
+
+export async function deleteClub(id: string): Promise<boolean> {
+  const numericId = Number(id);
+  if (!Number.isFinite(numericId)) return false;
+  const { error } = await supabase.from("clubs").delete().eq("id", numericId);
+  if (error) {
+    console.error("[clubs-store] failed to delete club", error);
+    return false;
+  }
+  clubsCache = clubsCache.filter((c) => c.id !== id);
+  notifyClubs();
+  return true;
 }
 
 /** Attempt to claim a Created club for the given teacher. Returns the
- *  updated club on success, or null if it was already assigned (race). */
-export function claimClub(id: string, teacherId: string): Club | null {
-  const clubs = loadClubs();
-  const idx = clubs.findIndex((c) => c.id === id);
-  if (idx < 0) return null;
-  if (clubs[idx].teacher_id) return null;
-  clubs[idx] = { ...clubs[idx], teacher_id: teacherId, claimed_at: new Date().toISOString() };
-  persistClubs(clubs);
-  return clubs[idx];
+ *  updated club on success, or null if it was already assigned. The
+ *  `.is("teacher_id", null)` filter makes this race-safe at the database
+ *  level — two teachers claiming simultaneously can't both succeed. */
+export async function claimClub(id: string, teacherId: string): Promise<Club | null> {
+  const numericId = Number(id);
+  if (!Number.isFinite(numericId)) return null;
+  const teacherUuid = await legacyToUuid(teacherId);
+  if (!teacherUuid) return null;
+  const { data: row, error } = await supabase
+    .from("clubs")
+    .update({ teacher_id: teacherUuid, claimed_at: new Date().toISOString() })
+    .eq("id", numericId)
+    .is("teacher_id", null)
+    .select("*")
+    .single();
+  if (error || !row) {
+    // PGRST116 = "no rows returned" — expected when someone else claimed it first.
+    if (error && error.code !== "PGRST116") console.error("[clubs-store] failed to claim club", error);
+    return null;
+  }
+  const club = mapClubRow(row);
+  clubsCache = clubsCache.map((c) => (c.id === id ? club : c));
+  notifyClubs();
+  return club;
 }
 
 /** Release a claim — clears teacher + claimed_at, returning it to "Created". */
-export function releaseClub(id: string): Club | null {
+export async function releaseClub(id: string): Promise<Club | null> {
   return updateClub(id, { teacher_id: undefined, claimed_at: undefined });
 }
 
 // --- Release requests -------------------------------------------------------
 export function loadReleaseRequests(): ClubReleaseRequest[] {
-  if (typeof window === "undefined") return [];
-  try { return JSON.parse(localStorage.getItem(RELEASE_REQUESTS_KEY) || "[]") as ClubReleaseRequest[]; }
-  catch { return []; }
-}
-
-export function persistReleaseRequests(list: ClubReleaseRequest[]) {
-  if (typeof window === "undefined") return;
-  try {
-    localStorage.setItem(RELEASE_REQUESTS_KEY, JSON.stringify(list));
-    window.dispatchEvent(new CustomEvent(RELEASE_REQUESTS_EVENT));
-  } catch { /* noop */ }
+  if (!requestsHydrated) void hydrateRequests();
+  return requestsCache;
 }
 
 export function subscribeReleaseRequests(cb: () => void): () => void {
-  if (typeof window === "undefined") return () => {};
-  const onStorage = (e: StorageEvent) => { if (e.key === RELEASE_REQUESTS_KEY) cb(); };
-  window.addEventListener(RELEASE_REQUESTS_EVENT, cb);
-  window.addEventListener("storage", onStorage);
+  requestListeners.add(cb);
   return () => {
-    window.removeEventListener(RELEASE_REQUESTS_EVENT, cb);
-    window.removeEventListener("storage", onStorage);
+    requestListeners.delete(cb);
   };
 }
 
 export function addReleaseRequest(input: { club_id: string; teacher_id: string; reason: string }): ClubReleaseRequest {
-  const list = loadReleaseRequests();
+  const tempId = `temp-${Date.now()}`;
   const req: ClubReleaseRequest = {
-    id: `rr${Date.now()}`,
+    id: tempId,
     club_id: input.club_id,
     teacher_id: input.teacher_id,
     reason: input.reason,
     requested_at: new Date().toISOString(),
   };
-  persistReleaseRequests([req, ...list]);
+  requestsCache = [req, ...requestsCache];
+  notifyRequests();
+
+  void (async () => {
+    const numericClubId = Number(input.club_id);
+    const teacherUuid = await legacyToUuid(input.teacher_id);
+    if (!teacherUuid || !Number.isFinite(numericClubId)) {
+      requestsCache = requestsCache.filter((r) => r.id !== tempId);
+      notifyRequests();
+      return;
+    }
+    const { data, error } = await supabase
+      .from("club_release_requests")
+      .insert({ club_id: numericClubId, teacher_id: teacherUuid, reason: input.reason || null })
+      .select("*")
+      .single();
+    if (error || !data) {
+      console.error("[clubs-store] failed to submit release request", error);
+      requestsCache = requestsCache.filter((r) => r.id !== tempId);
+      notifyRequests();
+      return;
+    }
+    requestsCache = requestsCache.map((r) => (r.id === tempId ? mapReleaseRow(data) : r));
+    notifyRequests();
+  })();
+
   return req;
 }
 
 export function removeReleaseRequest(id: string) {
-  persistReleaseRequests(loadReleaseRequests().filter((r) => r.id !== id));
+  const prev = requestsCache;
+  requestsCache = requestsCache.filter((r) => r.id !== id);
+  notifyRequests();
+  const numericId = Number(id);
+  if (!Number.isFinite(numericId)) return;
+  void (async () => {
+    const { error } = await supabase.from("club_release_requests").delete().eq("id", numericId);
+    if (error) {
+      console.error("[clubs-store] failed to remove release request", error);
+      requestsCache = prev;
+      notifyRequests();
+    }
+  })();
 }
