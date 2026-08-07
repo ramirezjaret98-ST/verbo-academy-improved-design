@@ -2755,6 +2755,32 @@ export type Database = {
           },
         ]
       }
+      unit_attempts: {
+        Row: {
+          attempts: number
+          student_id: string
+          unit_id: string
+        }
+        Insert: {
+          attempts?: number
+          student_id: string
+          unit_id: string
+        }
+        Update: {
+          attempts?: number
+          student_id?: string
+          unit_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "unit_attempts_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "app_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       unit_unlock_seen: {
         Row: {
           student_id: string
