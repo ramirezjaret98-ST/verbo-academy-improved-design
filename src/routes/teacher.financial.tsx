@@ -587,7 +587,10 @@ function MyBalancePage() {
         <FinancialIssueModal
           onClose={() => setReportOpen(false)}
           onSubmit={(text) => {
-            addFinancialIssue({ teacherId: teacher.id, text });
+            addFinancialIssue({ teacherId: teacher.id, text }).catch((err) => {
+              console.error("[teacher.financial] failed to report issue", err);
+              window.alert("Couldn't send the report. Please try again.");
+            });
             setReportOpen(false);
             setReportSent(true);
           }}

@@ -887,10 +887,20 @@ function UnitsView({
   const currentUnit = level.units.find((u, i) => states[i] === "current");
 
   // Only the freshly unlocked unit flips, and only the first time it is seen.
-  const [flipUnitId] = useState<string | null>(() => {
-    if (!currentUnit) return null;
-    return markUnlockSeen(studentId, currentUnit.id) ? currentUnit.id : null;
-  });
+  // markUnlockSeen is async (Supabase-backed) — check once on mount and only
+  // flip once we get a real answer back.
+  const [flipUnitId, setFlipUnitId] = useState<string | null>(null);
+  useEffect(() => {
+    if (!currentUnit) return;
+    let cancelled = false;
+    markUnlockSeen(studentId, currentUnit.id).then((firstTime) => {
+      if (!cancelled && firstTime) setFlipUnitId(currentUnit.id);
+    });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const currentBlock = currentUnit
     ? Math.min(2, Math.floor((unitNumberOf(currentUnit.id) - 1) / 10))

@@ -17,7 +17,7 @@ import {
   subscribePayments,
 } from "@/lib/payments-log";
 import {
-  getRetentionMonths, setRetentionMonths,
+  getRetentionMonths, setRetentionMonths, subscribeLogRetention,
   retentionCutoffMs, downloadJson, todayStamp,
 } from "@/lib/log-retention";
 
@@ -201,6 +201,11 @@ function DataRetentionSection() {
   const kpi = useLive(loadKpiOverrides, subscribeKpiOverrides);
   const payments = useLive(loadPayments, subscribePayments);
   const [months, setMonths] = useState<number>(() => getRetentionMonths());
+  useEffect(() => {
+    setMonths(getRetentionMonths());
+    return subscribeLogRetention(() => setMonths(getRetentionMonths()));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const cutoff = useMemo(() => retentionCutoffMs(months), [months, kpi, payments]);
 
@@ -216,7 +221,10 @@ function DataRetentionSection() {
   const commitMonths = (v: number) => {
     const n = Math.max(1, Math.min(120, Math.round(v || 0)));
     setMonths(n);
-    setRetentionMonths(n);
+    void setRetentionMonths(n).catch((err) => {
+      console.error("[admin.activity-logs] failed to save retention months", err);
+      setMonths(getRetentionMonths());
+    });
   };
 
   const exportAndPruneKpi = () => {
