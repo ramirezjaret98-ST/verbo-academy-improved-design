@@ -7,7 +7,7 @@ import { appendTeacherAdjustment } from "@/lib/teacher-tiers";
 import {
   type Club, type ClubType, type TimeStatus, type ClubReleaseRequest,
   assignmentOf, clubTeacherName as teacherName,
-  loadClubs, persistClubs, subscribeClubs, updateClub, releaseClub,
+  loadClubs, createClub, updateClub, deleteClub, subscribeClubs, releaseClub,
   loadReleaseRequests, subscribeReleaseRequests, removeReleaseRequest,
 } from "@/lib/clubs-store";
 import {
@@ -107,25 +107,15 @@ function Page() {
   const onCreate = () => { setEditing(null); setOpen(true); };
   const onEdit = (c: Club) => { setEditing(c); setOpen(true); };
   const onDelete = (id: string) => {
-    const next = loadClubs().filter((c) => c.id !== id);
-    persistClubs(next);
+    void deleteClub(id);
   };
 
   const onSave = (data: Omit<Club, "id" | "spots_taken" | "status">) => {
-    const current = loadClubs();
-    const next = editing
-      ? current.map((c) => (c.id === editing.id ? { ...c, ...data } : c))
-      : [
-          {
-            id: `c${Date.now()}`,
-            spots_taken: 0,
-            status: "upcoming" as TimeStatus,
-            created_at: new Date().toISOString(),
-            ...data,
-          },
-          ...current,
-        ];
-    persistClubs(next);
+    if (editing) {
+      void updateClub(editing.id, data);
+    } else {
+      void createClub(data);
+    }
     setOpen(false);
   };
 

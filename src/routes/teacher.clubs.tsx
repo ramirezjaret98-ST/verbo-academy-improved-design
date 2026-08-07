@@ -111,8 +111,8 @@ function Page() {
 
   if (!user) return null;
 
-  const onClaim = (c: Club) => {
-    const updated = claimClub(c.id, user.id);
+  const onClaim = async (c: Club) => {
+    const updated = await claimClub(c.id, user.id);
     if (!updated) {
       toast.error("This club was just claimed by another teacher");
       setClubs(loadClubs());
@@ -125,7 +125,7 @@ function Page() {
 
   const onFreeRelease = () => {
     if (!banner) return;
-    releaseClub(banner.clubId);
+    void releaseClub(banner.clubId);
     setBanner(null);
     toast("Club released");
   };
