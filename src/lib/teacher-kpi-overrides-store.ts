@@ -6,8 +6,17 @@
 // An override rewrites a SPECIFIC month's snapshot for a single teacher, so
 // bonus-streak recalculations can honour retroactive corrections. It does NOT
 // change how future months are computed.
+//
+// Backed by Supabase (`public.teacher_kpi_overrides`, RLS: SELECT self+admin,
+// INSERT coordinator_ops-scoped (super_admin required for bonusStreak),
+// DELETE super_admin-only — matches the Data Retention section in
+// Admin > Activity Logs, which is itself gated to super_admin). Global cache
+// hydrated once + Postgres Realtime, same pattern used across this migration.
 // ============================================================================
 import { useSyncExternalStore } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import type { Database } from "@/integrations/supabase/types";
+import { hydrateUserIdBridge, legacyToUuid, uuidToLegacySync } from "@/lib/user-id-bridge";
 
 export type KpiMetric =
   | "connectionPunctuality"
@@ -53,47 +62,80 @@ export interface KpiOverride {
   created_at: string;         // ISO
 }
 
-export const KPI_OVERRIDES_KEY = "verbo:kpi-overrides";
 export const KPI_OVERRIDES_EVENT = "verbo:kpi-overrides-updated";
 
-let cachedSnapshot: KpiOverride[] | null = null;
+type OverrideRow = Database["public"]["Tables"]["teacher_kpi_overrides"]["Row"];
 
-// ----- Persistence ---------------------------------------------------------
+let overridesCache: KpiOverride[] = [];
+let hydrated = false;
+let hydratePromise: Promise<void> | null = null;
+const listeners = new Set<() => void>();
+
+function notify() {
+  listeners.forEach((cb) => cb());
+  if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent(KPI_OVERRIDES_EVENT));
+}
+
+function mapRow(row: OverrideRow): KpiOverride {
+  return {
+    id: String(row.id),
+    teacher_id: uuidToLegacySync(row.teacher_id),
+    month_key: row.month_key,
+    metric: row.metric,
+    previous_value: row.previous_value ?? 0,
+    new_value: row.new_value,
+    justification: row.justification,
+    evidence_name: row.evidence_name ?? undefined,
+    admin_id: uuidToLegacySync(row.admin_id),
+    admin_name: row.admin_name,
+    admin_type: row.admin_type ?? undefined,
+    created_at: row.created_at,
+  };
+}
+
+async function hydrate(): Promise<void> {
+  if (hydrated) return;
+  if (hydratePromise) return hydratePromise;
+  hydratePromise = (async () => {
+    await hydrateUserIdBridge();
+    const { data, error } = await supabase
+      .from("teacher_kpi_overrides")
+      .select("*")
+      .order("created_at", { ascending: false });
+    if (error) {
+      console.error("[teacher-kpi-overrides-store] failed to load overrides", error);
+      hydrated = true;
+      return;
+    }
+    overridesCache = (data ?? []).map(mapRow);
+    hydrated = true;
+  })();
+  await hydratePromise;
+  hydratePromise = null;
+  notify();
+}
+
+if (typeof window !== "undefined") {
+  void hydrate();
+  supabase
+    .channel("teacher-kpi-overrides-changes")
+    .on("postgres_changes", { event: "*", schema: "public", table: "teacher_kpi_overrides" }, () => {
+      hydrated = false;
+      void hydrate();
+    })
+    .subscribe();
+}
+
+// ----- Reads -----------------------------------------------------------
 export function loadKpiOverrides(): KpiOverride[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = localStorage.getItem(KPI_OVERRIDES_KEY);
-    return raw ? (JSON.parse(raw) as KpiOverride[]) : [];
-  } catch {
-    return [];
-  }
-}
-
-function getSnapshot(): KpiOverride[] {
-  if (cachedSnapshot === null) cachedSnapshot = loadKpiOverrides();
-  return cachedSnapshot;
-}
-
-function persist(list: KpiOverride[]) {
-  if (typeof window === "undefined") return;
-  try {
-    localStorage.setItem(KPI_OVERRIDES_KEY, JSON.stringify(list));
-    cachedSnapshot = null;
-    window.dispatchEvent(new CustomEvent(KPI_OVERRIDES_EVENT));
-  } catch {
-    /* noop */
-  }
+  if (!hydrated) void hydrate();
+  return overridesCache;
 }
 
 export function subscribeKpiOverrides(cb: () => void): () => void {
-  if (typeof window === "undefined") return () => {};
-  const invalidate = () => { cachedSnapshot = null; cb(); };
-  const onStorage = (e: StorageEvent) => { if (e.key === KPI_OVERRIDES_KEY) invalidate(); };
-  window.addEventListener(KPI_OVERRIDES_EVENT, invalidate);
-  window.addEventListener("storage", onStorage);
+  listeners.add(cb);
   return () => {
-    window.removeEventListener(KPI_OVERRIDES_EVENT, invalidate);
-    window.removeEventListener("storage", onStorage);
+    listeners.delete(cb);
   };
 }
 
@@ -105,7 +147,8 @@ export type AddKpiOverrideResult =
 /** Permission check kept alongside the mutation so any caller — including
  * future ones that forget the UI-level gate — cannot bypass separation of
  * duties. coordinator_fin can never adjust; only super_admin can touch the
- * bonusStreak metric. */
+ * bonusStreak metric. Mirrors the `teacher_kpi_overrides_insert` RLS policy
+ * exactly, so a request that passes this check will also pass RLS. */
 export function canAdminOverrideMetric(
   adminType: KpiOverrideAdminType | null | undefined,
   metric: KpiMetric,
@@ -121,18 +164,76 @@ export function addKpiOverride(
   if (!canAdminOverrideMetric(input.admin_type ?? null, input.metric)) {
     return { ok: false, error: "You don't have permission to make this adjustment." };
   }
+  const tempId = `temp-${Date.now()}`;
   const entry: KpiOverride = {
     ...input,
-    id: `kpio_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    id: tempId,
     created_at: new Date().toISOString(),
   };
-  persist([entry, ...loadKpiOverrides()]);
+  overridesCache = [entry, ...overridesCache];
+  notify();
+
+  void (async () => {
+    const [teacherUuid, adminUuid] = await Promise.all([
+      legacyToUuid(input.teacher_id),
+      legacyToUuid(input.admin_id),
+    ]);
+    if (!teacherUuid || !adminUuid) {
+      console.error("[teacher-kpi-overrides-store] unknown teacher/admin id");
+      overridesCache = overridesCache.filter((o) => o.id !== tempId);
+      notify();
+      return;
+    }
+    const { data, error } = await supabase
+      .from("teacher_kpi_overrides")
+      .insert({
+        teacher_id: teacherUuid,
+        month_key: input.month_key,
+        metric: input.metric,
+        previous_value: input.previous_value,
+        new_value: input.new_value,
+        justification: input.justification,
+        evidence_name: input.evidence_name ?? null,
+        admin_id: adminUuid,
+        admin_name: input.admin_name,
+        admin_type: input.admin_type ?? null,
+      })
+      .select("*")
+      .single();
+    if (error || !data) {
+      console.error("[teacher-kpi-overrides-store] failed to save override", error);
+      overridesCache = overridesCache.filter((o) => o.id !== tempId);
+      notify();
+      return;
+    }
+    const saved = mapRow(data);
+    overridesCache = overridesCache.map((o) => (o.id === tempId ? saved : o));
+    notify();
+  })();
+
   return { ok: true, entry };
 }
 
-/** Replace the entire overrides list — used by retention cleanup. */
-export function replaceKpiOverrides(list: KpiOverride[]) {
-  persist(list);
+/** Retention pruning: deletes every override created before `cutoffMs`.
+ *  Replaces the old localStorage-era `replaceKpiOverrides(fullList)` —
+ *  Supabase has no cheap "replace the whole table" primitive, so this issues
+ *  a targeted DELETE instead. Only super_admin can call this (RLS), matching
+ *  the super_admin-only gate on the Data Retention section that's its only
+ *  caller. */
+export function deleteOldKpiOverrides(cutoffMs: number): void {
+  const prev = overridesCache;
+  const cutoffIso = new Date(cutoffMs).toISOString();
+  overridesCache = overridesCache.filter((o) => +new Date(o.created_at) >= cutoffMs);
+  notify();
+
+  void (async () => {
+    const { error } = await supabase.from("teacher_kpi_overrides").delete().lt("created_at", cutoffIso);
+    if (error) {
+      console.error("[teacher-kpi-overrides-store] failed to prune old overrides", error);
+      overridesCache = prev;
+      notify();
+    }
+  })();
 }
 
 // ----- Queries -------------------------------------------------------------
@@ -167,7 +268,7 @@ export function overridesForMonth(teacherId: string, monthKey: string): Record<K
 export function useKpiOverrides(): KpiOverride[] {
   return useSyncExternalStore(
     (cb) => subscribeKpiOverrides(cb),
-    getSnapshot,
+    loadKpiOverrides,
     () => [],
   );
 }

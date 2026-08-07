@@ -1,7 +1,21 @@
 // Teacher availability + change-request queue.
-// Persisted to localStorage, broadcast via CustomEvent.
+//
+// Backed by Supabase (`public.teacher_availability` singleton row per
+// teacher + `public.teacher_availability_blocks` normalized weekly blocks +
+// public.availability_change_requests`, RLS: self + admin on all three).
+// Global caches hydrated once + Postgres Realtime, same pattern used across
+// this migration — admin's RLS-bypassed `select("*")` already returns every
+// teacher's rows, so a single global cache serves both the teacher's own
+// "My Availability" page and Admin's cross-teacher lookups.
+//
+// `saveAvailability` writes go through the `replace_teacher_availability`
+// RPC (one DB transaction) rather than a plain delete+insert from the
+// client, so Realtime subscribers never observe an intermediate
+// "blocks deleted but not yet reinserted" flicker.
+import { supabase } from "@/integrations/supabase/client";
+import type { Database } from "@/integrations/supabase/types";
+import { hydrateUserIdBridge, legacyToUuid, uuidToLegacySync } from "@/lib/user-id-bridge";
 import { loadSessions } from "./sessions-store";
-import { USERS, type User } from "./mock-data";
 
 export type DayKey = "mon" | "tue" | "wed" | "thu" | "fri" | "sat";
 export const DAY_KEYS: DayKey[] = ["mon", "tue", "wed", "thu", "fri", "sat"];
@@ -32,8 +46,6 @@ export interface AvailabilityChangeRequest {
   resolvedAt?: string;
 }
 
-const AVAIL_KEY = "verbo:teacher-availability";
-const REQ_KEY = "verbo:availability-change-requests";
 export const AVAIL_EVENT = "verbo:availability-updated";
 
 export const MIN_MINUTES = 7 * 60;
@@ -52,152 +64,273 @@ export function timeToMinutes(t: string): number {
   return h * 60 + m;
 }
 
-function readAvailRaw(): Record<string, TeacherAvailability> {
-  if (typeof window === "undefined") return {};
-  try { return JSON.parse(localStorage.getItem(AVAIL_KEY) || "{}"); } catch { return {}; }
-}
-function writeAvailRaw(v: Record<string, TeacherAvailability>) {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(AVAIL_KEY, JSON.stringify(v));
-  window.dispatchEvent(new CustomEvent(AVAIL_EVENT));
-}
+type AvailRow = Database["public"]["Tables"]["teacher_availability"]["Row"];
+type BlockRow = Database["public"]["Tables"]["teacher_availability_blocks"]["Row"];
+type ReqRow = Database["public"]["Tables"]["availability_change_requests"]["Row"];
 
-const LEGACY_DAY_TO_KEY: Record<string, DayKey> = Object.fromEntries(
-  DAY_KEYS.map((k) => [DAY_LABELS[k], k]),
-) as Record<string, DayKey>;
+let availabilityMap: Record<string, TeacherAvailability> = {};
+let availHydrated = false;
+let availHydratePromise: Promise<void> | null = null;
+const availListeners = new Set<() => void>();
 
-function parseLegacyRange(range: string): TimeBlock | null {
-  const parts = range.split(/[–-]/).map((s) => s.trim());
-  if (parts.length !== 2) return null;
-  const startMin = timeToMinutes(parts[0]);
-  const endMin = timeToMinutes(parts[1]);
-  if (Number.isNaN(startMin) || Number.isNaN(endMin)) return null;
-  const clampedStart = Math.max(MIN_MINUTES, startMin);
-  const clampedEnd = Math.min(MAX_MINUTES, endMin);
-  if (clampedEnd <= clampedStart) return null;
-  return { startMin: clampedStart, endMin: clampedEnd };
+let changeRequestsCache: AvailabilityChangeRequest[] = [];
+let reqHydrated = false;
+let reqHydratePromise: Promise<void> | null = null;
+const reqListeners = new Set<() => void>();
+
+function notifyAvailability() {
+  availListeners.forEach((cb) => cb());
+  if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent(AVAIL_EVENT));
+}
+function notifyChangeRequests() {
+  reqListeners.forEach((cb) => cb());
+  if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent(AVAIL_EVENT));
 }
 
-let _availabilityHydrated = false;
+function setAvailabilityEntry(teacherId: string, entry: TeacherAvailability | undefined) {
+  const next = { ...availabilityMap };
+  if (entry) next[teacherId] = entry;
+  else delete next[teacherId];
+  availabilityMap = next;
+}
 
-/** One-time seed: any teacher who has never saved real availability (no
- *  entry yet under AVAIL_KEY) but carries the static demo `availability`
- *  field from mock-data gets it converted into real Weekly blocks and
- *  persisted — WITHOUT confirmedAt, so the teacher's own My Availability
- *  page still offers a free "Save Availability" (not "Request Change") and
- *  they can edit it freely before confirming. Runs automatically the first
- *  time availability is read anywhere in the app — no page needs to call
- *  this. Idempotent; never overwrites a teacher who already has real saved
- *  availability (including one who deliberately saved an empty schedule). */
-function hydrateAvailabilityOnce() {
-  if (_availabilityHydrated || typeof window === "undefined") return;
-  _availabilityHydrated = true;
-  const map = readAvailRaw();
-  let changed = false;
-  for (const u of USERS as User[]) {
-    if (u.role !== "teacher" || map[u.id]) continue;
-    const legacy = u.availability;
-    if (!legacy || legacy.length === 0) continue;
-    const weekly = emptyWeekly();
-    for (const entry of legacy) {
-      const key = LEGACY_DAY_TO_KEY[entry.day];
-      if (!key) continue; // drops "Sunday" or unrecognized labels safely
-      for (const slot of entry.slots) {
-        const block = parseLegacyRange(slot);
-        if (block) weekly[key].push(block);
-      }
+function mapChangeRequestRow(row: ReqRow): AvailabilityChangeRequest {
+  return {
+    id: String(row.id),
+    teacherId: uuidToLegacySync(row.teacher_id),
+    reason: row.reason ?? undefined,
+    proposed: row.proposed as unknown as Weekly,
+    status: row.status as AvailabilityChangeRequest["status"],
+    createdAt: row.created_at,
+    resolvedAt: row.resolved_at ?? undefined,
+  };
+}
+
+async function hydrateAvailability(): Promise<void> {
+  if (availHydrated) return;
+  if (availHydratePromise) return availHydratePromise;
+  availHydratePromise = (async () => {
+    await hydrateUserIdBridge();
+    const [{ data: rows, error: rowsErr }, { data: blocks, error: blocksErr }] = await Promise.all([
+      supabase.from("teacher_availability").select("*"),
+      supabase.from("teacher_availability_blocks").select("*").order("id", { ascending: true }),
+    ]);
+    if (rowsErr) console.error("[availability-store] failed to load teacher_availability", rowsErr);
+    if (blocksErr) console.error("[availability-store] failed to load teacher_availability_blocks", blocksErr);
+    const map: Record<string, TeacherAvailability> = {};
+    for (const row of (rows ?? []) as AvailRow[]) {
+      const legacyId = uuidToLegacySync(row.teacher_id);
+      map[legacyId] = { teacherId: legacyId, weekly: emptyWeekly(), confirmedAt: row.confirmed_at ?? undefined };
     }
-    if (Object.values(weekly).some((blocks) => blocks.length > 0)) {
-      map[u.id] = { teacherId: u.id, weekly };
-      changed = true;
+    for (const b of (blocks ?? []) as BlockRow[]) {
+      const legacyId = uuidToLegacySync(b.teacher_id);
+      if (!map[legacyId]) map[legacyId] = { teacherId: legacyId, weekly: emptyWeekly() };
+      map[legacyId].weekly[b.day].push({ startMin: b.start_min, endMin: b.end_min });
     }
-  }
-  if (changed) writeAvailRaw(map);
+    availabilityMap = map;
+    availHydrated = true;
+  })();
+  await availHydratePromise;
+  availHydratePromise = null;
+  notifyAvailability();
 }
 
-function readAvail(): Record<string, TeacherAvailability> {
-  hydrateAvailabilityOnce();
-  return readAvailRaw();
+async function hydrateChangeRequests(): Promise<void> {
+  if (reqHydrated) return;
+  if (reqHydratePromise) return reqHydratePromise;
+  reqHydratePromise = (async () => {
+    await hydrateUserIdBridge();
+    const { data, error } = await supabase
+      .from("availability_change_requests")
+      .select("*")
+      .order("created_at", { ascending: false });
+    if (error) {
+      console.error("[availability-store] failed to load change requests", error);
+      reqHydrated = true;
+      return;
+    }
+    changeRequestsCache = (data ?? []).map(mapChangeRequestRow);
+    reqHydrated = true;
+  })();
+  await reqHydratePromise;
+  reqHydratePromise = null;
+  notifyChangeRequests();
 }
 
-function writeAvail(v: Record<string, TeacherAvailability>) {
-  writeAvailRaw(v);
-}
-
-function readReqs(): AvailabilityChangeRequest[] {
-  if (typeof window === "undefined") return [];
-  try { return JSON.parse(localStorage.getItem(REQ_KEY) || "[]"); } catch { return []; }
-}
-function writeReqs(v: AvailabilityChangeRequest[]) {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(REQ_KEY, JSON.stringify(v));
-  window.dispatchEvent(new CustomEvent(AVAIL_EVENT));
+if (typeof window !== "undefined") {
+  void hydrateAvailability();
+  void hydrateChangeRequests();
+  supabase
+    .channel("teacher-availability-changes")
+    .on("postgres_changes", { event: "*", schema: "public", table: "teacher_availability" }, () => {
+      availHydrated = false;
+      void hydrateAvailability();
+    })
+    .subscribe();
+  supabase
+    .channel("teacher-availability-blocks-changes")
+    .on("postgres_changes", { event: "*", schema: "public", table: "teacher_availability_blocks" }, () => {
+      availHydrated = false;
+      void hydrateAvailability();
+    })
+    .subscribe();
+  supabase
+    .channel("availability-change-requests-changes")
+    .on("postgres_changes", { event: "*", schema: "public", table: "availability_change_requests" }, () => {
+      reqHydrated = false;
+      void hydrateChangeRequests();
+    })
+    .subscribe();
 }
 
 export function getAvailability(teacherId: string): TeacherAvailability {
-  const map = readAvail();
-  return map[teacherId] ?? { teacherId, weekly: emptyWeekly() };
+  if (!availHydrated) void hydrateAvailability();
+  return availabilityMap[teacherId] ?? { teacherId, weekly: emptyWeekly() };
 }
 
-export function saveAvailability(teacherId: string, weekly: Weekly) {
-  const map = readAvail();
-  map[teacherId] = { teacherId, weekly, confirmedAt: new Date().toISOString() };
-  writeAvail(map);
+/** Optimistic write: updates the local cache + notifies immediately, then
+ *  round-trips through the `replace_teacher_availability` RPC in the
+ *  background (rolling back the optimistic change on failure). Used both by
+ *  the teacher's own "Save Availability" and by `approveChangeRequest`
+ *  (called as admin, on the teacher's behalf — RLS allows this since the
+ *  underlying tables' policies accept `is_admin()`). */
+export function saveAvailability(teacherId: string, weekly: Weekly): void {
+  const prev = availabilityMap[teacherId];
+  const confirmedAt = new Date().toISOString();
+  setAvailabilityEntry(teacherId, { teacherId, weekly, confirmedAt });
+  notifyAvailability();
+
+  void (async () => {
+    const teacherUuid = await legacyToUuid(teacherId);
+    if (!teacherUuid) {
+      console.error("[availability-store] unknown teacher id", teacherId);
+      setAvailabilityEntry(teacherId, prev);
+      notifyAvailability();
+      return;
+    }
+    const blocks = DAY_KEYS.flatMap((day) =>
+      weekly[day].map((b) => ({ day, startMin: b.startMin, endMin: b.endMin })),
+    );
+    const { error } = await supabase.rpc("replace_teacher_availability", {
+      p_teacher_id: teacherUuid,
+      p_confirmed_at: confirmedAt,
+      p_blocks: blocks,
+    });
+    if (error) {
+      console.error("[availability-store] failed to save availability", error);
+      setAvailabilityEntry(teacherId, prev);
+      notifyAvailability();
+    }
+  })();
 }
 
 export function subscribeAvailability(cb: () => void): () => void {
-  if (typeof window === "undefined") return () => {};
-  const onEvt = () => cb();
-  const onStorage = (e: StorageEvent) => { if (e.key === AVAIL_KEY || e.key === REQ_KEY) cb(); };
-  window.addEventListener(AVAIL_EVENT, onEvt);
-  window.addEventListener("storage", onStorage);
+  availListeners.add(cb);
+  reqListeners.add(cb);
   return () => {
-    window.removeEventListener(AVAIL_EVENT, onEvt);
-    window.removeEventListener("storage", onStorage);
+    availListeners.delete(cb);
+    reqListeners.delete(cb);
   };
 }
 
 // ---- Change requests -------------------------------------------------------
 export function listChangeRequests(status?: AvailabilityChangeRequest["status"]): AvailabilityChangeRequest[] {
-  const all = readReqs();
-  return status ? all.filter((r) => r.status === status) : all;
+  if (!reqHydrated) void hydrateChangeRequests();
+  return status ? changeRequestsCache.filter((r) => r.status === status) : changeRequestsCache;
 }
 
 export function hasPendingRequest(teacherId: string): boolean {
-  return readReqs().some((r) => r.teacherId === teacherId && r.status === "pending");
+  if (!reqHydrated) void hydrateChangeRequests();
+  return changeRequestsCache.some((r) => r.teacherId === teacherId && r.status === "pending");
 }
 
 export function submitChangeRequest(teacherId: string, proposed: Weekly, reason?: string): AvailabilityChangeRequest | null {
   if (hasPendingRequest(teacherId)) return null;
+  const tempId = `temp-${Date.now()}`;
   const req: AvailabilityChangeRequest = {
-    id: `avr-${Date.now()}`,
+    id: tempId,
     teacherId,
     reason,
     proposed,
     status: "pending",
     createdAt: new Date().toISOString(),
   };
-  writeReqs([req, ...readReqs()]);
+  changeRequestsCache = [req, ...changeRequestsCache];
+  notifyChangeRequests();
+
+  void (async () => {
+    const teacherUuid = await legacyToUuid(teacherId);
+    if (!teacherUuid) {
+      changeRequestsCache = changeRequestsCache.filter((r) => r.id !== tempId);
+      notifyChangeRequests();
+      return;
+    }
+    const { data, error } = await supabase
+      .from("availability_change_requests")
+      .insert({ teacher_id: teacherUuid, reason: reason || null, proposed: proposed as unknown as never })
+      .select("*")
+      .single();
+    if (error || !data) {
+      console.error("[availability-store] failed to submit change request", error);
+      changeRequestsCache = changeRequestsCache.filter((r) => r.id !== tempId);
+      notifyChangeRequests();
+      return;
+    }
+    changeRequestsCache = changeRequestsCache.map((r) => (r.id === tempId ? mapChangeRequestRow(data) : r));
+    notifyChangeRequests();
+  })();
+
   return req;
 }
 
 export function approveChangeRequest(id: string) {
-  const list = readReqs();
-  const req = list.find((r) => r.id === id);
+  const req = changeRequestsCache.find((r) => r.id === id);
   if (!req) return;
   saveAvailability(req.teacherId, req.proposed);
-  req.status = "approved";
-  req.resolvedAt = new Date().toISOString();
-  writeReqs(list);
+
+  const prev = changeRequestsCache;
+  const resolvedAt = new Date().toISOString();
+  changeRequestsCache = changeRequestsCache.map((r) =>
+    r.id === id ? { ...r, status: "approved", resolvedAt } : r,
+  );
+  notifyChangeRequests();
+
+  const numericId = Number(id);
+  if (!Number.isFinite(numericId)) return;
+  void (async () => {
+    const { error } = await supabase
+      .from("availability_change_requests")
+      .update({ status: "approved", resolved_at: resolvedAt })
+      .eq("id", numericId);
+    if (error) {
+      console.error("[availability-store] failed to approve change request", error);
+      changeRequestsCache = prev;
+      notifyChangeRequests();
+    }
+  })();
 }
 
 export function rejectChangeRequest(id: string) {
-  const list = readReqs();
-  const req = list.find((r) => r.id === id);
-  if (!req) return;
-  req.status = "rejected";
-  req.resolvedAt = new Date().toISOString();
-  writeReqs(list);
+  const prev = changeRequestsCache;
+  const resolvedAt = new Date().toISOString();
+  changeRequestsCache = changeRequestsCache.map((r) =>
+    r.id === id ? { ...r, status: "rejected", resolvedAt } : r,
+  );
+  notifyChangeRequests();
+
+  const numericId = Number(id);
+  if (!Number.isFinite(numericId)) return;
+  void (async () => {
+    const { error } = await supabase
+      .from("availability_change_requests")
+      .update({ status: "rejected", resolved_at: resolvedAt })
+      .eq("id", numericId);
+    if (error) {
+      console.error("[availability-store] failed to reject change request", error);
+      changeRequestsCache = prev;
+      notifyChangeRequests();
+    }
+  })();
 }
 
 // ---- Availability check ----------------------------------------------------
