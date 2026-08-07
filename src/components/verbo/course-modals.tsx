@@ -24,8 +24,7 @@ import {
   updateActivity,
   removeActivity,
   phaseOf,
-  saveActivities,
-  loadActivities,
+  addActivitiesBulk,
   validateBulkActivities,
 } from "@/lib/activities-store";
 import {
@@ -496,7 +495,7 @@ export function BulkUploadModal({ unitId, unitTitle, onClose, onImported, zClass
   }, [parsed]);
 
   const doImport = () => {
-    saveActivities([...loadActivities(), ...parsed]);
+    addActivitiesBulk(parsed);
     setImported(true);
     onImported();
   };
