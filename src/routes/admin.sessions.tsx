@@ -3,7 +3,8 @@ import { useEffect, useMemo, useState } from "react";
 import { USERS, ASSIGNMENTS, userById } from "@/lib/mock-data";
 import {
   loadSessions,
-  persistSessions,
+  createSession,
+  updateSession,
   subscribeSessions,
   WORKSHOP_STATUS_META,
   type ExtSession,
@@ -59,7 +60,25 @@ function Page() {
   useEffect(() => subscribeSessions(() => setSessions(loadSessions())), []);
   useEffect(() => subscribeStudents(() => forceTick((n) => n + 1)), []);
 
-  const save = (next: ExtSession[]) => { setSessions(next); persistSessions(next); };
+  // Replaces the old localStorage-era "compute the full array, replace the
+  // whole table" pattern: the store's own Realtime subscription (above)
+  // already keeps `sessions` in sync, so these just dispatch the real
+  // per-row writes. `batch` entries carry a throwaway client-side `id`
+  // (ignored — createSession assigns the real one).
+  const createBatch = (batch: ExtSession[]) => {
+    for (const s of batch) {
+      createSession({
+        student_id: s.student_id,
+        teacher_id: s.teacher_id,
+        date_time: s.date_time,
+        duration_minutes: s.duration_minutes,
+        teams_link: s.teams_link,
+        status: s.status,
+        attendance_sub_status: s.attendance_sub_status,
+        holiday_makeup: s.holiday_makeup,
+      });
+    }
+  };
 
   const [openStudent, setOpenStudent] = useState<string | null>(null);
   const [bulkOpen, setBulkOpen] = useState(true);
@@ -105,7 +124,7 @@ function Page() {
               students={students}
               teachers={teachers}
               existing={sessions}
-              onCreate={(batch) => save([...batch, ...sessions])}
+              onCreate={createBatch}
             />
           </div>
         )}
@@ -204,7 +223,7 @@ function Page() {
           sessions={sessions}
           teachers={teachers}
           onClose={() => setOpenStudent(null)}
-          onSave={save}
+          onSave={updateSession}
         />
       )}
     </div>
@@ -493,7 +512,7 @@ function StudentSessionsModal({
   sessions: ExtSession[];
   teachers: ReturnType<typeof USERS.filter>;
   onClose: () => void;
-  onSave: (next: ExtSession[]) => void;
+  onSave: (id: string, patch: Partial<ExtSession>) => void;
 }) {
   const student = userById(studentId);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -511,18 +530,14 @@ function StudentSessionsModal({
   // Shared source of truth: the student's Video Call Link (Students profile).
   const currentTeamsLink = getStudentVideoLink(studentId) || `https://teams.microsoft.com/l/meetup/${studentId}`;
 
-  const updateSession = (id: string, patch: Partial<ExtSession>, rescheduleApplied = false) => {
-    const next = sessions.map((s) => {
-      if (s.id !== id) return s;
-      const merged = { ...s, ...patch };
-      if (rescheduleApplied) {
-        if (s.status === "scheduled" || s.status === "rescheduled") merged.status = "rescheduled";
-        else if (s.status === "ready" || s.status === "rearranged") merged.status = "rescheduled";
-
-      }
-      return merged;
-    });
-    onSave(next);
+  const applySessionEdit = (id: string, patch: Partial<ExtSession>, rescheduleApplied = false) => {
+    const s = sessions.find((x) => x.id === id);
+    const finalPatch: Partial<ExtSession> = { ...patch };
+    if (rescheduleApplied && s) {
+      if (s.status === "scheduled" || s.status === "rescheduled") finalPatch.status = "rescheduled";
+      else if (s.status === "ready" || s.status === "rearranged") finalPatch.status = "rescheduled";
+    }
+    onSave(id, finalPatch);
   };
 
 
@@ -530,10 +545,10 @@ function StudentSessionsModal({
     // Sync the link back to the student's shared Video Call Link field.
     setStudentVideoLink(studentId, opts.teamsLink);
     const [hh, mm] = opts.time.split(":").map(Number);
-    const next = sessions.map((s) => {
-      if (s.student_id !== studentId) return s;
-      if (["completed", "absent"].includes(s.status)) return s;
-      const merged: ExtSession = { ...s, teams_link: opts.teamsLink, teacher_id: opts.teacherId };
+    for (const s of sessions) {
+      if (s.student_id !== studentId) continue;
+      if (["completed", "absent"].includes(s.status)) continue;
+      const patch: Partial<ExtSession> = { teams_link: opts.teamsLink, teacher_id: opts.teacherId };
       const dt = new Date(s.date_time);
       dt.setHours(hh, mm, 0, 0);
       if (opts.days.length > 0 && !opts.days.includes(dt.getDay())) {
@@ -542,13 +557,11 @@ function StudentSessionsModal({
           if (opts.days.includes(d.getDay())) { dt.setDate(dt.getDate() + i); break; }
         }
       }
-      merged.date_time = dt.toISOString();
-      if (s.status === "scheduled" || s.status === "rescheduled") merged.status = "rescheduled";
-      else if (s.status === "ready" || s.status === "rearranged") merged.status = "rescheduled";
-
-      return merged;
-    });
-    onSave(next);
+      patch.date_time = dt.toISOString();
+      if (s.status === "scheduled" || s.status === "rescheduled") patch.status = "rescheduled";
+      else if (s.status === "ready" || s.status === "rearranged") patch.status = "rescheduled";
+      onSave(s.id, patch);
+    }
     setBulkOpen(false);
   };
 
@@ -618,7 +631,7 @@ function StudentSessionsModal({
                   onEdit={() => setEditingId(s.id)}
                   onCancelEdit={() => setEditingId(null)}
                   onSubmit={(patch, rescheduled) => {
-                    updateSession(s.id, patch, rescheduled);
+                    applySessionEdit(s.id, patch, rescheduled);
                     setEditingId(null);
                   }}
                 />
