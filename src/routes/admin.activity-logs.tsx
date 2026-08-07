@@ -9,7 +9,7 @@ import {
 } from "@/lib/activity-logs-store";
 import { USERS } from "@/lib/mock-data";
 import {
-  loadKpiOverrides, replaceKpiOverrides,
+  loadKpiOverrides, deleteOldKpiOverrides,
   subscribeKpiOverrides,
 } from "@/lib/teacher-kpi-overrides-store";
 import {
@@ -234,8 +234,7 @@ function DataRetentionSection() {
     );
     if (!ok) return;
     downloadJson(`kpi-overrides-export-${todayStamp()}.json`, kpiOld);
-    const kept = loadKpiOverrides().filter((o) => +new Date(o.created_at) >= cutoff);
-    replaceKpiOverrides(kept);
+    deleteOldKpiOverrides(cutoff);
   };
 
   const exportAndPrunePayments = () => {
