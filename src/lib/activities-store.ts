@@ -1,5 +1,30 @@
-// Mock activities engine — persisted to localStorage so admin edits + student
-// progress survive reloads without a backend.
+// Activities engine — admin/teacher-authored unit activities plus per-student
+// progress (completion, attempts, scores) and the unit unlock/lock audit log.
+//
+// Backed by Supabase across five tables: `public.activities`,
+// `public.activity_completions`, `public.unit_attempts`,
+// `public.activity_scores` and `public.unit_access_events`.
+//
+// Reads of `activities` go through two SECURITY DEFINER RPCs instead of a
+// plain select: `activities_for_staff()` (all columns, staff only) and
+// `activities_for_student()` (all columns EXCEPT `audio_name`, which is
+// internal Admin metadata never rendered to students). Which one to call is
+// decided per hydration from the current `app_users.role`. Writes go straight
+// to the table (RLS: admin or teacher only).
+//
+// The other four tables are read with a normal `select("*")` — their RLS
+// already scopes rows to self / admin / a teacher of that student.
+//
+// Same pattern as every store migrated in previous lotes: one global
+// in-memory cache per table, hydrated once and kept fresh via Postgres
+// Realtime; writes stay optimistic and synchronous in their public signature
+// (update the cache + notify immediately, fire the real Supabase call in the
+// background, roll the cache back if it fails), so consumer call sites keep
+// working unchanged. `student_id`/`actor_id` uuid columns are translated to
+// and from the legacy short ids ("u1".."u8") via user-id-bridge.
+import { supabase } from "@/integrations/supabase/client";
+import type { Database, Json } from "@/integrations/supabase/types";
+import { hydrateUserIdBridge, legacyToUuid, uuidToLegacySync } from "@/lib/user-id-bridge";
 import { loadLevels } from "./courses-store";
 import type { CourseLevel } from "./product-courses-store";
 
@@ -198,113 +223,70 @@ export function validateBulkActivities(raw: unknown[], unitId: string): { valid:
   return { valid, errs };
 }
 
-const ACTIVITIES_KEY = "verbo:activities";
-const COMPLETION_KEY = "verbo:unit-completion";
-const ATTEMPTS_KEY = "verbo:unit-attempts";
-const SCORES_KEY = "verbo:activity-scores";
-const UNIT_ACCESS_LOG_KEY = "verbo:unit-access-log";
+/* -------------------- Supabase row mapping -------------------- */
 
-function safeRead<T>(k: string, fallback: T): T {
-  if (typeof window === "undefined") return fallback;
-  try { const v = localStorage.getItem(k); return v ? (JSON.parse(v) as T) : fallback; }
-  catch { return fallback; }
-}
-function safeWrite(k: string, v: unknown) {
-  if (typeof window === "undefined") return;
-  try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* noop */ }
-}
+type ActivityTableRow = Database["public"]["Tables"]["activities"]["Row"];
+type StaffActivityRow = Database["public"]["Functions"]["activities_for_staff"]["Returns"][number];
+type StudentActivityRow = Database["public"]["Functions"]["activities_for_student"]["Returns"][number];
+type ActivityRow = ActivityTableRow | StaffActivityRow | StudentActivityRow;
+type CompletionRow = Database["public"]["Tables"]["activity_completions"]["Row"];
+type UnitAttemptRow = Database["public"]["Tables"]["unit_attempts"]["Row"];
+type ScoreRow = Database["public"]["Tables"]["activity_scores"]["Row"];
+type AccessEventRow = Database["public"]["Tables"]["unit_access_events"]["Row"];
 
-const SEED: Activity[] = [
-  { id: "act-seed-1", unit_id: "A1-U1", name: "Greeting basics", type: "fill_gaps", category: "vocabulary", paragraph: "Hello, my [blank] is Sarah.", answer: "name" },
-  { id: "act-seed-2", unit_id: "A1-U1", name: "Pick the greeting", type: "read_select", category: "grammar", prompt: "Morning at the office.", question: "Which greeting fits best?", options: ["Good night", "Good morning", "See you", "Bye"], correctIndex: 1 },
-  { id: "act-seed-3", unit_id: "A1-U1", name: "Say it out loud", type: "record", category: "practice", answer: "Nice to meet you." },
-];
-
-/** One-time cleanup of citation artifacts on activities already persisted in
- *  localStorage. Runs at most once per page load and only writes when at least
- *  one field actually changed, so it is fully idempotent. */
-let citationCleanupDone = false;
-function cleanupStoredActivities(stored: Activity[]): Activity[] {
-  if (citationCleanupDone) return stored;
-  citationCleanupDone = true;
-  const cleaned = stored.map((a) => sanitizeActivity(a));
-  if (JSON.stringify(cleaned) !== JSON.stringify(stored)) {
-    safeWrite(ACTIVITIES_KEY, cleaned);
-    return cleaned;
-  }
-  return stored;
-}
-
-export function loadActivities(): Activity[] {
-  const stored = safeRead<Activity[] | null>(ACTIVITIES_KEY, null);
-  if (stored) return cleanupStoredActivities(stored);
-  safeWrite(ACTIVITIES_KEY, SEED);
-  return SEED;
-}
-export function saveActivities(list: Activity[]) { safeWrite(ACTIVITIES_KEY, list); }
-
-export function activitiesForUnit(unitId: string): Activity[] {
-  return loadActivities().filter((a) => a.unit_id === unitId);
+/** Maps a DB row (table select or either RPC — the student RPC omits
+ *  `audio_name` on purpose) to the frontend `Activity` shape. */
+function fromActivityRow(row: ActivityRow): Activity {
+  const a: Activity = {
+    id: String(row.id),
+    unit_id: row.unit_id,
+    name: row.name,
+    type: row.type,
+  };
+  if (row.category != null) a.category = row.category;
+  if (row.session_phase != null) a.session_phase = row.session_phase === "post" ? "post" : "pre";
+  if (row.paragraph != null) a.paragraph = row.paragraph;
+  if (row.answer != null) a.answer = row.answer;
+  if (row.prompt != null) a.prompt = row.prompt;
+  if (row.question != null) a.question = row.question;
+  if (Array.isArray(row.items)) a.items = row.items as unknown as MatchItem[];
+  if (Array.isArray(row.options)) a.options = row.options as unknown as string[];
+  if (row.correct_index != null) a.correctIndex = row.correct_index;
+  if ("audio_name" in row && row.audio_name != null && row.audio_name !== "") a.audioName = row.audio_name;
+  if (row.audio_duration_sec != null) a.audioDurationSec = row.audio_duration_sec;
+  if (row.feedback != null) a.feedback = row.feedback;
+  // Same citation cleanup the old store applied to persisted rows on load.
+  return sanitizeActivity(a);
 }
 
-export function phaseOf(a: Activity): SessionPhase {
-  return a.session_phase ?? "pre";
+/** Full column set for an insert or a whole-row update. `id` is a bigint
+ *  identity generated by the DB and is never sent. */
+function toDbColumns(a: Activity): Database["public"]["Tables"]["activities"]["Insert"] {
+  return {
+    unit_id: a.unit_id,
+    name: a.name,
+    type: a.type,
+    category: a.category ?? null,
+    session_phase: a.session_phase ?? "pre",
+    paragraph: a.paragraph ?? null,
+    answer: a.answer ?? null,
+    prompt: a.prompt ?? null,
+    question: a.question ?? null,
+    items: a.items ? (a.items as unknown as Json) : null,
+    options: a.options ? (a.options as unknown as Json) : null,
+    correct_index: a.correctIndex ?? null,
+    audio_name: a.audioName ? a.audioName : null,
+    audio_duration_sec: a.audioDurationSec ?? null,
+    feedback: a.feedback ?? null,
+  };
 }
 
+/* -------------------- Global caches + hydration -------------------- */
 
-export function addActivity(a: Activity) {
-  const list = loadActivities();
-  list.push(sanitizeActivity(a));
-  saveActivities(list);
-}
+export const ACTIVITIES_EVENT = "verbo:activities-updated";
 
-/** Updates an existing activity in place. `id` and `unit_id` are never
- *  overwritten, so an edit (e.g. attaching audio to a bulk-imported
- *  listen_select) keeps the rest of its saved configuration. */
-export function updateActivity(id: string, patch: Partial<Omit<Activity, "id" | "unit_id">>) {
-  saveActivities(
-    loadActivities().map((a) =>
-      a.id === id ? sanitizeActivity({ ...a, ...patch, id: a.id, unit_id: a.unit_id }) : a,
-    ),
-  );
-}
-
-
-export function removeActivity(id: string) {
-  saveActivities(loadActivities().filter((a) => a.id !== id));
-}
-
-/* ---- Completion + attempts (scoped per student) ---- */
 function scopedKey(studentId: string, id: string) { return `${studentId}::${id}`; }
 
-export function loadCompletion(_studentId: string): Record<string, boolean> {
-  // Returns the raw Record keyed by `${studentId}::${unitId}`; kept for
-  // callers that want to enumerate. Prefer setUnitCompleted / unitPassed.
-  return safeRead<Record<string, boolean>>(COMPLETION_KEY, {});
-}
-export function setUnitCompleted(studentId: string, unitId: string, value: boolean) {
-  const c = safeRead<Record<string, boolean>>(COMPLETION_KEY, {});
-  c[scopedKey(studentId, unitId)] = value;
-  safeWrite(COMPLETION_KEY, c);
-}
-
-export function loadAttempts(_studentId: string): Record<string, number> {
-  return safeRead<Record<string, number>>(ATTEMPTS_KEY, {});
-}
-export function incrementAttempts(studentId: string, unitId: string): number {
-  const a = safeRead<Record<string, number>>(ATTEMPTS_KEY, {});
-  const k = scopedKey(studentId, unitId);
-  a[k] = (a[k] ?? 0) + 1;
-  safeWrite(ATTEMPTS_KEY, a);
-  return a[k];
-}
-export function resetAttempts(studentId: string, unitId: string) {
-  const a = safeRead<Record<string, number>>(ATTEMPTS_KEY, {});
-  delete a[scopedKey(studentId, unitId)];
-  safeWrite(ATTEMPTS_KEY, a);
-}
-
-/* ---- Per-activity best scores (scoped per student) ---- */
 export interface ActivityScore {
   best: number;
   attempts: number;
@@ -313,32 +295,456 @@ export interface ActivityScore {
    *  UI tell "answered incorrectly (best = 0)" apart from "never attempted". */
   attempted: boolean;
 }
+
+export type UnitAccessAction = "unlocked" | "locked";
+export interface UnitAccessEvent {
+  id: string;
+  studentId: string;
+  unitId: string;
+  action: UnitAccessAction;
+  actorId: string;
+  actorRole: "admin" | "teacher";
+  at: string;
+}
+
+let activitiesCache: Activity[] = [];
+// The three per-student maps keep the exact legacy shapes, keyed by
+// `${legacyStudentId}::${unitId|activityId}` so every old read helper stays
+// a trivial lookup. RLS already limits the rows each session can see.
+let completionsCache: Record<string, boolean> = {};
+let attemptsCache: Record<string, number> = {};
+let scoresCache: Record<string, ActivityScore> = {};
+let accessEventsCache: UnitAccessEvent[] = [];
+
+let hydrated = false;
+let hydratePromise: Promise<void> | null = null;
+let lastAuthId: string | null | undefined;
+const listeners = new Set<() => void>();
+
+function notify() {
+  listeners.forEach((cb) => cb());
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent(ACTIVITIES_EVENT));
+  }
+}
+
+/** Role of the signed-in user, straight from `app_users` (there is no
+ *  synchronous "current role" accessor outside React). `null` when the
+ *  session is not ready yet — treated as "student" for the read RPC. */
+async function currentRole(): Promise<"admin" | "teacher" | "student" | null> {
+  const { data: sessionData } = await supabase.auth.getSession();
+  const authId = sessionData.session?.user?.id ?? null;
+  lastAuthId = authId;
+  if (!authId) return null;
+  const { data, error } = await supabase.from("app_users").select("role").eq("id", authId).maybeSingle();
+  if (error || !data) return null;
+  return data.role as "admin" | "teacher" | "student";
+}
+
+function fromAccessRow(row: AccessEventRow): UnitAccessEvent {
+  return {
+    id: String(row.id),
+    studentId: uuidToLegacySync(row.student_id),
+    unitId: row.unit_id,
+    action: row.action,
+    actorId: uuidToLegacySync(row.actor_id),
+    actorRole: row.actor_role === "teacher" ? "teacher" : "admin",
+    at: row.at,
+  };
+}
+
+async function hydrate(): Promise<void> {
+  if (hydrated) return;
+  if (hydratePromise) return hydratePromise;
+  hydratePromise = (async () => {
+    const [, role] = await Promise.all([hydrateUserIdBridge(), currentRole()]);
+    // `activities` has no open SELECT path for this store — reads go through
+    // role-scoped RPCs so students never receive `audio_name`.
+    const activitiesPromise =
+      role === "admin" || role === "teacher"
+        ? supabase.rpc("activities_for_staff")
+        : supabase.rpc("activities_for_student");
+    const [actRes, compRes, attRes, scoreRes, accessRes] = await Promise.all([
+      activitiesPromise,
+      supabase.from("activity_completions").select("*"),
+      supabase.from("unit_attempts").select("*"),
+      supabase.from("activity_scores").select("*"),
+      supabase.from("unit_access_events").select("*"),
+    ]);
+    if (actRes.error) console.error("[activities-store] failed to load activities", actRes.error);
+    if (compRes.error) console.error("[activities-store] failed to load completions", compRes.error);
+    if (attRes.error) console.error("[activities-store] failed to load unit attempts", attRes.error);
+    if (scoreRes.error) console.error("[activities-store] failed to load scores", scoreRes.error);
+    if (accessRes.error) console.error("[activities-store] failed to load unit access events", accessRes.error);
+
+    activitiesCache = ((actRes.data ?? []) as ActivityRow[]).map(fromActivityRow);
+
+    const comp: Record<string, boolean> = {};
+    for (const row of (compRes.data ?? []) as CompletionRow[]) {
+      comp[scopedKey(uuidToLegacySync(row.student_id), row.unit_id)] = row.completed;
+    }
+    completionsCache = comp;
+
+    const att: Record<string, number> = {};
+    for (const row of (attRes.data ?? []) as UnitAttemptRow[]) {
+      att[scopedKey(uuidToLegacySync(row.student_id), row.unit_id)] = row.attempts;
+    }
+    attemptsCache = att;
+
+    const scores: Record<string, ActivityScore> = {};
+    for (const row of (scoreRes.data ?? []) as ScoreRow[]) {
+      scores[scopedKey(uuidToLegacySync(row.student_id), String(row.activity_id))] = {
+        best: Number(row.best),
+        attempts: row.attempts,
+        lastAt: row.last_at ?? "",
+        attempted: row.attempted,
+      };
+    }
+    scoresCache = scores;
+
+    accessEventsCache = ((accessRes.data ?? []) as AccessEventRow[])
+      .map(fromAccessRow)
+      .sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime());
+
+    hydrated = true;
+  })();
+  await hydratePromise;
+  hydratePromise = null;
+  notify();
+}
+
+function invalidateAndRehydrate() {
+  hydrated = false;
+  hydratePromise = null;
+  void hydrate();
+}
+
+let realtimeStarted = false;
+function ensureRealtime() {
+  if (realtimeStarted || typeof window === "undefined") return;
+  realtimeStarted = true;
+  supabase
+    .channel("activities-store-changes")
+    .on("postgres_changes", { event: "*", schema: "public", table: "activities" }, invalidateAndRehydrate)
+    .on("postgres_changes", { event: "*", schema: "public", table: "activity_completions" }, invalidateAndRehydrate)
+    .on("postgres_changes", { event: "*", schema: "public", table: "unit_attempts" }, invalidateAndRehydrate)
+    .on("postgres_changes", { event: "*", schema: "public", table: "activity_scores" }, invalidateAndRehydrate)
+    .on("postgres_changes", { event: "*", schema: "public", table: "unit_access_events" }, invalidateAndRehydrate)
+    .subscribe();
+}
+
+if (typeof window !== "undefined") {
+  // Kick off hydration eagerly so plain (non-hook) readers like
+  // `loadActivities()` have data available as soon as possible.
+  void hydrate();
+  ensureRealtime();
+  // The activities read is ROLE-dependent (staff vs student RPC), so unlike
+  // the RLS-only stores this one must re-hydrate when the auth identity
+  // changes (login/logout after the eager module-load hydration).
+  supabase.auth.onAuthStateChange((_event, session) => {
+    const authId = session?.user?.id ?? null;
+    if (authId !== lastAuthId) {
+      lastAuthId = authId;
+      invalidateAndRehydrate();
+    }
+  });
+}
+
+/** Subscribe to any change in this store's caches (all five tables notify the
+ *  same listener set, mirroring how the old single-event store behaved). */
+export function subscribeActivities(cb: () => void): () => void {
+  listeners.add(cb);
+  void hydrate();
+  ensureRealtime();
+  return () => {
+    listeners.delete(cb);
+  };
+}
+
+/* -------------------- Activities -------------------- */
+
+export function loadActivities(): Activity[] {
+  return activitiesCache;
+}
+
+export function activitiesForUnit(unitId: string): Activity[] {
+  return activitiesCache.filter((a) => a.unit_id === unitId);
+}
+
+export function phaseOf(a: Activity): SessionPhase {
+  return a.session_phase ?? "pre";
+}
+
+
+export function addActivity(a: Activity) {
+  const clean = sanitizeActivity(a);
+  const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+  const optimistic: Activity = { ...clean, id: tempId };
+  activitiesCache = [...activitiesCache, optimistic];
+  notify();
+
+  void (async () => {
+    const { data, error } = await supabase
+      .from("activities")
+      .insert(toDbColumns(clean))
+      .select()
+      .single();
+    if (error || !data) {
+      console.error("[activities-store] failed to add activity", error);
+      activitiesCache = activitiesCache.filter((x) => x.id !== tempId);
+      notify();
+      return;
+    }
+    const saved = fromActivityRow(data);
+    activitiesCache = activitiesCache.map((x) => (x.id === tempId ? saved : x));
+    notify();
+  })();
+}
+
+/** Appends already-validated activities in a single optimistic update + a
+ *  single background bulk insert (replaces the old
+ *  `saveActivities([...loadActivities(), ...parsed])` full-array rewrite). */
+export function addActivitiesBulk(activities: Activity[]): void {
+  if (activities.length === 0) return;
+  const cleaned = activities.map(sanitizeActivity);
+  const tempActivities = cleaned.map((a) => ({
+    ...a,
+    id: `temp-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+  }));
+  activitiesCache = [...activitiesCache, ...tempActivities];
+  notify();
+
+  void (async () => {
+    const { data, error } = await supabase
+      .from("activities")
+      .insert(cleaned.map(toDbColumns))
+      .select();
+    const tempIds = new Set(tempActivities.map((a) => a.id));
+    if (error || !data) {
+      console.error("[activities-store] failed to bulk-add activities", error);
+      activitiesCache = activitiesCache.filter((a) => !tempIds.has(a.id));
+      notify();
+      return;
+    }
+    const saved = data.map(fromActivityRow);
+    activitiesCache = [...activitiesCache.filter((a) => !tempIds.has(a.id)), ...saved];
+    notify();
+  })();
+}
+
+/** Updates an existing activity in place. `id` and `unit_id` are never
+ *  overwritten, so an edit (e.g. attaching audio to a bulk-imported
+ *  listen_select) keeps the rest of its saved configuration. */
+export function updateActivity(id: string, patch: Partial<Omit<Activity, "id" | "unit_id">>) {
+  const existing = activitiesCache.find((a) => a.id === id);
+  if (!existing) return;
+  // Same merge semantics as the old `{ ...a, ...patch }`: keys present with
+  // an `undefined` value clear the field, absent keys keep the saved value.
+  const merged = sanitizeActivity({ ...existing, ...patch, id: existing.id, unit_id: existing.unit_id });
+  const prev = activitiesCache;
+  activitiesCache = activitiesCache.map((a) => (a.id === id ? merged : a));
+  notify();
+
+  void (async () => {
+    const { error } = await supabase
+      .from("activities")
+      .update(toDbColumns(merged))
+      .eq("id", Number(id));
+    if (error) {
+      console.error("[activities-store] failed to update activity", error);
+      activitiesCache = prev;
+      notify();
+    }
+  })();
+}
+
+
+export function removeActivity(id: string) {
+  const prev = activitiesCache;
+  activitiesCache = activitiesCache.filter((a) => a.id !== id);
+  notify();
+
+  void (async () => {
+    const { error } = await supabase.from("activities").delete().eq("id", Number(id));
+    if (error) {
+      console.error("[activities-store] failed to delete activity", error);
+      activitiesCache = prev;
+      notify();
+    }
+  })();
+}
+
+/* ---- Completion + attempts (scoped per student) ---- */
+
+export function loadCompletion(_studentId: string): Record<string, boolean> {
+  // Returns the raw Record keyed by `${studentId}::${unitId}`; kept for
+  // callers that want to enumerate. Prefer setUnitCompleted / unitPassed.
+  return completionsCache;
+}
+export function setUnitCompleted(studentId: string, unitId: string, value: boolean) {
+  const k = scopedKey(studentId, unitId);
+  const hadKey = k in completionsCache;
+  const prevValue = completionsCache[k];
+  completionsCache = { ...completionsCache, [k]: value };
+  notify();
+
+  void (async () => {
+    const studentUuid = await legacyToUuid(studentId);
+    if (!studentUuid) {
+      console.error("[activities-store] no app_users row for legacy id", studentId);
+      rollback();
+      return;
+    }
+    const { error } = await supabase
+      .from("activity_completions")
+      .upsert({ student_id: studentUuid, unit_id: unitId, completed: value }, { onConflict: "student_id,unit_id" });
+    if (error) {
+      console.error("[activities-store] failed to set unit completion", error);
+      rollback();
+    }
+  })();
+
+  function rollback() {
+    const next = { ...completionsCache };
+    if (hadKey) next[k] = prevValue;
+    else delete next[k];
+    completionsCache = next;
+    notify();
+  }
+}
+
+export function loadAttempts(_studentId: string): Record<string, number> {
+  return attemptsCache;
+}
+export function incrementAttempts(studentId: string, unitId: string): number {
+  const k = scopedKey(studentId, unitId);
+  const hadKey = k in attemptsCache;
+  const prevValue = attemptsCache[k];
+  const next = (attemptsCache[k] ?? 0) + 1;
+  attemptsCache = { ...attemptsCache, [k]: next };
+  notify();
+
+  void (async () => {
+    const studentUuid = await legacyToUuid(studentId);
+    if (!studentUuid) {
+      console.error("[activities-store] no app_users row for legacy id", studentId);
+      rollback();
+      return;
+    }
+    const { error } = await supabase
+      .from("unit_attempts")
+      .upsert({ student_id: studentUuid, unit_id: unitId, attempts: next }, { onConflict: "student_id,unit_id" });
+    if (error) {
+      console.error("[activities-store] failed to increment unit attempts", error);
+      rollback();
+    }
+  })();
+
+  function rollback() {
+    const restored = { ...attemptsCache };
+    if (hadKey) restored[k] = prevValue;
+    else delete restored[k];
+    attemptsCache = restored;
+    notify();
+  }
+
+  return next;
+}
+export function resetAttempts(studentId: string, unitId: string) {
+  const k = scopedKey(studentId, unitId);
+  const hadKey = k in attemptsCache;
+  const prevValue = attemptsCache[k];
+  if (hadKey) {
+    const next = { ...attemptsCache };
+    delete next[k];
+    attemptsCache = next;
+    notify();
+  }
+
+  void (async () => {
+    const studentUuid = await legacyToUuid(studentId);
+    if (!studentUuid) {
+      console.error("[activities-store] no app_users row for legacy id", studentId);
+      return;
+    }
+    // Mirrors the old `delete a[key]`: the row is removed, not zeroed.
+    const { error } = await supabase
+      .from("unit_attempts")
+      .delete()
+      .eq("student_id", studentUuid)
+      .eq("unit_id", unitId);
+    if (error) {
+      console.error("[activities-store] failed to reset unit attempts", error);
+      if (hadKey) {
+        attemptsCache = { ...attemptsCache, [k]: prevValue };
+        notify();
+      }
+    }
+  })();
+}
+
+/* ---- Per-activity best scores (scoped per student) ---- */
+
 export function loadActivityScores(_studentId: string): Record<string, ActivityScore> {
-  return safeRead<Record<string, ActivityScore>>(SCORES_KEY, {});
+  return scoresCache;
 }
 export function recordActivityScore(studentId: string, activityId: string, score: number): ActivityScore {
-  const all = safeRead<Record<string, ActivityScore>>(SCORES_KEY, {});
   const k = scopedKey(studentId, activityId);
-  const cur = all[k] ?? { best: 0, attempts: 0, lastAt: "", attempted: false };
+  const hadKey = k in scoresCache;
+  const prevValue = scoresCache[k];
+  const cur = scoresCache[k] ?? { best: 0, attempts: 0, lastAt: "", attempted: false };
   const next: ActivityScore = {
     best: Math.max(cur.best, Math.round(score)),
     attempts: cur.attempts + 1,
     lastAt: new Date().toISOString(),
     attempted: true,
   };
-  all[k] = next;
-  safeWrite(SCORES_KEY, all);
+  scoresCache = { ...scoresCache, [k]: next };
+  notify();
+
+  void (async () => {
+    const studentUuid = await legacyToUuid(studentId);
+    if (!studentUuid) {
+      console.error("[activities-store] no app_users row for legacy id", studentId);
+      rollback();
+      return;
+    }
+    const { error } = await supabase
+      .from("activity_scores")
+      .upsert(
+        {
+          student_id: studentUuid,
+          activity_id: Number(activityId),
+          best: next.best,
+          attempts: next.attempts,
+          attempted: next.attempted,
+          last_at: next.lastAt,
+        },
+        { onConflict: "student_id,activity_id" },
+      );
+    if (error) {
+      console.error("[activities-store] failed to record activity score", error);
+      rollback();
+    }
+  })();
+
+  function rollback() {
+    const restored = { ...scoresCache };
+    if (hadKey) restored[k] = prevValue;
+    else delete restored[k];
+    scoresCache = restored;
+    notify();
+  }
+
   return next;
 }
 export function bestScoreFor(studentId: string, activityId: string): number {
-  const all = safeRead<Record<string, ActivityScore>>(SCORES_KEY, {});
-  return all[scopedKey(studentId, activityId)]?.best ?? 0;
+  return scoresCache[scopedKey(studentId, activityId)]?.best ?? 0;
 }
 /** Whether the student already submitted an answer for this activity.
  *  Legacy records without the flag fall back to their attempt counter. */
 export function wasAttempted(studentId: string, activityId: string): boolean {
-  const all = safeRead<Record<string, ActivityScore>>(SCORES_KEY, {});
-  const s = all[scopedKey(studentId, activityId)];
+  const s = scoresCache[scopedKey(studentId, activityId)];
   if (!s) return false;
   return s.attempted ?? s.attempts > 0;
 }
@@ -351,17 +757,42 @@ export function wasAttempted(studentId: string, activityId: string): boolean {
 export function resetUnitActivityAttempts(studentId: string, unitId: string) {
   resetAttempts(studentId, unitId);
   const ids = new Set(activitiesForUnit(unitId).map((a) => a.id));
-  const all = safeRead<Record<string, ActivityScore>>(SCORES_KEY, {});
+  const toClear: string[] = [];
+  const nextScores = { ...scoresCache };
   let changed = false;
   for (const id of ids) {
     const k = scopedKey(studentId, id);
-    const s = all[k];
+    const s = nextScores[k];
     if (s && (s.attempted ?? s.attempts > 0)) {
-      all[k] = { ...s, attempted: false };
+      nextScores[k] = { ...s, attempted: false };
+      toClear.push(id);
       changed = true;
     }
   }
-  if (changed) safeWrite(SCORES_KEY, all);
+  if (!changed) return;
+  const prev = scoresCache;
+  scoresCache = nextScores;
+  notify();
+
+  void (async () => {
+    const studentUuid = await legacyToUuid(studentId);
+    if (!studentUuid) {
+      console.error("[activities-store] no app_users row for legacy id", studentId);
+      scoresCache = prev;
+      notify();
+      return;
+    }
+    const { error } = await supabase
+      .from("activity_scores")
+      .update({ attempted: false })
+      .eq("student_id", studentUuid)
+      .in("activity_id", toClear.map(Number));
+    if (error) {
+      console.error("[activities-store] failed to reset activity attempts", error);
+      scoresCache = prev;
+      notify();
+    }
+  })();
 }
 
 
@@ -381,19 +812,9 @@ export function isMilestoneUnit(unitId: string): boolean {
  * override — the default progression rule applies (milestones locked
  * by default, non-milestones follow sequential order).
  */
-export type UnitAccessAction = "unlocked" | "locked";
-export interface UnitAccessEvent {
-  id: string;
-  studentId: string;
-  unitId: string;
-  action: UnitAccessAction;
-  actorId: string;
-  actorRole: "admin" | "teacher";
-  at: string;
-}
 
 export function loadUnitAccessLog(): UnitAccessEvent[] {
-  return safeRead<UnitAccessEvent[]>(UNIT_ACCESS_LOG_KEY, []);
+  return accessEventsCache;
 }
 export function setUnitAccess(
   studentId: string,
@@ -402,21 +823,55 @@ export function setUnitAccess(
   actorId: string,
   actorRole: "admin" | "teacher",
 ): void {
-  const log = loadUnitAccessLog();
-  log.push({
-    id: `ua-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+  const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const optimistic: UnitAccessEvent = {
+    id: tempId,
     studentId, unitId, action, actorId, actorRole,
     at: new Date().toISOString(),
-  });
-  safeWrite(UNIT_ACCESS_LOG_KEY, log);
+  };
+  accessEventsCache = [...accessEventsCache, optimistic];
+  notify();
+
+  void (async () => {
+    const [studentUuid, actorUuid] = await Promise.all([legacyToUuid(studentId), legacyToUuid(actorId)]);
+    if (!studentUuid || !actorUuid) {
+      console.error("[activities-store] no app_users row for legacy id", !studentUuid ? studentId : actorId);
+      accessEventsCache = accessEventsCache.filter((e) => e.id !== tempId);
+      notify();
+      return;
+    }
+    const { data, error } = await supabase
+      .from("unit_access_events")
+      .insert({
+        student_id: studentUuid,
+        unit_id: unitId,
+        action,
+        actor_id: actorUuid,
+        actor_role: actorRole,
+        at: optimistic.at,
+      })
+      .select()
+      .single();
+    if (error || !data) {
+      console.error("[activities-store] failed to log unit access event", error);
+      accessEventsCache = accessEventsCache.filter((e) => e.id !== tempId);
+      notify();
+      return;
+    }
+    const saved = fromAccessRow(data);
+    accessEventsCache = accessEventsCache.map((e) => (e.id === tempId ? saved : e));
+    notify();
+  })();
 }
 export function getUnitAccessOverride(studentId: string, unitId: string): UnitAccessAction | null {
-  const log = loadUnitAccessLog();
-  for (let i = log.length - 1; i >= 0; i--) {
-    const e = log[i];
-    if (e.studentId === studentId && e.unitId === unitId) return e.action;
+  // The MOST RECENT event by `at` wins — Realtime/hydration arrival order is
+  // not guaranteed to be chronological, so compare timestamps explicitly.
+  let latest: UnitAccessEvent | null = null;
+  for (const e of accessEventsCache) {
+    if (e.studentId !== studentId || e.unitId !== unitId) continue;
+    if (!latest || new Date(e.at).getTime() >= new Date(latest.at).getTime()) latest = e;
   }
-  return null;
+  return latest ? latest.action : null;
 }
 /** Backwards-compatible wrapper for existing callers. */
 export function isMilestoneUnlocked(studentId: string, unitId: string): boolean {
@@ -425,8 +880,7 @@ export function isMilestoneUnlocked(studentId: string, unitId: string): boolean 
 
 /** Attempts recorded against a given activity, for gating milestone retries. */
 export function attemptsFor(studentId: string, activityId: string): number {
-  const all = safeRead<Record<string, ActivityScore>>(SCORES_KEY, {});
-  return all[scopedKey(studentId, activityId)]?.attempts ?? 0;
+  return scoresCache[scopedKey(studentId, activityId)]?.attempts ?? 0;
 }
 
 /* ---- Unit pass rule ----
@@ -437,7 +891,6 @@ export function attemptsFor(studentId: string, activityId: string): number {
  */
 export function unitPassed(studentId: string, unitId: string): boolean {
   const list = activitiesForUnit(unitId);
-  const scores = safeRead<Record<string, ActivityScore>>(SCORES_KEY, {});
   const byCat = new Map<string, Activity[]>();
   for (const a of list) {
     if (!isMandatoryCategory(a.category)) continue;
@@ -446,11 +899,10 @@ export function unitPassed(studentId: string, unitId: string): boolean {
     byCat.set(a.category!, arr);
   }
   if (byCat.size === 0) {
-    const completion = safeRead<Record<string, boolean>>(COMPLETION_KEY, {});
-    return !!completion[scopedKey(studentId, unitId)];
+    return !!completionsCache[scopedKey(studentId, unitId)];
   }
   for (const [, arr] of byCat) {
-    const ok = arr.some((a) => (scores[scopedKey(studentId, a.id)]?.best ?? 0) >= 60);
+    const ok = arr.some((a) => (scoresCache[scopedKey(studentId, a.id)]?.best ?? 0) >= 60);
     if (!ok) return false;
   }
   return true;
@@ -461,7 +913,6 @@ export function unitPassed(studentId: string, unitId: string): boolean {
  *  for medal/mission math so overrides and seeds can't award medals. */
 export function unitPassedByActivities(studentId: string, unitId: string): boolean {
   const list = activitiesForUnit(unitId);
-  const scores = safeRead<Record<string, ActivityScore>>(SCORES_KEY, {});
   const byCat = new Map<string, Activity[]>();
   for (const a of list) {
     if (!isMandatoryCategory(a.category)) continue;
@@ -471,7 +922,7 @@ export function unitPassedByActivities(studentId: string, unitId: string): boole
   }
   if (byCat.size === 0) return false;
   for (const [, arr] of byCat) {
-    const ok = arr.some((a) => (scores[scopedKey(studentId, a.id)]?.best ?? 0) >= 60);
+    const ok = arr.some((a) => (scoresCache[scopedKey(studentId, a.id)]?.best ?? 0) >= 60);
     if (!ok) return false;
   }
   return true;
@@ -481,7 +932,6 @@ export function unitCategoryProgress(studentId: string, unitId: string): {
   category: string; passed: boolean; best: number; mandatory: boolean;
 }[] {
   const list = activitiesForUnit(unitId);
-  const scores = safeRead<Record<string, ActivityScore>>(SCORES_KEY, {});
   const byCat = new Map<string, Activity[]>();
   for (const a of list) {
     const cat = a.category ?? "uncategorized";
@@ -490,48 +940,56 @@ export function unitCategoryProgress(studentId: string, unitId: string): {
     byCat.set(cat, arr);
   }
   return Array.from(byCat.entries()).map(([category, arr]) => {
-    const best = arr.reduce((m, a) => Math.max(m, scores[scopedKey(studentId, a.id)]?.best ?? 0), 0);
+    const best = arr.reduce((m, a) => Math.max(m, scoresCache[scopedKey(studentId, a.id)]?.best ?? 0), 0);
     const mandatory = isMandatoryCategory(category);
     return { category, best, mandatory, passed: mandatory ? best >= 60 : true };
   });
 }
 
 export function renameUnitReferences(oldUnitId: string, newUnitId: string) {
-  const activities = loadActivities();
-  let changed = false;
-  for (const a of activities) {
-    if (a.unit_id === oldUnitId) {
-      a.unit_id = newUnitId;
-      changed = true;
-    }
-  }
-  if (changed) saveActivities(activities);
+  const prevActivities = activitiesCache;
+  const prevCompletions = completionsCache;
+  const prevAttempts = attemptsCache;
 
-  // Completion + attempts keys are now `${studentId}::${unitId}`. Rewrite any
+  activitiesCache = activitiesCache.map((a) =>
+    a.unit_id === oldUnitId ? { ...a, unit_id: newUnitId } : a,
+  );
+
+  // Completion + attempts keys are `${studentId}::${unitId}`. Rewrite any
   // key ending in `::${oldUnitId}`, preserving the studentId prefix.
-  const completion = safeRead<Record<string, boolean>>(COMPLETION_KEY, {});
-  let compChanged = false;
-  for (const k of Object.keys(completion)) {
-    if (k.endsWith(`::${oldUnitId}`)) {
-      const prefix = k.slice(0, k.length - oldUnitId.length);
-      completion[`${prefix}${newUnitId}`] = completion[k];
-      delete completion[k];
-      compChanged = true;
+  const rewriteKeys = <T,>(map: Record<string, T>): Record<string, T> => {
+    const next: Record<string, T> = {};
+    for (const [k, v] of Object.entries(map)) {
+      if (k.endsWith(`::${oldUnitId}`)) {
+        const prefix = k.slice(0, k.length - oldUnitId.length);
+        next[`${prefix}${newUnitId}`] = v;
+      } else {
+        next[k] = v;
+      }
     }
-  }
-  if (compChanged) safeWrite(COMPLETION_KEY, completion);
+    return next;
+  };
+  completionsCache = rewriteKeys(prevCompletions);
+  attemptsCache = rewriteKeys(prevAttempts);
+  notify();
 
-  const attempts = safeRead<Record<string, number>>(ATTEMPTS_KEY, {});
-  let attChanged = false;
-  for (const k of Object.keys(attempts)) {
-    if (k.endsWith(`::${oldUnitId}`)) {
-      const prefix = k.slice(0, k.length - oldUnitId.length);
-      attempts[`${prefix}${newUnitId}`] = attempts[k];
-      delete attempts[k];
-      attChanged = true;
+  void (async () => {
+    const [actRes, compRes, attRes] = await Promise.all([
+      supabase.from("activities").update({ unit_id: newUnitId }).eq("unit_id", oldUnitId),
+      supabase.from("activity_completions").update({ unit_id: newUnitId }).eq("unit_id", oldUnitId),
+      supabase.from("unit_attempts").update({ unit_id: newUnitId }).eq("unit_id", oldUnitId),
+    ]);
+    if (actRes.error || compRes.error || attRes.error) {
+      console.error(
+        "[activities-store] failed to rename unit references",
+        actRes.error ?? compRes.error ?? attRes.error,
+      );
+      activitiesCache = prevActivities;
+      completionsCache = prevCompletions;
+      attemptsCache = prevAttempts;
+      notify();
     }
-  }
-  if (attChanged) safeWrite(ATTEMPTS_KEY, attempts);
+  })();
 }
 
 /**
@@ -567,5 +1025,3 @@ export function levelIsComplete(level: CourseLevel, studentId: string): boolean 
   }
   return true;
 }
-
-
