@@ -39,7 +39,9 @@ import {
   UNITS_PER_LEVEL,
   buildSkeletonUnits,
   loadCourses,
-  persistCourses,
+  saveUnit as saveCourseUnit,
+  deleteUnit as deleteCourseUnit,
+  addUnitsBulk,
   subscribeCourses,
 } from "@/lib/product-courses-store";
 
@@ -69,54 +71,34 @@ function Page() {
   const product = productId ? courses.find((c) => c.product === productId) ?? null : null;
   const level = product && levelId ? product.levels.find((l) => l.id === levelId) ?? null : null;
 
-  const mutateLevel = (fn: (units: CourseUnit[]) => CourseUnit[]) => {
-    if (!productId || !levelId) return;
-    setCourses((prev) => {
-      const next = prev.map((c) =>
-        c.product === productId
-          ? { ...c, levels: c.levels.map((l) => (l.id === levelId ? { ...l, units: fn(l.units) } : l)) }
-          : c,
-      );
-      persistCourses(next);
-      return next;
-    });
-  };
-
-  const sortUnits = (units: CourseUnit[]) =>
-    [...units].sort((a, b) => unitNum(a.id) - unitNum(b.id));
-
   const createUnit = (title: string, num: number, videoUrl: string, pdfUrl: string, teaser: string) => {
     if (!level) return;
     const id = `${level.id}-U${num}`;
-    mutateLevel((units) => {
-      const prev = units.find((u) => u.id === id);
-      const merged: CourseUnit = {
-        ...(prev ?? {}),
-        id,
-        title,
-        video_url: videoUrl,
-        pdf_url: pdfUrl,
-        teaser,
-      };
-      return sortUnits([...units.filter((u) => u.id !== id), merged]);
-    });
+    const prev = level.units.find((u) => u.id === id);
+    const merged: CourseUnit = {
+      ...(prev ?? {}),
+      id,
+      title,
+      video_url: videoUrl,
+      pdf_url: pdfUrl,
+      teaser,
+    };
+    saveCourseUnit(level.id, null, merged);
   };
 
   const updateUnit = (originalId: string, title: string, num: number, videoUrl: string, pdfUrl: string, teaser: string) => {
     if (!level) return;
     const newId = `${level.id}-U${num}`;
-    mutateLevel((units) => {
-      const prev = units.find((u) => u.id === originalId) ?? units.find((u) => u.id === newId);
-      const merged: CourseUnit = {
-        ...(prev ?? {}),
-        id: newId,
-        title,
-        video_url: videoUrl,
-        pdf_url: pdfUrl,
-        teaser,
-      };
-      return sortUnits([...units.filter((u) => u.id !== originalId && u.id !== newId), merged]);
-    });
+    const prev = level.units.find((u) => u.id === originalId) ?? level.units.find((u) => u.id === newId);
+    const merged: CourseUnit = {
+      ...(prev ?? {}),
+      id: newId,
+      title,
+      video_url: videoUrl,
+      pdf_url: pdfUrl,
+      teaser,
+    };
+    saveCourseUnit(level.id, originalId, merged);
     if (newId !== originalId) {
       renameUnitReferences(originalId, newId);
       setActivityRev((r) => r + 1);
@@ -125,14 +107,15 @@ function Page() {
 
   const deleteUnit = (unitId: string) => {
     if (!confirm("Delete this unit and all its activities?")) return;
-    mutateLevel((units) => units.filter((u) => u.id !== unitId));
+    if (!level) return;
+    deleteCourseUnit(level.id, unitId);
   };
 
   const generateSkeleton = () => {
     if (!level) return;
     const existingNums = new Set(level.units.map((u) => unitNum(u.id)));
     const generated = buildSkeletonUnits(level.id).filter((u) => !existingNums.has(unitNum(u.id)));
-    mutateLevel((units) => sortUnits([...units, ...generated]));
+    addUnitsBulk(level.id, generated);
   };
 
   /* ---------------- Screen 1: Product selection ---------------- */
