@@ -23,13 +23,13 @@ export function AnnouncementBanner() {
 
   if (!user || (user.role !== "student" && user.role !== "teacher")) return null;
 
-  const items = announcementsForRole(user.role);
+  const items = announcementsForRole(user.role, user.id);
   if (items.length === 0) return null;
 
   const handleDismiss = (id: string) => {
     setExiting(id);
     window.setTimeout(() => {
-      dismissAnnouncement(id);
+      dismissAnnouncement(id, user.id);
       setExiting((cur) => (cur === id ? null : cur));
     }, EXIT_MS);
   };
