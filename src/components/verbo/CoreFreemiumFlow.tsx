@@ -74,7 +74,7 @@ export function useCoreFreemiumGate(user: { id: string; access_plan?: string } |
   const dismissUsed = (silence: boolean) => {
     if (!state || state.step !== "used" || !user) return;
     if (silence) {
-      markSilenced(user.id, state.kind);
+      void markSilenced(user.id, state.kind);
       setState({ kind: state.kind, step: "farewell" });
     } else {
       setState(null);
