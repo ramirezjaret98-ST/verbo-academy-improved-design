@@ -39,6 +39,55 @@ const Ctx = createContext<AuthCtx | null>(null);
 
 type AppUserRow = Database["public"]["Tables"]["app_users"]["Row"];
 
+/** The DB-backed STUDENT profile/commercial fields, copied from the
+ *  `app_users` row onto the built `User` so the freshly-logged-in student sees
+ *  real data before any page-level `hydrateStudents()` runs. Uses the
+ *  `?? undefined` pattern and then drops the undefined keys entirely so a
+ *  `null` DB value never clobbers the canonical/mock value on spread. */
+function buildStudentProfilePatch(row: AppUserRow): Partial<User> {
+  const patch: Partial<User> = {
+    current_level: row.current_level ?? undefined,
+    attendance_percentage: row.attendance_percentage ?? undefined,
+    company: row.company ?? undefined,
+    member_since: row.member_since ?? undefined,
+    hired_sessions: row.hired_sessions ?? undefined,
+    remaining_sessions: row.remaining_sessions ?? undefined,
+    product: row.product ?? undefined,
+    focus: row.focus ?? undefined,
+    access_plan: row.access_plan ?? undefined,
+    contracted_levels: row.contracted_levels ?? undefined,
+    current_roadmap_level: row.current_roadmap_level ?? undefined,
+    reopened_levels: row.reopened_levels ?? undefined,
+    sessions_per_week: row.sessions_per_week ?? undefined,
+    session_duration: row.session_duration ?? undefined,
+    reschedule_policy: row.reschedule_policy ?? undefined,
+    reschedule_custom_hours: row.reschedule_custom_hours ?? undefined,
+    reschedule_custom_pct: row.reschedule_custom_pct ?? undefined,
+    payment_day: row.payment_day ?? undefined,
+    cycle_start: row.cycle_start ?? undefined,
+    next_payment: row.next_payment ?? undefined,
+    video_call_link: row.video_call_link ?? undefined,
+    status: row.status ?? undefined,
+    insights_strikes: row.insights_strikes ?? undefined,
+    bookclub_strikes: row.bookclub_strikes ?? undefined,
+    sessions_auto: row.sessions_auto ?? undefined,
+    admin_notes: row.admin_notes ?? undefined,
+    freeze_start: row.freeze_start ?? undefined,
+    freeze_end: row.freeze_end ?? undefined,
+    product_type: row.product_type ?? undefined,
+    addon_insights_per_month: row.addon_insights_per_month ?? undefined,
+    addon_bookclubs_per_month: row.addon_bookclubs_per_month ?? undefined,
+    addon_spotlight_per_month: row.addon_spotlight_per_month ?? undefined,
+    addon_workshops_enabled: row.addon_workshops_enabled ?? undefined,
+    // Legacy display-only alias of access_plan (no DB column of its own).
+    hired_plan: row.access_plan ?? undefined,
+  };
+  for (const k of Object.keys(patch) as (keyof User)[]) {
+    if (patch[k] === undefined) delete patch[k];
+  }
+  return patch;
+}
+
 /** Builds the frontend `User` object from the real Supabase Auth session.
  *
  *  Every other store still lives in `localStorage`/`mock-data.ts` and is
@@ -77,6 +126,7 @@ async function buildUser(authId: string, email: string): Promise<User | null> {
     role: typedRow.role,
     admin_type: typedRow.admin_type ?? undefined,
     must_change_password: typedRow.must_change_password,
+    ...(typedRow.role === "student" ? buildStudentProfilePatch(typedRow) : {}),
   };
 }
 

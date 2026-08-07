@@ -10,6 +10,7 @@
 import { USERS, ASSIGNMENTS, type User } from "./mock-data";
 import { nextPaymentDateAfterToday, type ProductId, type AccessPlanId } from "./student-model";
 import { logPayment, expectedAmountForGroup } from "./payments-log";
+import { patchStudentProfile, type StudentProfileFields } from "./students-store";
 
 export type GroupMemberStatus = "active" | "pending_removal" | "archived";
 
@@ -221,25 +222,21 @@ function propagateGroupToMembers(before: Group, after: Group) {
     .map((m) => m.student_id);
   if (memberIds.length === 0) return;
 
-  // Mutate USERS + persist profile overrides.
-  let overrides: Record<string, Partial<User>> = {};
-  if (typeof window !== "undefined") {
-    try { overrides = JSON.parse(localStorage.getItem("verbo:student-profile-overrides") || "{}"); }
-    catch { overrides = {}; }
-  }
   for (const sid of memberIds) {
-    const u = USERS.find((x) => x.id === sid);
-    if (!u) continue;
     const patch: Partial<User> = {};
     for (const [gk, uk] of changed) {
       const value = after[gk] as unknown;
       const keys = Array.isArray(uk) ? uk : [uk];
       for (const k of keys) {
-        (u as unknown as Record<string, unknown>)[k as string] = value;
         (patch as unknown as Record<string, unknown>)[k as string] = value;
       }
     }
-    overrides[sid] = { ...(overrides[sid] ?? {}), ...patch };
+    if (Object.keys(patch).length > 0) {
+      // patchStudentProfile handles the USERS mutation, the Supabase write
+      // (or localStorage fallback for local-only members), and the
+      // STUDENTS_EVENT ("verbo:students-updated") dispatch.
+      patchStudentProfile(sid, patch as Partial<StudentProfileFields>);
+    }
 
     if (teacherChanged) {
       const idx = ASSIGNMENTS.findIndex((a) => a.student_id === sid);
@@ -250,12 +247,6 @@ function propagateGroupToMembers(before: Group, after: Group) {
         ASSIGNMENTS.splice(idx, 1);
       }
     }
-  }
-  if (typeof window !== "undefined") {
-    try {
-      localStorage.setItem("verbo:student-profile-overrides", JSON.stringify(overrides));
-      window.dispatchEvent(new CustomEvent("verbo:students-updated"));
-    } catch { /* noop */ }
   }
 }
 

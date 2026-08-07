@@ -15,6 +15,9 @@ import {
 import { loadChallenges } from "./challenges-store";
 import { loadFlashChallenges } from "./flash-challenges-store";
 import { addStudentReport } from "./student-reports-store";
+import { supabase } from "@/integrations/supabase/client";
+import type { Database } from "@/integrations/supabase/types";
+import { legacyToUuid } from "@/lib/user-id-bridge";
 
 export type { ChallengeSubmission, ChallengeSubmissionFormat };
 
@@ -35,8 +38,139 @@ function readRegisteredStudents(): User[] {
   try { return JSON.parse(localStorage.getItem(REGISTERED_KEY) || "[]"); } catch { return []; }
 }
 
+/** The STUDENT-side profile/commercial slice of `User` that is backed by the
+ *  real `public.app_users` table (same field names as the DB columns). This is
+ *  a strict subset shape of `Partial<User>` — keep the types in sync with the
+ *  `User` interface in mock-data.ts. */
+export interface StudentProfileFields {
+  current_level?: string;
+  attendance_percentage?: number;
+  company?: string;
+  member_since?: string;
+  hired_sessions?: number;
+  remaining_sessions?: number;
+  product?: "enterprise" | "go" | "international" | "vip";
+  focus?: string;
+  access_plan?: "Core" | "Advance" | "Elite" | "Signature";
+  contracted_levels?: string[];
+  current_roadmap_level?: string;
+  reopened_levels?: string[];
+  sessions_per_week?: number;
+  session_duration?: number;
+  reschedule_policy?: string;
+  reschedule_custom_hours?: number;
+  reschedule_custom_pct?: number;
+  payment_day?: number;
+  cycle_start?: string;
+  next_payment?: string;
+  video_call_link?: string;
+  status?: "active" | "suspended" | "frozen";
+  insights_strikes?: number;
+  bookclub_strikes?: number;
+  sessions_auto?: boolean;
+  admin_notes?: string;
+  freeze_start?: string;
+  freeze_end?: string;
+  product_type?: "performance" | "workshops" | "insights";
+  addon_insights_per_month?: number;
+  addon_bookclubs_per_month?: number;
+  addon_spotlight_per_month?: number;
+  addon_workshops_enabled?: boolean;
+}
+
+/** Every DB-backed student profile field — the ONLY keys ever sent to the
+ *  `app_users` UPDATE (extra keys a caller may sneak in via a cast, e.g.
+ *  `password` or Challenges state, are filtered out so PostgREST never sees an
+ *  unknown column). */
+const STUDENT_PROFILE_FIELD_KEYS: (keyof StudentProfileFields)[] = [
+  "current_level",
+  "attendance_percentage",
+  "company",
+  "member_since",
+  "hired_sessions",
+  "remaining_sessions",
+  "product",
+  "focus",
+  "access_plan",
+  "contracted_levels",
+  "current_roadmap_level",
+  "reopened_levels",
+  "sessions_per_week",
+  "session_duration",
+  "reschedule_policy",
+  "reschedule_custom_hours",
+  "reschedule_custom_pct",
+  "payment_day",
+  "cycle_start",
+  "next_payment",
+  "video_call_link",
+  "status",
+  "insights_strikes",
+  "bookclub_strikes",
+  "sessions_auto",
+  "admin_notes",
+  "freeze_start",
+  "freeze_end",
+  "product_type",
+  "addon_insights_per_month",
+  "addon_bookclubs_per_month",
+  "addon_spotlight_per_month",
+  "addon_workshops_enabled",
+];
+
+type AppUsersUpdate = Database["public"]["Tables"]["app_users"]["Update"];
+
+/** Patch a student's DB-backed profile fields. Optimistic: mutates the USERS
+ *  singleton + broadcasts immediately, then persists to Supabase in the
+ *  background (or to the legacy localStorage override map when the student has
+ *  no real `app_users` row yet — e.g. locally-registered demo students). */
+export function patchStudentProfile(studentId: string, patch: Partial<StudentProfileFields>): void {
+  const u = USERS.find((x) => x.id === studentId);
+  // Shallow snapshot of the previous values so a failed Supabase write can
+  // roll the optimistic mutation back.
+  const prev: Record<string, unknown> = {};
+  if (u) {
+    for (const key of Object.keys(patch)) {
+      prev[key] = (u as unknown as Record<string, unknown>)[key];
+    }
+    prev.hired_plan = u.hired_plan;
+    Object.assign(u, patch);
+    // Legacy display-only alias — mirrored locally, never sent to Supabase.
+    if (patch.access_plan !== undefined) u.hired_plan = patch.access_plan;
+  }
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent(STUDENTS_EVENT));
+
+  void (async () => {
+    const uuid = await legacyToUuid(studentId);
+    if (uuid === null) {
+      // No real app_users row (locally-registered-only student) — keep the
+      // old localStorage-override persistence path working exactly as today.
+      const overrides = readProfileOverrides();
+      const merged: Record<string, unknown> = { ...(overrides[studentId] ?? {}), ...patch };
+      delete merged.hired_plan;
+      overrides[studentId] = merged as Partial<User>;
+      writeProfileOverrides(overrides);
+      return;
+    }
+    const dbPatch: AppUsersUpdate = {};
+    for (const key of STUDENT_PROFILE_FIELD_KEYS) {
+      if (key in patch) {
+        (dbPatch as Record<string, unknown>)[key] = (patch as Record<string, unknown>)[key];
+      }
+    }
+    const { error } = await supabase.from("app_users").update(dbPatch).eq("id", uuid);
+    if (error) {
+      console.error("[students-store] failed to save profile", error);
+      if (u) Object.assign(u, prev);
+      window.dispatchEvent(new CustomEvent(STUDENTS_EVENT));
+    }
+  })();
+}
+
 // Apply persisted overrides + locally-registered students onto the USERS
-// singleton. Idempotent — safe to call on every mount.
+// singleton, then refresh the DB-backed student profile fields from Supabase
+// in the background. Idempotent — safe to call on every mount.
 export function hydrateStudents() {
   if (typeof window === "undefined") return;
   const overrides = readProfileOverrides();
@@ -44,6 +178,48 @@ export function hydrateStudents() {
   readRegisteredStudents().forEach((u) => {
     if (!USERS.find((x) => x.id === u.id)) USERS.push(u);
   });
+  void (async () => {
+    // `app_users` SELECT RLS only allows a row's own id or admin — a teacher
+    // does NOT see their roster's rows this way (on purpose: the schema
+    // exposes that column-limited slice only via the student_profile_for_teacher
+    // RPC, which hides admin/financial fields — see Lote 10 notes). So this
+    // fetches BOTH sources and merges them: select("*") covers self (any
+    // role) and, for admin, every student; the RPC covers a teacher's own
+    // roster with its narrower column set. For a student or admin caller the
+    // RPC's own WHERE clause just returns 0 rows / a harmless redundant
+    // superset, respectively — no need to branch on the caller's role here.
+    const [selectRes, rpcRes] = await Promise.all([
+      supabase.from("app_users").select("*"),
+      supabase.rpc("student_profile_for_teacher"),
+    ]);
+    if (selectRes.error) {
+      console.error("[students-store] failed to load app_users profiles", selectRes.error);
+    }
+    if (rpcRes.error) {
+      console.error("[students-store] failed to load teacher roster profiles", rpcRes.error);
+    }
+    const applyRow = (row: Record<string, unknown>) => {
+      const legacyId = row.legacy_id;
+      if (typeof legacyId !== "string" || !legacyId) return;
+      const u = USERS.find((x) => x.id === legacyId);
+      if (!u) return;
+      for (const key of STUDENT_PROFILE_FIELD_KEYS) {
+        const value = row[key];
+        // Only assign non-null/known DB values so a column this row's source
+        // doesn't return (RPC) or hasn't been backfilled yet doesn't clobber
+        // a mock demo default.
+        if (value !== null && value !== undefined) {
+          (u as unknown as Record<string, unknown>)[key] = value;
+        }
+      }
+      if (row.access_plan) u.hired_plan = row.access_plan as typeof u.hired_plan;
+    };
+    for (const row of selectRes.data ?? []) applyRow(row as unknown as Record<string, unknown>);
+    for (const row of rpcRes.data ?? []) applyRow(row as unknown as Record<string, unknown>);
+    if (!selectRes.error || !rpcRes.error) {
+      window.dispatchEvent(new CustomEvent(STUDENTS_EVENT));
+    }
+  })();
 }
 
 export function getStudentVideoLink(studentId: string): string {
@@ -51,33 +227,23 @@ export function getStudentVideoLink(studentId: string): string {
   return u?.video_call_link ?? "";
 }
 
-// Update a student's video call link — the single shared field. Mutates USERS,
-// persists the override, and broadcasts so subscribers refresh.
+// Update a student's video call link — the single shared field. Optimistically
+// mutates USERS + broadcasts, then persists to Supabase (or the local
+// fallback) via patchStudentProfile.
 export function setStudentVideoLink(studentId: string, link: string) {
-  const u = USERS.find((x) => x.id === studentId);
-  if (u) u.video_call_link = link;
-  if (typeof window === "undefined") return;
-  const overrides = readProfileOverrides();
-  overrides[studentId] = { ...(overrides[studentId] ?? {}), video_call_link: link };
-  writeProfileOverrides(overrides);
-  window.dispatchEvent(new CustomEvent(STUDENTS_EVENT));
+  patchStudentProfile(studentId, { video_call_link: link });
 }
 
 /** Adjust an individual student's remaining_sessions by `delta` (can be negative).
- *  Result is clamped to [0, hired_sessions]. Persists via the same override map
- *  used by setStudentVideoLink and broadcasts STUDENTS_EVENT. */
+ *  Result is clamped to [0, hired_sessions]. Persists via patchStudentProfile
+ *  and broadcasts STUDENTS_EVENT. */
 export function adjustRemainingSessions(studentId: string, delta: number) {
   const u = USERS.find((x) => x.id === studentId);
   if (!u) return;
   const hired = u.hired_sessions ?? 0;
   const current = u.remaining_sessions ?? 0;
   const next = Math.max(0, Math.min(hired, current + delta));
-  u.remaining_sessions = next;
-  if (typeof window === "undefined") return;
-  const overrides = readProfileOverrides();
-  overrides[studentId] = { ...(overrides[studentId] ?? {}), remaining_sessions: next };
-  writeProfileOverrides(overrides);
-  window.dispatchEvent(new CustomEvent(STUDENTS_EVENT));
+  patchStudentProfile(studentId, { remaining_sessions: next });
 }
 
 /** Toggle a completed level into "Reopened for Review" (read-only student access). */
@@ -87,12 +253,7 @@ export function setLevelReopened(studentId: string, levelName: string, on: boole
   const next = on
     ? Array.from(new Set([...current, levelName]))
     : current.filter((n) => n !== levelName);
-  if (u) u.reopened_levels = next;
-  if (typeof window === "undefined") return;
-  const overrides = readProfileOverrides();
-  overrides[studentId] = { ...(overrides[studentId] ?? {}), reopened_levels: next };
-  writeProfileOverrides(overrides);
-  window.dispatchEvent(new CustomEvent(STUDENTS_EVENT));
+  patchStudentProfile(studentId, { reopened_levels: next });
 }
 
 export function getReopenedLevels(studentId: string): string[] {
