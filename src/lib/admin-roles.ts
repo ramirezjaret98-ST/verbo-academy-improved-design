@@ -10,6 +10,8 @@
 // Newly-created accounts (from the User Management page) persist in
 // localStorage and are merged into the USERS singleton on hydrate.
 import { USERS, type User, type Role } from "./mock-data";
+import { patchTeacherProfile } from "./teacher-model";
+import { patchStudentProfile } from "./students-store";
 
 export type AdminType = "super_admin" | "coordinator_ops" | "coordinator_fin";
 export type CoordinatorType = "operations" | "financial";
@@ -154,19 +156,6 @@ export function updateInternalUser(
   return { ok: true };
 }
 
-const T_OVERRIDES_KEY = "verbo:teacher-profile-overrides";
-const S_OVERRIDES_KEY = "verbo:student-profile-overrides";
-
-function writeProfileOverride(key: string, id: string, patch: Record<string, unknown>) {
-  if (typeof window === "undefined") return;
-  try {
-    const raw = localStorage.getItem(key);
-    const map = raw ? JSON.parse(raw) : {};
-    map[id] = { ...(map[id] || {}), ...patch };
-    localStorage.setItem(key, JSON.stringify(map));
-  } catch { /* noop */ }
-}
-
 // A user is "deactivated" when:
 // - teacher whose teacher_status === "frozen" (same freeze used by strikes & Teachers page)
 // - student whose status === "suspended" (same suspend used by Students page)
@@ -185,17 +174,23 @@ export function setUserDeactivated(userId: string, deactivated: boolean) {
   if (!u) return;
 
   if (u.role === "teacher") {
-    // Reuse the Teachers freeze/reactivate flow — same field, same override key.
-    const next = deactivated ? "frozen" : "active";
-    u.teacher_status = next;
-    writeProfileOverride(T_OVERRIDES_KEY, userId, { teacher_status: next });
+    // Reuse the Teachers freeze/reactivate flow — same DB-backed field,
+    // persisted through the Supabase-backed teacher profile store (Lote 11).
+    // IMPORTANT: this must go through patchTeacherProfile() and not a direct
+    // localStorage override — a direct override is silently reverted the
+    // next time hydrateTeachers() re-fetches from Supabase (its background
+    // fetch applies the real, unchanged DB value on top of the override),
+    // so a raw override looks like it worked for a moment and then quietly
+    // undoes itself. This was a real bug found and fixed in Lote 14.
+    patchTeacherProfile(userId, { teacher_status: deactivated ? "frozen" : "active" });
   } else if (u.role === "student") {
-    // Reuse the Students suspend flow.
-    const next = deactivated ? "suspended" : "active";
-    u.status = next;
-    writeProfileOverride(S_OVERRIDES_KEY, userId, { status: next });
+    // Reuse the Students suspend flow — same reasoning as above, via the
+    // Supabase-backed student profile store (Lote 10).
+    patchStudentProfile(userId, { status: deactivated ? "suspended" : "active" });
   } else {
-    // Internal admin — no equivalent freeze page, use the local override map.
+    // Internal admin — no equivalent freeze page and no migrated DB field
+    // for this concept; keep the local override map (internal/coordinator
+    // accounts are not part of the Supabase migration).
     const st = readStatus();
     if (deactivated) st[userId] = { status: "deactivated" };
     else delete st[userId];
