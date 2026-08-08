@@ -568,6 +568,32 @@ export type Database = {
           },
         ]
       }
+      badge_unlock_seen: {
+        Row: {
+          badge_storage_id: string
+          seen_at: string
+          student_id: string
+        }
+        Insert: {
+          badge_storage_id: string
+          seen_at?: string
+          student_id: string
+        }
+        Update: {
+          badge_storage_id?: string
+          seen_at?: string
+          student_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "badge_unlock_seen_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "app_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       challenge_submission_history: {
         Row: {
           id: number
@@ -3165,6 +3191,14 @@ export type Database = {
           p_top_status: Database["public"]["Enums"]["ext_session_status"]
         }
         Returns: undefined
+      }
+      user_avatar_for_peek: {
+        Args: never
+        Returns: {
+          avatar_url: string
+          id: string
+          legacy_id: string
+        }[]
       }
     }
     Enums: {
