@@ -657,6 +657,7 @@ export type Database = {
           reviewed_at: string | null
           reviewed_by: string | null
           status: Database["public"]["Enums"]["challenge_submission_status"]
+          streak_before: number | null
           student_id: string
           submitted_at: string
           teacher_feedback: string | null
@@ -670,6 +671,7 @@ export type Database = {
           reviewed_at?: string | null
           reviewed_by?: string | null
           status?: Database["public"]["Enums"]["challenge_submission_status"]
+          streak_before?: number | null
           student_id: string
           submitted_at?: string
           teacher_feedback?: string | null
@@ -683,6 +685,7 @@ export type Database = {
           reviewed_at?: string | null
           reviewed_by?: string | null
           status?: Database["public"]["Enums"]["challenge_submission_status"]
+          streak_before?: number | null
           student_id?: string
           submitted_at?: string
           teacher_feedback?: string | null
