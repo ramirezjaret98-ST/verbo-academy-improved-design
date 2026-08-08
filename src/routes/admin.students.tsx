@@ -36,6 +36,8 @@ import {
   patchStudentProfile,
   type StudentProfileFields,
 } from "@/lib/students-store";
+import { supabase } from "@/integrations/supabase/client";
+import { invalidateUserIdBridge } from "@/lib/user-id-bridge";
 import { RotateCcw, Unlock as UnlockIcon, Lock as LockIcon, Trophy } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { loadCourses, subscribeCourses, type CourseLevel } from "@/lib/product-courses-store";
@@ -229,6 +231,26 @@ function Page() {
     setFormFor(null);
     forceTick((n) => n + 1);
     setDetail(null);
+
+    // Create a REAL Supabase Auth account in the background so this student
+    // can actually log in (beta users need a working account, not just a
+    // localStorage-only entry). The localStorage/USERS bookkeeping above
+    // already happened, so a failure here just leaves the student without a
+    // real login yet — same net effect as before this lote, logged for
+    // follow-up rather than blocking the admin's flow.
+    void (async () => {
+      const { data, error } = await supabase.functions.invoke("admin-create-user", {
+        body: { legacyId: u.id, email: u.email, password: u.password, name: u.name, role: "student" },
+      });
+      const invokeError = (data as { error?: string } | null)?.error;
+      if (error || invokeError) {
+        console.error("[admin.students] failed to create real auth account", error ?? invokeError);
+        return;
+      }
+      invalidateUserIdBridge();
+      const { id, name, role, ...rest } = u;
+      patchStudentProfile(u.id, rest as Partial<StudentProfileFields>);
+    })();
   };
 
   const handleUpdate = (u: User, teacherId?: string) => {

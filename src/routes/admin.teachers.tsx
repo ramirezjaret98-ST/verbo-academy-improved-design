@@ -36,6 +36,8 @@ import { useAuth } from "@/lib/auth";
 import { getAdminType } from "@/lib/admin-roles";
 import { KpiOverrideModal } from "@/components/verbo/KpiOverrideModal";
 import type { KpiMetric } from "@/lib/teacher-kpi-overrides-store";
+import { supabase } from "@/integrations/supabase/client";
+import { invalidateUserIdBridge } from "@/lib/user-id-bridge";
 
 export const Route = createFileRoute("/admin/teachers")({
   component: Page,
@@ -172,6 +174,24 @@ function Page() {
     reg.push(u); write(REGISTERED_KEY, reg);
     setFormFor(null);
     forceTick((n) => n + 1);
+
+    // Create a REAL Supabase Auth account in the background so this teacher
+    // can actually log in — same reasoning as admin.students.tsx's
+    // handleRegister. A failure here leaves the teacher without a real login
+    // yet (same as before this lote) rather than blocking the admin's flow.
+    void (async () => {
+      const { data, error } = await supabase.functions.invoke("admin-create-user", {
+        body: { legacyId: u.id, email: u.email, password: u.password, name: u.name, role: "teacher" },
+      });
+      const invokeError = (data as { error?: string } | null)?.error;
+      if (error || invokeError) {
+        console.error("[admin.teachers] failed to create real auth account", error ?? invokeError);
+        return;
+      }
+      invalidateUserIdBridge();
+      const { id, role, ...rest } = u;
+      patchTeacherProfile(u.id, rest as Partial<User>);
+    })();
   };
 
   const updateTeacher = (u: User) => {
