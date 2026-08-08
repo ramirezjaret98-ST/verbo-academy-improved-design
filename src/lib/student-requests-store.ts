@@ -9,8 +9,27 @@
 // Spotlight Requests work the same way (student initiates, teachers claim,
 // same 8h escalation) but carry a mandatory description text and consume the
 // monthly Spotlight cap on the student side.
-
-import { loadSessions, createSession, updateSession, type ExtSessionStatus } from "./sessions-store";
+//
+// Backed by Supabase (`public.student_requests`). This is a CROSS-USER
+// workflow by design — the student creates the request on their device and
+// any qualified teacher must see it on THEIR device — so the old
+// localStorage backing could never work. Reads are served from an in-memory
+// cache kept in sync via Postgres Realtime, so `loadStudentRequests()` stays
+// synchronous for the render-time call sites. RLS scopes rows naturally
+// (students see their own, teachers/admins see all), so a plain
+// hydrate-once + Realtime pattern is enough here. Mutations write
+// optimistically to the cache and persist in the background. The DB
+// generates `id` itself (bigint identity), so inserts use the
+// temp-id-then-replace pattern from teacher-kpi-overrides-store.ts.
+import { supabase } from "@/integrations/supabase/client";
+import type { Database } from "@/integrations/supabase/types";
+import { legacyToUuid, uuidToLegacySync, hydrateUserIdBridge } from "./user-id-bridge";
+import {
+  loadSessions,
+  createSession,
+  updateSession,
+  type ExtSessionStatus,
+} from "./sessions-store";
 import { getStudentVideoLink } from "./students-store";
 
 export type StudentRequestKind = "reschedule" | "spotlight";
@@ -35,58 +54,198 @@ export interface StudentRequest {
   claimed_at?: string;
 }
 
-export const REQUESTS_KEY = "verbo:student-requests";
 export const REQUESTS_EVENT = "verbo:student-requests-updated";
 /** Requests unclaimed for this long escalate to Admin's Unclaimed queue. */
 export const UNCLAIMED_ESCALATE_MS = 8 * 60 * 60 * 1000;
 
-function readAll(): StudentRequest[] {
-  if (typeof window === "undefined") return [];
-  try { return JSON.parse(localStorage.getItem(REQUESTS_KEY) || "[]"); } catch { return []; }
-}
-function writeAll(list: StudentRequest[]) {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(REQUESTS_KEY, JSON.stringify(list));
-  window.dispatchEvent(new CustomEvent(REQUESTS_EVENT));
+type RequestRow = Database["public"]["Tables"]["student_requests"]["Row"];
+
+let cache: StudentRequest[] = [];
+let hydrated = false;
+let hydratePromise: Promise<void> | null = null;
+const listeners = new Set<() => void>();
+
+function notify() {
+  listeners.forEach((cb) => cb());
+  if (typeof window !== "undefined") {
+    // notifications-store.ts listens for this window event directly
+    // (bypassing `subscribeStudentRequests`), so it must keep firing on
+    // every mutation and cache refresh.
+    window.dispatchEvent(new CustomEvent(REQUESTS_EVENT));
+  }
 }
 
+function mapRow(row: RequestRow): StudentRequest {
+  return {
+    id: String(row.id),
+    kind: row.kind,
+    student_id: uuidToLegacySync(row.student_id),
+    assigned_teacher_id: row.assigned_teacher_id
+      ? uuidToLegacySync(row.assigned_teacher_id)
+      : undefined,
+    origin_session_id: row.origin_session_id != null ? String(row.origin_session_id) : undefined,
+    proposed_datetime: row.proposed_datetime,
+    duration_minutes: row.duration_minutes,
+    spotlight_context: row.spotlight_context ?? undefined,
+    last_report_summary: row.last_report_summary ?? undefined,
+    requested_at: row.requested_at,
+    status: row.status,
+    claimed_by: row.claimed_by ? uuidToLegacySync(row.claimed_by) : undefined,
+    claimed_at: row.claimed_at ?? undefined,
+  };
+}
+
+async function hydrate(): Promise<void> {
+  if (hydrated) return;
+  if (hydratePromise) return hydratePromise;
+  hydratePromise = (async () => {
+    // Warm the user-id bridge first so `uuidToLegacySync` below resolves.
+    await hydrateUserIdBridge();
+    const { data, error } = await supabase
+      .from("student_requests")
+      .select("*")
+      .order("requested_at", { ascending: false });
+    if (error) {
+      console.error("[student-requests-store] failed to load student_requests", error);
+      hydratePromise = null;
+      return;
+    }
+    cache = (data ?? []).map(mapRow);
+    hydrated = true;
+    notify();
+  })();
+  return hydratePromise;
+}
+
+let realtimeStarted = false;
+function ensureRealtime() {
+  if (realtimeStarted || typeof window === "undefined") return;
+  realtimeStarted = true;
+  supabase
+    .channel("student-requests-changes")
+    .on("postgres_changes", { event: "*", schema: "public", table: "student_requests" }, () => {
+      hydrated = false;
+      hydratePromise = null;
+      void hydrate();
+    })
+    .subscribe();
+}
+
+if (typeof window !== "undefined") {
+  // Kick off hydration eagerly — `loadStudentRequests()` and the monthly
+  // quota counters are called synchronously inside render logic, so the
+  // cache needs to be warm as early as possible.
+  void hydrate();
+  ensureRealtime();
+}
+
+/** Ids whose escalation is being (or has been) persisted this session, to
+ *  avoid firing a duplicate Supabase UPDATE on every read/render. */
+const escalationInFlight = new Set<string>();
+
 /** Applies time-based auto-escalation on read so consumers always see the
- *  right status without a background job. */
+ *  right status without a background job. The status flip is applied to the
+ *  cache synchronously; the Supabase UPDATE persisting it fires at most once
+ *  per row per session (retried on a later read only if it errored). */
 export function loadStudentRequests(): StudentRequest[] {
   const now = Date.now();
-  const list = readAll();
-  let mutated = false;
-  const next = list.map((r) => {
+  let changed = false;
+  const next = cache.map((r) => {
     if (r.status !== "open") return r;
     if (now - +new Date(r.requested_at) >= UNCLAIMED_ESCALATE_MS) {
-      mutated = true;
+      changed = true;
       return { ...r, status: "escalated" as const };
     }
     return r;
   });
-  if (mutated) writeAll(next);
-  return next;
+  if (changed) {
+    cache = next;
+    for (const r of next) {
+      if (r.status !== "escalated") continue;
+      if (r.id.startsWith("temp-")) continue; // not persisted yet, nothing to update
+      if (escalationInFlight.has(r.id)) continue;
+      escalationInFlight.add(r.id);
+      void supabase
+        .from("student_requests")
+        .update({ status: "escalated" })
+        .eq("id", Number(r.id))
+        .then(({ error }) => {
+          if (error) {
+            console.error("[student-requests-store] failed to persist escalation", error);
+            escalationInFlight.delete(r.id); // allow retry on a future read
+          }
+        });
+    }
+    notify();
+  }
+  return cache;
 }
 
 export function subscribeStudentRequests(cb: () => void): () => void {
-  if (typeof window === "undefined") return () => {};
-  const onStorage = (e: StorageEvent) => { if (e.key === REQUESTS_KEY) cb(); };
-  window.addEventListener(REQUESTS_EVENT, cb);
-  window.addEventListener("storage", onStorage);
+  listeners.add(cb);
+  void hydrate();
+  ensureRealtime();
   return () => {
-    window.removeEventListener(REQUESTS_EVENT, cb);
-    window.removeEventListener("storage", onStorage);
+    listeners.delete(cb);
   };
 }
 
-export function addStudentRequest(input: Omit<StudentRequest, "id" | "requested_at" | "status">): StudentRequest {
+export function addStudentRequest(
+  input: Omit<StudentRequest, "id" | "requested_at" | "status">,
+): StudentRequest {
+  const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
   const req: StudentRequest = {
     ...input,
-    id: `sr-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    id: tempId,
     requested_at: new Date().toISOString(),
     status: "open",
   };
-  writeAll([req, ...readAll()]);
+  // Optimistic: prepend to the cache + notify, persist in background.
+  cache = [req, ...cache];
+  notify();
+
+  void (async () => {
+    const [studentUuid, assignedUuid] = await Promise.all([
+      legacyToUuid(input.student_id),
+      input.assigned_teacher_id ? legacyToUuid(input.assigned_teacher_id) : Promise.resolve(null),
+    ]);
+    if (!studentUuid) {
+      console.error("[student-requests-store] cannot persist request — unresolved student id", {
+        studentId: input.student_id,
+      });
+      cache = cache.filter((r) => r.id !== tempId);
+      notify();
+      return;
+    }
+    const { data, error } = await supabase
+      .from("student_requests")
+      .insert({
+        kind: input.kind,
+        student_id: studentUuid,
+        assigned_teacher_id: assignedUuid ?? null,
+        origin_session_id: input.origin_session_id ? Number(input.origin_session_id) : null,
+        proposed_datetime: input.proposed_datetime,
+        duration_minutes: input.duration_minutes,
+        spotlight_context: input.spotlight_context ?? null,
+        last_report_summary: input.last_report_summary ?? null,
+        requested_at: req.requested_at,
+        status: "open",
+      })
+      .select("*")
+      .single();
+    if (error || !data) {
+      console.error("[student-requests-store] failed to save request", error);
+      // Rollback: a request that silently failed to persist must not sit in
+      // the local UI as if it worked.
+      cache = cache.filter((r) => r.id !== tempId);
+      notify();
+      return;
+    }
+    const saved = mapRow(data);
+    cache = cache.map((r) => (r.id === tempId ? saved : r));
+    notify();
+  })();
+
   return req;
 }
 
@@ -99,59 +258,126 @@ export function recordSpotlightConversion(input: {
   duration_minutes: number;
   spotlight_context: string;
 }): void {
+  const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+  const nowIso = new Date().toISOString();
   const req: StudentRequest = {
-    id: `sr-conv-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    id: tempId,
     kind: "spotlight",
     student_id: input.student_id,
     assigned_teacher_id: input.teacher_id,
     proposed_datetime: input.proposed_datetime,
     duration_minutes: input.duration_minutes,
     spotlight_context: input.spotlight_context,
-    requested_at: new Date().toISOString(),
+    requested_at: nowIso,
     status: "assigned",
     claimed_by: input.teacher_id,
-    claimed_at: new Date().toISOString(),
+    claimed_at: nowIso,
   };
-  writeAll([req, ...readAll()]);
+  // Optimistic so the monthly-cap counters reflect it immediately.
+  cache = [req, ...cache];
+  notify();
+
+  void (async () => {
+    const [studentUuid, teacherUuid] = await Promise.all([
+      legacyToUuid(input.student_id),
+      legacyToUuid(input.teacher_id),
+    ]);
+    if (!studentUuid || !teacherUuid) {
+      console.error(
+        "[student-requests-store] cannot persist spotlight conversion — unresolved ids",
+        {
+          studentId: input.student_id,
+          teacherId: input.teacher_id,
+        },
+      );
+      cache = cache.filter((r) => r.id !== tempId);
+      notify();
+      return;
+    }
+    const { data, error } = await supabase
+      .from("student_requests")
+      .insert({
+        kind: "spotlight",
+        student_id: studentUuid,
+        assigned_teacher_id: teacherUuid,
+        origin_session_id: null,
+        proposed_datetime: input.proposed_datetime,
+        duration_minutes: input.duration_minutes,
+        spotlight_context: input.spotlight_context,
+        last_report_summary: null,
+        requested_at: nowIso,
+        status: "assigned",
+        claimed_by: teacherUuid,
+        claimed_at: nowIso,
+      })
+      .select("*")
+      .single();
+    if (error || !data) {
+      console.error("[student-requests-store] failed to save spotlight conversion", error);
+      cache = cache.filter((r) => r.id !== tempId);
+      notify();
+      return;
+    }
+    const saved = mapRow(data);
+    cache = cache.map((r) => (r.id === tempId ? saved : r));
+    notify();
+  })();
+}
+
+/** Shared body of claim/assign: optimistic cache flip + session
+ *  materialization + background persistence of the status change. */
+function transitionRequest(
+  id: string,
+  teacherId: string,
+  newStatus: "claimed" | "assigned",
+): StudentRequest | null {
+  const idx = cache.findIndex((r) => r.id === id);
+  if (idx < 0) return null;
+  const r = cache[idx];
+  if (r.status !== "open" && r.status !== "escalated") return null;
+  // Extremely unlikely race: the request hasn't finished persisting yet, so
+  // there's no DB row to claim. Fail gracefully instead of half-claiming.
+  if (id.startsWith("temp-")) return null;
+  const claimedAt = new Date().toISOString();
+  const updated: StudentRequest = {
+    ...r,
+    status: newStatus,
+    claimed_by: teacherId,
+    claimed_at: claimedAt,
+  };
+  cache = cache.map((x) => (x.id === id ? updated : x));
+  notify();
+  // Materialize the actual session in the shared sessions-store so it shows
+  // on both calendars immediately.
+  requireHelpers().addClaimedSession(updated);
+
+  void (async () => {
+    const teacherUuid = await legacyToUuid(teacherId);
+    if (!teacherUuid) {
+      console.error("[student-requests-store] cannot persist claim — unresolved teacher id", {
+        teacherId,
+        requestId: id,
+      });
+      return;
+    }
+    const { error } = await supabase
+      .from("student_requests")
+      .update({ status: newStatus, claimed_by: teacherUuid, claimed_at: claimedAt })
+      .eq("id", Number(id));
+    if (error) {
+      console.error("[student-requests-store] failed to persist claim", error);
+    }
+  })();
+
+  return updated;
 }
 
 export function claimStudentRequest(id: string, teacherId: string): StudentRequest | null {
-  const list = readAll();
-  const idx = list.findIndex((r) => r.id === id);
-  if (idx < 0) return null;
-  const r = list[idx];
-  if (r.status !== "open" && r.status !== "escalated") return null;
-  const updated: StudentRequest = {
-    ...r,
-    status: "claimed",
-    claimed_by: teacherId,
-    claimed_at: new Date().toISOString(),
-  };
-  list[idx] = updated;
-  writeAll(list);
-  // Materialize the actual session in the shared sessions-store so it shows
-  // on both calendars immediately.
-  const { addClaimedSession } = requireHelpers();
-  addClaimedSession(updated);
-  return updated;
+  return transitionRequest(id, teacherId, "claimed");
 }
 
 export function adminAssignRequest(id: string, teacherId: string): StudentRequest | null {
-  const list = readAll();
-  const idx = list.findIndex((r) => r.id === id);
-  if (idx < 0) return null;
-  const r = list[idx];
-  if (r.status !== "escalated" && r.status !== "open") return null;
-  const updated: StudentRequest = {
-    ...r,
-    status: "assigned",
-    claimed_by: teacherId,
-    claimed_at: new Date().toISOString(),
-  };
-  list[idx] = updated;
-  writeAll(list);
-  requireHelpers().addClaimedSession(updated);
-  return updated;
+  return transitionRequest(id, teacherId, "assigned");
 }
 
 /** How many reschedule/spotlight requests this teacher has already picked up
@@ -167,7 +393,9 @@ export function teacherRequestLoadThisMonth(teacherId: string): number {
 }
 
 /** Candidate teachers ranked by fewest requests handled this month. */
-export function fairRotationCandidates(qualifiedTeacherIds: string[]): { teacherId: string; load: number }[] {
+export function fairRotationCandidates(
+  qualifiedTeacherIds: string[],
+): { teacherId: string; load: number }[] {
   return qualifiedTeacherIds
     .map((teacherId) => ({ teacherId, load: teacherRequestLoadThisMonth(teacherId) }))
     .sort((a, b) => a.load - b.load);
@@ -204,14 +432,18 @@ export function parseReschedulePolicy(u: {
  *  both open requests and any historical converted sessions. */
 export function reschedulesUsedThisMonth(studentId: string): number {
   const now = new Date();
-  const y = now.getFullYear(), m = now.getMonth();
+  const y = now.getFullYear(),
+    m = now.getMonth();
   const inMonth = (iso: string) => {
     const d = new Date(iso);
     return d.getFullYear() === y && d.getMonth() === m;
   };
   const reqs = loadStudentRequests().filter(
-    (r) => r.kind === "reschedule" && r.student_id === studentId
-      && r.status !== "cancelled" && inMonth(r.requested_at),
+    (r) =>
+      r.kind === "reschedule" &&
+      r.student_id === studentId &&
+      r.status !== "cancelled" &&
+      inMonth(r.requested_at),
   ).length;
   return reqs;
 }
@@ -219,14 +451,18 @@ export function reschedulesUsedThisMonth(studentId: string): number {
 /** Spotlight requests submitted in the current calendar month for a student. */
 export function spotlightRequestsThisMonth(studentId: string): number {
   const now = new Date();
-  const y = now.getFullYear(), m = now.getMonth();
+  const y = now.getFullYear(),
+    m = now.getMonth();
   const inMonth = (iso: string) => {
     const d = new Date(iso);
     return d.getFullYear() === y && d.getMonth() === m;
   };
   return loadStudentRequests().filter(
-    (r) => r.kind === "spotlight" && r.student_id === studentId
-      && r.status !== "cancelled" && inMonth(r.requested_at),
+    (r) =>
+      r.kind === "spotlight" &&
+      r.student_id === studentId &&
+      r.status !== "cancelled" &&
+      inMonth(r.requested_at),
   ).length;
 }
 
@@ -252,7 +488,9 @@ function requireHelpers() {
     addClaimedSession(req: StudentRequest) {
       const teacherId = req.claimed_by;
       if (!teacherId) return;
-      const link = getStudentVideoLink(req.student_id) || `https://teams.microsoft.com/l/meetup/${req.student_id}`;
+      const link =
+        getStudentVideoLink(req.student_id) ||
+        `https://teams.microsoft.com/l/meetup/${req.student_id}`;
       const status: ExtSessionStatus = "scheduled";
       createSession({
         student_id: req.student_id,
@@ -262,7 +500,10 @@ function requireHelpers() {
         teams_link: link,
         status,
         origin: req.kind === "spotlight" ? "spotlight" : undefined,
-        notes: req.kind === "spotlight" ? `Spotlight Session — ${req.spotlight_context ?? ""}` : `Reschedule — original ${req.origin_session_id}`,
+        notes:
+          req.kind === "spotlight"
+            ? `Spotlight Session — ${req.spotlight_context ?? ""}`
+            : `Reschedule — original ${req.origin_session_id}`,
       });
       // For reschedules: mark the original session cancelled (Cancel-only path
       // already handled that; this branch is used when the student picked
