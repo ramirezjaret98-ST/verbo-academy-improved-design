@@ -71,6 +71,7 @@ import { groupOfStudent, incrementGroupRemaining, effectiveSessionCounts, sessio
 import { useCoreFreemiumGate } from "@/components/verbo/CoreFreemiumFlow";
 import { isSilenced, hasCreditUsed as freemiumUsed, markCreditUsed as markFreemiumUsed } from "@/lib/core-freemium-store";
 import { effectiveHourlyRate, appendTeacherAdjustment } from "@/lib/teacher-tiers";
+import { hydrateTeachers } from "@/lib/teacher-model";
 import { ProfilePeekCard } from "@/components/verbo/ProfilePeekCard";
 import { useAvatar } from "@/lib/avatar-store";
 
@@ -106,6 +107,9 @@ function Page() {
   const [pulseActive, setPulseActive] = useState(focusParam === "clubs");
 
   useEffect(() => subscribeSessions(() => tick((n) => n + 1)), []);
+  // Refresh teacher profile fields (ProfilePeekCard + qualified_products /
+  // teacher_status filtering in the Spotlight & reschedule flows).
+  useEffect(() => { hydrateTeachers(); }, []);
 
   useEffect(() => {
     if (focusParam !== "clubs") return;

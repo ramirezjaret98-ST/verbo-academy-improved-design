@@ -11,7 +11,7 @@ import {
   type ProductId, type AccessPlanId,
   accessPlanPillStyle,
 } from "@/lib/student-model";
-import { teachersForProduct, teachersForProductSorted } from "@/lib/teacher-model";
+import { teachersForProduct, teachersForProductSorted, hydrateTeachers } from "@/lib/teacher-model";
 import { teacherTier } from "@/lib/teacher-tiers";
 import { PLAN_DEFAULTS } from "@/lib/club-bookings-store";
 
@@ -135,6 +135,7 @@ function Page() {
     readRegisteredStudents().forEach((u) => {
       if (!USERS.find((x) => x.id === u.id)) USERS.push(u);
     });
+    hydrateTeachers();
     forceTick((n) => n + 1);
   }, []);
 

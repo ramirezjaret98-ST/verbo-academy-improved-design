@@ -107,6 +107,7 @@ import {
   completeSeasonChallenge,
 } from "@/lib/students-store";
 import { USERS } from "@/lib/mock-data";
+import { hydrateTeachers } from "@/lib/teacher-model";
 import { groupsByStudentId } from "@/lib/groups-store";
 import { setAvatar, useAvatar } from "@/lib/avatar-store";
 import {
@@ -664,6 +665,7 @@ function Page() {
   >(null);
 
   useEffect(() => {
+    hydrateTeachers();
     setChallenges(loadChallenges());
     setFlashList(loadFlashChallenges());
     setFlashConfig(loadFlashConfig());

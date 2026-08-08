@@ -15,7 +15,7 @@ import {
   type ProductId, type AccessPlanId,
   accessPlanPillStyle,
 } from "@/lib/student-model";
-import { teachersForProduct } from "@/lib/teacher-model";
+import { teachersForProduct, hydrateTeachers } from "@/lib/teacher-model";
 import {
   loadGroups, loadGroupMembers, subscribeGroups, registerGroupWithMembers,
   updateGroup, addMember, removeMember, restoreMember, archiveMember,
@@ -40,6 +40,7 @@ function Page() {
   const [detailId, setDetailId] = useState<string | null>(null);
 
   useEffect(() => {
+    hydrateTeachers();
     tick((n) => n + 1);
     return subscribeGroups(() => tick((n) => n + 1));
   }, []);

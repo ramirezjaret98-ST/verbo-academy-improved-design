@@ -7,6 +7,7 @@ import {
   teacherStatus, qualifiedProducts, assignedStudents, activeStudents,
   teachersForProduct, avgRating, flaggedReviews, pendingReviews,
   PAYMENT_FREQUENCIES, paymentFrequency, defaultPaymentRecords, financialSummary,
+  patchTeacherProfile, hydrateTeachers,
   type QualifiedProduct, type TeacherStatus, type PaymentFrequency,
 } from "@/lib/teacher-model";
 import { effectiveHourlyRate, teacherTier } from "@/lib/teacher-tiers";
@@ -89,6 +90,7 @@ function Page() {
     });
     const reviews = read<Record<string, Partial<Session>>>(REVIEW_KEY, {});
     SESSIONS.forEach((s) => { if (reviews[s.id]) Object.assign(s, reviews[s.id]); });
+    hydrateTeachers();
     forceTick((n) => n + 1);
     const unsub = subscribeStrikes(() => forceTick((n) => n + 1));
     return () => unsub();
@@ -126,13 +128,11 @@ function Page() {
   const persist = (updated: User) => {
     const idx = USERS.findIndex((u) => u.id === updated.id);
     if (idx >= 0) USERS[idx] = updated; else USERS.push(updated);
-    const overrides = read<Record<string, Partial<User>>>(PROFILE_KEY, {});
-    const { id, role, ...rest } = updated;
-    overrides[updated.id] = rest;
-    write(PROFILE_KEY, overrides);
     const reg = read<User[]>(REGISTERED_KEY, []);
     const ri = reg.findIndex((u) => u.id === updated.id);
     if (ri >= 0) { reg[ri] = updated; write(REGISTERED_KEY, reg); }
+    const { id, role, ...rest } = updated;
+    patchTeacherProfile(updated.id, rest as Partial<User>);
     forceTick((n) => n + 1);
   };
 

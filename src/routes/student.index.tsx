@@ -15,6 +15,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { useAuth } from "@/lib/auth";
 import { userById } from "@/lib/mock-data";
+import { hydrateTeachers } from "@/lib/teacher-model";
 import { effectiveSessionCounts, groupOfStudent } from "@/lib/groups-store";
 import { subscribeSessions, getSessionsSnapshot, getServerSessionsSnapshot, submitStudentRating, studentAttendance, type ExtSession, type ExtSessionStatus } from "@/lib/sessions-store";
 import {
@@ -258,6 +259,8 @@ function StudentDashboard() {
 
   const [plansRev, setPlansRev] = useState(0);
   useEffect(() => subscribeLessonPlans(() => setPlansRev((r) => r + 1)), []);
+  // Refresh teacher profile fields (ProfilePeekCard for this student's teacher).
+  useEffect(() => { hydrateTeachers(); }, []);
 
   // Shared "Can't Attend" flow (same real logic as Live Sessions).
   const [cantAttendFor, setCantAttendFor] = useState<ExtSession | null>(null);
