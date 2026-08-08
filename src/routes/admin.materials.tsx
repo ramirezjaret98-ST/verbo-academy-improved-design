@@ -10,6 +10,7 @@ import {
   levelsForProduct,
   acceptForType,
   isFileTooLarge,
+  uploadMaterialFile,
   MAX_MATERIAL_FILE_ERROR,
   RESTRICT_PRODUCTS,
   type RestrictProduct,
@@ -44,6 +45,8 @@ function Page() {
   const [resourceName, setResourceName] = useState<string>("");
   const [resourceError, setResourceError] = useState<string | null>(null);
   const [coverError, setCoverError] = useState<string | null>(null);
+  const [resourceUploading, setResourceUploading] = useState(false);
+  const [coverUploading, setCoverUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const resourceRef = useRef<HTMLInputElement>(null);
 
@@ -65,7 +68,7 @@ function Page() {
     if (resourceRef.current) resourceRef.current.value = "";
   };
 
-  const onResourceFile = (file?: File | null) => {
+  const onResourceFile = async (file?: File | null) => {
     if (!file) return;
     if (isFileTooLarge(file)) {
       setResourceError(MAX_MATERIAL_FILE_ERROR);
@@ -76,9 +79,16 @@ function Page() {
     }
     setResourceError(null);
     setResourceName(file.name);
-    const reader = new FileReader();
-    reader.onload = () => setResourceFile(reader.result as string);
-    reader.readAsDataURL(file);
+    setResourceUploading(true);
+    const res = await uploadMaterialFile(file, "resource");
+    setResourceUploading(false);
+    if (!res.ok) {
+      setResourceError(res.error);
+      setResourceName("");
+      if (resourceRef.current) resourceRef.current.value = "";
+      return;
+    }
+    setResourceFile(res.url);
   };
 
 
@@ -100,7 +110,7 @@ function Page() {
     setNewCat("");
   };
 
-  const onCoverFile = (file?: File | null) => {
+  const onCoverFile = async (file?: File | null) => {
     if (!file) return;
     if (isFileTooLarge(file)) {
       setCoverError(MAX_MATERIAL_FILE_ERROR);
@@ -108,9 +118,15 @@ function Page() {
       return;
     }
     setCoverError(null);
-    const reader = new FileReader();
-    reader.onload = () => setCover(reader.result as string);
-    reader.readAsDataURL(file);
+    setCoverUploading(true);
+    const res = await uploadMaterialFile(file, "cover");
+    setCoverUploading(false);
+    if (!res.ok) {
+      setCoverError(res.error);
+      if (fileRef.current) fileRef.current.value = "";
+      return;
+    }
+    setCover(res.url);
   };
 
   const onProductChange = (v: string) => {
@@ -289,8 +305,8 @@ function Page() {
             onChange={(e) => onResourceFile(e.target.files?.[0])}
           />
           <div className="mt-1.5 flex flex-wrap items-center gap-3">
-            <GhostButton onClick={() => resourceRef.current?.click()}>
-              <Upload className="h-3.5 w-3.5" /> {resourceFile ? "Replace file" : "Choose file"}
+            <GhostButton onClick={() => resourceRef.current?.click()} disabled={resourceUploading}>
+              <Upload className="h-3.5 w-3.5" /> {resourceUploading ? "Uploading…" : resourceFile ? "Replace file" : "Choose file"}
             </GhostButton>
             {resourceName && <span className="text-xs text-foreground">{resourceName}</span>}
             {resourceFile && (
@@ -340,7 +356,9 @@ function Page() {
               </>
             )}
             <div className="mt-3 flex gap-2">
-              <GhostButton onClick={() => fileRef.current?.click()}>{cover ? "Replace image" : "Choose file"}</GhostButton>
+              <GhostButton onClick={() => fileRef.current?.click()} disabled={coverUploading}>
+                {coverUploading ? "Uploading…" : cover ? "Replace image" : "Choose file"}
+              </GhostButton>
               {cover && (
                 <GhostButton onClick={() => setCover(undefined)}>
                   <X className="h-3.5 w-3.5" /> Remove
@@ -353,7 +371,9 @@ function Page() {
 
 
         <div className="mt-5 flex justify-end">
-          <PrimaryButton onClick={save}>{editingId ? "Save changes" : "Save material"}</PrimaryButton>
+          <PrimaryButton onClick={save} disabled={resourceUploading || coverUploading}>
+            {editingId ? "Save changes" : "Save material"}
+          </PrimaryButton>
         </div>
       </Card>
 
