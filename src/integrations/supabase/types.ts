@@ -2019,35 +2019,61 @@ export type Database = {
       }
       performance_ratings: {
         Row: {
-          confidence: number | null
-          fluency: number | null
-          grammar: number | null
+          confidence: number
+          created_at: string
+          fluency: number
+          grammar: number
           session_id: number
-          subskills: Json | null
-          vocabulary: number | null
+          student_id: string
+          subskills: Json
+          teacher_id: string
+          updated_at: string
+          vocabulary: number
         }
         Insert: {
-          confidence?: number | null
-          fluency?: number | null
-          grammar?: number | null
+          confidence?: number
+          created_at?: string
+          fluency?: number
+          grammar?: number
           session_id: number
-          subskills?: Json | null
-          vocabulary?: number | null
+          student_id: string
+          subskills?: Json
+          teacher_id: string
+          updated_at?: string
+          vocabulary?: number
         }
         Update: {
-          confidence?: number | null
-          fluency?: number | null
-          grammar?: number | null
+          confidence?: number
+          created_at?: string
+          fluency?: number
+          grammar?: number
           session_id?: number
-          subskills?: Json | null
-          vocabulary?: number | null
+          student_id?: string
+          subskills?: Json
+          teacher_id?: string
+          updated_at?: string
+          vocabulary?: number
         }
         Relationships: [
           {
             foreignKeyName: "performance_ratings_session_id_fkey"
             columns: ["session_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "performance_ratings_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "app_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "performance_ratings_teacher_id_fkey"
+            columns: ["teacher_id"]
+            isOneToOne: false
+            referencedRelation: "app_users"
             referencedColumns: ["id"]
           },
         ]
