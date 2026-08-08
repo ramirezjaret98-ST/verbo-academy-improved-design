@@ -68,3 +68,12 @@ export function uuidToLegacySync(uuid: string): string {
 export function hydrateUserIdBridge(): Promise<void> {
   return hydrate();
 }
+
+/** Forces the next `legacyToUuid`/`uuidToLegacy`/`hydrateUserIdBridge` call to
+ *  re-fetch from Supabase instead of serving the stale in-memory cache — call
+ *  this right after creating a brand-new real account (e.g. via the
+ *  `admin-create-user` Edge Function) so the newly-linked `legacy_id` is
+ *  resolvable immediately instead of only after a full page reload. */
+export function invalidateUserIdBridge(): void {
+  hydrated = false;
+}
