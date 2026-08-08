@@ -8,51 +8,119 @@
 // month key (stable across renders). The CURRENT (in-progress) month always
 // uses the real base composite / refusal count fed in by the caller.
 // ============================================================================
+import { supabase } from "@/integrations/supabase/client";
 import { type User } from "./mock-data";
 import { loadSessions } from "./sessions-store";
 import { latestOverride } from "./teacher-kpi-overrides-store";
 import { getBonusThreshold } from "./teacher-kpis-threshold";
+import { legacyToUuid, uuidToLegacySync, hydrateUserIdBridge } from "./user-id-bridge";
 
 // ----- Real monthly snapshot persistence -----------------------------------
 // Stores the last known REAL baseComposite / refusals per teacher+month, so
 // that once the "current month" rolls over, historical months keep their real
 // values instead of falling back to the deterministic mock.
-const REAL_SNAPSHOT_KEY = "verbo.teacher-kpi.real-monthly-snapshots.v1";
+//
+// Backed by Supabase (`public.teacher_kpi_monthly_snapshots`). Reads are
+// served from a module-level in-memory cache kept in sync via Postgres
+// Realtime, so `getRealSnapshot()` stays synchronous for the render-time
+// call sites below. `saveRealSnapshot()` updates the cache optimistically
+// and upserts the row in the background. RLS scopes rows to admins + the
+// teacher's own rows, matching what each caller is allowed to see.
 interface RealMonthlySnapshot {
   baseComposite?: number;
   refusals?: number;
 }
-type RealSnapshotMap = Record<string, Record<string, RealMonthlySnapshot>>; // teacherId -> monthKey -> snapshot
 
-function loadRealSnapshots(): RealSnapshotMap {
-  if (typeof window === "undefined") return {};
-  try {
-    const raw = window.localStorage.getItem(REAL_SNAPSHOT_KEY);
-    return raw ? (JSON.parse(raw) as RealSnapshotMap) : {};
-  } catch {
-    return {};
-  }
+function snapshotKey(teacherId: string, monthKey: string): string {
+  return `${teacherId}:${monthKey}`;
 }
-function persistRealSnapshots(map: RealSnapshotMap): void {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(REAL_SNAPSHOT_KEY, JSON.stringify(map));
-  } catch {
-    /* ignore quota / access errors */
-  }
+
+/** `${teacherLegacyId}:${monthKey}` -> snapshot */
+let snapshotCache = new Map<string, RealMonthlySnapshot>();
+let hydrated = false;
+let hydratePromise: Promise<void> | null = null;
+
+async function hydrate(): Promise<void> {
+  if (hydrated) return;
+  if (hydratePromise) return hydratePromise;
+  hydratePromise = (async () => {
+    // Warm the user-id bridge first so `uuidToLegacySync` below resolves.
+    await hydrateUserIdBridge();
+    const { data, error } = await supabase
+      .from("teacher_kpi_monthly_snapshots")
+      .select("teacher_id, month_key, base_composite, refusals");
+    if (error) {
+      console.error(
+        "[teacher-kpi-history-store] failed to load teacher_kpi_monthly_snapshots",
+        error,
+      );
+      hydratePromise = null;
+      return;
+    }
+    const next = new Map<string, RealMonthlySnapshot>();
+    for (const row of data ?? []) {
+      const snapshot: RealMonthlySnapshot = {};
+      if (typeof row.base_composite === "number") snapshot.baseComposite = row.base_composite;
+      if (typeof row.refusals === "number") snapshot.refusals = row.refusals;
+      next.set(snapshotKey(uuidToLegacySync(row.teacher_id), row.month_key), snapshot);
+    }
+    snapshotCache = next;
+    hydrated = true;
+  })();
+  return hydratePromise;
 }
+
+let realtimeStarted = false;
+function ensureRealtime() {
+  if (realtimeStarted || typeof window === "undefined") return;
+  realtimeStarted = true;
+  supabase
+    .channel("teacher-kpi-snapshots-changes")
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "teacher_kpi_monthly_snapshots" },
+      () => {
+        hydrated = false;
+        hydratePromise = null;
+        void hydrate();
+      },
+    )
+    .subscribe();
+}
+
+if (typeof window !== "undefined") {
+  // Kick off hydration eagerly — `getRealSnapshot()` is called synchronously
+  // inside the monthly snapshot / refusal computations below, so the cache
+  // needs to be warm as early as possible.
+  void hydrate();
+  ensureRealtime();
+}
+
 function getRealSnapshot(teacherId: string, monthKey: string): RealMonthlySnapshot | undefined {
-  return loadRealSnapshots()[teacherId]?.[monthKey];
+  return snapshotCache.get(snapshotKey(teacherId, monthKey));
 }
 function saveRealSnapshot(teacherId: string, monthKey: string, patch: RealMonthlySnapshot): void {
-  const map = loadRealSnapshots();
-  const forTeacher = map[teacherId] ?? {};
-  const prev = forTeacher[monthKey] ?? {};
+  const prev = snapshotCache.get(snapshotKey(teacherId, monthKey)) ?? {};
   const next: RealMonthlySnapshot = { ...prev, ...patch };
   if (next.baseComposite === prev.baseComposite && next.refusals === prev.refusals) return;
-  forTeacher[monthKey] = next;
-  map[teacherId] = forTeacher;
-  persistRealSnapshots(map);
+  // Optimistic: update the cache immediately, persist in the background.
+  snapshotCache.set(snapshotKey(teacherId, monthKey), next);
+  void (async () => {
+    const teacherUuid = await legacyToUuid(teacherId);
+    if (!teacherUuid) return; // no real account linked yet — cache-only, nothing to persist
+    const { error } = await supabase.from("teacher_kpi_monthly_snapshots").upsert(
+      {
+        teacher_id: teacherUuid,
+        month_key: monthKey,
+        base_composite: next.baseComposite ?? null,
+        refusals: next.refusals ?? null,
+      },
+      { onConflict: "teacher_id,month_key" },
+    );
+    if (error) {
+      console.error("[teacher-kpi-history-store] failed to persist monthly snapshot", error);
+    }
+  })();
 }
 
 // ----- Month-key helpers ----------------------------------------------------
