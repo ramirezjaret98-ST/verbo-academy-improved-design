@@ -21,6 +21,7 @@ import { subscribeSessions, getSessionsSnapshot, getServerSessionsSnapshot, subm
 import {
   getPerformanceSnapshot,
   getServerPerformanceSnapshot,
+  performanceKey,
   subscribePerformance,
   type PerformanceRating,
 } from "@/lib/performance-store";
@@ -1293,7 +1294,7 @@ function StudentDashboard() {
             const teacher = userById(s.teacher_id);
             const plan: LessonPlan | undefined = getLessonPlan(s.id);
             void plansRev; // re-render on lesson plan updates
-            const rating = performance[s.id];
+            const rating = performance[performanceKey(s.id, user.id)];
             const isAbsent = s.status === "absent";
             const cause = s.absent_cause;
             const absentMsg = cause === "student"

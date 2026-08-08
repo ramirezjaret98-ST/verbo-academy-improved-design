@@ -496,7 +496,7 @@ function TeacherDashboard() {
       if (attendance !== "absent") markTailoredUnitDone(plan.tailored_unit_id, sessionId);
       else clearTailoredUnitDoneForSession(sessionId);
     }
-    if (attendance !== "absent") savePerformance(sessionId, perf);
+    if (attendance !== "absent") savePerformance(sessionId, session?.student_id ?? "", user.id, perf);
     setEditing(null);
   };
 
