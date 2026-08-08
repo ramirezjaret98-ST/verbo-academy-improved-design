@@ -1,7 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { Card, GhostButton, PrimaryButton, Pill, AccentModal, AccentModalFooter } from "@/components/verbo/ui";
-import { Plus, Trash2, X, Pencil, Link2, Lock, Zap, Package, Gift, Sparkles } from "lucide-react";
+import { Plus, Trash2, X, Pencil, Link2, Lock, Zap, Package, Gift, Sparkles, Upload } from "lucide-react";
+import { uploadContentFile } from "@/lib/content-uploads";
 import {
   type FlashChallenge,
   type FlashProductId,
@@ -349,6 +350,17 @@ function FlashModal({
   const [videoUrl, setVideoUrl] = useState(editing?.video_url ?? "");
   const [premium, setPremium] = useState<boolean>(editing?.premium ?? false);
   const [videoSource, setVideoSource] = useState<"url" | "upload">("url");
+  const [videoUploading, setVideoUploading] = useState(false);
+  const [videoUploadError, setVideoUploadError] = useState("");
+  const handleVideoFile = async (file?: File) => {
+    if (!file) return;
+    setVideoUploading(true);
+    setVideoUploadError("");
+    const res = await uploadContentFile(file, "flash-video");
+    setVideoUploading(false);
+    if (!res.ok) { setVideoUploadError(res.error); return; }
+    setVideoUrl(res.url);
+  };
   const [iconImageUrl, setIconImageUrl] = useState(editing?.icon_image_url ?? "");
   const [iconError, setIconError] = useState("");
   const [applyAllProducts, setApplyAllProducts] = useState(false);
@@ -546,17 +558,23 @@ function FlashModal({
               </button>
               <button
                 type="button"
-                disabled
-                title="Coming soon"
-                className="flex cursor-not-allowed items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-secondary/40 px-3 py-2 text-sm font-medium text-muted-foreground opacity-70"
+                onClick={() => setVideoSource("upload")}
+                className={`flex items-center justify-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${videoSource === "upload" ? "border-accent bg-accent/10 text-foreground" : "border-border bg-background text-muted-foreground hover:bg-secondary"}`}
               >
-                <Lock className="h-4 w-4" /> Upload File
+                <Upload className="h-4 w-4" /> Upload File
               </button>
             </div>
             {videoSource === "url" ? (
               <input value={videoUrl} onChange={(e) => setVideoUrl(e.target.value)} className={`${inputCls} mt-2`} placeholder="https://youtube.com/watch?v=..." />
             ) : (
-              <div className="mt-2 rounded-lg border border-dashed border-border bg-secondary/40 px-3 py-3 text-xs text-muted-foreground">Coming soon</div>
+              <div className="mt-2 space-y-1.5">
+                <label className="flex h-16 w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-secondary/40 text-sm text-muted-foreground transition-colors hover:bg-secondary">
+                  <Upload className="h-4 w-4" />
+                  {videoUploading ? "Uploading…" : videoUrl || "Click to upload a video"}
+                  <input type="file" accept="video/*" className="sr-only" disabled={videoUploading} onChange={(e) => handleVideoFile(e.target.files?.[0])} />
+                </label>
+                {videoUploadError && <p className="text-xs text-destructive">{videoUploadError}</p>}
+              </div>
             )}
           </Field>
 
@@ -592,7 +610,7 @@ function FlashModal({
         </div>
       <AccentModalFooter accent="#5fca16">
         <GhostButton onClick={onClose}>Cancel</GhostButton>
-        <PrimaryButton accentColor="#5fca16" disabled={!title.trim()} onClick={handleSave}>{isEdit ? "Save Changes" : "Create Challenge"}</PrimaryButton>
+        <PrimaryButton accentColor="#5fca16" disabled={!title.trim() || videoUploading} onClick={handleSave}>{isEdit ? "Save Changes" : "Create Challenge"}</PrimaryButton>
       </AccentModalFooter>
     </AccentModal>
   );

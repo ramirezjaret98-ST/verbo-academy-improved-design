@@ -8,6 +8,7 @@ import {
   subscribeVipUnits, subscribeVipUnitCompletion, vipUnitDoneMap, type VipUnit,
 } from "@/lib/vip-courses-store";
 import { loadSessions, subscribeSessions } from "@/lib/sessions-store";
+import { uploadContentFile } from "@/lib/content-uploads";
 import { loadLessonPlans, subscribeLessonPlans } from "@/lib/lesson-plans-store";
 import {
   ActivityModal, BulkUploadUnitsModal, Field, ModalFooter, ModalShell, inputCls,
@@ -312,6 +313,20 @@ function VipUnitModal({ editingUnit, onClose, onCreate, onUpdate }: {
   const [title, setTitle] = useState(isEdit ? editingUnit!.title : "");
   const [fileUrl, setFileUrl] = useState(isEdit ? editingUnit!.file_url : "");
   const [fileName, setFileName] = useState(isEdit ? (editingUnit!.file_name ?? "") : "");
+  const [source, setSource] = useState<"url" | "upload">("url");
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState("");
+
+  const handleFile = async (file?: File) => {
+    if (!file) return;
+    setUploading(true);
+    setUploadError("");
+    const res = await uploadContentFile(file, "vip-units");
+    setUploading(false);
+    if (!res.ok) { setUploadError(res.error); return; }
+    setFileUrl(res.url);
+    setFileName(res.fileName);
+  };
 
   const handleSave = () => {
     if (!title.trim()) return;
@@ -335,25 +350,36 @@ function VipUnitModal({ editingUnit, onClose, onCreate, onUpdate }: {
           <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
-              className="flex items-center justify-center gap-2 rounded-lg border border-accent bg-accent/10 px-3 py-2 text-sm font-medium text-foreground"
+              onClick={() => setSource("url")}
+              className={`flex items-center justify-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${source === "url" ? "border-accent bg-accent/10 text-foreground" : "border-border bg-background text-muted-foreground hover:bg-secondary"}`}
             >
               <Link2 className="h-4 w-4" /> File URL
             </button>
             <button
               type="button"
-              disabled
-              title="Available after the Cloud storage migration"
-              className="flex cursor-not-allowed items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-secondary/40 px-3 py-2 text-sm font-medium text-muted-foreground opacity-70"
+              onClick={() => setSource("upload")}
+              className={`flex items-center justify-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${source === "upload" ? "border-accent bg-accent/10 text-foreground" : "border-border bg-background text-muted-foreground hover:bg-secondary"}`}
             >
               <Upload className="h-4 w-4" /> Upload File
             </button>
           </div>
-          <input
-            value={fileUrl}
-            onChange={(e) => setFileUrl(e.target.value)}
-            className={`${inputCls} mt-2`}
-            placeholder="e.g., https://cloud.storage/... or public document link"
-          />
+          {source === "url" ? (
+            <input
+              value={fileUrl}
+              onChange={(e) => setFileUrl(e.target.value)}
+              className={`${inputCls} mt-2`}
+              placeholder="e.g., https://cloud.storage/... or public document link"
+            />
+          ) : (
+            <div className="mt-2 space-y-1.5">
+              <label className="flex h-16 w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-secondary/40 text-sm text-muted-foreground transition-colors hover:bg-secondary">
+                <Upload className="h-4 w-4" />
+                {uploading ? "Uploading…" : fileName || "Click to upload a file"}
+                <input type="file" className="sr-only" disabled={uploading} onChange={(e) => handleFile(e.target.files?.[0])} />
+              </label>
+              {uploadError && <p className="text-xs text-destructive">{uploadError}</p>}
+            </div>
+          )}
         </Field>
 
         <Field label="File Label" hint="Optional. Shown as the download link text.">
@@ -362,7 +388,7 @@ function VipUnitModal({ editingUnit, onClose, onCreate, onUpdate }: {
       </div>
       <ModalFooter>
         <GhostButton onClick={onClose}>Cancel</GhostButton>
-        <PrimaryButton disabled={!title.trim()} onClick={handleSave}>
+        <PrimaryButton disabled={!title.trim() || uploading} onClick={handleSave}>
           {isEdit ? "Save Changes" : "Create Unit"}
         </PrimaryButton>
       </ModalFooter>

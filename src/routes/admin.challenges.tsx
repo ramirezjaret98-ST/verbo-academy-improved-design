@@ -30,6 +30,7 @@ import {
   subscribeBadges,
   newBadgeId,
 } from "@/lib/badges-store";
+import { uploadContentFile } from "@/lib/content-uploads";
 import {
   type Challenge,
   type ChallengeProductId,
@@ -373,6 +374,17 @@ function ChallengeModal({
   const [diff, setDiff] = useState<DifficultyId>(editing?.difficulty ?? difficulty);
   const [videoSource, setVideoSource] = useState<"url" | "upload">("url");
   const [videoUrl, setVideoUrl] = useState(editing?.video_url ?? "");
+  const [videoUploading, setVideoUploading] = useState(false);
+  const [videoUploadError, setVideoUploadError] = useState("");
+  const handleVideoFile = async (file?: File) => {
+    if (!file) return;
+    setVideoUploading(true);
+    setVideoUploadError("");
+    const res = await uploadContentFile(file, "challenge-video");
+    setVideoUploading(false);
+    if (!res.ok) { setVideoUploadError(res.error); return; }
+    setVideoUrl(res.url);
+  };
   const [premium, setPremium] = useState<boolean>(editing?.premium ?? false);
   const [skillTags, setSkillTags] = useState<string[]>(editing?.skill_tags ?? []);
   const SKILL_TAG_OPTIONS: ChallengeSkillTag[] = ["Speaking", "Writing", "Reading", "Listening"];
@@ -508,25 +520,29 @@ function ChallengeModal({
             </button>
             <button
               type="button"
-              disabled
-              title="Available in a future update"
-              className="flex cursor-not-allowed items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-secondary/40 px-3 py-2 text-sm font-medium text-muted-foreground opacity-70"
+              onClick={() => setVideoSource("upload")}
+              className={`flex items-center justify-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${videoSource === "upload" ? "border-accent bg-accent/10 text-foreground" : "border-border bg-background text-muted-foreground hover:bg-secondary"}`}
             >
-              <Lock className="h-4 w-4" /> Upload Video
+              <Upload className="h-4 w-4" /> Upload Video
             </button>
           </div>
           {videoSource === "url" ? (
             <input value={videoUrl} onChange={(e) => setVideoUrl(e.target.value)} className={`${inputCls} mt-2`} placeholder="e.g., https://youtube.com/watch?v=... or vimeo link" />
           ) : (
-            <div className="mt-2 rounded-lg border border-dashed border-border bg-secondary/40 px-3 py-3 text-xs text-muted-foreground">
-              Available in a future update.
+            <div className="mt-2 space-y-1.5">
+              <label className="flex h-16 w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-secondary/40 text-sm text-muted-foreground transition-colors hover:bg-secondary">
+                <Upload className="h-4 w-4" />
+                {videoUploading ? "Uploading…" : videoUrl || "Click to upload a video"}
+                <input type="file" accept="video/*" className="sr-only" disabled={videoUploading} onChange={(e) => handleVideoFile(e.target.files?.[0])} />
+              </label>
+              {videoUploadError && <p className="text-xs text-destructive">{videoUploadError}</p>}
             </div>
           )}
         </Field>
       </div>
       <ModalFooter>
         <GhostButton onClick={onClose}>Cancel</GhostButton>
-        <PrimaryButton disabled={!title.trim()} onClick={handleSave}>{isEdit ? "Save Changes" : "Create Challenge"}</PrimaryButton>
+        <PrimaryButton disabled={!title.trim() || videoUploading} onClick={handleSave}>{isEdit ? "Save Changes" : "Create Challenge"}</PrimaryButton>
       </ModalFooter>
     </ModalShell>
   );
