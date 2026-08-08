@@ -3,10 +3,21 @@
 // Profile modal (Equipped Badges + Achievements Gallery).
 //
 // Same declarative rule engine + persistence pattern as badges-store.ts
-// (Challenge Badges), but with entirely separate storage keys and metrics.
+// (Challenge Badges), but with entirely separate metrics and rows.
 // Do NOT merge this with badges-store.ts — those two systems are intentionally
 // independent.
+//
+// Backed by Supabase (`public.badge_defs`, filtered to `system = 'profile'` —
+// that table is shared with Challenge Badges, distinguished by that column).
+// Reads are served from an in-memory cache kept in sync via Postgres
+// Realtime, so `loadBadges()`/`useBadges()` stay synchronous for existing
+// call sites. Writes (`addBadge`/`updateBadge`/`deleteBadge`) talk to
+// Supabase directly and are therefore async.
 
+import { useSyncExternalStore } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import type { Database } from "@/integrations/supabase/types";
+import { invalidateBadgeIdBridge } from "./badge-id-bridge";
 import type { User } from "./mock-data";
 import { unitPassed, unitPassedByActivities, levelIsComplete } from "./activities-store";
 import { loadCourses } from "./product-courses-store";
@@ -156,7 +167,8 @@ export function buildProfileBadgeContext(user: User): BadgeContext {
         let done = 0;
         for (let m = 0; m < 3; m++) {
           const block = level.units.slice(m * 10, m * 10 + 10);
-          if (block.length === 10 && block.every((u) => unitPassedByActivities(user.id, u.id))) done++;
+          if (block.length === 10 && block.every((u) => unitPassedByActivities(user.id, u.id)))
+            done++;
         }
         missions[li] = done;
       });
@@ -176,89 +188,169 @@ export function buildProfileBadgeContext(user: User): BadgeContext {
   };
 }
 
-/* ---------------- Seed ---------------- */
+/* ---------------- Supabase-backed store ---------------- */
 
-const METALS = ["Bronze", "Silver", "Gold", "Onyx"] as const;
+export const PROFILE_BADGES_EVENT = "verbo:profile-badges-updated";
+/** Back-compat alias — some consumers (e.g. notifications-store.ts) import
+ *  the old unprefixed name. */
+export const BADGES_EVENT = PROFILE_BADGES_EVENT;
 
-const MEDAL_SEED: BadgeDef[] = METALS.flatMap((metal, i) => {
-  const n = i + 1;
-  const metric = `level${n}MissionsCompleted` as BadgeMetric;
-  return [
-    { id: `l${n}-m1`, name: `${metal} — Mission 1`, description: `Completed Mission 1 of Level ${n}.`, image: "", rule: { metric, threshold: 1 } },
-    { id: `l${n}-m2`, name: `${metal} — Mission 2`, description: `Completed Mission 2 of Level ${n}.`, image: "", rule: { metric, threshold: 2 } },
-    { id: `l${n}-m3`, name: `${metal} — Mission 3`, description: `Completed Mission 3 of Level ${n}.`, image: "", rule: { metric, threshold: 3 } },
-    { id: `l${n}-complete`, name: `${metal} — Level Complete`, description: `Completed all 3 Missions of Level ${n}.`, image: "", rule: { metric, threshold: 3 } },
-  ];
-});
+type BadgeRow = Database["public"]["Tables"]["badge_defs"]["Row"];
 
-const BADGES_SEED: BadgeDef[] = [
-  { id: "member",     name: "Verbo Member",       description: "Active for 3+ months.",                image: "", rule: { metric: "tenureMonths",          threshold: 3 } },
-  { id: "veteran",    name: "Verbo Veteran",      description: "Active for 12+ months.",               image: "", rule: { metric: "tenureMonths",          threshold: 12 } },
-  { id: "attendance", name: "Perfect Attendance", description: "95% attendance or higher.",            image: "", rule: { metric: "attendancePercentage",  threshold: 95 } },
-  { id: "first",      name: "First Steps",        description: "Completed your first 10 units.",       image: "", rule: { metric: "unitsCompletedCount",   threshold: 10 } },
-  { id: "explorer",   name: "Explorer",           description: "Completed 50 units.",                  image: "", rule: { metric: "unitsCompletedCount",   threshold: 50 } },
-  { id: "master",     name: "Unit Master",        description: "Completed 150 units.",                 image: "", rule: { metric: "unitsCompletedCount",   threshold: 150 } },
-  { id: "conqueror",  name: "Level Conqueror",    description: "Completed 100% of a level.",           image: "", rule: { metric: "levelsCompletedCount",  threshold: 1 } },
-  { id: "legend",     name: "Level Legend",       description: "Completed 100% of 3 different levels.", image: "", rule: { metric: "levelsCompletedCount",  threshold: 3 } },
-  { id: "streak-3",   name: "3-Day Flame",        description: "3 days in a row logging into Verbo Academy.",   image: "", rule: { metric: "loginStreakDays", threshold: 3 } },
-  { id: "streak-10",  name: "10-Day Flame",       description: "10 days in a row logging into Verbo Academy.",  image: "", rule: { metric: "loginStreakDays", threshold: 10 } },
-  { id: "streak-30",  name: "30-Day Flame",       description: "30 days in a row logging into Verbo Academy.",  image: "", rule: { metric: "loginStreakDays", threshold: 30 } },
-  { id: "streak-60",  name: "60-Day Flame",       description: "60 days in a row logging into Verbo Academy.",  image: "", rule: { metric: "loginStreakDays", threshold: 60 } },
-  { id: "streak-100", name: "100-Day Flame",      description: "100 days in a row logging into Verbo Academy.", image: "", rule: { metric: "loginStreakDays", threshold: 100 } },
-  ...MEDAL_SEED,
-];
-
-/* ---------------- Persistence ---------------- */
-
-export const BADGES_KEY = "verbo:profile-badges";
-export const BADGES_EVENT = "verbo:profile-badges-updated";
-
-function isValidBadge(b: unknown): b is BadgeDef {
-  if (!b || typeof b !== "object") return false;
-  const r = b as Record<string, unknown>;
-  return (
-    typeof r.id === "string" &&
-    typeof r.name === "string" &&
-    typeof r.description === "string" &&
-    typeof r.image === "string" &&
-    !!r.rule &&
-    typeof (r.rule as Record<string, unknown>).metric === "string"
-  );
-}
-
-export function loadBadges(): BadgeDef[] {
-  if (typeof window === "undefined") return BADGES_SEED.slice();
-  try {
-    const raw = localStorage.getItem(BADGES_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0 && parsed.every(isValidBadge)) {
-        return parsed as BadgeDef[];
-      }
-    }
-  } catch { /* noop */ }
-  return BADGES_SEED.slice();
-}
-
-export function persistBadges(list: BadgeDef[]) {
-  if (typeof window === "undefined") return;
-  try {
-    localStorage.setItem(BADGES_KEY, JSON.stringify(list));
-    window.dispatchEvent(new CustomEvent(BADGES_EVENT));
-  } catch { /* noop */ }
-}
-
-export function subscribeBadges(cb: () => void): () => void {
-  if (typeof window === "undefined") return () => {};
-  const onStorage = (e: StorageEvent) => { if (e.key === BADGES_KEY) cb(); };
-  window.addEventListener(BADGES_EVENT, cb);
-  window.addEventListener("storage", onStorage);
-  return () => {
-    window.removeEventListener(BADGES_EVENT, cb);
-    window.removeEventListener("storage", onStorage);
+function fromRow(row: BadgeRow): BadgeDef {
+  const metric = row.metric as BadgeMetric;
+  return {
+    id: row.code,
+    name: row.name,
+    description: row.description ?? "",
+    image: row.image_url ?? "",
+    rule: { metric, threshold: row.threshold != null ? Number(row.threshold) : undefined },
   };
 }
 
+let cache: BadgeDef[] = [];
+let hydrated = false;
+let hydratePromise: Promise<void> | null = null;
+const listeners = new Set<() => void>();
+
+function notify() {
+  listeners.forEach((cb) => cb());
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent(PROFILE_BADGES_EVENT));
+  }
+}
+
+async function hydrate(): Promise<void> {
+  if (hydrated) return;
+  if (hydratePromise) return hydratePromise;
+  hydratePromise = (async () => {
+    const { data, error } = await supabase
+      .from("badge_defs")
+      .select("*")
+      .eq("system", "profile")
+      .order("id");
+    if (error) {
+      console.error("[profile-badges-store] failed to load profile badges", error);
+      hydratePromise = null;
+      return;
+    }
+    cache = (data ?? []).map(fromRow);
+    hydrated = true;
+    notify();
+  })();
+  return hydratePromise;
+}
+
+let realtimeStarted = false;
+function ensureRealtime() {
+  if (realtimeStarted || typeof window === "undefined") return;
+  realtimeStarted = true;
+  supabase
+    .channel("badge-defs-profile-changes")
+    .on("postgres_changes", { event: "*", schema: "public", table: "badge_defs" }, () => {
+      hydrated = false;
+      hydratePromise = null;
+      invalidateBadgeIdBridge();
+      void hydrate();
+    })
+    .subscribe();
+}
+
+if (typeof window !== "undefined") {
+  // Kick off hydration eagerly so plain (non-hook) readers like
+  // `loadBadges()` have data available as soon as possible, without
+  // requiring a component to mount `useBadges()` first.
+  void hydrate();
+  ensureRealtime();
+}
+
+/** Synchronous snapshot of the current in-memory cache. May be empty
+ * (or stale) until the initial Supabase fetch resolves. */
+export function loadBadges(): BadgeDef[] {
+  return cache;
+}
+
+function getSnapshot(): BadgeDef[] {
+  return cache;
+}
+
+export async function addBadge(badge: BadgeDef): Promise<BadgeDef> {
+  const { data, error } = await supabase
+    .from("badge_defs")
+    .insert({
+      system: "profile",
+      code: badge.id,
+      name: badge.name,
+      description: badge.description,
+      image_url: badge.image,
+      metric: badge.rule.metric,
+      threshold: badge.rule.threshold ?? null,
+    })
+    .select()
+    .single();
+  if (error || !data) {
+    throw error ?? new Error("Failed to add badge");
+  }
+  const created = fromRow(data);
+  cache = [...cache, created];
+  invalidateBadgeIdBridge();
+  notify();
+  return created;
+}
+
+export async function updateBadge(badge: BadgeDef): Promise<BadgeDef> {
+  const { data, error } = await supabase
+    .from("badge_defs")
+    .update({
+      name: badge.name,
+      description: badge.description,
+      image_url: badge.image,
+      metric: badge.rule.metric,
+      threshold: badge.rule.threshold ?? null,
+    })
+    .eq("system", "profile")
+    .eq("code", badge.id)
+    .select()
+    .single();
+  if (error || !data) {
+    throw error ?? new Error("Failed to update badge");
+  }
+  const updated = fromRow(data);
+  cache = cache.map((b) => (b.id === updated.id ? updated : b));
+  notify();
+  return updated;
+}
+
+export async function deleteBadge(id: string): Promise<void> {
+  const { error } = await supabase
+    .from("badge_defs")
+    .delete()
+    .eq("system", "profile")
+    .eq("code", id);
+  if (error) {
+    throw error;
+  }
+  cache = cache.filter((b) => b.id !== id);
+  invalidateBadgeIdBridge();
+  notify();
+}
+
+export function subscribeBadges(cb: () => void): () => void {
+  listeners.add(cb);
+  void hydrate();
+  ensureRealtime();
+  return () => {
+    listeners.delete(cb);
+  };
+}
+
+export function useBadges(): BadgeDef[] {
+  return useSyncExternalStore(subscribeBadges, getSnapshot, () => []);
+}
+
+/** Pure helper: pick a fresh `pbadge-N` id that isn't already taken. Used by
+ *  the admin modal to preview/assign an id for a brand-new badge before it's
+ *  saved — the actual insert uses this as `code`. */
 export function newBadgeId(existing: BadgeDef[]): string {
   const taken = new Set(existing.map((b) => b.id));
   let i = existing.length + 1;
