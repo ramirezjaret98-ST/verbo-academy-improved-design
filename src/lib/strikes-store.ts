@@ -10,7 +10,15 @@
 // This module also owns the "Can't Attend" cancel action so that
 // sessions-store stays free of strike / freeze knowledge and no circular
 // imports appear.
-// ============================================================================
+//
+// Backed by Supabase (`public.teacher_strikes`). Reads are served from an
+// in-memory cache kept in sync via Postgres Realtime, so `loadStrikes()` /
+// `activeStrikeCount()` stay synchronous for the render-time call sites.
+// RLS scopes rows to self-or-admin, so a plain hydrate-once + Realtime
+// pattern is enough here. Mutations write optimistically to the cache and
+// persist in the background.
+import { supabase } from "@/integrations/supabase/client";
+import { legacyToUuid, uuidToLegacySync, hydrateUserIdBridge } from "./user-id-bridge";
 import { USERS } from "./mock-data";
 import { loadSessions, updateSession, type ExtSession } from "./sessions-store";
 import { patchTeacherProfile } from "./teacher-model";
@@ -36,32 +44,91 @@ export interface Strike {
   justified_at?: string;
 }
 
-export const STRIKES_KEY = "verbo:teacher-strikes";
 export const STRIKES_EVENT = "verbo:teacher-strikes-updated";
 export const SIX_MONTHS_MS = 180 * 24 * 60 * 60 * 1000;
 
-export function loadStrikes(): Strike[] {
-  if (typeof window === "undefined") return [];
-  try { return JSON.parse(localStorage.getItem(STRIKES_KEY) || "[]") as Strike[]; }
-  catch { return []; }
+let cache: Strike[] = [];
+let hydrated = false;
+let hydratePromise: Promise<void> | null = null;
+const listeners = new Set<() => void>();
+
+function notify() {
+  listeners.forEach((cb) => cb());
+  if (typeof window !== "undefined") {
+    // notifications-store.ts and activity-logs-store.ts listen for this
+    // window event directly (bypassing `subscribeStrikes`), so it must keep
+    // firing on every mutation and cache refresh.
+    window.dispatchEvent(new CustomEvent(STRIKES_EVENT));
+  }
 }
 
-export function persistStrikes(list: Strike[]) {
-  if (typeof window === "undefined") return;
-  try {
-    localStorage.setItem(STRIKES_KEY, JSON.stringify(list));
-    window.dispatchEvent(new CustomEvent(STRIKES_EVENT));
-  } catch { /* noop */ }
+async function hydrate(): Promise<void> {
+  if (hydrated) return;
+  if (hydratePromise) return hydratePromise;
+  hydratePromise = (async () => {
+    // Warm the user-id bridge first so `uuidToLegacySync` below resolves.
+    await hydrateUserIdBridge();
+    const { data, error } = await supabase
+      .from("teacher_strikes")
+      .select("*")
+      .order("created_at", { ascending: false });
+    if (error) {
+      console.error("[strikes-store] failed to load teacher_strikes", error);
+      hydratePromise = null;
+      return;
+    }
+    cache = (data ?? []).map((row) => ({
+      id: row.id,
+      teacher_id: uuidToLegacySync(row.teacher_id),
+      session_id: row.session_id != null ? String(row.session_id) : "",
+      reason: row.reason as CancelReason,
+      note: row.note ?? undefined,
+      medical_note_name: row.medical_note_name ?? undefined,
+      created_at: row.created_at,
+      needs_substitute: row.needs_substitute ?? undefined,
+      substitute_found: row.substitute_found ?? undefined,
+      justified: row.justified,
+      justification_cause: (row.justification_cause as JustificationCause) ?? undefined,
+      justified_at: row.justified_at ?? undefined,
+    }));
+    hydrated = true;
+    notify();
+  })();
+  return hydratePromise;
+}
+
+let realtimeStarted = false;
+function ensureRealtime() {
+  if (realtimeStarted || typeof window === "undefined") return;
+  realtimeStarted = true;
+  supabase
+    .channel("teacher-strikes-changes")
+    .on("postgres_changes", { event: "*", schema: "public", table: "teacher_strikes" }, () => {
+      hydrated = false;
+      hydratePromise = null;
+      void hydrate();
+    })
+    .subscribe();
+}
+
+if (typeof window !== "undefined") {
+  // Kick off hydration eagerly — `activeStrikeCount()` is called
+  // synchronously inside render logic and KPI computations, so the cache
+  // needs to be warm as early as possible.
+  void hydrate();
+  ensureRealtime();
+}
+
+export function loadStrikes(): Strike[] {
+  return cache;
 }
 
 export function subscribeStrikes(cb: () => void): () => void {
-  if (typeof window === "undefined") return () => {};
-  const onStorage = (e: StorageEvent) => { if (e.key === STRIKES_KEY) cb(); };
-  window.addEventListener(STRIKES_EVENT, cb);
-  window.addEventListener("storage", onStorage);
+  listeners.add(cb);
+  void hydrate();
+  ensureRealtime();
   return () => {
-    window.removeEventListener(STRIKES_EVENT, cb);
-    window.removeEventListener("storage", onStorage);
+    listeners.delete(cb);
   };
 }
 
@@ -95,7 +162,10 @@ function autoFreezeIfNeeded(teacherId: string) {
   if ((u.teacher_status ?? "active") === "frozen") return;
   // Also stamp tier_frozen_since so the tier clock pauses — the manual admin
   // freeze flow already did this; the auto-freeze path historically didn't.
-  patchTeacherProfile(teacherId, { teacher_status: "frozen", tier_frozen_since: new Date().toISOString() });
+  patchTeacherProfile(teacherId, {
+    teacher_status: "frozen",
+    tier_frozen_since: new Date().toISOString(),
+  });
 }
 
 /** Full "Can't Attend" cancellation action for Performance Sessions.
@@ -136,24 +206,72 @@ export function cancelSessionByTeacher(input: {
     created_at: new Date(now).toISOString(),
     needs_substitute: needsSubstitute,
   };
-  persistStrikes([strike, ...loadStrikes()]);
+  // Optimistic: prepend to the cache + notify BEFORE the freeze check, so
+  // `activeStrikeCount` inside `autoFreezeIfNeeded` already counts this
+  // strike — the 3rd-strike auto-freeze must trigger on the SAME
+  // cancellation that crosses the threshold.
+  cache = [strike, ...cache];
+  notify();
   autoFreezeIfNeeded(input.teacherId);
+
+  void (async () => {
+    const teacherUuid = await legacyToUuid(input.teacherId);
+    if (!teacherUuid) {
+      console.error("[strikes-store] cannot persist strike — unresolved teacher id", {
+        teacherId: input.teacherId,
+        strikeId: strike.id,
+      });
+      return;
+    }
+    const { error } = await supabase.from("teacher_strikes").insert({
+      id: strike.id,
+      teacher_id: teacherUuid,
+      session_id: input.sessionId ? Number(input.sessionId) : null,
+      reason: strike.reason,
+      note: strike.note ?? null,
+      medical_note_name: strike.medical_note_name ?? null,
+      created_at: strike.created_at,
+      needs_substitute: strike.needs_substitute ?? null,
+    });
+    if (error) {
+      console.error("[strikes-store] failed to persist strike", error);
+    }
+  })();
 
   return { strike, session: target, needsSubstitute };
 }
 
 export function justifyStrike(strikeId: string, cause: JustificationCause) {
-  const next = loadStrikes().map((s) =>
+  const justifiedAt = new Date().toISOString();
+  cache = cache.map((s) =>
     s.id === strikeId
-      ? { ...s, justified: true, justification_cause: cause, justified_at: new Date().toISOString() }
+      ? { ...s, justified: true, justification_cause: cause, justified_at: justifiedAt }
       : s,
   );
-  persistStrikes(next);
+  notify();
+  void (async () => {
+    const { error } = await supabase
+      .from("teacher_strikes")
+      .update({ justified: true, justification_cause: cause, justified_at: justifiedAt })
+      .eq("id", strikeId);
+    if (error) {
+      console.error("[strikes-store] failed to persist strike justification", error);
+    }
+  })();
 }
 
 export function markSubstituteFound(strikeId: string, found: boolean) {
-  const next = loadStrikes().map((s) => (s.id === strikeId ? { ...s, substitute_found: found } : s));
-  persistStrikes(next);
+  cache = cache.map((s) => (s.id === strikeId ? { ...s, substitute_found: found } : s));
+  notify();
+  void (async () => {
+    const { error } = await supabase
+      .from("teacher_strikes")
+      .update({ substitute_found: found })
+      .eq("id", strikeId);
+    if (error) {
+      console.error("[strikes-store] failed to persist substitute flag", error);
+    }
+  })();
 }
 
 export const CANCEL_REASON_LABEL: Record<CancelReason, string> = {
