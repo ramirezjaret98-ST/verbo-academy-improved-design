@@ -2,7 +2,8 @@
 // Teacher commercial/operational model — single source of truth for the
 // Admin > Teachers UI. Mirrors the shape of student-model.ts.
 // ============================================================================
-import { USERS, ASSIGNMENTS, SESSIONS, userById, type User, type Session } from "./mock-data";
+import { USERS, SESSIONS, userById, type User, type Session } from "./mock-data";
+import { assignedStudentIdsFor } from "./assignments-store";
 import { PRODUCTS, type ProductId } from "./student-model";
 import { effectiveHourlyRate, teacherTier } from "./teacher-tiers";
 import { supabase } from "@/integrations/supabase/client";
@@ -87,7 +88,7 @@ export function qualifiedProducts(t: User): QualifiedProduct[] {
 // Assignment helpers
 // ----------------------------------------------------------------------------
 export function assignedStudents(teacherId: string): User[] {
-  const ids = ASSIGNMENTS.filter((a) => a.teacher_id === teacherId).map((a) => a.student_id);
+  const ids = assignedStudentIdsFor(teacherId);
   return USERS.filter((u) => u.role === "student" && ids.includes(u.id));
 }
 

@@ -1,4 +1,6 @@
 // Mock database — replace with Lovable Cloud later.
+import { assignedStudentIdsFor } from "./assignments-store";
+
 export type Role = "student" | "teacher" | "admin";
 export type AdminType = "super_admin" | "coordinator_ops" | "coordinator_fin";
 
@@ -218,12 +220,13 @@ export const USERS: User[] = [
   { id: "u6", name: "Yuki Tanaka", email: "yuki@student.com", password: "", role: "student", current_level: "B2", attendance_percentage: 88, company: "Rakuten", hired_plan: "Core", member_since: "2024-11-20", hired_sessions: 120, remaining_sessions: 82, product: "go", focus: "Global Experience", access_plan: "Core", contracted_levels: ["Kickstart", "Everyday Flow", "Confident Voice", "Culture Master"], current_roadmap_level: "Everyday Flow", sessions_per_week: 2, session_duration: 60, reschedule_policy: "24h notice, max 25% of monthly sessions", payment_day: 20, cycle_start: "2024-11-20", video_call_link: "https://teams.microsoft.com/l/meetup-join/yuki", status: "active", insights_strikes: 0, sessions_auto: true },
 ];
 
-// Assignments: teacher -> students
-export const ASSIGNMENTS: { teacher_id: string; student_id: string }[] = [
-  { teacher_id: "u2", student_id: "u4" },
-  { teacher_id: "u2", student_id: "u5" },
-  { teacher_id: "u3", student_id: "u6" },
-];
+// Teacher <-> student assignments used to live here as a hardcoded,
+// never-persisted array (`ASSIGNMENTS`). Moved to `assignments-store.ts`
+// (backed by the real `public.assignments` Supabase table) on 2026-08-08 —
+// see that file for why: the old array reset on every page load and was
+// never shared between browsers/devices, so any student an admin assigned
+// to a teacher after the initial 3 seed rows was invisible to that teacher
+// anywhere but the admin's own tab.
 
 const now = new Date();
 const inMinutes = (m: number) => new Date(now.getTime() + m * 60_000).toISOString();
@@ -283,6 +286,6 @@ export function userById(id: string) {
 }
 
 export function studentsOfTeacher(teacherId: string) {
-  const ids = ASSIGNMENTS.filter((a) => a.teacher_id === teacherId).map((a) => a.student_id);
+  const ids = assignedStudentIdsFor(teacherId);
   return USERS.filter((u) => ids.includes(u.id));
 }

@@ -33,7 +33,7 @@ import {
 import {
   loadContentIssueReports, CONTENT_ISSUE_EVENT,
 } from "./content-issue-reports-store";
-import { ASSIGNMENTS } from "./mock-data";
+import { assignedStudentIdsFor } from "./assignments-store";
 import { loadChallenges, CHALLENGES_EVENT } from "./challenges-store";
 import { STUDENTS_EVENT } from "./students-store";
 import {
@@ -366,9 +366,9 @@ function teacherNotifications(teacherId: string): Notification[] {
   }
 
   // ---- Students on this teacher's roster picked a Challenge --------------
-  // Reuses the ASSIGNMENTS table (same source used by session_assigned) —
+  // Reuses the assignments table (same source used by session_assigned) —
   // no new "assigned teacher" field needed.
-  const roster = ASSIGNMENTS.filter((a) => a.teacher_id === teacherId).map((a) => a.student_id);
+  const roster = assignedStudentIdsFor(teacherId);
   if (roster.length > 0) {
     const challengeById = new Map(loadChallenges().map((c) => [c.id, c]));
     for (const sid of roster) {

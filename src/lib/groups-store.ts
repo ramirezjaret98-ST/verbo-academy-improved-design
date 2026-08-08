@@ -7,7 +7,8 @@
 // Persisted to localStorage and broadcast across tabs, mirroring the
 // sessions-store / clubs-store convention. Swap for Lovable Cloud later.
 
-import { USERS, ASSIGNMENTS, type User } from "./mock-data";
+import { USERS, type User } from "./mock-data";
+import { removeAssignment, setAssignment } from "./assignments-store";
 import { nextPaymentDateAfterToday, type ProductId, type AccessPlanId } from "./student-model";
 import { logPayment, expectedAmountForGroup } from "./payments-log";
 import { patchStudentProfile, type StudentProfileFields } from "./students-store";
@@ -239,13 +240,8 @@ function propagateGroupToMembers(before: Group, after: Group) {
     }
 
     if (teacherChanged) {
-      const idx = ASSIGNMENTS.findIndex((a) => a.student_id === sid);
-      if (after.teacher_id) {
-        if (idx >= 0) ASSIGNMENTS[idx].teacher_id = after.teacher_id;
-        else ASSIGNMENTS.push({ teacher_id: after.teacher_id, student_id: sid });
-      } else if (idx >= 0) {
-        ASSIGNMENTS.splice(idx, 1);
-      }
+      if (after.teacher_id) setAssignment(sid, after.teacher_id);
+      else removeAssignment(sid);
     }
   }
 }
@@ -286,12 +282,8 @@ export function addMember(groupId: string, member: {
   // active membership.
   const next = loadGroupMembers().filter((x) => x.student_id !== member.student_id);
   persistMembers([...next, m]);
-  // Ensure ASSIGNMENTS reflects the group's teacher.
-  if (g.teacher_id) {
-    const existingAssign = ASSIGNMENTS.find((a) => a.student_id === member.student_id);
-    if (existingAssign) existingAssign.teacher_id = g.teacher_id;
-    else ASSIGNMENTS.push({ teacher_id: g.teacher_id, student_id: member.student_id });
-  }
+  // Ensure the assignments store reflects the group's teacher.
+  if (g.teacher_id) setAssignment(member.student_id, g.teacher_id);
   return m;
 }
 
@@ -358,11 +350,7 @@ export function moveMember(studentId: string, targetGroupId: string): { ok: bool
   );
   persistMembers(next);
   // Reassign teacher to target group's teacher.
-  if (target.teacher_id) {
-    const existingAssign = ASSIGNMENTS.find((a) => a.student_id === studentId);
-    if (existingAssign) existingAssign.teacher_id = target.teacher_id;
-    else ASSIGNMENTS.push({ teacher_id: target.teacher_id, student_id: studentId });
-  }
+  if (target.teacher_id) setAssignment(studentId, target.teacher_id);
   return { ok: true };
 }
 
