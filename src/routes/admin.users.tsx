@@ -1,6 +1,6 @@
 import { createFileRoute, Navigate, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { UserPlus, Pencil, X, ShieldCheck, ShieldAlert, Eye, EyeOff } from "lucide-react";
+import { UserPlus, Pencil, X, ShieldCheck, ShieldAlert } from "lucide-react";
 import { USERS, type User, type AdminType } from "@/lib/mock-data";
 import { Card, SectionTitle, PrimaryButton, GhostButton, Pill } from "@/components/verbo/ui";
 import { useAuth } from "@/lib/auth";
@@ -153,29 +153,25 @@ function CreateUserModal({ onClose }: { onClose: () => void }) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
   // Single unified "Role" field for internal users:
   //   "super_admin"  → Super Admin
   //   "coordinator"  → Coordinator (requires a type below)
   const [uiRole, setUiRole] = useState<"super_admin" | "coordinator">("super_admin");
   const [coordType, setCoordType] = useState<"operations" | "financial" | "">("");
-  const [submitting, setSubmitting] = useState(false);
 
   const canSubmit =
-    name.trim() && email.trim() && password.length >= 6 &&
+    name.trim() && email.trim() && password.length >= 4 &&
     (uiRole === "super_admin" || (uiRole === "coordinator" && coordType !== ""));
 
-  const submit = async () => {
-    if (!canSubmit || submitting) return;
-    setSubmitting(true);
+  const submit = () => {
+    if (!canSubmit) return;
     const finalAdminType: AdminType =
       uiRole === "super_admin"
         ? "super_admin"
         : coordType === "operations" ? "coordinator_ops" : "coordinator_fin";
-    const res = await createInternalUser({
+    const res = createInternalUser({
       name, email, password, role: "admin", admin_type: finalAdminType,
     });
-    setSubmitting(false);
     if (!res.ok) { toast.error(res.error); return; }
     toast.success("User created.");
     onClose();
@@ -202,15 +198,8 @@ function CreateUserModal({ onClose }: { onClose: () => void }) {
             </div>
             <div>
               <label className="block text-xs font-medium text-muted-foreground">Password</label>
-              <div className="relative mt-1">
-                <input value={password} onChange={(e) => setPassword(e.target.value)} type={showPassword ? "text" : "password"}
-                  className="w-full rounded-md border border-border bg-background px-3 py-2 pr-9 text-sm" />
-                <button type="button" onClick={() => setShowPassword((v) => !v)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground hover:text-foreground" aria-label="Toggle password">
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
-              </div>
-              <p className="mt-1 text-xs text-muted-foreground">At least 6 characters.</p>
+              <input value={password} onChange={(e) => setPassword(e.target.value)} type="text"
+                className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm" />
             </div>
           </div>
 
@@ -249,10 +238,8 @@ function CreateUserModal({ onClose }: { onClose: () => void }) {
           )}
         </div>
         <div className="flex justify-end gap-2 border-t border-border px-5 py-3">
-          <GhostButton onClick={onClose} disabled={submitting}>Cancel</GhostButton>
-          <PrimaryButton onClick={submit} disabled={!canSubmit || submitting}>
-            {submitting ? "Creating…" : "Create user"}
-          </PrimaryButton>
+          <GhostButton onClick={onClose}>Cancel</GhostButton>
+          <PrimaryButton onClick={submit} disabled={!canSubmit}>Create user</PrimaryButton>
         </div>
       </div>
     </div>

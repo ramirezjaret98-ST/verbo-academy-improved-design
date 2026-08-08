@@ -18,7 +18,7 @@ import { useSyncExternalStore } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 import { hydrateUserIdBridge, legacyToUuid, uuidToLegacySync } from "@/lib/user-id-bridge";
-import { loadClubs, type Club, type ClubType } from "./clubs-store";
+import { loadClubs, updateClub, type Club, type ClubType } from "./clubs-store";
 import { groupsByStudentId } from "./groups-store";
 import { userById } from "./mock-data";
 import type { AccessPlanId } from "./student-model";
@@ -274,19 +274,15 @@ export async function reserveSeat(studentId: string, clubId: string): Promise<{ 
     .single();
   if (error || !data) {
     console.error("[club-bookings-store] failed to reserve seat", error);
-    // A `club_bookings_before_insert` trigger re-validates capacity/cutoff/
-    // status server-side and raises a human-readable message when it blocks
-    // the insert (belt-and-suspenders against the client-side check above
-    // going stale under concurrent reservations) — surface it when present.
-    return { ok: false, reason: error?.message || "Something went wrong. Try again." };
+    return { ok: false, reason: "Something went wrong. Try again." };
   }
   const booking = mapRow(data);
   cache = [booking, ...cache];
   notify();
-  // spots_taken is now bumped atomically, server-side, by the
-  // `club_bookings_before_insert` trigger — no client-side patch needed here
-  // (and doing one here would double-count it). clubs-store's own Realtime
-  // subscription picks up the trigger's update.
+
+  // Bump spots_taken — best-effort, the reservation itself already succeeded.
+  const updated = await updateClub(clubId, { spots_taken: (club.spots_taken ?? 0) + 1 });
+  if (!updated) console.error("[club-bookings-store] failed to bump spots_taken after reserving a seat");
 
   // Core freemium: consume the one-shot courtesy credit at confirmation.
   if (userById(studentId)?.access_plan === "Core") {
@@ -321,8 +317,9 @@ export async function cancelSeat(studentId: string, clubId: string): Promise<{ o
   }
   cache = cache.filter((b) => !(b.student_id === studentId && b.club_id === clubId));
   notify();
-  // spots_taken is now decremented atomically, server-side, by the
-  // `club_bookings_after_delete` trigger.
+
+  const updated = await updateClub(clubId, { spots_taken: Math.max(0, (club.spots_taken ?? 0) - 1) });
+  if (!updated) console.error("[club-bookings-store] failed to decrement spots_taken after cancelling a seat");
 
   return { ok: true };
 }

@@ -7,6 +7,7 @@
 // duplicating it. Editing the link here reflects in Students and vice-versa.
 import {
   USERS,
+  ASSIGNMENTS,
   type User,
   type ChallengeSubmission,
   type ChallengeSubmissionFormat,
@@ -16,7 +17,7 @@ import { loadFlashChallenges } from "./flash-challenges-store";
 import { addStudentReport } from "./student-reports-store";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
-import { hydrateUserIdBridge, legacyToUuid, uuidToLegacySync } from "@/lib/user-id-bridge";
+import { legacyToUuid } from "@/lib/user-id-bridge";
 
 export type { ChallengeSubmission, ChallengeSubmissionFormat };
 
@@ -489,151 +490,18 @@ export function completeSeasonChallenge(
 
 
 /* -------------------------------------------------------------------------- */
-/* Challenge submissions — the student never completes a challenge directly    */
-/* anymore: they SUBMIT a delivery that a teacher reviews.                     */
+/* Challenge submissions (Etapa 2) — the student never completes a challenge   */
+/* directly anymore: they SUBMIT a delivery that a teacher reviews.            */
 /* completeChallenge / completeLightningChallenge / completeSeasonChallenge     */
-/* stay in this file untouched — approveSubmission below calls them.           */
-/*                                                                              */
-/* Backed by Supabase (`public.challenge_submissions` +                        */
-/* `public.challenge_submission_history`). RLS: a student sees/inserts only     */
-/* their own row; a teacher/admin sees their roster via                        */
-/* private.teaches_student(). UPDATE is split so a student may only resubmit    */
-/* their own row back into 'pending_review' (never self-approve/reject) while   */
-/* a teacher/admin may set any status. Cache is keyed by the legacy student id   */
-/* (matching every other USERS-keyed helper in this file), global Postgres      */
-/* Realtime, same pattern used across this migration. Streak counters and        */
-/* completion state stay 100% on the local persistStudentPatch path — only the   */
-/* submission record itself moved to Supabase.                                  */
+/* stay in this file untouched — Etapa 3's approveSubmission will call them.    */
 /* -------------------------------------------------------------------------- */
-
-type SubmissionRow = Database["public"]["Tables"]["challenge_submissions"]["Row"];
-type SubmissionInsert = Database["public"]["Tables"]["challenge_submissions"]["Insert"];
-type SubmissionUpdate = Database["public"]["Tables"]["challenge_submissions"]["Update"];
-type SubmissionHistoryRow = Database["public"]["Tables"]["challenge_submission_history"]["Row"];
-type SubmissionHistoryInsert = Database["public"]["Tables"]["challenge_submission_history"]["Insert"];
-
-let submissionsCache = new Map<string, ChallengeSubmission[]>();
-// `${studentLegacyId}:${challengeCode}` -> the row's real bigint id, needed to
-// target UPDATEs/history inserts (the frontend only ever deals in legacy ids
-// and challenge codes).
-let submissionDbId = new Map<string, number>();
-const challengeCodeToDbId = new Map<string, number>();
-const challengeDbIdToCode = new Map<number, string>();
-let submissionsHydrated = false;
-let submissionsHydratePromise: Promise<void> | null = null;
-
-function mapSubmissionRow(row: SubmissionRow, historyRows: SubmissionHistoryRow[]): ChallengeSubmission {
-  return {
-    challenge_id: challengeDbIdToCode.get(row.challenge_id) ?? String(row.challenge_id),
-    challenge_format: row.challenge_format,
-    status: row.status,
-    link: row.link,
-    note: row.note ?? undefined,
-    submitted_at: row.submitted_at,
-    history: historyRows
-      .filter((h) => h.submission_id === row.id)
-      .sort((a, b) => +new Date(a.submitted_at) - +new Date(b.submitted_at))
-      .map((h) => ({ link: h.link, note: h.note ?? undefined, submitted_at: h.submitted_at })),
-    streak_before: row.streak_before ?? undefined,
-    reviewed_at: row.reviewed_at ?? undefined,
-    reviewer_id: row.reviewed_by ? uuidToLegacySync(row.reviewed_by) : undefined,
-    teacher_feedback: row.teacher_feedback ?? undefined,
-  };
-}
-
-async function hydrateSubmissions(): Promise<void> {
-  if (submissionsHydrated) return;
-  if (submissionsHydratePromise) return submissionsHydratePromise;
-  submissionsHydratePromise = (async () => {
-    await hydrateUserIdBridge();
-    const [subsRes, historyRes, challengesRes] = await Promise.all([
-      supabase.from("challenge_submissions").select("*"),
-      supabase.from("challenge_submission_history").select("*"),
-      supabase.from("challenges").select("id, code"),
-    ]);
-    if (subsRes.error) {
-      console.error("[students-store] failed to load challenge submissions", subsRes.error);
-      submissionsHydrated = true;
-      return;
-    }
-    if (historyRes.error) {
-      console.error("[students-store] failed to load challenge submission history", historyRes.error);
-    }
-    if (challengesRes.error) {
-      console.error("[students-store] failed to load challenges for submission mapping", challengesRes.error);
-    }
-    for (const c of challengesRes.data ?? []) {
-      if (!c.code) continue;
-      challengeDbIdToCode.set(c.id, c.code);
-      challengeCodeToDbId.set(c.code, c.id);
-    }
-    const historyRows = historyRes.data ?? [];
-    const nextCache = new Map<string, ChallengeSubmission[]>();
-    const nextDbIds = new Map<string, number>();
-    for (const row of subsRes.data ?? []) {
-      const legacyId = uuidToLegacySync(row.student_id);
-      const submission = mapSubmissionRow(row, historyRows);
-      const list = nextCache.get(legacyId) ?? [];
-      list.push(submission);
-      nextCache.set(legacyId, list);
-      nextDbIds.set(`${legacyId}:${submission.challenge_id}`, row.id);
-    }
-    submissionsCache = nextCache;
-    submissionDbId = nextDbIds;
-    submissionsHydrated = true;
-  })();
-  await submissionsHydratePromise;
-  submissionsHydratePromise = null;
-  if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent(STUDENTS_EVENT));
-}
-
-if (typeof window !== "undefined") {
-  void hydrateSubmissions();
-  supabase
-    .channel("challenge-submissions-changes")
-    .on(
-      "postgres_changes",
-      { event: "*", schema: "public", table: "challenge_submissions" },
-      () => {
-        submissionsHydrated = false;
-        void hydrateSubmissions();
-      },
-    )
-    .subscribe();
-  supabase
-    .channel("challenge-submission-history-changes")
-    .on(
-      "postgres_changes",
-      { event: "*", schema: "public", table: "challenge_submission_history" },
-      () => {
-        submissionsHydrated = false;
-        void hydrateSubmissions();
-      },
-    )
-    .subscribe();
-}
-
-/** Resolves a challenge's frontend code to its real bigint id, using the
- *  submissions hydrate's catalog snapshot (falls back to a direct lookup if
- *  the code isn't in it yet — e.g. a brand-new challenge created after the
- *  last hydrate ran). */
-async function resolveChallengeDbId(code: string): Promise<number | null> {
-  if (submissionsHydratePromise) await submissionsHydratePromise;
-  const cached = challengeCodeToDbId.get(code);
-  if (cached !== undefined) return cached;
-  const { data, error } = await supabase.from("challenges").select("id").eq("code", code).maybeSingle();
-  if (error || !data) return null;
-  challengeCodeToDbId.set(code, data.id);
-  challengeDbIdToCode.set(data.id, code);
-  return data.id;
-}
 
 export function getSubmission(
   studentId: string,
   challengeId: string,
 ): ChallengeSubmission | null {
-  if (!submissionsHydrated) void hydrateSubmissions();
-  return (submissionsCache.get(studentId) ?? []).find((s) => s.challenge_id === challengeId) ?? null;
+  const u = USERS.find((x) => x.id === studentId);
+  return (u?.challenge_submissions ?? []).find((s) => s.challenge_id === challengeId) ?? null;
 }
 
 /** Create a submission for a challenge (status "pending_review").
@@ -641,14 +509,9 @@ export function getSubmission(
  *  - "normal" / "mystery_box": enforces the same 24h cooldown as
  *    completeCooldownRemaining and advances the streak counters right away with
  *    the same "≤14 days keeps the streak alive" rule, storing the pre-change
- *    current_streak in `streak_before`. The streak counters stay on the local
- *    persistStudentPatch path exactly as before this migration.
+ *    current_streak in `streak_before`.
  *  - "lightning" / "season": no counters are touched here — those move to the
- *    teacher approval step below.
- *
- *  Optimistic: the new submission is visible immediately; a failed Supabase
- *  write rolls it back out of the cache (the streak counters, being a
- *  local-only write that doesn't fail, are left as-is on that rare failure).
+ *    teacher approval step in Etapa 3.
  *
  *  Returns false if blocked (unknown student, cooldown, or already submitted). */
 export function submitChallenge(
@@ -660,7 +523,7 @@ export function submitChallenge(
 ): boolean {
   const u = USERS.find((x) => x.id === studentId);
   if (!u) return false;
-  const list = submissionsCache.get(studentId) ?? [];
+  const list = u.challenge_submissions ?? [];
   if (list.some((s) => s.challenge_id === challengeId)) return false;
 
   const streakFormat = format === "normal" || format === "mystery_box";
@@ -678,74 +541,40 @@ export function submitChallenge(
     history: [],
   };
 
+  const patch: Partial<User> = {};
   if (streakFormat) {
     const last = u.last_completed_at ? new Date(u.last_completed_at) : null;
     const diffDays = last ? (now.getTime() - last.getTime()) / 86_400_000 : Infinity;
     const nextCurrent = last && diffDays <= 14 ? (u.current_streak ?? 0) + 1 : 1;
     submission.streak_before = u.current_streak ?? 0;
-    persistStudentPatch(studentId, {
-      last_completed_at: nowIso,
-      current_streak: nextCurrent,
-      longest_streak: Math.max(u.longest_streak ?? 0, nextCurrent),
-    });
+    patch.last_completed_at = nowIso;
+    patch.current_streak = nextCurrent;
+    patch.longest_streak = Math.max(u.longest_streak ?? 0, nextCurrent);
   }
 
-  const prevList = list;
-  submissionsCache.set(studentId, [...list, submission]);
-  if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent(STUDENTS_EVENT));
-
-  void (async () => {
-    const [uuid, dbChallengeId] = await Promise.all([
-      legacyToUuid(studentId),
-      resolveChallengeDbId(challengeId),
-    ]);
-    if (uuid === null || dbChallengeId === null) {
-      console.error("[students-store] failed to submit challenge — could not resolve ids", { studentId, challengeId });
-      submissionsCache.set(studentId, prevList);
-      if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent(STUDENTS_EVENT));
-      return;
-    }
-    const insert: SubmissionInsert = {
-      student_id: uuid,
-      challenge_id: dbChallengeId,
-      challenge_format: format,
-      status: "pending_review",
-      link: submission.link,
-      note: submission.note ?? null,
-      submitted_at: nowIso,
-      streak_before: submission.streak_before ?? null,
-    };
-    const { data, error } = await supabase.from("challenge_submissions").insert(insert).select("id").single();
-    if (error || !data) {
-      console.error("[students-store] failed to submit challenge", error);
-      submissionsCache.set(studentId, prevList);
-      if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent(STUDENTS_EVENT));
-      return;
-    }
-    submissionDbId.set(`${studentId}:${challengeId}`, data.id);
-  })();
-
+  persistStudentPatch(studentId, {
+    ...patch,
+    challenge_submissions: [...list, submission],
+  });
   return true;
 }
 
 /** Replace the delivery of a submission the teacher sent back. Only valid while
- *  the current status is "needs_resubmission". Archives the previous attempt
- *  into `challenge_submission_history` (server-side, richer than the frontend
- *  type — also keeps the archived status/feedback for audit) and returns the
- *  submission to "pending_review". Streak untouched. */
+ *  the current status is "needs_resubmission". Archives the previous attempt in
+ *  `history` and returns the submission to "pending_review". Streak untouched. */
 export function resubmitChallenge(
   studentId: string,
   challengeId: string,
   link: string,
   note?: string,
 ): boolean {
-  const list = submissionsCache.get(studentId) ?? [];
+  const u = USERS.find((x) => x.id === studentId);
+  if (!u) return false;
+  const list = u.challenge_submissions ?? [];
   const idx = list.findIndex((s) => s.challenge_id === challengeId);
   if (idx < 0) return false;
   const prev = list[idx];
   if (prev.status !== "needs_resubmission") return false;
-  const dbId = submissionDbId.get(`${studentId}:${challengeId}`);
-  if (dbId === undefined) return false;
 
   const nowIso = new Date().toISOString();
   const next = [...list];
@@ -763,41 +592,7 @@ export function resubmitChallenge(
     reviewer_id: undefined,
     teacher_feedback: undefined,
   };
-  submissionsCache.set(studentId, next);
-  if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent(STUDENTS_EVENT));
-
-  void (async () => {
-    const historyInsert: SubmissionHistoryInsert = {
-      submission_id: dbId,
-      link: prev.link,
-      note: prev.note ?? null,
-      submitted_at: prev.submitted_at,
-      status: prev.status,
-      teacher_feedback: prev.teacher_feedback ?? null,
-    };
-    const { error: historyError } = await supabase.from("challenge_submission_history").insert(historyInsert);
-    if (historyError) {
-      console.error("[students-store] failed to archive previous submission", historyError);
-      submissionsCache.set(studentId, list);
-      if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent(STUDENTS_EVENT));
-      return;
-    }
-    const update: SubmissionUpdate = {
-      status: "pending_review",
-      link: next[idx].link,
-      note: next[idx].note ?? null,
-      submitted_at: nowIso,
-      reviewed_at: null,
-      reviewed_by: null,
-      teacher_feedback: null,
-    };
-    const { error } = await supabase.from("challenge_submissions").update(update).eq("id", dbId);
-    if (error) {
-      console.error("[students-store] failed to resubmit challenge", error);
-      submissionsCache.set(studentId, list);
-      if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent(STUDENTS_EVENT));
-    }
-  })();
+  persistStudentPatch(studentId, { challenge_submissions: next });
   return true;
 }
 
@@ -812,32 +607,14 @@ function patchSubmission(
   challengeId: string,
   patch: Partial<ChallengeSubmission>,
 ): ChallengeSubmission | null {
-  const list = submissionsCache.get(studentId) ?? [];
+  const u = USERS.find((x) => x.id === studentId);
+  if (!u) return null;
+  const list = u.challenge_submissions ?? [];
   const idx = list.findIndex((s) => s.challenge_id === challengeId);
   if (idx < 0) return null;
-  const dbId = submissionDbId.get(`${studentId}:${challengeId}`);
-  if (dbId === undefined) return null;
   const next = [...list];
   next[idx] = { ...list[idx], ...patch };
-  submissionsCache.set(studentId, next);
-  if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent(STUDENTS_EVENT));
-
-  void (async () => {
-    const reviewerUuid = patch.reviewer_id ? await legacyToUuid(patch.reviewer_id) : null;
-    const update: SubmissionUpdate = {
-      teacher_feedback: patch.teacher_feedback ?? null,
-      reviewed_at: patch.reviewed_at ?? null,
-      reviewed_by: reviewerUuid,
-    };
-    if (patch.status) update.status = patch.status;
-    const { error } = await supabase.from("challenge_submissions").update(update).eq("id", dbId);
-    if (error) {
-      console.error("[students-store] failed to update submission", error);
-      submissionsCache.set(studentId, list);
-      if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent(STUDENTS_EVENT));
-    }
-  })();
-
+  persistStudentPatch(studentId, { challenge_submissions: next });
   return next[idx];
 }
 
@@ -946,22 +723,17 @@ export interface PendingSubmissionRow {
 }
 
 /** Every submission still awaiting the student or the teacher on this teacher's
- *  roster. `teacherId` is no longer used to filter here (kept in the signature
- *  for compatibility with existing callers): the `challenge_submissions_select`
- *  RLS policy already scopes what lands in `submissionsCache` to this caller's
- *  own row (student), roster (teacher, via private.teaches_student — covers
- *  both direct assignments and active group members), or everything (admin) —
- *  so the cache itself is already correctly scoped per session. `studentName`
- *  is looked up from the in-memory USERS array rather than a Supabase join,
- *  since `app_users_select` RLS would block a teacher from reading a roster
- *  student's row that way. */
+ *  roster. The roster source is the ASSIGNMENTS table — the same one
+ *  teacherNotifications() uses in notifications-store.ts. */
 export function pendingSubmissionsForTeacher(teacherId: string): PendingSubmissionRow[] {
+  const roster = ASSIGNMENTS.filter((a) => a.teacher_id === teacherId).map((a) => a.student_id);
   const out: PendingSubmissionRow[] = [];
-  for (const [sid, subs] of submissionsCache.entries()) {
+  for (const sid of roster) {
     const st = USERS.find((x) => x.id === sid);
-    for (const s of subs) {
+    if (!st) continue;
+    for (const s of st.challenge_submissions ?? []) {
       if (s.status !== "pending_review" && s.status !== "needs_resubmission") continue;
-      out.push({ studentId: sid, studentName: st?.name ?? sid, submission: s });
+      out.push({ studentId: sid, studentName: st.name, submission: s });
     }
   }
   return out.sort((a, b) => +new Date(a.submission.submitted_at) - +new Date(b.submission.submitted_at));

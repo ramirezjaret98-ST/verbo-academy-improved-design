@@ -502,14 +502,10 @@ export function addActivity(a: Activity) {
 }
 
 /** Appends already-validated activities in a single optimistic update + a
- *  single bulk insert (replaces the old
- *  `saveActivities([...loadActivities(), ...parsed])` full-array rewrite).
- *  Returns once the write has actually round-tripped (success or failure) so
- *  callers can show an accurate result instead of an optimistic guess. */
-export async function addActivitiesBulk(
-  activities: Activity[],
-): Promise<{ ok: true; count: number } | { ok: false; error: string }> {
-  if (activities.length === 0) return { ok: true, count: 0 };
+ *  single background bulk insert (replaces the old
+ *  `saveActivities([...loadActivities(), ...parsed])` full-array rewrite). */
+export function addActivitiesBulk(activities: Activity[]): void {
+  if (activities.length === 0) return;
   const cleaned = activities.map(sanitizeActivity);
   const tempActivities = cleaned.map((a) => ({
     ...a,
@@ -518,21 +514,22 @@ export async function addActivitiesBulk(
   activitiesCache = [...activitiesCache, ...tempActivities];
   notify();
 
-  const { data, error } = await supabase
-    .from("activities")
-    .insert(cleaned.map(toDbColumns))
-    .select();
-  const tempIds = new Set(tempActivities.map((a) => a.id));
-  if (error || !data) {
-    console.error("[activities-store] failed to bulk-add activities", error);
-    activitiesCache = activitiesCache.filter((a) => !tempIds.has(a.id));
+  void (async () => {
+    const { data, error } = await supabase
+      .from("activities")
+      .insert(cleaned.map(toDbColumns))
+      .select();
+    const tempIds = new Set(tempActivities.map((a) => a.id));
+    if (error || !data) {
+      console.error("[activities-store] failed to bulk-add activities", error);
+      activitiesCache = activitiesCache.filter((a) => !tempIds.has(a.id));
+      notify();
+      return;
+    }
+    const saved = data.map(fromActivityRow);
+    activitiesCache = [...activitiesCache.filter((a) => !tempIds.has(a.id)), ...saved];
     notify();
-    return { ok: false, error: error?.message || "The import failed — please try again." };
-  }
-  const saved = data.map(fromActivityRow);
-  activitiesCache = [...activitiesCache.filter((a) => !tempIds.has(a.id)), ...saved];
-  notify();
-  return { ok: true, count: saved.length };
+  })();
 }
 
 /** Updates an existing activity in place. `id` and `unit_id` are never

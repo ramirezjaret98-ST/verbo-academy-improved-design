@@ -4,7 +4,7 @@
 import { useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { X } from "lucide-react";
-import megaphoneAsset from "@/assets/red_megaphone.svg.asset.json";
+import megaphoneAsset from "@/assets/red_megaphone.svg";
 import {
   useAnnouncements,
   announcementsForRole,
@@ -62,7 +62,7 @@ export function AnnouncementBanner() {
             className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#f38934]/12 ring-1 ring-inset ring-[#f38934]/25"
           >
             <img
-              src={megaphoneAsset.url}
+              src={megaphoneAsset}
               alt=""
               className="h-7 w-7 object-contain"
               loading="lazy"

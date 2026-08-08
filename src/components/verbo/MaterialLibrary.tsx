@@ -6,15 +6,15 @@ import type { MaterialType } from "@/lib/mock-data";
 import { PremiumBadge } from "@/components/verbo/PremiumGate";
 import { useAuth } from "@/lib/auth";
 import { groupsByStudentId } from "@/lib/groups-store";
-import listeningArt from "@/assets/Listiening.svg.asset.json";
-import grammarArt from "@/assets/Grammar.svg.asset.json";
-import vocabularyArt from "@/assets/Vocabulary_2.svg.asset.json";
-import speakingArt from "@/assets/speaking.svg.asset.json";
-import premiumArt from "@/assets/Premium.svg.asset.json";
-import gettingStartedArt from "@/assets/Getting_Started.svg.asset.json";
-import studyTipsArt from "@/assets/study_tips.svg.asset.json";
-import businessArt from "@/assets/Business.svg.asset.json";
-import troubleshootingArt from "@/assets/Troubleshooting.svg.asset.json";
+import listeningArt from "@/assets/Listiening.svg";
+import grammarArt from "@/assets/Grammar.svg";
+import vocabularyArt from "@/assets/Vocabulary_2.svg";
+import speakingArt from "@/assets/speaking.svg";
+import premiumArt from "@/assets/Premium.svg";
+import gettingStartedArt from "@/assets/Getting_Started.svg";
+import studyTipsArt from "@/assets/study_tips.svg";
+import businessArt from "@/assets/Business.svg";
+import troubleshootingArt from "@/assets/Troubleshooting.svg";
 
 
 import {
@@ -435,7 +435,7 @@ export function MaterialLibrary({
       subtitle: "Audio practice and listening exercises to train your ear.",
       accent: "#ef8f14",
       icon: Headphones,
-      iconImage: listeningArt.url,
+      iconImage: listeningArt,
       onClick: () => openCategory("Listening"),
     },
     {
@@ -443,7 +443,7 @@ export function MaterialLibrary({
       subtitle: "Structures and practice sheets to sharpen your grammar.",
       accent: "#157f36",
       icon: SpellCheck,
-      iconImage: grammarArt.url,
+      iconImage: grammarArt,
       onClick: () => openCategory("Grammar"),
     },
     {
@@ -451,7 +451,7 @@ export function MaterialLibrary({
       subtitle: "Word lists and expressions to grow your everyday vocabulary.",
       accent: "#2f6fe4",
       icon: Type,
-      iconImage: vocabularyArt.url,
+      iconImage: vocabularyArt,
       onClick: () => openCategory("Vocabulary"),
     },
     {
@@ -459,7 +459,7 @@ export function MaterialLibrary({
       subtitle: "Prompts and exercises to build real speaking confidence.",
       accent: "#d13da4",
       icon: Mic,
-      iconImage: speakingArt.url,
+      iconImage: speakingArt,
       onClick: () => openCategory("Speaking"),
     },
     {
@@ -467,7 +467,7 @@ export function MaterialLibrary({
       subtitle: "Deep-dive guides and exclusive practice packs for Advance tier and up.",
       accent: "#b45309",
       icon: Crown,
-      iconImage: premiumArt.url,
+      iconImage: premiumArt,
       badge: <PremiumBadge />,
       onClick: () => openCategory(PREMIUM_KEY),
     },
@@ -476,7 +476,7 @@ export function MaterialLibrary({
       subtitle: "Everything you need to take your first steps with confidence.",
       accent: "#f97316",
       icon: Rocket,
-      iconImage: gettingStartedArt.url,
+      iconImage: gettingStartedArt,
       onClick: () => openCategory("Getting Started"),
     },
     {
@@ -484,7 +484,7 @@ export function MaterialLibrary({
       subtitle: "Habits, routines and techniques to study smarter every week.",
       accent: "#a41630",
       icon: Lightbulb,
-      iconImage: studyTipsArt.url,
+      iconImage: studyTipsArt,
       onClick: () => openCategory("Study Tips"),
     },
     {
@@ -492,7 +492,7 @@ export function MaterialLibrary({
       subtitle: "Templates and phrases for professional communication.",
       accent: "#01304a",
       icon: Briefcase,
-      iconImage: businessArt.url,
+      iconImage: businessArt,
       onClick: () => openCategory("Business"),
     },
     ...extraCategories.map((c, i) => ({
@@ -544,7 +544,7 @@ export function MaterialLibrary({
                 subtitle="Quick fixes and answers for common technical issues."
                 accent="#64748b"
                 icon={LifeBuoy}
-                iconImage={troubleshootingArt.url}
+                iconImage={troubleshootingArt}
                 noBlob
                 compact
                 onClick={() => openCategory("Troubleshooting")}
