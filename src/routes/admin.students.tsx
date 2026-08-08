@@ -30,7 +30,7 @@ import {
 } from "@/lib/workshops-store";
 import { groupsByStudentId, groupOfStudent, removeMember, subscribeGroups, effectiveSessionCounts, sessionProgressFor } from "@/lib/groups-store";
 import { studentAttendance } from "@/lib/sessions-store";
-import { logPayment, expectedAmountForStudent, loadPayments } from "@/lib/payments-log";
+import { logPayment, expectedAmountForStudent, loadPayments, subscribePayments } from "@/lib/payments-log";
 import {
   setLevelReopened,
   patchStudentProfile,
@@ -1278,6 +1278,12 @@ function StudentDetailModal({
   const [teacherId, setTeacherId] = useState(ASSIGNMENTS.find((a) => a.student_id === student.id)?.teacher_id ?? "");
   const [freezeStart, setFreezeStart] = useState(student.freeze_start ?? "");
   const [freezeEnd, setFreezeEnd] = useState(student.freeze_end ?? "");
+
+  // Payment History reads loadPayments() synchronously in render below; the
+  // Supabase-backed store hydrates asynchronously, so re-render once it (or
+  // any later payment) lands — same convention as subscribeGroups/
+  // subscribeStudentReports elsewhere in this file.
+  useEffect(() => subscribePayments(() => forceTick((n) => n + 1)), []);
 
   const avatar = useAvatar(student.id);
   const product = getProduct(student.product);

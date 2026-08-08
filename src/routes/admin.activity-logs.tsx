@@ -13,7 +13,7 @@ import {
   subscribeKpiOverrides,
 } from "@/lib/teacher-kpi-overrides-store";
 import {
-  loadPayments, replacePayments,
+  loadPayments, deleteOldPayments,
   subscribePayments,
 } from "@/lib/payments-log";
 import {
@@ -244,8 +244,7 @@ function DataRetentionSection() {
     );
     if (!ok) return;
     downloadJson(`payments-log-export-${todayStamp()}.json`, paymentsOld);
-    const kept = loadPayments().filter((p) => +new Date(p.paid_at) >= cutoff);
-    replacePayments(kept);
+    deleteOldPayments(cutoff);
   };
 
   const rows = [
