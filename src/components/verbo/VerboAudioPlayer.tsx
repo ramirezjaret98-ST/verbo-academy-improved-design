@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Pause, Play } from "lucide-react";
 
 function formatDuration(sec?: number): string {
@@ -9,26 +9,54 @@ function formatDuration(sec?: number): string {
 }
 
 /**
- * Shared audio player shell for listening exercises.
- * Playback is local/mock — it never exposes the source file name, which is
- * internal Admin metadata and must stay out of student-facing views.
+ * Shared audio player shell for listening exercises. Plays the real uploaded
+ * file via `audioUrl` (from Storage) when present; falls back to the old
+ * silent/simulated waveform for legacy activities that predate real audio
+ * uploads (audioName set, but no audioUrl). It never exposes the source file
+ * name, which is internal Admin metadata and must stay out of student-facing
+ * views.
  */
 export function VerboAudioPlayer({
   durationSec,
+  audioUrl,
   disabled,
   className = "",
 }: {
   durationSec?: number;
+  audioUrl?: string;
   disabled?: boolean;
   className?: string;
 }) {
   const [isPlaying, setIsPlaying] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    // Stop playback if the underlying activity changes out from under us.
+    return () => { audioRef.current?.pause(); };
+  }, [audioUrl]);
+
+  const toggle = () => {
+    if (!audioUrl) { setIsPlaying((p) => !p); return; } // legacy fallback: no real file to play
+    const el = audioRef.current;
+    if (!el) return;
+    if (isPlaying) el.pause();
+    else void el.play();
+  };
 
   return (
     <div className={`flex items-center gap-4 rounded-xl border border-border bg-secondary/50 p-4 ${className}`}>
+      {audioUrl && (
+        <audio
+          ref={audioRef}
+          src={audioUrl}
+          onPlay={() => setIsPlaying(true)}
+          onPause={() => setIsPlaying(false)}
+          onEnded={() => setIsPlaying(false)}
+        />
+      )}
       <button
         type="button"
-        onClick={() => setIsPlaying((p) => !p)}
+        onClick={toggle}
         disabled={disabled}
         aria-label={isPlaying ? "Pause audio clip" : "Play audio clip"}
         className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-accent text-accent-foreground shadow-lg transition-transform duration-150 ease-out hover:scale-105 active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-60"

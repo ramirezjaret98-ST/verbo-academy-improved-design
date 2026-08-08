@@ -33,6 +33,7 @@ import {
   validateBulkUnits,
   addCustomUnitsBulk,
 } from "@/lib/custom-units-store";
+import { uploadContentFile } from "@/lib/content-uploads";
 
 export const inputCls =
   "h-10 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground shadow-sm transition-colors focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30";
@@ -113,6 +114,9 @@ export function ActivityModal({ unitId, unitTitle, onClose, accent }: { unitId: 
   const [prompt, setPrompt] = useState("");
   const [audioName, setAudioName] = useState("");
   const [audioDurationSec, setAudioDurationSec] = useState<number | undefined>(undefined);
+  const [audioUrl, setAudioUrl] = useState("");
+  const [audioUploading, setAudioUploading] = useState(false);
+  const [audioUploadError, setAudioUploadError] = useState("");
   const [question, setQuestion] = useState("");
   const [options, setOptions] = useState(["", "", "", ""]);
   const [correctIndex, setCorrectIndex] = useState(0);
@@ -130,7 +134,7 @@ export function ActivityModal({ unitId, unitTitle, onClose, accent }: { unitId: 
   const resetDraft = () => {
     setName(""); setParagraph(""); setAnswer("");
     setItems([{ text: "", key: "" }, { text: "", key: "" }]);
-    setPrompt(""); setAudioName(""); setAudioDurationSec(undefined); setQuestion("");
+    setPrompt(""); setAudioName(""); setAudioDurationSec(undefined); setAudioUrl(""); setAudioUploadError(""); setQuestion("");
     setOptions(["", "", "", ""]); setCorrectIndex(0); setFeedback("");
     setEditingId(null);
   };
@@ -154,6 +158,8 @@ export function ActivityModal({ unitId, unitTitle, onClose, accent }: { unitId: 
     setPrompt(a.prompt ?? "");
     setAudioName(a.audioName ?? "");
     setAudioDurationSec(a.audioDurationSec);
+    setAudioUrl(a.audioUrl ?? "");
+    setAudioUploadError("");
     setQuestion(a.question ?? "");
     const opts = a.options ?? [];
     setOptions([0, 1, 2, 3].map((i) => opts[i] ?? ""));
@@ -161,19 +167,27 @@ export function ActivityModal({ unitId, unitTitle, onClose, accent }: { unitId: 
     setFeedback(a.feedback ?? "");
   };
 
-  /** Reads the audio duration straight from the file — admins never type it. */
-  const handleAudioFile = (file?: File) => {
-    if (!file) { setAudioName(""); setAudioDurationSec(undefined); return; }
+  /** Reads the audio duration straight from the file (admins never type it)
+   *  and uploads the real file to Storage so students can actually play it. */
+  const handleAudioFile = async (file?: File) => {
+    if (!file) { setAudioName(""); setAudioDurationSec(undefined); setAudioUrl(""); return; }
     setAudioName(file.name);
     setAudioDurationSec(undefined);
-    const url = URL.createObjectURL(file);
+    setAudioUploadError("");
+    const objectUrl = URL.createObjectURL(file);
     const audio = new Audio();
     audio.addEventListener("loadedmetadata", () => {
       if (Number.isFinite(audio.duration)) setAudioDurationSec(Math.round(audio.duration));
-      URL.revokeObjectURL(url);
+      URL.revokeObjectURL(objectUrl);
     });
-    audio.addEventListener("error", () => URL.revokeObjectURL(url));
-    audio.src = url;
+    audio.addEventListener("error", () => URL.revokeObjectURL(objectUrl));
+    audio.src = objectUrl;
+
+    setAudioUploading(true);
+    const res = await uploadContentFile(file, "activity-audio");
+    setAudioUploading(false);
+    if (!res.ok) { setAudioUploadError(res.error); return; }
+    setAudioUrl(res.url);
   };
 
   const save = () => {
@@ -190,7 +204,7 @@ export function ActivityModal({ unitId, unitTitle, onClose, accent }: { unitId: 
       payload = { ...base, items: cleaned };
     } else if (type === "read_select" || type === "listen_select") {
       if (!question.trim() || options.filter((o) => o.trim()).length < 2) { alert("Add a question and at least two options."); return; }
-      payload = { ...base, prompt: prompt.trim(), audioName: type === "listen_select" ? audioName.trim() : undefined, audioDurationSec: type === "listen_select" ? audioDurationSec : undefined, question: question.trim(), options: options.map((o) => o.trim()), correctIndex };
+      payload = { ...base, prompt: prompt.trim(), audioName: type === "listen_select" ? audioName.trim() : undefined, audioDurationSec: type === "listen_select" ? audioDurationSec : undefined, audioUrl: type === "listen_select" ? (audioUrl.trim() || undefined) : undefined, question: question.trim(), options: options.map((o) => o.trim()), correctIndex };
     } else if (type === "record") {
       if (!answer.trim()) { alert("Type the sentence the student must speak."); return; }
       payload = { ...base, answer: answer.trim() };
@@ -314,9 +328,11 @@ export function ActivityModal({ unitId, unitTitle, onClose, accent }: { unitId: 
                 <Field label="Audio file">
                   <label className="flex h-24 w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-secondary/40 text-sm text-muted-foreground transition-colors hover:bg-secondary">
                     <Headphones className="h-4 w-4" />
-                    {audioName || "Click to upload audio"}
-                    <input type="file" accept="audio/*" className="sr-only" onChange={(e) => handleAudioFile(e.target.files?.[0])} />
+                    {audioUploading ? "Uploading…" : audioName || "Click to upload audio"}
+                    <input type="file" accept="audio/*" className="sr-only" disabled={audioUploading} onChange={(e) => handleAudioFile(e.target.files?.[0])} />
                   </label>
+                  {audioUploadError && <p className="mt-1 text-xs text-destructive">{audioUploadError}</p>}
+                  {audioUrl && !audioUploading && <p className="mt-1 text-xs text-emerald-600">Uploaded ✓</p>}
                 </Field>
               ) : (
                 <Field label="Prompt text">
@@ -364,7 +380,7 @@ export function ActivityModal({ unitId, unitTitle, onClose, accent }: { unitId: 
             ) : (
               <GhostButton onClick={onClose}>Done</GhostButton>
             )}
-            <PrimaryButton onClick={save}>
+            <PrimaryButton onClick={save} disabled={audioUploading}>
               {editingId ? <><Pencil className="h-3.5 w-3.5" /> Save Changes</> : <><Plus className="h-3.5 w-3.5" /> Save {phase === "post" ? "Post-Session" : "Pre-Session"} Activity</>}
             </PrimaryButton>
           </div>
@@ -468,6 +484,9 @@ export function BulkUploadModal({ unitId, unitTitle, onClose, onImported, zClass
   const [parsed, setParsed] = useState<Activity[]>([]);
   const [errors, setErrors] = useState<string[]>([]);
   const [imported, setImported] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [importedCount, setImportedCount] = useState(0);
+  const [importError, setImportError] = useState("");
 
   const handleFile = (file?: File) => {
     if (!file) return;
@@ -494,8 +513,16 @@ export function BulkUploadModal({ unitId, unitTitle, onClose, onImported, zClass
     return [...m.entries()];
   }, [parsed]);
 
-  const doImport = () => {
-    addActivitiesBulk(parsed);
+  const doImport = async () => {
+    setImporting(true);
+    setImportError("");
+    const result = await addActivitiesBulk(parsed);
+    setImporting(false);
+    if (!result.ok) {
+      setImportError(result.error);
+      return;
+    }
+    setImportedCount(result.count);
     setImported(true);
     onImported();
   };
@@ -511,7 +538,7 @@ export function BulkUploadModal({ unitId, unitTitle, onClose, onImported, zClass
       {imported ? (
         <div className="p-6">
           <div className="rounded-lg border border-dashed border-emerald-500/60 bg-emerald-500/10 p-6 text-center text-sm font-semibold text-emerald-700 dark:text-emerald-300">
-            {parsed.length} activities imported successfully.
+            {importedCount} activities imported successfully.
           </div>
         </div>
       ) : (
@@ -536,6 +563,12 @@ export function BulkUploadModal({ unitId, unitTitle, onClose, onImported, zClass
             </div>
           )}
 
+          {importError && (
+            <div className="rounded-lg border border-dashed border-destructive/60 bg-destructive/5 p-3 text-[11px] leading-relaxed text-destructive">
+              <div className="font-semibold">Import failed: {importError}</div>
+            </div>
+          )}
+
           {parsed.length > 0 && (
             <div className="space-y-2 rounded-lg border border-border bg-secondary/30 p-3">
               <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Ready to import</div>
@@ -553,10 +586,10 @@ export function BulkUploadModal({ unitId, unitTitle, onClose, onImported, zClass
       )}
 
       <ModalFooter>
-        <GhostButton onClick={onClose}>{imported ? "Close" : "Cancel"}</GhostButton>
+        <GhostButton onClick={onClose} disabled={importing}>{imported ? "Close" : "Cancel"}</GhostButton>
         {!imported && (
-          <PrimaryButton accentColor="#5fca16" onClick={doImport} disabled={parsed.length === 0}>
-            Import {parsed.length} Activities
+          <PrimaryButton accentColor="#5fca16" onClick={doImport} disabled={parsed.length === 0 || importing}>
+            {importing ? "Importing…" : `Import ${parsed.length} Activities`}
           </PrimaryButton>
         )}
       </ModalFooter>
@@ -576,6 +609,9 @@ export function BulkUploadUnitsModal({ kind, studentId, unitLabel, onClose, onIm
   const [parsed, setParsed] = useState<CustomUnit[]>([]);
   const [errors, setErrors] = useState<string[]>([]);
   const [imported, setImported] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [importedCount, setImportedCount] = useState(0);
+  const [importError, setImportError] = useState("");
 
   const handleFile = (file?: File) => {
     if (!file) return;
@@ -596,8 +632,16 @@ export function BulkUploadUnitsModal({ kind, studentId, unitLabel, onClose, onIm
     reader.readAsText(file);
   };
 
-  const doImport = () => {
-    addCustomUnitsBulk(parsed);
+  const doImport = async () => {
+    setImporting(true);
+    setImportError("");
+    const result = await addCustomUnitsBulk(parsed);
+    setImporting(false);
+    if (!result.ok) {
+      setImportError(result.error);
+      return;
+    }
+    setImportedCount(result.count);
     setImported(true);
     onImported();
   };
@@ -613,7 +657,7 @@ export function BulkUploadUnitsModal({ kind, studentId, unitLabel, onClose, onIm
       {imported ? (
         <div className="p-6">
           <div className="rounded-lg border border-dashed border-emerald-500/60 bg-emerald-500/10 p-6 text-center text-sm font-semibold text-emerald-700 dark:text-emerald-300">
-            {parsed.length} units imported successfully.
+            {importedCount} units imported successfully.
           </div>
         </div>
       ) : (
@@ -638,6 +682,12 @@ export function BulkUploadUnitsModal({ kind, studentId, unitLabel, onClose, onIm
             </div>
           )}
 
+          {importError && (
+            <div className="rounded-lg border border-dashed border-destructive/60 bg-destructive/5 p-3 text-[11px] leading-relaxed text-destructive">
+              <div className="font-semibold">Import failed: {importError}</div>
+            </div>
+          )}
+
           {parsed.length > 0 && (
             <div className="space-y-2 rounded-lg border border-border bg-secondary/30 p-3">
               <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Ready to import</div>
@@ -655,10 +705,10 @@ export function BulkUploadUnitsModal({ kind, studentId, unitLabel, onClose, onIm
       )}
 
       <ModalFooter>
-        <GhostButton onClick={onClose}>{imported ? "Close" : "Cancel"}</GhostButton>
+        <GhostButton onClick={onClose} disabled={importing}>{imported ? "Close" : "Cancel"}</GhostButton>
         {!imported && (
-          <PrimaryButton accentColor="#5fca16" onClick={doImport} disabled={parsed.length === 0}>
-            Import {parsed.length} Units
+          <PrimaryButton accentColor="#5fca16" onClick={doImport} disabled={parsed.length === 0 || importing}>
+            {importing ? "Importing…" : `Import ${parsed.length} Units`}
           </PrimaryButton>
         )}
       </ModalFooter>
