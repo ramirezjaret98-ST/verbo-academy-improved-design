@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { toast } from "sonner";
-import { USERS, ASSIGNMENTS, userById, type User } from "@/lib/mock-data";
+import { USERS, userById, type User } from "@/lib/mock-data";
 import {
   PRODUCTS, ACCESS_PLAN_IDS, RESCHEDULE_PRESETS, SESSIONS_PER_LEVEL,
   MAX_INSIGHT_STRIKES, MAX_BOOKCLUB_STRIKES, getProduct, getAccessPlan,

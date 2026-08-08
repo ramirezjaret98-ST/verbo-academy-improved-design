@@ -1,18 +1,29 @@
 import { createFileRoute, Outlet } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import { RoleGuard } from "@/components/verbo/RoleGuard";
 import { PageTransition } from "@/components/verbo/PageTransition";
 import { Footer } from "@/components/verbo/Footer";
 import { TopNav, NavItem, NavGroup } from "@/components/verbo/TopNav";
 import { AnnouncementBanner } from "@/components/verbo/AnnouncementBanner";
 import { useAuth } from "@/lib/auth";
-import { ASSIGNMENTS, USERS } from "@/lib/mock-data";
+import { USERS } from "@/lib/mock-data";
+import { assignedStudentIdsFor, hydrateAssignments, subscribeAssignments } from "@/lib/assignments-store";
 
 export const Route = createFileRoute("/teacher")({ component: Layout });
 
 function Layout() {
   const { user } = useAuth();
+  const [, tick] = useState(0);
+
+  // Nav items depend on which products this teacher's assigned students
+  // have — re-render when the assignments store (re)hydrates or changes.
+  useEffect(() => {
+    hydrateAssignments();
+    return subscribeAssignments(() => tick((n) => n + 1));
+  }, []);
+
   const assignedStudents = user
-    ? USERS.filter((u) => u.role === "student" && ASSIGNMENTS.some((a) => a.teacher_id === user.id && a.student_id === u.id))
+    ? USERS.filter((u) => u.role === "student" && assignedStudentIdsFor(user.id).includes(u.id))
     : [];
   const hasVipStudent = assignedStudents.some((u) => u.product === "vip");
   const hasEliteStudent = assignedStudents.some((u) => u.access_plan === "Elite");

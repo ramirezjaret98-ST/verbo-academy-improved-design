@@ -1,8 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  USERS, SESSIONS, ASSIGNMENTS, userById, type User,
+  USERS, SESSIONS, userById, type User,
 } from "@/lib/mock-data";
+import { assignedTeacherIdFor, hydrateAssignments, setAssignment, subscribeAssignments } from "@/lib/assignments-store";
 import {
   PRODUCTS, FOCUSES, ACCESS_PLANS, ACCESS_PLAN_IDS, RESCHEDULE_PRESETS,
   SESSIONS_PER_LEVEL, MAX_INSIGHT_STRIKES, MAX_BOOKCLUB_STRIKES,
@@ -161,6 +162,10 @@ function Page() {
   const teachers = USERS.filter((u) => u.role === "teacher");
 
   useEffect(() => subscribeGroups(() => forceTick((n) => n + 1)), []);
+  useEffect(() => {
+    hydrateAssignments();
+    return subscribeAssignments(() => forceTick((n) => n + 1));
+  }, []);
 
   // ---------------------------------------------------------------------------
   // Filter & search state
@@ -224,7 +229,6 @@ function Page() {
 
   const handleRegister = (u: User, teacherId?: string) => {
     USERS.push(u);
-    if (teacherId) ASSIGNMENTS.push({ teacher_id: teacherId, student_id: u.id });
     const registered = readRegisteredStudents();
     registered.push(u);
     writeRegisteredStudents(registered);
@@ -250,16 +254,16 @@ function Page() {
       invalidateUserIdBridge();
       const { id, name, role, ...rest } = u;
       patchStudentProfile(u.id, rest as Partial<StudentProfileFields>);
+      // The assignments table FKs into app_users, so the real row (created
+      // just above) has to exist before this can resolve — that's why this
+      // waits until here instead of firing at the top of handleRegister.
+      if (teacherId) setAssignment(u.id, teacherId);
     })();
   };
 
   const handleUpdate = (u: User, teacherId?: string) => {
     persist(u);
-    if (teacherId) {
-      const existing = ASSIGNMENTS.find((a) => a.student_id === u.id);
-      if (existing) existing.teacher_id = teacherId;
-      else ASSIGNMENTS.push({ teacher_id: teacherId, student_id: u.id });
-    }
+    if (teacherId) setAssignment(u.id, teacherId);
     setFormFor(null);
     // keep detail modal in sync
     setDetail((d) => (d && d.id === u.id ? u : d));
@@ -660,7 +664,7 @@ function StudentFormModal({
   onSave: (u: User, teacherId?: string) => void;
 }) {
   const editing = !!initial;
-  const existingTeacher = initial ? ASSIGNMENTS.find((a) => a.student_id === initial.id)?.teacher_id ?? "" : "";
+  const existingTeacher = initial ? assignedTeacherIdFor(initial.id) ?? "" : "";
 
   const [f, setF] = useState<FormState>(() => ({
     name: initial?.name ?? "",
@@ -1275,7 +1279,7 @@ function StudentDetailModal({
   const [showLink, setShowLink] = useState(false);
   const [copied, setCopied] = useState(false);
   const [panel, setPanel] = useState<"none" | "reassign" | "freeze">("none");
-  const [teacherId, setTeacherId] = useState(ASSIGNMENTS.find((a) => a.student_id === student.id)?.teacher_id ?? "");
+  const [teacherId, setTeacherId] = useState(assignedTeacherIdFor(student.id) ?? "");
   const [freezeStart, setFreezeStart] = useState(student.freeze_start ?? "");
   const [freezeEnd, setFreezeEnd] = useState(student.freeze_end ?? "");
 

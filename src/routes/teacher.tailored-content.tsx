@@ -1,8 +1,9 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/lib/auth";
-import { ASSIGNMENTS, USERS } from "@/lib/mock-data";
+import { USERS } from "@/lib/mock-data";
 import { hydrateStudents, subscribeStudents } from "@/lib/students-store";
+import { assignedStudentIdsFor, hydrateAssignments, subscribeAssignments } from "@/lib/assignments-store";
 import {
   tailoredUnitsForStudent, addTailoredUnit, updateTailoredUnit, removeTailoredUnit,
   subscribeTailoredUnits, subscribeTailoredUnitCompletion, tailoredUnitDoneMap,
@@ -42,12 +43,14 @@ function Page() {
     const unsubX = subscribeSessions(() => tick((n) => n + 1));
     const unsubC = subscribeTailoredUnitCompletion(() => tick((n) => n + 1));
     const unsubP = subscribeLessonPlans(() => tick((n) => n + 1));
-    return () => { unsubS(); unsubT(); unsubX(); unsubC(); unsubP(); };
+    hydrateAssignments();
+    const unsubA = subscribeAssignments(() => tick((n) => n + 1));
+    return () => { unsubS(); unsubT(); unsubX(); unsubC(); unsubP(); unsubA(); };
   }, []);
 
   if (!user) return null;
 
-  const assignedIds = ASSIGNMENTS.filter((a) => a.teacher_id === user.id).map((a) => a.student_id);
+  const assignedIds = assignedStudentIdsFor(user.id);
   const eliteStudents = USERS.filter(
     (u) => u.role === "student" && assignedIds.includes(u.id) && u.access_plan === "Elite",
   );

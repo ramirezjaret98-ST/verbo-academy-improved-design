@@ -1,7 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/lib/auth";
-import { ASSIGNMENTS, USERS, SESSIONS, type User } from "@/lib/mock-data";
+import { USERS, SESSIONS, type User } from "@/lib/mock-data";
+import { assignedStudentIdsFor, hydrateAssignments, subscribeAssignments } from "@/lib/assignments-store";
 import { studentAttendance } from "@/lib/sessions-store";
 import {
   MAX_INSIGHT_STRIKES, MAX_BOOKCLUB_STRIKES,
@@ -66,7 +67,9 @@ function Page() {
     const unsub = subscribeStudents(() => tick((n) => n + 1));
     const unsubG = subscribeGroups(() => tick((n) => n + 1));
     const unsubC = subscribeCourses(() => tick((n) => n + 1));
-    return () => { unsub(); unsubG(); unsubC(); };
+    hydrateAssignments();
+    const unsubA = subscribeAssignments(() => tick((n) => n + 1));
+    return () => { unsub(); unsubG(); unsubC(); unsubA(); };
   }, []);
 
   const curriculumLevelName = (s: User): string | null =>
@@ -75,7 +78,7 @@ function Page() {
   if (!user) return null;
 
   // Only students assigned to the current teacher — never all platform users.
-  const assignedIds = ASSIGNMENTS.filter((a) => a.teacher_id === user.id).map((a) => a.student_id);
+  const assignedIds = assignedStudentIdsFor(user.id);
   const myStudents = USERS.filter((u) => u.role === "student" && assignedIds.includes(u.id));
 
   const filtered = useMemo(() => {

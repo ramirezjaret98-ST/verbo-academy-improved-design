@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { USERS, ASSIGNMENTS, userById } from "@/lib/mock-data";
+import { USERS, userById } from "@/lib/mock-data";
+import { assignedTeacherIdFor } from "@/lib/assignments-store";
 import {
   loadSessions,
   createSession,
@@ -244,7 +245,7 @@ function BulkScheduler({
 }) {
   const [studentId, setStudentId] = useState(students[0]?.id ?? "");
   const defaultTeacher = useMemo(
-    () => ASSIGNMENTS.find((a) => a.student_id === studentId)?.teacher_id ?? teachers[0]?.id ?? "",
+    () => assignedTeacherIdFor(studentId) ?? teachers[0]?.id ?? "",
     [studentId, teachers],
   );
   const [teacherId, setTeacherId] = useState(defaultTeacher);

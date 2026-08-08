@@ -1,7 +1,8 @@
 import { createFileRoute, useSearch, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth";
-import { ASSIGNMENTS, USERS, studentsOfTeacher, userById, type Session, type SessionStatus } from "@/lib/mock-data";
+import { USERS, studentsOfTeacher, userById, type Session, type SessionStatus } from "@/lib/mock-data";
+import { assignedStudentIdsFor, hydrateAssignments, subscribeAssignments } from "@/lib/assignments-store";
 import { Gauge } from "lucide-react";
 import { AccentModal, AccentModalHeader, AccentModalFooter, AnimatedNumber, Card, GhostButton, HeroStatCard, Pill, PrimaryButton, SectionTitle } from "@/components/verbo/ui";
 import { SkeletonStatCards, useHydrated } from "@/components/verbo/skeletons";
@@ -131,7 +132,9 @@ function TeacherDashboard() {
     setClubReports(loadClubReports());
     const u6 = subscribeClubReports(() => setClubReports(loadClubReports()));
     const u7 = subscribeCourses(() => setAvailTick((n) => n + 1));
-    return () => { u2(); u3(); u4(); u5(); u6(); u7(); };
+    hydrateAssignments();
+    const u8 = subscribeAssignments(() => setAvailTick((n) => n + 1));
+    return () => { u2(); u3(); u4(); u5(); u6(); u7(); u8(); };
   }, []);
 
   // If we arrived with ?report=<id>, auto-open Step 1 for that session
@@ -427,9 +430,9 @@ function TeacherDashboard() {
   }
 
   // ---- Quick Actions (visibility mirrors nav) ----
+  const myAssignedIds = assignedStudentIdsFor(user.id);
   const hasVipStudent = USERS.some(
-    (u) => u.role === "student" && u.product === "vip" &&
-      ASSIGNMENTS.some((a) => a.teacher_id === user.id && a.student_id === u.id),
+    (u) => u.role === "student" && u.product === "vip" && myAssignedIds.includes(u.id),
   );
 
   // ---- Recent Activity (real data) ----

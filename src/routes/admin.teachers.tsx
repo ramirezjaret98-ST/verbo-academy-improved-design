@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { USERS, ASSIGNMENTS, SESSIONS, userById, type User, type Session } from "@/lib/mock-data";
+import { USERS, SESSIONS, userById, type User, type Session } from "@/lib/mock-data";
+import { hydrateAssignments, removeAssignment, setAssignment, subscribeAssignments, allAssignments } from "@/lib/assignments-store";
 import { getProduct } from "@/lib/student-model";
 import {
   QUALIFIED_PRODUCTS, DEFAULT_HOURLY_RATE, AVAILABILITY_CHANGE_DAYS,
@@ -93,9 +94,11 @@ function Page() {
     const reviews = read<Record<string, Partial<Session>>>(REVIEW_KEY, {});
     SESSIONS.forEach((s) => { if (reviews[s.id]) Object.assign(s, reviews[s.id]); });
     hydrateTeachers();
+    hydrateAssignments();
     forceTick((n) => n + 1);
     const unsub = subscribeStrikes(() => forceTick((n) => n + 1));
-    return () => unsub();
+    const unsubA = subscribeAssignments(() => forceTick((n) => n + 1));
+    return () => { unsub(); unsubA(); };
   }, []);
 
   // Deep-link from the Admin Overview snapshot (open a teacher profile).
@@ -139,13 +142,8 @@ function Page() {
   };
 
   const reassignStudent = (studentId: string, teacherId: string) => {
-    const existing = ASSIGNMENTS.find((a) => a.student_id === studentId);
-    if (teacherId) {
-      if (existing) existing.teacher_id = teacherId;
-      else ASSIGNMENTS.push({ teacher_id: teacherId, student_id: studentId });
-    } else if (existing) {
-      ASSIGNMENTS.splice(ASSIGNMENTS.indexOf(existing), 1);
-    }
+    if (teacherId) setAssignment(studentId, teacherId);
+    else removeAssignment(studentId);
     forceTick((n) => n + 1);
   };
 
@@ -169,7 +167,6 @@ function Page() {
 
   const registerTeacher = (u: User, studentIds: string[]) => {
     USERS.push(u);
-    studentIds.forEach((sid) => reassignStudent(sid, u.id));
     const reg = read<User[]>(REGISTERED_KEY, []);
     reg.push(u); write(REGISTERED_KEY, reg);
     setFormFor(null);
@@ -191,6 +188,11 @@ function Page() {
       invalidateUserIdBridge();
       const { id, role, ...rest } = u;
       patchTeacherProfile(u.id, rest as Partial<User>);
+      // The assignments table FKs into app_users, so the real teacher row
+      // (created just above) has to exist before this can resolve — that's
+      // why this waits until here instead of firing at the top of
+      // registerTeacher.
+      studentIds.forEach((sid) => reassignStudent(sid, u.id));
     })();
   };
 
@@ -1337,9 +1339,10 @@ function TeacherFormModal({
   const [studentIds, setStudentIds] = useState<string[]>([]);
 
   // Students with no teacher assigned (available for initial assignment)
+  const assignedStudentIds = useMemo(() => new Set(allAssignments().map((a) => a.student_id)), []);
   const unassigned = useMemo(
-    () => USERS.filter((u) => u.role === "student" && !ASSIGNMENTS.some((a) => a.student_id === u.id)),
-    [],
+    () => USERS.filter((u) => u.role === "student" && !assignedStudentIds.has(u.id)),
+    [assignedStudentIds],
   );
 
   const valid = name.trim() && email.trim() && password.trim() && products.length > 0 && !!hireDate;
