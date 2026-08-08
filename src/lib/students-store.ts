@@ -203,8 +203,34 @@ export function hydrateStudents() {
     const applyRow = (row: Record<string, unknown>) => {
       const legacyId = row.legacy_id;
       if (typeof legacyId !== "string" || !legacyId) return;
-      const u = USERS.find((x) => x.id === legacyId);
-      if (!u) return;
+      // `selectRes.data` (select("*")) returns every role admin can see, not
+      // just students — skip non-students here so this store only ever
+      // creates student entries (a real admin/teacher row reaching this
+      // point is handled by hydrateAdminRoles()/hydrateTeachers() instead).
+      // `rpcRes.data` (student_profile_for_teacher) has no `role` column at
+      // all — it's already student-only by the RPC's own WHERE clause.
+      if (typeof row.role === "string" && row.role !== "student") return;
+      let u = USERS.find((x) => x.id === legacyId);
+      if (!u) {
+        // A real student registered (or assigned) from a DIFFERENT
+        // browser/session never reached THIS session's in-memory USERS
+        // array — that bookkeeping (USERS.push + localStorage) only ever
+        // happens in the browser tab that ran the registration form. Build
+        // a fresh entry straight from this DB/RPC row instead of silently
+        // dropping it, so the student is visible here too (this was the
+        // root cause of a real bug: a newly-registered/assigned student
+        // never showed up in their assigned teacher's own roster, even
+        // after the assignments-store fix, because the teacher's session
+        // had no USERS entry for them to attach the profile fields to).
+        u = {
+          id: legacyId,
+          name: typeof row.name === "string" ? row.name : "",
+          email: typeof row.email === "string" ? row.email : "",
+          password: "",
+          role: "student",
+        };
+        USERS.push(u);
+      }
       for (const key of STUDENT_PROFILE_FIELD_KEYS) {
         const value = row[key];
         // Only assign non-null/known DB values so a column this row's source

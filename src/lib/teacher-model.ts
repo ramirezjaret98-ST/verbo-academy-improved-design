@@ -299,11 +299,29 @@ export function hydrateTeachers(): void {
     ]);
     if (selectRes.error) console.error("[teacher-model] failed to load app_users profiles", selectRes.error);
     if (rpcRes.error) console.error("[teacher-model] failed to load teacher peek profiles", rpcRes.error);
+    // A real teacher registered from a DIFFERENT browser/session never
+    // reached THIS session's in-memory USERS array (that bookkeeping is
+    // per-browser, localStorage-only) — build a fresh entry straight from
+    // the DB/RPC row instead of silently dropping it (same root-cause fix as
+    // students-store.ts's hydrateStudents(), applied here for teachers: e.g.
+    // a student peeking a teacher card, or the reschedule-teacher picker,
+    // for a teacher only assigned/registered in another session).
+    const ensureTeacher = (legacyId: string, name: string): User => {
+      let u = USERS.find((x) => x.id === legacyId && x.role === "teacher");
+      if (!u) {
+        u = { id: legacyId, name, email: "", password: "", role: "teacher" };
+        USERS.push(u);
+      }
+      return u;
+    };
     const applyFullRow = (row: Record<string, unknown>) => {
       const legacyId = row.legacy_id;
       if (typeof legacyId !== "string" || !legacyId) return;
-      const u = USERS.find((x) => x.id === legacyId && x.role === "teacher");
-      if (!u) return;
+      // select("*") returns every role admin can see — only build teacher
+      // entries here.
+      if (typeof row.role === "string" && row.role !== "teacher") return;
+      const u = ensureTeacher(legacyId, typeof row.name === "string" ? row.name : "");
+      if (typeof row.email === "string" && row.email) u.email = row.email;
       for (const key of TEACHER_PROFILE_FIELD_KEYS) {
         const value = row[key];
         if (value !== null && value !== undefined) { (u as unknown as Record<string, unknown>)[key] = value; }
@@ -315,8 +333,7 @@ export function hydrateTeachers(): void {
     const applyPeekRow = (row: Record<string, unknown>) => {
       const legacyId = row.legacy_id;
       if (typeof legacyId !== "string" || !legacyId) return;
-      const u = USERS.find((x) => x.id === legacyId && x.role === "teacher");
-      if (!u) return;
+      const u = ensureTeacher(legacyId, typeof row.name === "string" ? row.name : "");
       const peekKeys: (keyof TeacherProfileFields)[] = ["qualified_products", "teacher_status", "hire_date", "tier_frozen_since", "tier_frozen_days", "tier_reset_at", "rating", "hours_month"];
       for (const key of peekKeys) {
         const value = (row as Record<string, unknown>)[key];
