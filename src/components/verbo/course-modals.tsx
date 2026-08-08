@@ -468,6 +468,9 @@ export function BulkUploadModal({ unitId, unitTitle, onClose, onImported, zClass
   const [parsed, setParsed] = useState<Activity[]>([]);
   const [errors, setErrors] = useState<string[]>([]);
   const [imported, setImported] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [importedCount, setImportedCount] = useState(0);
+  const [importError, setImportError] = useState("");
 
   const handleFile = (file?: File) => {
     if (!file) return;
@@ -494,8 +497,16 @@ export function BulkUploadModal({ unitId, unitTitle, onClose, onImported, zClass
     return [...m.entries()];
   }, [parsed]);
 
-  const doImport = () => {
-    addActivitiesBulk(parsed);
+  const doImport = async () => {
+    setImporting(true);
+    setImportError("");
+    const result = await addActivitiesBulk(parsed);
+    setImporting(false);
+    if (!result.ok) {
+      setImportError(result.error);
+      return;
+    }
+    setImportedCount(result.count);
     setImported(true);
     onImported();
   };
@@ -511,7 +522,7 @@ export function BulkUploadModal({ unitId, unitTitle, onClose, onImported, zClass
       {imported ? (
         <div className="p-6">
           <div className="rounded-lg border border-dashed border-emerald-500/60 bg-emerald-500/10 p-6 text-center text-sm font-semibold text-emerald-700 dark:text-emerald-300">
-            {parsed.length} activities imported successfully.
+            {importedCount} activities imported successfully.
           </div>
         </div>
       ) : (
@@ -536,6 +547,12 @@ export function BulkUploadModal({ unitId, unitTitle, onClose, onImported, zClass
             </div>
           )}
 
+          {importError && (
+            <div className="rounded-lg border border-dashed border-destructive/60 bg-destructive/5 p-3 text-[11px] leading-relaxed text-destructive">
+              <div className="font-semibold">Import failed: {importError}</div>
+            </div>
+          )}
+
           {parsed.length > 0 && (
             <div className="space-y-2 rounded-lg border border-border bg-secondary/30 p-3">
               <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Ready to import</div>
@@ -553,10 +570,10 @@ export function BulkUploadModal({ unitId, unitTitle, onClose, onImported, zClass
       )}
 
       <ModalFooter>
-        <GhostButton onClick={onClose}>{imported ? "Close" : "Cancel"}</GhostButton>
+        <GhostButton onClick={onClose} disabled={importing}>{imported ? "Close" : "Cancel"}</GhostButton>
         {!imported && (
-          <PrimaryButton accentColor="#5fca16" onClick={doImport} disabled={parsed.length === 0}>
-            Import {parsed.length} Activities
+          <PrimaryButton accentColor="#5fca16" onClick={doImport} disabled={parsed.length === 0 || importing}>
+            {importing ? "Importing…" : `Import ${parsed.length} Activities`}
           </PrimaryButton>
         )}
       </ModalFooter>
@@ -576,6 +593,9 @@ export function BulkUploadUnitsModal({ kind, studentId, unitLabel, onClose, onIm
   const [parsed, setParsed] = useState<CustomUnit[]>([]);
   const [errors, setErrors] = useState<string[]>([]);
   const [imported, setImported] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [importedCount, setImportedCount] = useState(0);
+  const [importError, setImportError] = useState("");
 
   const handleFile = (file?: File) => {
     if (!file) return;
@@ -596,8 +616,16 @@ export function BulkUploadUnitsModal({ kind, studentId, unitLabel, onClose, onIm
     reader.readAsText(file);
   };
 
-  const doImport = () => {
-    addCustomUnitsBulk(parsed);
+  const doImport = async () => {
+    setImporting(true);
+    setImportError("");
+    const result = await addCustomUnitsBulk(parsed);
+    setImporting(false);
+    if (!result.ok) {
+      setImportError(result.error);
+      return;
+    }
+    setImportedCount(result.count);
     setImported(true);
     onImported();
   };
@@ -613,7 +641,7 @@ export function BulkUploadUnitsModal({ kind, studentId, unitLabel, onClose, onIm
       {imported ? (
         <div className="p-6">
           <div className="rounded-lg border border-dashed border-emerald-500/60 bg-emerald-500/10 p-6 text-center text-sm font-semibold text-emerald-700 dark:text-emerald-300">
-            {parsed.length} units imported successfully.
+            {importedCount} units imported successfully.
           </div>
         </div>
       ) : (
@@ -638,6 +666,12 @@ export function BulkUploadUnitsModal({ kind, studentId, unitLabel, onClose, onIm
             </div>
           )}
 
+          {importError && (
+            <div className="rounded-lg border border-dashed border-destructive/60 bg-destructive/5 p-3 text-[11px] leading-relaxed text-destructive">
+              <div className="font-semibold">Import failed: {importError}</div>
+            </div>
+          )}
+
           {parsed.length > 0 && (
             <div className="space-y-2 rounded-lg border border-border bg-secondary/30 p-3">
               <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Ready to import</div>
@@ -655,10 +689,10 @@ export function BulkUploadUnitsModal({ kind, studentId, unitLabel, onClose, onIm
       )}
 
       <ModalFooter>
-        <GhostButton onClick={onClose}>{imported ? "Close" : "Cancel"}</GhostButton>
+        <GhostButton onClick={onClose} disabled={importing}>{imported ? "Close" : "Cancel"}</GhostButton>
         {!imported && (
-          <PrimaryButton accentColor="#5fca16" onClick={doImport} disabled={parsed.length === 0}>
-            Import {parsed.length} Units
+          <PrimaryButton accentColor="#5fca16" onClick={doImport} disabled={parsed.length === 0 || importing}>
+            {importing ? "Importing…" : `Import ${parsed.length} Units`}
           </PrimaryButton>
         )}
       </ModalFooter>
