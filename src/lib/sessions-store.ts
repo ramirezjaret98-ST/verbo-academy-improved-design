@@ -634,7 +634,7 @@ export function submitSessionReport(input: {
   updateSession(input.sessionId, patch);
 
   if (status !== "absent" && Object.keys(input.subskills).length > 0) {
-    saveSubskillEvaluation(input.sessionId, input.subskills);
+    saveSubskillEvaluation(input.sessionId, input.studentId, input.teacherId, input.subskills);
   }
   setCoverageNote(input.teacherId, input.studentId, "");
 
@@ -710,7 +710,7 @@ export function submitGroupSessionReport(input: {
 
   for (const m of input.perMember) {
     if (m.attendance !== "absent" && Object.keys(m.subskills).length > 0) {
-      saveSubskillEvaluation(input.sessionId, m.subskills);
+      saveSubskillEvaluation(input.sessionId, m.studentId, input.teacherId, m.subskills);
     }
     setCoverageNote(input.teacherId, m.studentId, "");
   }
