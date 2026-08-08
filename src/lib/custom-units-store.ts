@@ -201,50 +201,52 @@ export function addCustomUnit(
 }
 
 /** Appends already-validated units in a single optimistic update + a single
- *  background bulk insert. Mirrors the style of the old localStorage
- *  "single write" bulk import. */
-export function addCustomUnitsBulk(units: CustomUnit[]): void {
-  if (units.length === 0) return;
+ *  bulk insert. Mirrors the style of the old localStorage "single write"
+ *  bulk import. Returns once the write has actually round-tripped (success
+ *  or failure) so callers can show an accurate result instead of an
+ *  optimistic guess. */
+export async function addCustomUnitsBulk(
+  units: CustomUnit[],
+): Promise<{ ok: true; count: number } | { ok: false; error: string }> {
+  if (units.length === 0) return { ok: true, count: 0 };
   const tempUnits = units.map((u) => ({
     ...u,
     id: `temp-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
   }));
   unitsCache = [...unitsCache, ...tempUnits];
   notify();
+  const tempIds = new Set(tempUnits.map((u) => u.id));
 
-  void (async () => {
-    const studentUuid = await legacyToUuid(units[0].student_id);
-    if (!studentUuid) {
-      console.error("[custom-units-store] no app_users row for legacy id", units[0].student_id);
-      const tempIds = new Set(tempUnits.map((u) => u.id));
-      unitsCache = unitsCache.filter((u) => !tempIds.has(u.id));
-      notify();
-      return;
-    }
-    const { data, error } = await supabase
-      .from("custom_units")
-      .insert(
-        units.map((u) => ({
-          student_id: studentUuid,
-          kind: u.kind,
-          title: u.title,
-          file_url: u.file_url,
-          file_name: u.file_name ?? null,
-          position: u.order ?? null,
-        })),
-      )
-      .select();
-    const tempIds = new Set(tempUnits.map((u) => u.id));
-    if (error || !data) {
-      console.error("[custom-units-store] failed to bulk-add units", error);
-      unitsCache = unitsCache.filter((u) => !tempIds.has(u.id));
-      notify();
-      return;
-    }
-    const saved = data.map(fromUnitRow);
-    unitsCache = [...unitsCache.filter((u) => !tempIds.has(u.id)), ...saved];
+  const studentUuid = await legacyToUuid(units[0].student_id);
+  if (!studentUuid) {
+    console.error("[custom-units-store] no app_users row for legacy id", units[0].student_id);
+    unitsCache = unitsCache.filter((u) => !tempIds.has(u.id));
     notify();
-  })();
+    return { ok: false, error: "Could not find that student — please try again." };
+  }
+  const { data, error } = await supabase
+    .from("custom_units")
+    .insert(
+      units.map((u) => ({
+        student_id: studentUuid,
+        kind: u.kind,
+        title: u.title,
+        file_url: u.file_url,
+        file_name: u.file_name ?? null,
+        position: u.order ?? null,
+      })),
+    )
+    .select();
+  if (error || !data) {
+    console.error("[custom-units-store] failed to bulk-add units", error);
+    unitsCache = unitsCache.filter((u) => !tempIds.has(u.id));
+    notify();
+    return { ok: false, error: error?.message || "The import failed — please try again." };
+  }
+  const saved = data.map(fromUnitRow);
+  unitsCache = [...unitsCache.filter((u) => !tempIds.has(u.id)), ...saved];
+  notify();
+  return { ok: true, count: saved.length };
 }
 
 /**
