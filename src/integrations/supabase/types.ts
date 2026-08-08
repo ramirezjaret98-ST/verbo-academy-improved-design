@@ -3191,6 +3191,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      accept_lightning: {
+        Args: { p_student_id: string }
+        Returns: undefined
+      }
       activities_for_staff: {
         Args: never
         Returns: {
