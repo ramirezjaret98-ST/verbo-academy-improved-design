@@ -93,8 +93,9 @@ export interface Activity {
   items?: MatchItem[];
   // read_select / listen_select
   prompt?: string;
-  audioName?: string; // listen_select only (mock placeholder) — INTERNAL Admin metadata, never rendered to students
+  audioName?: string; // listen_select only — display name of the attached audio file
   audioDurationSec?: number; // listen_select only — auto-detected from the uploaded file, never manual
+  audioUrl?: string; // listen_select only — real Storage URL of the uploaded audio, played by the student
   question?: string;
   options?: string[];
   correctIndex?: number;
@@ -254,6 +255,7 @@ function fromActivityRow(row: ActivityRow): Activity {
   if (row.correct_index != null) a.correctIndex = row.correct_index;
   if ("audio_name" in row && row.audio_name != null && row.audio_name !== "") a.audioName = row.audio_name;
   if (row.audio_duration_sec != null) a.audioDurationSec = row.audio_duration_sec;
+  if ("audio_url" in row && row.audio_url != null && row.audio_url !== "") a.audioUrl = row.audio_url;
   if (row.feedback != null) a.feedback = row.feedback;
   // Same citation cleanup the old store applied to persisted rows on load.
   return sanitizeActivity(a);
@@ -277,6 +279,7 @@ function toDbColumns(a: Activity): Database["public"]["Tables"]["activities"]["I
     correct_index: a.correctIndex ?? null,
     audio_name: a.audioName ? a.audioName : null,
     audio_duration_sec: a.audioDurationSec ?? null,
+    audio_url: a.audioUrl ? a.audioUrl : null,
     feedback: a.feedback ?? null,
   };
 }
@@ -502,10 +505,14 @@ export function addActivity(a: Activity) {
 }
 
 /** Appends already-validated activities in a single optimistic update + a
- *  single background bulk insert (replaces the old
- *  `saveActivities([...loadActivities(), ...parsed])` full-array rewrite). */
-export function addActivitiesBulk(activities: Activity[]): void {
-  if (activities.length === 0) return;
+ *  single bulk insert (replaces the old
+ *  `saveActivities([...loadActivities(), ...parsed])` full-array rewrite).
+ *  Returns once the write has actually round-tripped (success or failure) so
+ *  callers can show an accurate result instead of an optimistic guess. */
+export async function addActivitiesBulk(
+  activities: Activity[],
+): Promise<{ ok: true; count: number } | { ok: false; error: string }> {
+  if (activities.length === 0) return { ok: true, count: 0 };
   const cleaned = activities.map(sanitizeActivity);
   const tempActivities = cleaned.map((a) => ({
     ...a,
@@ -514,22 +521,21 @@ export function addActivitiesBulk(activities: Activity[]): void {
   activitiesCache = [...activitiesCache, ...tempActivities];
   notify();
 
-  void (async () => {
-    const { data, error } = await supabase
-      .from("activities")
-      .insert(cleaned.map(toDbColumns))
-      .select();
-    const tempIds = new Set(tempActivities.map((a) => a.id));
-    if (error || !data) {
-      console.error("[activities-store] failed to bulk-add activities", error);
-      activitiesCache = activitiesCache.filter((a) => !tempIds.has(a.id));
-      notify();
-      return;
-    }
-    const saved = data.map(fromActivityRow);
-    activitiesCache = [...activitiesCache.filter((a) => !tempIds.has(a.id)), ...saved];
+  const { data, error } = await supabase
+    .from("activities")
+    .insert(cleaned.map(toDbColumns))
+    .select();
+  const tempIds = new Set(tempActivities.map((a) => a.id));
+  if (error || !data) {
+    console.error("[activities-store] failed to bulk-add activities", error);
+    activitiesCache = activitiesCache.filter((a) => !tempIds.has(a.id));
     notify();
-  })();
+    return { ok: false, error: error?.message || "The import failed — please try again." };
+  }
+  const saved = data.map(fromActivityRow);
+  activitiesCache = [...activitiesCache.filter((a) => !tempIds.has(a.id)), ...saved];
+  notify();
+  return { ok: true, count: saved.length };
 }
 
 /** Updates an existing activity in place. `id` and `unit_id` are never
