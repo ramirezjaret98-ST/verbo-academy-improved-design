@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { ASSIGNMENTS, USERS } from "@/lib/mock-data";
+import { USERS } from "@/lib/mock-data";
+import { assignedTeacherIdFor, hydrateAssignments } from "@/lib/assignments-store";
 import { cohortsForStudent } from "@/lib/workshops-store";
 import {
   addConductReport,
@@ -49,13 +50,16 @@ export function ReportConductModal({ studentId, open, onClose, watermarkImageUrl
     return () => clearTimeout(t);
   }, [confirming]);
 
+  useEffect(() => { hydrateAssignments(); }, []);
+
   // Teachers the student actually has a relationship with:
-  // - assigned 1:1 teacher(s) via ASSIGNMENTS
+  // - the assigned 1:1 teacher via the assignments store
   // - workshop cohort teachers (cohort.teacher_id)
   // Clubs excluded on purpose — no per-student attendee list exists today.
   const teacherOptions = useMemo(() => {
     const ids = new Set<string>();
-    for (const a of ASSIGNMENTS) if (a.student_id === studentId) ids.add(a.teacher_id);
+    const assignedTeacherId = assignedTeacherIdFor(studentId);
+    if (assignedTeacherId) ids.add(assignedTeacherId);
     for (const { cohort } of cohortsForStudent(studentId)) {
       if (cohort.teacher_id) ids.add(cohort.teacher_id);
     }
