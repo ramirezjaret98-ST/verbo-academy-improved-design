@@ -3138,6 +3138,22 @@ export type Database = {
           video_call_link: string
         }[]
       }
+      teacher_profile_for_peek: {
+        Args: never
+        Returns: {
+          hire_date: string
+          hours_month: number
+          id: string
+          legacy_id: string
+          name: string
+          qualified_products: Database["public"]["Enums"]["product_id"][]
+          rating: number
+          teacher_status: Database["public"]["Enums"]["teacher_status"]
+          tier_frozen_days: number
+          tier_frozen_since: string
+          tier_reset_at: string
+        }[]
+      }
       upsert_session_member_statuses: {
         Args: {
           p_members: Json
