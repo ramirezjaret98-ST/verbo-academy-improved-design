@@ -1,10 +1,25 @@
 // Weekly Challenges catalog — the source of truth for Admin > Challenges.
 // Navigation: Product > Difficulty > list of challenges. VIP IS included here
 // (unlike Courses). Challenges are complementary weekly activities and do NOT
-// affect student performance/metrics. Persisted to localStorage and broadcast
-// via a custom event so any open tab/route updates in real-time.
-
-import { CHALLENGES_SEED } from "./challenges-seed";
+// affect student performance/metrics.
+//
+// Backed by Supabase (`public.challenges`, kind='standard' — the same table
+// also holds Verbo Flash challenges under kind='flash', see
+// flash-challenges-store.ts). RLS: SELECT open to everyone, INSERT/UPDATE/
+// DELETE admin-only (private.is_admin()). Global cache hydrated once +
+// Postgres Realtime, same pattern used across this migration (see
+// teacher-kpi-overrides-store.ts).
+//
+// The old localStorage design replaced the *entire* catalog on every edit
+// (persistChallenges(fullList) — admin.challenges.tsx still builds and passes
+// the full ~150-row list on every save/delete/skeleton-generate). Supabase
+// has no cheap "replace everything" primitive and re-upserting all 150 rows
+// on every keystroke-adjacent save would flood Realtime with no-op row
+// events, so persistChallenges() now diffs the incoming list against the
+// last-synced cache and only upserts/deletes what actually changed. Callers
+// don't need to change — same signature, same call sites.
+import { supabase } from "@/integrations/supabase/client";
+import type { Database } from "@/integrations/supabase/types";
 
 export type ChallengeProductId = "go" | "enterprise" | "international" | "vip";
 
@@ -13,7 +28,7 @@ export type DifficultyId = "esencial" | "intermedio" | "avanzado" | "experto";
 export type ChallengeSkillTag = "Speaking" | "Writing" | "Reading" | "Listening";
 
 export interface Challenge {
-  id: string; // e.g. GO-ESENCIAL-C1
+  id: string; // e.g. GO-ESENCIAL-C1 — maps to `challenges.code`
   product: ChallengeProductId;
   difficulty: DifficultyId;
   category: string; // empty until admin assigns one
@@ -58,92 +73,161 @@ export const CHALLENGES_PER_DIFFICULTY: Record<DifficultyId, number> = {
   experto: 12,
 };
 
-export const CHALLENGES_KEY = "verbo:challenges";
 export const CHALLENGES_EVENT = "verbo:challenges-updated";
 export const CHALLENGE_CATEGORIES_KEY = "verbo:challenge-categories";
 export const CHALLENGE_CATEGORIES_EVENT = "verbo:challenge-categories-updated";
-// Tracks which products have already had their real seed applied so we never
-// overwrite admin edits on a second load.
-const CHALLENGES_SEEDED_KEY = "verbo:challenges-seeded-products";
-const SEEDED_PRODUCTS: ChallengeProductId[] = ["enterprise", "go", "international"];
 
-/* ---------------- Challenges ---------------- */
+/* ---------------- Challenges (Supabase) ---------------- */
 
-function readSeededProducts(): ChallengeProductId[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = localStorage.getItem(CHALLENGES_SEEDED_KEY);
-    if (raw) return JSON.parse(raw) as ChallengeProductId[];
-  } catch { /* noop */ }
-  return [];
+type ChallengeRow = Database["public"]["Tables"]["challenges"]["Row"];
+
+let cache: Challenge[] = [];
+let hydrated = false;
+let hydratePromise: Promise<void> | null = null;
+const listeners = new Set<() => void>();
+
+function notify() {
+  listeners.forEach((cb) => cb());
+  if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent(CHALLENGES_EVENT));
 }
 
-function writeSeededProducts(list: ChallengeProductId[]) {
-  try { localStorage.setItem(CHALLENGES_SEEDED_KEY, JSON.stringify(list)); } catch { /* noop */ }
+function mapRow(row: ChallengeRow): Challenge {
+  return {
+    id: row.code ?? String(row.id),
+    product: row.product as ChallengeProductId,
+    difficulty: (row.difficulty ?? "esencial") as DifficultyId,
+    category: row.category,
+    title: row.title,
+    description: row.description,
+    video_url: row.video_url ?? "",
+    premium: row.premium || undefined,
+    submission_instructions: row.submission_instructions ?? undefined,
+    skill_tags: row.skill_tags ?? undefined,
+    created_at: row.created_at,
+  };
 }
 
-/** Seed real challenge data once per product. Never overwrites admin edits:
- *  only injects seed items for a product if that product has zero challenges
- *  in storage AND hasn't been seeded before. */
-function ensureSeed(list: Challenge[]): Challenge[] {
-  if (typeof window === "undefined") return list;
-  const seeded = readSeededProducts();
-  const toSeed = SEEDED_PRODUCTS.filter((p) => !seeded.includes(p));
-  if (toSeed.length === 0) return list;
+async function hydrate(): Promise<void> {
+  if (hydrated) return;
+  if (hydratePromise) return hydratePromise;
+  hydratePromise = (async () => {
+    const { data, error } = await supabase
+      .from("challenges")
+      .select("*")
+      .eq("kind", "standard");
+    if (error) {
+      console.error("[challenges-store] failed to load challenges", error);
+      hydrated = true;
+      return;
+    }
+    cache = (data ?? []).map(mapRow);
+    hydrated = true;
+  })();
+  await hydratePromise;
+  hydratePromise = null;
+  notify();
+}
 
-  let next = list;
-  let mutated = false;
-  const newlySeeded: ChallengeProductId[] = [];
-  for (const product of toSeed) {
-    const hasAny = list.some((c) => c.product === product);
-    if (hasAny) {
-      // Admin already has data for this product — mark seeded and move on.
-      newlySeeded.push(product);
-      continue;
-    }
-    const additions = CHALLENGES_SEED.filter((c) => c.product === product);
-    if (additions.length > 0) {
-      next = [...next, ...additions];
-      mutated = true;
-    }
-    newlySeeded.push(product);
-  }
-  writeSeededProducts([...seeded, ...newlySeeded]);
-  if (mutated) {
-    try {
-      localStorage.setItem(CHALLENGES_KEY, JSON.stringify(next));
-    } catch { /* noop */ }
-  }
-  return next;
+if (typeof window !== "undefined") {
+  void hydrate();
+  supabase
+    .channel("challenges-standard-changes")
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "challenges", filter: "kind=eq.standard" },
+      () => {
+        hydrated = false;
+        void hydrate();
+      },
+    )
+    .subscribe();
 }
 
 export function loadChallenges(): Challenge[] {
-  if (typeof window === "undefined") return [];
-  let list: Challenge[] = [];
-  try {
-    const raw = localStorage.getItem(CHALLENGES_KEY);
-    if (raw) list = JSON.parse(raw) as Challenge[];
-  } catch { /* noop */ }
-  return ensureSeed(list);
-}
-
-export function persistChallenges(list: Challenge[]) {
-  if (typeof window === "undefined") return;
-  try {
-    localStorage.setItem(CHALLENGES_KEY, JSON.stringify(list));
-    window.dispatchEvent(new CustomEvent(CHALLENGES_EVENT));
-  } catch { /* noop */ }
+  if (!hydrated) void hydrate();
+  return cache;
 }
 
 export function subscribeChallenges(cb: () => void): () => void {
-  if (typeof window === "undefined") return () => {};
-  const onStorage = (e: StorageEvent) => { if (e.key === CHALLENGES_KEY) cb(); };
-  window.addEventListener(CHALLENGES_EVENT, cb);
-  window.addEventListener("storage", onStorage);
+  listeners.add(cb);
   return () => {
-    window.removeEventListener(CHALLENGES_EVENT, cb);
-    window.removeEventListener("storage", onStorage);
+    listeners.delete(cb);
   };
+}
+
+function challengeEquals(a: Challenge, b: Challenge): boolean {
+  return (
+    a.product === b.product &&
+    a.difficulty === b.difficulty &&
+    a.category === b.category &&
+    a.title === b.title &&
+    a.description === b.description &&
+    (a.video_url || "") === (b.video_url || "") &&
+    !!a.premium === !!b.premium &&
+    (a.submission_instructions ?? "") === (b.submission_instructions ?? "") &&
+    JSON.stringify(a.skill_tags ?? []) === JSON.stringify(b.skill_tags ?? [])
+  );
+}
+
+/** Replace the challenge catalog with `list` (optimistic; rolls back the
+ *  whole write on failure). Diffs against the last-synced cache — only rows
+ *  that were added, edited, or removed touch Supabase. See file header. */
+export function persistChallenges(list: Challenge[]) {
+  const prevCache = cache;
+  const prevById = new Map(prevCache.map((c) => [c.id, c]));
+  const nextIds = new Set(list.map((c) => c.id));
+
+  cache = list;
+  notify();
+
+  const toUpsert = list.filter((c) => {
+    const prev = prevById.get(c.id);
+    return !prev || !challengeEquals(prev, c);
+  });
+  const toDeleteIds = prevCache.filter((c) => !nextIds.has(c.id)).map((c) => c.id);
+
+  if (toUpsert.length === 0 && toDeleteIds.length === 0) return;
+
+  void (async () => {
+    if (toUpsert.length > 0) {
+      const { error } = await supabase
+        .from("challenges")
+        .upsert(
+          toUpsert.map((c) => ({
+            code: c.id,
+            kind: "standard" as const,
+            product: c.product,
+            difficulty: c.difficulty,
+            category: c.category,
+            title: c.title,
+            description: c.description,
+            video_url: c.video_url || null,
+            premium: c.premium ?? false,
+            skill_tags: c.skill_tags && c.skill_tags.length > 0 ? c.skill_tags : null,
+            submission_instructions: c.submission_instructions ?? null,
+          })),
+          { onConflict: "code" },
+        );
+      if (error) {
+        console.error("[challenges-store] failed to upsert challenges", error);
+        cache = prevCache;
+        notify();
+        return;
+      }
+    }
+    if (toDeleteIds.length > 0) {
+      const { error } = await supabase
+        .from("challenges")
+        .delete()
+        .eq("kind", "standard")
+        .in("code", toDeleteIds);
+      if (error) {
+        console.error("[challenges-store] failed to delete challenges", error);
+        cache = prevCache;
+        notify();
+      }
+    }
+  })();
 }
 
 export function challengesFor(list: Challenge[], product: ChallengeProductId, difficulty: DifficultyId): Challenge[] {
@@ -194,7 +278,11 @@ export function newChallengeId(
   return `${prefix}-C${max + 1}`;
 }
 
-/* ---------------- Categories (starts completely empty) ---------------- */
+/* ---------------- Categories ----------------
+ * Free-text category names used to tag/color-code challenges. There's no
+ * dedicated Supabase table for this (categories are just a string on each
+ * challenge row) and it's low-stakes single-admin UI convenience, so it
+ * intentionally stays on localStorage — same as before this migration. */
 
 export function loadCategories(): string[] {
   if (typeof window === "undefined") return [];
