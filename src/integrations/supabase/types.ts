@@ -2783,6 +2783,66 @@ export type Database = {
           },
         ]
       }
+      teacher_strikes: {
+        Row: {
+          created_at: string
+          id: string
+          justification_cause: string | null
+          justified: boolean
+          justified_at: string | null
+          medical_note_name: string | null
+          needs_substitute: boolean | null
+          note: string | null
+          reason: string
+          session_id: number | null
+          substitute_found: boolean | null
+          teacher_id: string
+        }
+        Insert: {
+          created_at?: string
+          id: string
+          justification_cause?: string | null
+          justified?: boolean
+          justified_at?: string | null
+          medical_note_name?: string | null
+          needs_substitute?: boolean | null
+          note?: string | null
+          reason: string
+          session_id?: number | null
+          substitute_found?: boolean | null
+          teacher_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          justification_cause?: string | null
+          justified?: boolean
+          justified_at?: string | null
+          medical_note_name?: string | null
+          needs_substitute?: boolean | null
+          note?: string | null
+          reason?: string
+          session_id?: number | null
+          substitute_found?: boolean | null
+          teacher_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "teacher_strikes_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "teacher_strikes_teacher_id_fkey"
+            columns: ["teacher_id"]
+            isOneToOne: false
+            referencedRelation: "app_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       unit_access_events: {
         Row: {
           action: Database["public"]["Enums"]["unit_access_action"]
