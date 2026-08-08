@@ -16,6 +16,7 @@ import type { LucideIcon } from "lucide-react";
 import {
   getPerformanceSnapshot,
   getServerPerformanceSnapshot,
+  performanceKey,
   subscribePerformance,
   type PerformanceMap,
 } from "@/lib/performance-store";
@@ -63,7 +64,13 @@ function computeMacros(performance: PerformanceMap): ComputedMacro[] {
 
 /** Public: current computed macros, live-subscribed, scoped to a student.
  *  Filters the performance map to sessions belonging to `studentId` so the
- *  aggregate reflects that student only — not the whole platform. */
+ *  aggregate reflects that student only — not the whole platform.
+ *
+ *  Performance entries are keyed by `${sessionId}:${studentId}` (see
+ *  performance-store.ts), not by session id alone — a group session is one
+ *  shared session row but has its own rating row per member, so matching
+ *  must account for both the 1:1 case (`s.student_id === studentId`) and
+ *  the group case (`studentId` present in `s.member_statuses`). */
 export function useComputedMacros(studentId: string): ComputedMacro[] {
   const performance = useSyncExternalStore(
     subscribePerformance,
@@ -77,12 +84,14 @@ export function useComputedMacros(studentId: string): ComputedMacro[] {
   );
   return useMemo(() => {
     if (!studentId) return computeMacros({});
-    const allowed = new Set(
-      sessions.filter((s) => s.student_id === studentId).map((s) => s.id),
+    const relevant = sessions.filter(
+      (s) => s.student_id === studentId || (s.member_statuses ? studentId in s.member_statuses : false),
     );
     const scoped: PerformanceMap = {};
-    for (const [sid, rating] of Object.entries(performance)) {
-      if (allowed.has(sid)) scoped[sid] = rating;
+    for (const s of relevant) {
+      const key = performanceKey(s.id, studentId);
+      const rating = performance[key];
+      if (rating) scoped[key] = rating;
     }
     return computeMacros(scoped);
   }, [performance, sessions, studentId]);
