@@ -8,10 +8,21 @@
 // - "coordinator_fin"   ONLY Financial (Money Lab) and KPIs.
 //
 // Newly-created accounts (from the User Management page) persist in
-// localStorage and are merged into the USERS singleton on hydrate.
+// localStorage and are merged into the USERS singleton on hydrate — this
+// keeps the table's instant-feedback UI working the same as before. But
+// createInternalUser() ALSO fires a real `admin-create-user` edge-function
+// call in the background (same pattern as handleRegister() in
+// admin.students.tsx), so the account actually gets a working Supabase Auth
+// login + a real app_users row with the right role/admin_type, instead of
+// being a localStorage-only fake that can never sign in. This was a
+// confirmed bug found in the pre-launch QA audit — the old version pushed to
+// USERS/localStorage and nothing else, so newly "created" admins/coordinators
+// had no real account at all.
 import { USERS, type User, type Role } from "./mock-data";
 import { patchTeacherProfile } from "./teacher-model";
 import { patchStudentProfile } from "./students-store";
+import { supabase } from "@/integrations/supabase/client";
+import { invalidateUserIdBridge } from "./user-id-bridge";
 
 export type AdminType = "super_admin" | "coordinator_ops" | "coordinator_fin";
 export type CoordinatorType = "operations" | "financial";
@@ -113,21 +124,48 @@ export interface CreateInternalUserInput {
   admin_type?: AdminType;     // required when role === "admin"
 }
 
-export function createInternalUser(
+/** Creates an internal admin/coordinator account. Requires a real Supabase
+ *  Auth account + app_users row to exist before reporting success — unlike
+ *  the student/teacher registration flows (which optimistically show success
+ *  and create the real account in the background), an admin/coordinator
+ *  account that's silently broken is a much worse failure mode (whoever it's
+ *  for simply can't log in, and nobody would notice until they tried), so
+ *  this awaits the real account creation and only writes to the local
+ *  USERS/localStorage cache — used for this page's table — once it's
+ *  confirmed to exist. Requires the password length the edge function itself
+ *  enforces (>= 6 chars), not just the old >= 4 used for the local-only mock. */
+export async function createInternalUser(
   input: CreateInternalUserInput,
-): { ok: true; user: User } | { ok: false; error: string } {
+): Promise<{ ok: true; user: User } | { ok: false; error: string }> {
   const name = input.name.trim();
   const email = input.email.trim().toLowerCase();
   if (!name) return { ok: false, error: "Name is required." };
   if (!email || !email.includes("@")) return { ok: false, error: "Valid email required." };
-  if (!input.password || input.password.length < 4) return { ok: false, error: "Password must be at least 4 characters." };
+  if (!input.password || input.password.length < 6) return { ok: false, error: "Password must be at least 6 characters." };
   if (USERS.some((u) => u.email.toLowerCase() === email)) {
     return { ok: false, error: "A user with that email already exists." };
   }
   if (input.role === "admin" && !input.admin_type) {
     return { ok: false, error: "Admin type is required." };
   }
-  const id = `u_${Math.random().toString(36).slice(2, 9)}`;
+  const id = `u${Date.now()}`;
+
+  const { data, error } = await supabase.functions.invoke("admin-create-user", {
+    body: {
+      legacyId: id,
+      email,
+      password: input.password,
+      name,
+      role: input.role,
+      ...(input.role === "admin" ? { adminType: input.admin_type } : {}),
+    },
+  });
+  const invokeError = (data as { error?: string } | null)?.error;
+  if (error || invokeError) {
+    return { ok: false, error: invokeError || error?.message || "Failed to create the account — please try again." };
+  }
+  invalidateUserIdBridge();
+
   const user: User = {
     id, name, email, password: input.password, role: input.role,
     ...(input.role === "admin" ? { admin_type: input.admin_type } : {}),
