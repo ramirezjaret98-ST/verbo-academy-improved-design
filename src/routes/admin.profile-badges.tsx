@@ -14,9 +14,11 @@ import {
   type BadgeMetric,
   BADGE_METRIC_META,
   loadBadges,
-  persistBadges,
   subscribeBadges,
   newBadgeId,
+  addBadge,
+  updateBadge,
+  deleteBadge,
 } from "@/lib/profile-badges-store";
 
 export const Route = createFileRoute("/admin/profile-badges")({ component: Page });
@@ -70,28 +72,36 @@ function ruleSummary(b: BadgeDef): string {
 function Page() {
   const [badges, setBadges] = useState<BadgeDef[]>(loadBadges);
   const [modal, setModal] = useState<{ mode: "create" | "edit"; badge?: BadgeDef } | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     setBadges(loadBadges());
     return subscribeBadges(() => setBadges(loadBadges()));
   }, []);
 
-  const save = (b: BadgeDef) => {
-    setBadges((prev) => {
-      const exists = prev.some((x) => x.id === b.id);
-      const next = exists ? prev.map((x) => (x.id === b.id ? b : x)) : [...prev, b];
-      persistBadges(next);
-      return next;
-    });
+  const save = async (b: BadgeDef) => {
+    setError(null);
+    try {
+      const exists = badges.some((x) => x.id === b.id);
+      if (exists) {
+        await updateBadge(b);
+      } else {
+        await addBadge(b);
+      }
+      setModal(null);
+    } catch {
+      setError("Couldn't save the badge. Try again.");
+    }
   };
 
-  const remove = (id: string) => {
+  const remove = async (id: string) => {
     if (!confirm("Delete this badge?")) return;
-    setBadges((prev) => {
-      const next = prev.filter((b) => b.id !== id);
-      persistBadges(next);
-      return next;
-    });
+    setError(null);
+    try {
+      await deleteBadge(id);
+    } catch {
+      setError("Couldn't delete the badge. Try again.");
+    }
   };
 
   return (
@@ -105,6 +115,8 @@ function Page() {
           <Plus className="h-3.5 w-3.5" /> Add badge
         </GhostButton>
       </div>
+
+      {error && <p className="text-xs text-red-600">{error}</p>}
 
       {badges.length === 0 ? (
         <Card><div className="py-10 text-center text-sm text-muted-foreground">No badges yet.</div></Card>
@@ -148,7 +160,7 @@ function Page() {
           existing={badges}
           editing={modal.mode === "edit" ? modal.badge : undefined}
           onClose={() => setModal(null)}
-          onSave={(b) => { save(b); setModal(null); }}
+          onSave={(b) => void save(b)}
         />
       )}
     </div>
