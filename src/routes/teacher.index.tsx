@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { USERS, studentsOfTeacher, userById, type Session, type SessionStatus } from "@/lib/mock-data";
 import { assignedStudentIdsFor, hydrateAssignments, subscribeAssignments } from "@/lib/assignments-store";
+import { hydrateStudents, subscribeStudents } from "@/lib/students-store";
 import { Gauge } from "lucide-react";
 import { AccentModal, AccentModalHeader, AccentModalFooter, AnimatedNumber, Card, GhostButton, HeroStatCard, Pill, PrimaryButton, SectionTitle } from "@/components/verbo/ui";
 import { SkeletonStatCards, useHydrated } from "@/components/verbo/skeletons";
@@ -134,7 +135,9 @@ function TeacherDashboard() {
     const u7 = subscribeCourses(() => setAvailTick((n) => n + 1));
     hydrateAssignments();
     const u8 = subscribeAssignments(() => setAvailTick((n) => n + 1));
-    return () => { u2(); u3(); u4(); u5(); u6(); u7(); u8(); };
+    hydrateStudents();
+    const u9 = subscribeStudents(() => setAvailTick((n) => n + 1));
+    return () => { u2(); u3(); u4(); u5(); u6(); u7(); u8(); u9(); };
   }, []);
 
   // If we arrived with ?report=<id>, auto-open Step 1 for that session

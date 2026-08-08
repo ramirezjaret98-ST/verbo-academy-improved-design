@@ -8,6 +8,7 @@ import { AnnouncementBanner } from "@/components/verbo/AnnouncementBanner";
 import { useAuth } from "@/lib/auth";
 import { USERS } from "@/lib/mock-data";
 import { assignedStudentIdsFor, hydrateAssignments, subscribeAssignments } from "@/lib/assignments-store";
+import { hydrateStudents, subscribeStudents } from "@/lib/students-store";
 
 export const Route = createFileRoute("/teacher")({ component: Layout });
 
@@ -17,9 +18,16 @@ function Layout() {
 
   // Nav items depend on which products this teacher's assigned students
   // have — re-render when the assignments store (re)hydrates or changes.
+  // Also hydrate the student roster itself here (once, for the whole Teacher
+  // panel shell) — a student registered/assigned from a different browser
+  // session isn't in this session's in-memory USERS array until this runs
+  // (see students-store.ts's hydrateStudents for the root-cause writeup).
   useEffect(() => {
     hydrateAssignments();
-    return subscribeAssignments(() => tick((n) => n + 1));
+    hydrateStudents();
+    const unsubA = subscribeAssignments(() => tick((n) => n + 1));
+    const unsubS = subscribeStudents(() => tick((n) => n + 1));
+    return () => { unsubA(); unsubS(); };
   }, []);
 
   const assignedStudents = user

@@ -29,7 +29,7 @@ import {
   Plus, X, Eye, EyeOff, Star, Users, Clock, KeyRound, Snowflake, Ban, Play,
   Pencil, Search, Filter, ArrowUpDown, Check, AlertTriangle, Mail, ShieldAlert,
   CheckCircle2, CalendarClock, ChevronRight, UserX, Wallet, FileDown, CircleDollarSign, Trophy,
-  ShieldCheck, Zap, Briefcase, Undo2,
+  ShieldCheck, Zap, Briefcase, Undo2, Trash2,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { HeroStatCard, Pill, AccentModal, AccentModalFooter, GhostButton, PrimaryButton } from "@/components/verbo/ui";
@@ -39,6 +39,7 @@ import { KpiOverrideModal } from "@/components/verbo/KpiOverrideModal";
 import type { KpiMetric } from "@/lib/teacher-kpi-overrides-store";
 import { supabase } from "@/integrations/supabase/client";
 import { invalidateUserIdBridge } from "@/lib/user-id-bridge";
+import { deleteUserAccount } from "@/lib/user-deletion";
 
 export const Route = createFileRoute("/admin/teachers")({
   component: Page,
@@ -145,6 +146,20 @@ function Page() {
     if (teacherId) setAssignment(studentId, teacherId);
     else removeAssignment(studentId);
     forceTick((n) => n + 1);
+  };
+
+  // Permanently erases the account (real Supabase login + every DB row that
+  // references it, via cascade) instead of just flipping a status field —
+  // see user-deletion.ts. Returns the result so the modal can show an error
+  // inline (e.g. real session/payment history the DB refuses to discard)
+  // instead of silently doing nothing.
+  const handleDelete = async (t: User) => {
+    const result = await deleteUserAccount(t);
+    if (result.ok) {
+      setDetailId(null);
+      forceTick((n) => n + 1);
+    }
+    return result;
   };
 
   const markReviewed = (sessionId: string, note: string) => {
@@ -286,6 +301,7 @@ function Page() {
           onMarkReviewed={markReviewed}
           onDiscardReview={discardReview}
           canDiscard={canDiscard}
+          onDelete={handleDelete}
           onEdit={() => { const t = detail; setDetailId(null); setFormFor(t); }}
         />
       )}
@@ -426,7 +442,7 @@ function Tag({ children, className = "" }: { children: React.ReactNode; classNam
 type Tab = "overview" | "kpis" | "availability" | "financial" | "notes";
 
 function TeacherDetailModal({
-  teacher: t, teachers, onClose, onPersist, onReassign, onMarkReviewed, onDiscardReview, canDiscard, onEdit,
+  teacher: t, teachers, onClose, onPersist, onReassign, onMarkReviewed, onDiscardReview, canDiscard, onDelete, onEdit,
 }: {
   teacher: User;
   teachers: User[];
@@ -436,12 +452,16 @@ function TeacherDetailModal({
   onMarkReviewed: (sessionId: string, note: string) => void;
   onDiscardReview: (sessionId: string, note: string) => void;
   canDiscard: boolean;
+  onDelete: (u: User) => Promise<{ ok: boolean; error?: string }>;
   onEdit: () => void;
 }) {
   const [tab, setTab] = useState<Tab>("overview");
   const avatar = useAvatar(t.id);
   const status = teacherStatus(t);
   const meta = STATUS_META[status];
+  const [deleteConfirming, setDeleteConfirming] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   // Editable fields
   const [rate, setRate] = useState(String(effectiveHourlyRate(t)));
@@ -778,8 +798,40 @@ function TeacherDetailModal({
           </div>
         )}
 
+        {/* Delete-permanently confirm */}
+        {!flow && deleteConfirming && (
+          <div className="border-t border-border bg-destructive/10 px-6 py-4">
+            <p className="text-sm font-semibold text-destructive">Permanently delete {t.name}?</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              This erases their real login and every record tied to it (sessions, assignments, payroll,
+              reports). This cannot be undone — use Freeze/Remove access instead if you just want to
+              disable them.
+            </p>
+            {deleteError && <p className="mt-2 text-xs font-medium text-destructive">{deleteError}</p>}
+            <div className="mt-3 flex justify-end gap-2">
+              <GhostBtn onClick={() => { setDeleteConfirming(false); setDeleteError(null); }}>Cancel</GhostBtn>
+              <button
+                onClick={async () => {
+                  setDeleting(true);
+                  setDeleteError(null);
+                  const result = await onDelete(t);
+                  if (!result.ok) {
+                    setDeleting(false);
+                    setDeleteError(result.error ?? "No se pudo eliminar la cuenta.");
+                  }
+                  // On success the parent closes the modal (teacher no longer exists).
+                }}
+                disabled={deleting}
+                className="verbo-sdm-action inline-flex items-center justify-center gap-1.5 rounded-full bg-destructive px-3.5 py-1.5 text-xs font-semibold text-destructive-foreground shadow-sm disabled:opacity-50"
+              >
+                <Trash2 className="h-3.5 w-3.5" strokeWidth={1.75} /> {deleting ? "Deleting…" : "Yes, delete permanently"}
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Footer actions */}
-        {!flow && (
+        {!flow && !deleteConfirming && (
           <div className="shrink-0 flex flex-wrap items-center gap-2 border-t border-border bg-secondary/30 px-6 py-4">
             <GhostBtn onClick={onEdit}><Pencil className="h-3.5 w-3.5" strokeWidth={1.75} /> Edit profile</GhostBtn>
             <GhostBtn onClick={() => { onPersist({ ...t, must_change_password: true }); alert("This user will be asked to set a new password the next time they log in."); }}><KeyRound className="h-3.5 w-3.5" strokeWidth={1.75} /> Require Password Reset</GhostBtn>
@@ -794,6 +846,12 @@ function TeacherDetailModal({
                 <Ban className="h-3.5 w-3.5" strokeWidth={1.75} /> Remove access
               </button>
             )}
+            <button
+              onClick={() => setDeleteConfirming(true)}
+              className="verbo-sdm-action inline-flex items-center justify-center gap-1.5 rounded-full border border-destructive px-3.5 py-1.5 text-xs font-semibold text-destructive shadow-sm transition-all hover:bg-destructive hover:text-destructive-foreground"
+            >
+              <Trash2 className="h-3.5 w-3.5" strokeWidth={1.75} /> Delete permanently
+            </button>
           </div>
 
         )}

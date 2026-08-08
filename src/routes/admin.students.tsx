@@ -22,7 +22,7 @@ import {
   Plus, X, Eye, EyeOff, KeyRound, Mail, Building2, CalendarDays, GraduationCap,
   Users, Briefcase, Compass, Globe, Crown, Copy, Check, Snowflake, Ban, Play, Unlock,
   Sparkles, Wand2, Pencil, Video, Repeat, Clock, CreditCard, ShieldAlert,
-  Search, ArrowUpDown, Filter, Gauge, Lightbulb, Layers,
+  Search, ArrowUpDown, Filter, Gauge, Lightbulb, Layers, Trash2,
 } from "lucide-react";
 import {
   type WorkshopCohort, type WorkshopTemplate,
@@ -43,6 +43,7 @@ import { RotateCcw, Unlock as UnlockIcon, Lock as LockIcon, Trophy } from "lucid
 import { useAuth } from "@/lib/auth";
 import { loadCourses, subscribeCourses, type CourseLevel } from "@/lib/product-courses-store";
 import { reportsForStudent, subscribeStudentReports } from "@/lib/student-reports-store";
+import { deleteUserAccount } from "@/lib/user-deletion";
 import {
   isMilestoneUnit, getUnitAccessOverride, setUnitAccess,
 } from "@/lib/activities-store";
@@ -269,6 +270,20 @@ function Page() {
     setDetail((d) => (d && d.id === u.id ? u : d));
   };
 
+  // Permanently erases the account (real Supabase login + every DB row that
+  // references it, via cascade) instead of just flipping a status field —
+  // see user-deletion.ts. Returns the result so the modal can show an error
+  // inline (e.g. real session/payment history the DB refuses to discard)
+  // instead of silently doing nothing.
+  const handleDelete = async (u: User) => {
+    const result = await deleteUserAccount(u);
+    if (result.ok) {
+      setDetail(null);
+      forceTick((n) => n + 1);
+    }
+    return result;
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -388,6 +403,7 @@ function Page() {
           teachers={teachers}
           onClose={() => setDetail(null)}
           onUpdate={handleUpdate}
+          onDelete={handleDelete}
           onEdit={() => { const s = detail; setDetail(null); setFormFor(s); }}
         />
       )}
@@ -1265,12 +1281,13 @@ function StudentFormModal({
 type Tab = "overview" | "performance" | "progress" | "badges" | "reports" | "notes";
 
 function StudentDetailModal({
-  student, teachers, onClose, onUpdate, onEdit,
+  student, teachers, onClose, onUpdate, onDelete, onEdit,
 }: {
   student: User;
   teachers: User[];
   onClose: () => void;
   onUpdate: (u: User, teacherId?: string) => void;
+  onDelete: (u: User) => Promise<{ ok: boolean; error?: string }>;
   onEdit: () => void;
 }) {
   const [tab, setTab] = useState<Tab>("overview");
@@ -1278,7 +1295,9 @@ function StudentDetailModal({
   const [notes, setNotes] = useState(student.admin_notes ?? "");
   const [showLink, setShowLink] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [panel, setPanel] = useState<"none" | "reassign" | "freeze">("none");
+  const [panel, setPanel] = useState<"none" | "reassign" | "freeze" | "delete">("none");
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [teacherId, setTeacherId] = useState(assignedTeacherIdFor(student.id) ?? "");
   const [freezeStart, setFreezeStart] = useState(student.freeze_start ?? "");
   const [freezeEnd, setFreezeEnd] = useState(student.freeze_end ?? "");
@@ -1593,6 +1612,35 @@ function StudentDetailModal({
             </div>
           </div>
         )}
+        {panel === "delete" && (
+          <div className="border-t border-border bg-destructive/10 px-6 py-4">
+            <p className="text-sm font-semibold text-destructive">Permanently delete {student.name}?</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              This erases their real login and every record tied to it (sessions, assignments, payments,
+              reports). This cannot be undone — use Suspend instead if you just want to disable access.
+            </p>
+            {deleteError && <p className="mt-2 text-xs font-medium text-destructive">{deleteError}</p>}
+            <div className="mt-3 flex justify-end gap-2">
+              <GhostButton onClick={() => { setPanel("none"); setDeleteError(null); }} disabled={deleting}>Cancel</GhostButton>
+              <button
+                onClick={async () => {
+                  setDeleting(true);
+                  setDeleteError(null);
+                  const result = await onDelete(student);
+                  if (!result.ok) {
+                    setDeleting(false);
+                    setDeleteError(result.error ?? "No se pudo eliminar la cuenta.");
+                  }
+                  // On success the parent closes the modal (student no longer exists).
+                }}
+                disabled={deleting}
+                className="verbo-sdm-action inline-flex items-center justify-center gap-1.5 rounded-lg bg-destructive px-3 py-1.5 text-xs font-semibold text-destructive-foreground shadow-sm transition-all hover:brightness-110 disabled:opacity-50"
+              >
+                <Trash2 className="h-3.5 w-3.5" /> {deleting ? "Deleting…" : "Yes, delete permanently"}
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Footer actions */}
         <div className="flex flex-wrap items-center gap-2 border-t border-border bg-secondary/30 px-5 py-4 sm:px-7">
@@ -1630,6 +1678,12 @@ function StudentDetailModal({
               <Ban className="h-3.5 w-3.5" /> Suspend
             </button>
           )}
+          <button
+            onClick={() => setPanel((p) => (p === "delete" ? "none" : "delete"))}
+            className="verbo-sdm-action inline-flex items-center justify-center gap-1.5 rounded-lg border border-destructive px-3 py-1.5 text-xs font-semibold text-destructive shadow-sm transition-all hover:bg-destructive hover:text-destructive-foreground"
+          >
+            <Trash2 className="h-3.5 w-3.5" /> Delete permanently
+          </button>
           <button
             onClick={() => blocked && patch({ insights_strikes: 0 })}
             disabled={!blocked}
