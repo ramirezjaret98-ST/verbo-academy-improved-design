@@ -36,42 +36,42 @@ import {
 import { AnimatedNumber, Card, Pill, StatRing } from "@/components/verbo/ui";
 import { Confetti } from "@/components/verbo/Confetti";
 import { VerboAudioPlayer } from "@/components/verbo/VerboAudioPlayer";
-import airportSunsetAsset from "@/assets/airport-sunset.png.asset.json";
-import mountainsSunsetAsset from "@/assets/mountains-sunset.png.asset.json";
-import coreFoundationsAsset from "@/assets/corefoundations.png.asset.json";
-import strategicFluencyAsset from "@/assets/strategicfluency.png.asset.json";
-import executivePresenceAsset from "@/assets/executivepresence.png.asset.json";
-import globalLeadershipAsset from "@/assets/Globalleadership.png.asset.json";
-import kickstartAsset from "@/assets/kickstart.png.asset.json";
-import everydayFlowAsset from "@/assets/everydayflow.png.asset.json";
-import confidentVoiceAsset from "@/assets/confidenvoice.png.asset.json";
-import cultureMasterAsset from "@/assets/culturemaster.png.asset.json";
-import survivalBasicsAsset from "@/assets/survival_basics_2.png.asset.json";
-import travelReadyAsset from "@/assets/travelready.png.asset.json";
-import globalConnectorAsset from "@/assets/global_connector.png.asset.json";
-import worldFluencyAsset from "@/assets/worldfluency.png.asset.json";
+import airportSunsetAsset from "@/assets/airport-sunset.png";
+import mountainsSunsetAsset from "@/assets/mountains-sunset.png";
+import coreFoundationsAsset from "@/assets/corefoundations.png";
+import strategicFluencyAsset from "@/assets/strategicfluency.png";
+import executivePresenceAsset from "@/assets/executivepresence.png";
+import globalLeadershipAsset from "@/assets/Globalleadership.png";
+import kickstartAsset from "@/assets/kickstart.png";
+import everydayFlowAsset from "@/assets/everydayflow.png";
+import confidentVoiceAsset from "@/assets/confidenvoice.png";
+import cultureMasterAsset from "@/assets/culturemaster.png";
+import survivalBasicsAsset from "@/assets/survival_basics_2.png";
+import travelReadyAsset from "@/assets/travelready.png";
+import globalConnectorAsset from "@/assets/global_connector.png";
+import worldFluencyAsset from "@/assets/worldfluency.png";
 
 /** Per-level cover artwork (purely presentational). */
 const LEVEL_COVERS: Record<string, string> = {
-  "ENTERPRISE-L1": coreFoundationsAsset.url,
-  "ENTERPRISE-L2": strategicFluencyAsset.url,
-  "ENTERPRISE-L3": executivePresenceAsset.url,
-  "ENTERPRISE-L4": globalLeadershipAsset.url,
-  "GO-L1": kickstartAsset.url,
-  "GO-L2": everydayFlowAsset.url,
-  "GO-L3": confidentVoiceAsset.url,
-  "GO-L4": cultureMasterAsset.url,
-  "INTERNATIONAL-L1": survivalBasicsAsset.url,
-  "INTERNATIONAL-L2": travelReadyAsset.url,
-  "INTERNATIONAL-L3": globalConnectorAsset.url,
-  "INTERNATIONAL-L4": worldFluencyAsset.url,
+  "ENTERPRISE-L1": coreFoundationsAsset,
+  "ENTERPRISE-L2": strategicFluencyAsset,
+  "ENTERPRISE-L3": executivePresenceAsset,
+  "ENTERPRISE-L4": globalLeadershipAsset,
+  "GO-L1": kickstartAsset,
+  "GO-L2": everydayFlowAsset,
+  "GO-L3": confidentVoiceAsset,
+  "GO-L4": cultureMasterAsset,
+  "INTERNATIONAL-L1": survivalBasicsAsset,
+  "INTERNATIONAL-L2": travelReadyAsset,
+  "INTERNATIONAL-L3": globalConnectorAsset,
+  "INTERNATIONAL-L4": worldFluencyAsset,
 };
-import flamaNaranjaAsset from "@/assets/Flama_Naranja.svg.asset.json";
-import flamaAmarillaPequenaAsset from "@/assets/Flama_amarilla_pequena.svg.asset.json";
-import flamaAmarillaMedianaAsset from "@/assets/Flama_amarilla_mediana.svg.asset.json";
-import flamaRosaAsset from "@/assets/Flama_Rosa.svg.asset.json";
-import flamaNegraAsset from "@/assets/Flama_Negra.svg.asset.json";
-import smokeAsset from "@/assets/smoke.svg.asset.json";
+import flamaNaranjaAsset from "@/assets/Flama_Naranja.svg";
+import flamaAmarillaPequenaAsset from "@/assets/Flama_amarilla_pequena.svg";
+import flamaAmarillaMedianaAsset from "@/assets/Flama_amarilla_mediana.svg";
+import flamaRosaAsset from "@/assets/Flama_Rosa.svg";
+import flamaNegraAsset from "@/assets/Flama_Negra.svg";
+import smokeAsset from "@/assets/smoke.svg";
 import { useAuth } from "@/lib/auth";
 import { CurriculumBreadcrumb } from "@/components/verbo/CurriculumBreadcrumb";
 import type { User } from "@/lib/mock-data";
@@ -514,12 +514,12 @@ const STREAK_TIERS = [
 
 /** Flame artwork per streak tier. */
 const FLAME_ART: Record<string, string> = {
-  negra: flamaNegraAsset.url,
-  rosa: flamaRosaAsset.url,
-  amarilla_mediana: flamaAmarillaMedianaAsset.url,
-  amarilla_pequena: flamaAmarillaPequenaAsset.url,
-  naranja: flamaNaranjaAsset.url,
-  smoke: smokeAsset.url,
+  negra: flamaNegraAsset,
+  rosa: flamaRosaAsset,
+  amarilla_mediana: flamaAmarillaMedianaAsset,
+  amarilla_pequena: flamaAmarillaPequenaAsset,
+  naranja: flamaNaranjaAsset,
+  smoke: smokeAsset,
 };
 
 /** Streak tiers with the background gradient + flame artwork they use.
@@ -772,7 +772,7 @@ function LevelCard({
   const pct = state.totalUnits === 0 ? 0 : Math.round((state.passedUnits / state.totalUnits) * 100);
   const coverImage =
     LEVEL_COVERS[level.id] ??
-    (level.id.endsWith("-L2") ? airportSunsetAsset.url : mountainsSunsetAsset.url);
+    (level.id.endsWith("-L2") ? airportSunsetAsset : mountainsSunsetAsset);
 
   const clickable = !isLocked && !isCompleted;
 
