@@ -76,6 +76,8 @@ export interface StudentProfileFields {
   addon_bookclubs_per_month?: number;
   addon_spotlight_per_month?: number;
   addon_workshops_enabled?: boolean;
+  /** Login gate — reused by "Require Password Reset" in the admin form. */
+  must_change_password?: boolean;
 }
 
 /** Every DB-backed student profile field — the ONLY keys ever sent to the
@@ -83,6 +85,7 @@ export interface StudentProfileFields {
  *  `password` or Challenges state, are filtered out so PostgREST never sees an
  *  unknown column). */
 const STUDENT_PROFILE_FIELD_KEYS: (keyof StudentProfileFields)[] = [
+  "must_change_password",
   "current_level",
   "attendance_percentage",
   "company",

@@ -13,6 +13,7 @@
 // ============================================================================
 import { USERS } from "./mock-data";
 import { loadSessions, updateSession, type ExtSession } from "./sessions-store";
+import { patchTeacherProfile } from "./teacher-model";
 
 export type CancelReason = "illness" | "personal" | "major_issue" | "other";
 export type JustificationCause = "evidence_provided" | "force_majeure" | "illness";
@@ -38,8 +39,6 @@ export interface Strike {
 export const STRIKES_KEY = "verbo:teacher-strikes";
 export const STRIKES_EVENT = "verbo:teacher-strikes-updated";
 export const SIX_MONTHS_MS = 180 * 24 * 60 * 60 * 1000;
-/** localStorage key already used by admin.teachers.tsx for teacher overrides. */
-const PROFILE_KEY = "verbo:teacher-profile-overrides";
 
 export function loadStrikes(): Strike[] {
   if (typeof window === "undefined") return [];
@@ -89,23 +88,14 @@ export function recentStrikes(teacherId: string, now = Date.now()): Strike[] {
 // ---------------------------------------------------------------------------
 // Mutations
 // ---------------------------------------------------------------------------
-function writeProfileOverride(teacherId: string, patch: Record<string, unknown>) {
-  if (typeof window === "undefined") return;
-  try {
-    const raw = localStorage.getItem(PROFILE_KEY);
-    const map = raw ? JSON.parse(raw) : {};
-    map[teacherId] = { ...(map[teacherId] || {}), ...patch };
-    localStorage.setItem(PROFILE_KEY, JSON.stringify(map));
-  } catch { /* noop */ }
-}
-
 function autoFreezeIfNeeded(teacherId: string) {
   if (activeStrikeCount(teacherId) < 3) return;
   const u = USERS.find((x) => x.id === teacherId && x.role === "teacher");
   if (!u) return;
   if ((u.teacher_status ?? "active") === "frozen") return;
-  u.teacher_status = "frozen";
-  writeProfileOverride(teacherId, { teacher_status: "frozen" });
+  // Also stamp tier_frozen_since so the tier clock pauses — the manual admin
+  // freeze flow already did this; the auto-freeze path historically didn't.
+  patchTeacherProfile(teacherId, { teacher_status: "frozen", tier_frozen_since: new Date().toISOString() });
 }
 
 /** Full "Can't Attend" cancellation action for Performance Sessions.

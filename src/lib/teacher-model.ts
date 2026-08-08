@@ -5,6 +5,9 @@
 import { USERS, ASSIGNMENTS, SESSIONS, userById, type User, type Session } from "./mock-data";
 import { PRODUCTS, type ProductId } from "./student-model";
 import { effectiveHourlyRate, teacherTier } from "./teacher-tiers";
+import { supabase } from "@/integrations/supabase/client";
+import type { Database } from "@/integrations/supabase/types";
+import { legacyToUuid } from "@/lib/user-id-bridge";
 
 export const DEFAULT_HOURLY_RATE = 120; // MXN / hour
 export const AVAILABILITY_CHANGE_DAYS = 30; // teacher may request a change once per N days
@@ -159,4 +162,174 @@ export function pendingReviews(teacherId: string): Session[] {
 
 export function studentName(id: string): string {
   return userById(id)?.name ?? "—";
+}
+
+// ----------------------------------------------------------------------------
+// Supabase-backed teacher profile store (Lote 11) — mirrors students-store.ts.
+// ----------------------------------------------------------------------------
+export const TEACHERS_EVENT = "verbo:teachers-updated";
+/** Same key admin.teachers.tsx / strikes-store.ts / teacher-tiers.ts already use. */
+const TEACHER_PROFILE_KEY = "verbo:teacher-profile-overrides";
+
+function readTeacherOverrides(): Record<string, Partial<User>> {
+  if (typeof window === "undefined") return {};
+  try { return JSON.parse(localStorage.getItem(TEACHER_PROFILE_KEY) || "{}"); } catch { return {}; }
+}
+function writeTeacherOverrides(map: Record<string, Partial<User>>) {
+  if (typeof window !== "undefined") localStorage.setItem(TEACHER_PROFILE_KEY, JSON.stringify(map));
+}
+
+/** The DB-backed slice of `User` for teachers (same field names as the
+ *  `app_users` columns actually used by this profile). Keep in sync with the
+ *  `User` interface in mock-data.ts. */
+export interface TeacherProfileFields {
+  qualified_products?: QualifiedProduct[];
+  hourly_rate?: number;
+  teacher_status?: TeacherStatus;
+  hire_date?: string;
+  tier_frozen_since?: string | null;
+  tier_frozen_days?: number;
+  tier_reset_at?: string | null;
+  rating?: number;
+  plan_punctuality?: number;
+  report_punctuality?: number;
+  hours_month?: number;
+  hours_cycle?: number;
+  payment_frequency?: PaymentFrequency;
+  admin_notes?: string;
+  must_change_password?: boolean;
+}
+
+/** Every DB-backed teacher profile field — the ONLY keys ever sent to the
+ *  `app_users` UPDATE (extra keys the caller may pass, e.g. `password`,
+ *  `adjustments`, `payment_records`, `availability`, are filtered out so
+ *  PostgREST never sees an unknown column — they stay localStorage-only,
+ *  see patchTeacherProfile below). */
+const TEACHER_PROFILE_FIELD_KEYS: (keyof TeacherProfileFields)[] = [
+  "qualified_products", "hourly_rate", "teacher_status", "hire_date",
+  "tier_frozen_since", "tier_frozen_days", "tier_reset_at", "rating",
+  "plan_punctuality", "report_punctuality", "hours_month", "hours_cycle",
+  "payment_frequency", "admin_notes", "must_change_password",
+];
+
+type AppUsersUpdate = Database["public"]["Tables"]["app_users"]["Update"];
+
+/** Patch a teacher's profile. Accepts a full `Partial<User>` (not just the
+ *  DB-backed subset) because callers like admin.teachers.tsx's persist()
+ *  pass the entire updated User object, including fields that are NOT
+ *  migrated this lote (adjustments, payment_records, availability,
+ *  password). Behavior:
+ *   1. Optimistic: `Object.assign` onto the live USERS singleton entry +
+ *      dispatch TEACHERS_EVENT immediately.
+ *   2. ALWAYS merge the full `patch` (minus id/role) into the
+ *      `verbo:teacher-profile-overrides` localStorage map — this is a MERGE
+ *      (`{...(map[id]||{}), ...patch}`), never a full replace, so a caller
+ *      passing a tiny partial patch (e.g. strikes-store.ts freezing just
+ *      `teacher_status`) never wipes out previously-stored fields like
+ *      `adjustments`. This is what keeps `adjustments`/`payment_records`/
+ *      `availability` working exactly as before — they simply never leave
+ *      localStorage, by design, for this lote.
+ *   3. In the background, resolve `legacyToUuid(teacherId)`. If a real UUID
+ *      exists: build a Supabase update payload containing only the keys in
+ *      `TEACHER_PROFILE_FIELD_KEYS` that are present in `patch`, PLUS a
+ *      special case — `patch.availability_request` (a nested
+ *      `{ note, requested_on } | null` shape on the frontend `User` type)
+ *      is flattened into the two DB columns `availability_request_note` /
+ *      `availability_request_at`. Only call the Supabase update if the
+ *      resulting payload has at least one key. On error, roll back ONLY the
+ *      DB-backed keys on the in-memory USERS entry (not the localStorage
+ *      mirror, which already succeeded) and re-dispatch TEACHERS_EVENT. */
+export function patchTeacherProfile(teacherId: string, patch: Partial<User>): void {
+  const u = USERS.find((x) => x.id === teacherId);
+  const prev: Record<string, unknown> = {};
+  if (u) {
+    for (const key of Object.keys(patch)) {
+      prev[key] = (u as unknown as Record<string, unknown>)[key];
+    }
+    Object.assign(u, patch);
+  }
+  if (typeof window === "undefined") return;
+  const overrides = readTeacherOverrides();
+  const rest = { ...patch } as Partial<User>;
+  delete (rest as Partial<User>).id;
+  delete (rest as Partial<User>).role;
+  overrides[teacherId] = { ...(overrides[teacherId] ?? {}), ...rest };
+  writeTeacherOverrides(overrides);
+  window.dispatchEvent(new CustomEvent(TEACHERS_EVENT));
+  void (async () => {
+    const uuid = await legacyToUuid(teacherId);
+    // No real Supabase Auth account yet — the localStorage mirror above is
+    // the only persistence, matching pre-existing behavior.
+    if (uuid === null) return;
+    const dbPatch: AppUsersUpdate = {};
+    for (const key of TEACHER_PROFILE_FIELD_KEYS) {
+      if (key in patch) { (dbPatch as Record<string, unknown>)[key] = (patch as Record<string, unknown>)[key]; }
+    }
+    if ("availability_request" in patch) {
+      const ar = (patch as Partial<User>).availability_request;
+      (dbPatch as Record<string, unknown>).availability_request_note = ar?.note ?? null;
+      (dbPatch as Record<string, unknown>).availability_request_at = ar?.requested_on ?? null;
+    }
+    if (Object.keys(dbPatch).length === 0) return;
+    const { error } = await supabase.from("app_users").update(dbPatch).eq("id", uuid);
+    if (error) {
+      console.error("[teacher-model] failed to save teacher profile", error);
+      if (u) Object.assign(u, prev);
+      window.dispatchEvent(new CustomEvent(TEACHERS_EVENT));
+    }
+  })();
+}
+
+/** Hydrates teacher profile fields from Supabase into the USERS singleton.
+ *  Dual-source, same reasoning as hydrateStudents(): RLS on `app_users` only
+ *  returns "myself" or (if admin) "everyone" via `select("*")`, so a
+ *  non-admin, non-self viewer (e.g. a student peeking a teacher's card, or
+ *  the reschedule-teacher picker) needs the `teacher_profile_for_peek()` RPC
+ *  for the safe subset of fields. Call this once per relevant route mount,
+ *  same pattern as hydrateStudents(). */
+export function hydrateTeachers(): void {
+  if (typeof window === "undefined") return;
+  const overrides = readTeacherOverrides();
+  USERS.forEach((u) => { if (u.role === "teacher" && overrides[u.id]) Object.assign(u, overrides[u.id]); });
+  void (async () => {
+    const [selectRes, rpcRes] = await Promise.all([
+      supabase.from("app_users").select("*"),
+      supabase.rpc("teacher_profile_for_peek"),
+    ]);
+    if (selectRes.error) console.error("[teacher-model] failed to load app_users profiles", selectRes.error);
+    if (rpcRes.error) console.error("[teacher-model] failed to load teacher peek profiles", rpcRes.error);
+    const applyFullRow = (row: Record<string, unknown>) => {
+      const legacyId = row.legacy_id;
+      if (typeof legacyId !== "string" || !legacyId) return;
+      const u = USERS.find((x) => x.id === legacyId && x.role === "teacher");
+      if (!u) return;
+      for (const key of TEACHER_PROFILE_FIELD_KEYS) {
+        const value = row[key];
+        if (value !== null && value !== undefined) { (u as unknown as Record<string, unknown>)[key] = value; }
+      }
+      const note = row.availability_request_note as string | null | undefined;
+      const at = row.availability_request_at as string | null | undefined;
+      u.availability_request = note || at ? { note: note ?? "", requested_on: at ?? "" } : null;
+    };
+    const applyPeekRow = (row: Record<string, unknown>) => {
+      const legacyId = row.legacy_id;
+      if (typeof legacyId !== "string" || !legacyId) return;
+      const u = USERS.find((x) => x.id === legacyId && x.role === "teacher");
+      if (!u) return;
+      const peekKeys: (keyof TeacherProfileFields)[] = ["qualified_products", "teacher_status", "hire_date", "tier_frozen_since", "tier_frozen_days", "tier_reset_at", "rating", "hours_month"];
+      for (const key of peekKeys) {
+        const value = (row as Record<string, unknown>)[key];
+        if (value !== null && value !== undefined) { (u as unknown as Record<string, unknown>)[key] = value; }
+      }
+    };
+    for (const row of selectRes.data ?? []) applyFullRow(row as unknown as Record<string, unknown>);
+    for (const row of rpcRes.data ?? []) applyPeekRow(row as unknown as Record<string, unknown>);
+    if (!selectRes.error || !rpcRes.error) window.dispatchEvent(new CustomEvent(TEACHERS_EVENT));
+  })();
+}
+
+export function subscribeTeachers(cb: () => void): () => void {
+  if (typeof window === "undefined") return () => {};
+  window.addEventListener(TEACHERS_EVENT, cb);
+  return () => window.removeEventListener(TEACHERS_EVENT, cb);
 }

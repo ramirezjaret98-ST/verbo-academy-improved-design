@@ -88,6 +88,41 @@ function buildStudentProfilePatch(row: AppUserRow): Partial<User> {
   return patch;
 }
 
+/** The DB-backed TEACHER profile/commercial fields, copied from the
+ *  `app_users` row onto the built `User` so the freshly-logged-in teacher sees
+ *  real data before any page-level `hydrateTeachers()` runs. Uses the same
+ *  `?? undefined` + drop-undefined-keys pattern as buildStudentProfilePatch,
+ *  EXCEPT `availability_request`: `null` is a valid value there (no pending
+ *  request), so that key is always kept. */
+function buildTeacherProfilePatch(row: AppUserRow): Partial<User> {
+  const patch: Partial<User> = {
+    qualified_products: row.qualified_products ?? undefined,
+    hourly_rate: row.hourly_rate ?? undefined,
+    teacher_status: row.teacher_status ?? undefined,
+    hire_date: row.hire_date ?? undefined,
+    tier_frozen_since: row.tier_frozen_since ?? undefined,
+    tier_frozen_days: row.tier_frozen_days ?? undefined,
+    tier_reset_at: row.tier_reset_at ?? undefined,
+    rating: row.rating ?? undefined,
+    plan_punctuality: row.plan_punctuality ?? undefined,
+    report_punctuality: row.report_punctuality ?? undefined,
+    hours_month: row.hours_month ?? undefined,
+    hours_cycle: row.hours_cycle ?? undefined,
+    payment_frequency: row.payment_frequency ?? undefined,
+    admin_notes: row.admin_notes ?? undefined,
+  };
+  for (const k of Object.keys(patch) as (keyof User)[]) {
+    if (patch[k] === undefined) delete patch[k];
+  }
+  // Nested shape reconstructed from the two flat DB columns. `null` (no
+  // pending request) is meaningful — always include the key.
+  patch.availability_request =
+    row.availability_request_note || row.availability_request_at
+      ? { note: row.availability_request_note ?? "", requested_on: row.availability_request_at ?? "" }
+      : null;
+  return patch;
+}
+
 /** Builds the frontend `User` object from the real Supabase Auth session.
  *
  *  Every other store still lives in `localStorage`/`mock-data.ts` and is
@@ -127,6 +162,7 @@ async function buildUser(authId: string, email: string): Promise<User | null> {
     admin_type: typedRow.admin_type ?? undefined,
     must_change_password: typedRow.must_change_password,
     ...(typedRow.role === "student" ? buildStudentProfilePatch(typedRow) : {}),
+    ...(typedRow.role === "teacher" ? buildTeacherProfilePatch(typedRow) : {}),
   };
 }
 
