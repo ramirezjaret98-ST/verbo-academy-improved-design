@@ -594,6 +594,21 @@ export type Database = {
           },
         ]
       }
+      bonus_threshold_setting: {
+        Row: {
+          id: boolean
+          threshold: number
+        }
+        Insert: {
+          id?: boolean
+          threshold?: number
+        }
+        Update: {
+          id?: boolean
+          threshold?: number
+        }
+        Relationships: []
+      }
       challenge_submission_history: {
         Row: {
           id: number
@@ -2640,6 +2655,38 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "teacher_availability_blocks_teacher_id_fkey"
+            columns: ["teacher_id"]
+            isOneToOne: false
+            referencedRelation: "app_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      teacher_kpi_monthly_snapshots: {
+        Row: {
+          base_composite: number | null
+          month_key: string
+          refusals: number | null
+          teacher_id: string
+          updated_at: string
+        }
+        Insert: {
+          base_composite?: number | null
+          month_key: string
+          refusals?: number | null
+          teacher_id: string
+          updated_at?: string
+        }
+        Update: {
+          base_composite?: number | null
+          month_key?: string
+          refusals?: number | null
+          teacher_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "teacher_kpi_monthly_snapshots_teacher_id_fkey"
             columns: ["teacher_id"]
             isOneToOne: false
             referencedRelation: "app_users"
