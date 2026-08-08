@@ -66,7 +66,6 @@ function LoginPage() {
   const [overlayOpen, setOverlayOpen] = useState(false);
   const [tilt, setTilt] = useState({ x: 0, y: 0 });
 
-  const [showDevSandbox, setShowDevSandbox] = useState(false);
   const btnRef = useRef<HTMLButtonElement>(null);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
 
@@ -74,13 +73,6 @@ function LoginPage() {
 
   useEffect(() => () => { timers.current.forEach(clearTimeout); }, []);
   const later = (fn: () => void, ms: number) => { timers.current.push(setTimeout(fn, ms)); };
-
-  useEffect(() => {
-    const devFlag =
-      new URLSearchParams(window.location.search).get("dev") === "1" ||
-      window.localStorage.getItem("verbo_dev") === "1";
-    setShowDevSandbox(devFlag);
-  }, []);
 
   const phrase = useMemo(
     () => EXECUTIVE_PHRASES[Math.floor(Math.random() * EXECUTIVE_PHRASES.length)],
@@ -306,18 +298,6 @@ function LoginPage() {
           </form>
 
 
-          {showDevSandbox && (
-            <div className="verbo-glass-light mt-8 rounded-2xl p-4">
-              <div className="inline-flex items-center rounded-md bg-[#01304a]/5 px-2 py-0.5 font-mono text-[10px] font-semibold tracking-[0.15em] text-[#01304a]/70">
-                DEVELOPER SANDBOX
-              </div>
-              <ul className="mt-3 space-y-1.5 text-xs text-[#01304a]/75">
-                <li><span className="font-semibold text-[#01304a]">Student:</span> elena@student.com / student123</li>
-                <li><span className="font-semibold text-[#01304a]">Teacher:</span> sarah@verbo.com / teacher123</li>
-                <li><span className="font-semibold text-[#01304a]">Admin:</span> admin@verbo.com / admin123</li>
-              </ul>
-            </div>
-          )}
         </div>
 
         <div className="relative z-10 text-center text-xs text-[#01304a]/50">
