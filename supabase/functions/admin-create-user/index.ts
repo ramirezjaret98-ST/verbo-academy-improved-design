@@ -15,6 +15,18 @@
 // regular admin/coordinator could otherwise mint themselves a super_admin
 // account. Student/teacher creation keeps the original any-admin check.
 //
+// 2026-08-08 fix: the browser calls this function cross-origin
+// (app origin -> *.supabase.co), so any real call is preceded by a CORS
+// preflight OPTIONS request. This function had no OPTIONS handling and no
+// CORS response headers at all, so every preflight got the generic
+// "Method not allowed" 405 and the browser silently dropped the real POST
+// before it was ever sent. Net effect: EVERY teacher/student created via the
+// Admin panel since this function went live got added to the on-screen list
+// (optimistic local state) but never actually got a working Supabase login,
+// with only a console.error left behind — nothing visible to the admin.
+// Added a standard CORS preflight branch + Access-Control-Allow-* headers on
+// every response to fix this.
+//
 // NOTE: this file is kept here for version control / reference. It is
 // already deployed live to the Supabase project via the Management API —
 // uploading this copy through GitHub does NOT redeploy it. If you ever need
@@ -23,9 +35,19 @@
 // file in the repo.
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
+
 Deno.serve(async (req: Request) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { status: 204, headers: corsHeaders });
+  }
+
   if (req.method !== "POST") {
-    return new Response(JSON.stringify({ error: "Method not allowed" }), { status: 405, headers: { "Content-Type": "application/json" } });
+    return new Response(JSON.stringify({ error: "Method not allowed" }), { status: 405, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 
   const authHeader = req.headers.get("Authorization") ?? "";
@@ -37,7 +59,7 @@ Deno.serve(async (req: Request) => {
   const callerClient = createClient(url, anonKey, { global: { headers: { Authorization: authHeader } } });
   const { data: callerAuth, error: callerErr } = await callerClient.auth.getUser();
   if (callerErr || !callerAuth?.user) {
-    return new Response(JSON.stringify({ error: "Not authenticated" }), { status: 401, headers: { "Content-Type": "application/json" } });
+    return new Response(JSON.stringify({ error: "Not authenticated" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 
   // Service-role client — used for the admin-role check (bypasses RLS so this
@@ -49,29 +71,29 @@ Deno.serve(async (req: Request) => {
     .eq("id", callerAuth.user.id)
     .maybeSingle();
   if (callerRowErr || !callerRow || callerRow.role !== "admin") {
-    return new Response(JSON.stringify({ error: "Forbidden: admin only" }), { status: 403, headers: { "Content-Type": "application/json" } });
+    return new Response(JSON.stringify({ error: "Forbidden: admin only" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 
   let body: { legacyId?: string; email?: string; password?: string; name?: string; role?: string; adminType?: string };
   try {
     body = await req.json();
   } catch {
-    return new Response(JSON.stringify({ error: "Invalid JSON body" }), { status: 400, headers: { "Content-Type": "application/json" } });
+    return new Response(JSON.stringify({ error: "Invalid JSON body" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
   const { legacyId, email, password, name, role, adminType } = body;
   if (!legacyId || !email || !password || !name || (role !== "student" && role !== "teacher" && role !== "admin")) {
-    return new Response(JSON.stringify({ error: "legacyId, email, password, name and role ('student'|'teacher'|'admin') are required" }), { status: 400, headers: { "Content-Type": "application/json" } });
+    return new Response(JSON.stringify({ error: "legacyId, email, password, name and role ('student'|'teacher'|'admin') are required" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
   if (password.length < 6) {
-    return new Response(JSON.stringify({ error: "password must be at least 6 characters" }), { status: 400, headers: { "Content-Type": "application/json" } });
+    return new Response(JSON.stringify({ error: "password must be at least 6 characters" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
   if (role === "admin") {
     if (callerRow.admin_type !== "super_admin") {
-      return new Response(JSON.stringify({ error: "Forbidden: only Super Admin can create internal admin/coordinator accounts" }), { status: 403, headers: { "Content-Type": "application/json" } });
+      return new Response(JSON.stringify({ error: "Forbidden: only Super Admin can create internal admin/coordinator accounts" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
     const validAdminTypes = ["super_admin", "coordinator_ops", "coordinator_fin"];
     if (!validAdminTypes.includes(adminType ?? "")) {
-      return new Response(JSON.stringify({ error: "adminType ('super_admin'|'coordinator_ops'|'coordinator_fin') is required when role is 'admin'" }), { status: 400, headers: { "Content-Type": "application/json" } });
+      return new Response(JSON.stringify({ error: "adminType ('super_admin'|'coordinator_ops'|'coordinator_fin') is required when role is 'admin'" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
   }
 
@@ -82,7 +104,7 @@ Deno.serve(async (req: Request) => {
     user_metadata: { name, role },
   });
   if (createErr || !created?.user) {
-    return new Response(JSON.stringify({ error: createErr?.message ?? "Failed to create auth user" }), { status: 400, headers: { "Content-Type": "application/json" } });
+    return new Response(JSON.stringify({ error: createErr?.message ?? "Failed to create auth user" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 
   const { error: updateErr } = await admin
@@ -96,8 +118,8 @@ Deno.serve(async (req: Request) => {
   if (updateErr) {
     // Auth user exists but the app_users patch failed — surface this clearly
     // rather than leaving a silent half-created account with no legacy_id.
-    return new Response(JSON.stringify({ error: `Auth account created but failed to link legacy_id: ${updateErr.message}`, authUserId: created.user.id }), { status: 500, headers: { "Content-Type": "application/json" } });
+    return new Response(JSON.stringify({ error: `Auth account created but failed to link legacy_id: ${updateErr.message}`, authUserId: created.user.id }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 
-  return new Response(JSON.stringify({ id: created.user.id, legacyId }), { status: 200, headers: { "Content-Type": "application/json" } });
+  return new Response(JSON.stringify({ id: created.user.id, legacyId }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 });
