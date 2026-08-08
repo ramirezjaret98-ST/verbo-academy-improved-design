@@ -43,8 +43,8 @@ import {
 import { Card, PrimaryButton, GhostButton, AccentModalHeader, InfoStatRow, AnimatedNumber } from "@/components/verbo/ui";
 
 import { X, Video, AlertTriangle, Sparkles, CalendarClock, Clock, RefreshCcw, ArrowLeft, ChevronRight, Users as UsersIcon, BookOpen, Star } from "lucide-react";
-import spotlightArt from "@/assets/spotlight1.png.asset.json";
-import nextUpArt from "@/assets/Verbot_up_next.svg.asset.json";
+import spotlightArt from "@/assets/spotlight1.png";
+import nextUpArt from "@/assets/Verbot_up_next.svg";
 import { getLessonPlan } from "@/lib/lesson-plans-store";
 import { NextEventCard } from "@/components/verbo/NextEventCard";
 import { resolvePlanTopic } from "@/lib/product-courses-store";
@@ -209,7 +209,7 @@ function Page() {
             }}
           >
             <img
-              src={spotlightArt.url}
+              src={spotlightArt}
               alt=""
               aria-hidden="true"
               className="pointer-events-none absolute bottom-0 right-0 h-[110%] w-auto translate-y-[6%] select-none object-contain"

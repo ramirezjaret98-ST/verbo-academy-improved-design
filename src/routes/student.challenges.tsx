@@ -133,14 +133,14 @@ import {
   EQUIPPED_MAX,
 } from "@/lib/equipped-profile-badges-store";
 import { BadgePickerModal, BadgeVisual } from "@/components/verbo/ProfileModal";
-import fireIconAsset from "@/assets/fire-animation.svg.asset.json";
-import trophyIconAsset from "@/assets/trophy-animation.svg.asset.json";
-import confettiIconAsset from "@/assets/success-confetti.svg.asset.json";
-import verbotHeroAsset from "@/assets/Verbot_Challenges_hero.svg.asset.json";
-import crownIconAsset from "@/assets/crown-animation.svg.asset.json";
-import winnerBadgeAsset from "@/assets/winner-badge.svg.asset.json";
-import silverCoinAsset from "@/assets/silver-coin.svg.asset.json";
-import bronzeCoinAsset from "@/assets/bronze-coin.svg.asset.json";
+import fireIconAsset from "@/assets/fire-animation.svg";
+import trophyIconAsset from "@/assets/trophy-animation.svg";
+import confettiIconAsset from "@/assets/success-confetti.svg";
+import verbotHeroAsset from "@/assets/Verbot_Challenges_hero.svg";
+import crownIconAsset from "@/assets/crown-animation.svg";
+import winnerBadgeAsset from "@/assets/winner-badge.svg";
+import silverCoinAsset from "@/assets/silver-coin.svg";
+import bronzeCoinAsset from "@/assets/bronze-coin.svg";
 
 export const Route = createFileRoute("/student/challenges")({ component: Page });
 
@@ -2818,7 +2818,7 @@ function LeaderboardSection({
                   />
                   {first && (
                     <img
-                      src={crownIconAsset.url}
+                      src={crownIconAsset}
                       alt=""
                       aria-hidden
                       className="verbo-podium-float pointer-events-none absolute -top-1 left-1/2 h-10 w-10 -translate-x-1/2 object-contain drop-shadow"
@@ -2836,7 +2836,7 @@ function LeaderboardSection({
                       </div>
                     </div>
                     <img
-                      src={rank === 0 ? winnerBadgeAsset.url : rank === 1 ? silverCoinAsset.url : bronzeCoinAsset.url}
+                      src={rank === 0 ? winnerBadgeAsset : rank === 1 ? silverCoinAsset : bronzeCoinAsset}
                       alt={`Rank ${style.label}`}
                       className="absolute -bottom-3 left-1/2 h-12 w-12 -translate-x-1/2 object-contain drop-shadow"
                     />
@@ -2919,9 +2919,9 @@ function ChallengesHero({
   completed: number;
 }) {
   const stats = [
-    { icon: fireIconAsset.url, label: "Current streak", value: currentStreak },
-    { icon: trophyIconAsset.url, label: "Longest streak", value: longestStreak },
-    { icon: confettiIconAsset.url, label: "Completed", value: completed },
+    { icon: fireIconAsset, label: "Current streak", value: currentStreak },
+    { icon: trophyIconAsset, label: "Longest streak", value: longestStreak },
+    { icon: confettiIconAsset, label: "Completed", value: completed },
   ];
   return (
     <div className={`verbo-hero-enter relative overflow-hidden rounded-3xl bg-gradient-to-br ${gradient} p-7 text-white shadow-elevated`}>
@@ -2952,7 +2952,7 @@ function ChallengesHero({
 
       {/* Verbot mascot — cropped at the banner's right edge */}
       <img
-        src={verbotHeroAsset.url}
+        src={verbotHeroAsset}
         alt=""
         aria-hidden
         className="pointer-events-none absolute -bottom-[19%] right-[-4%] hidden h-[140%] w-auto select-none object-contain sm:block"

@@ -1,15 +1,15 @@
 import { createFileRoute } from "@tanstack/react-router";
-import experiencesClubs from "@/assets/experiences-clubs.png.asset.json";
-import teamsLogo from "@/assets/teams-logo.webp.asset.json";
-import verbotGif from "@/assets/Verbot_1.gif.asset.json";
-import verbotEmocionado from "@/assets/Verbot_emocionado.svg.asset.json";
-import verbotMotivado from "@/assets/Verbot_motivado.svg.asset.json";
-import verbotGuau from "@/assets/Verbot_guau.svg.asset.json";
-import verbotEmoji from "@/assets/Verbot_emoji.svg.asset.json";
-import verbotMolesto from "@/assets/Verbot_molesto.svg.asset.json";
-import verbotEnojado from "@/assets/Verbot_enojado.svg.asset.json";
-import verbotFurioso from "@/assets/Verbot_furioso.svg.asset.json";
-import verbotStageZero from "@/assets/stage_0_verbot.svg.asset.json";
+import experiencesClubs from "@/assets/experiences-clubs.png";
+import teamsLogo from "@/assets/teams-logo.webp";
+import verbotGif from "@/assets/Verbot_1.gif";
+import verbotEmocionado from "@/assets/Verbot_emocionado.svg";
+import verbotMotivado from "@/assets/Verbot_motivado.svg";
+import verbotGuau from "@/assets/Verbot_guau.svg";
+import verbotEmoji from "@/assets/Verbot_emoji.svg";
+import verbotMolesto from "@/assets/Verbot_molesto.svg";
+import verbotEnojado from "@/assets/Verbot_enojado.svg";
+import verbotFurioso from "@/assets/Verbot_furioso.svg";
+import verbotStageZero from "@/assets/stage_0_verbot.svg";
 
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
@@ -89,18 +89,18 @@ import { EVENT_KIND_META, CALENDAR_STATUS_META, calendarEventTheme } from "@/lib
 import { RatingModal } from "@/components/verbo/RatingModal";
 import { ReportConductModal } from "@/components/verbo/ReportConductModal";
 import { CantAttendRouter, RescheduleRequestModal } from "@/components/verbo/CancelSessionFlow";
-import micIconAsset from "@/assets/yellow-mic.svg.asset.json";
-import pencilIconAsset from "@/assets/pencil-animation.svg.asset.json";
-import soundWavesIconAsset from "@/assets/sound-waves.svg.asset.json";
-import bookIconAsset from "@/assets/book-icon.svg.asset.json";
+import micIconAsset from "@/assets/yellow-mic.svg";
+import pencilIconAsset from "@/assets/pencil-animation.svg";
+import soundWavesIconAsset from "@/assets/sound-waves.svg";
+import bookIconAsset from "@/assets/book-icon.svg";
 import { useAvatar } from "@/lib/avatar-store";
 import { ProfilePeekCard } from "@/components/verbo/ProfilePeekCard";
 
 const MACRO_ICON_ASSETS: Record<string, string> = {
-  Speaking: micIconAsset.url,
-  Writing: pencilIconAsset.url,
-  Listening: soundWavesIconAsset.url,
-  Reading: bookIconAsset.url,
+  Speaking: micIconAsset,
+  Writing: pencilIconAsset,
+  Listening: soundWavesIconAsset,
+  Reading: bookIconAsset,
 };
 
 
@@ -216,15 +216,15 @@ function attendanceThemeFor(pct: number): AttendanceTheme {
 
 /** Verbot expression artwork by band name. */
 const VERBOT_EXPRESSIONS: Record<string, string> = {
-  emocionado: verbotEmocionado.url,
-  motivado: verbotMotivado.url,
-  guau: verbotGuau.url,
-  emoji: verbotEmoji.url,
-  molesto: verbotMolesto.url,
-  enojado: verbotEnojado.url,
-  furioso: verbotFurioso.url,
+  emocionado: verbotEmocionado,
+  motivado: verbotMotivado,
+  guau: verbotGuau,
+  emoji: verbotEmoji,
+  molesto: verbotMolesto,
+  enojado: verbotEnojado,
+  furioso: verbotFurioso,
   // No "triste" artwork uploaded yet — reuse the closest expression.
-  triste: verbotFurioso.url,
+  triste: verbotFurioso,
 };
 
 
@@ -464,7 +464,7 @@ function StudentDashboard() {
       <header className="verbo-fade-up motion-reduce:animate-none flex flex-wrap items-center justify-between gap-4" style={{ animationDelay: "0ms" }}>
         <div className="flex items-center gap-3">
           <img
-            src={verbotGif.url}
+            src={verbotGif}
             alt="Verbo mascot"
             className="h-24 w-auto shrink-0"
           />
@@ -612,7 +612,7 @@ function StudentDashboard() {
             decorative={
               <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-[2rem]" aria-hidden>
                 <img
-                  src={verbotStageZero.url}
+                  src={verbotStageZero}
                   alt=""
                   aria-hidden
                   className="absolute -top-4 right-0 h-[150%] w-auto select-none object-contain opacity-[0.08]"
@@ -944,7 +944,7 @@ function StudentDashboard() {
                             >
                               <div className="absolute inset-x-0 top-0 z-10 h-px" style={{ background: stripeColor }} />
                               <img
-                                src={teamsLogo.url}
+                                src={teamsLogo}
                                 alt=""
                                 aria-hidden
                                 className="pointer-events-none absolute -right-3 top-1/2 z-0 h-[155%] w-auto -translate-y-1/2 select-none object-contain opacity-[0.05]"
@@ -990,7 +990,7 @@ function StudentDashboard() {
 
                                 <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
                                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                    <img src={teamsLogo.url} alt="Microsoft Teams" className="h-5 w-5 shrink-0 object-contain" />
+                                    <img src={teamsLogo} alt="Microsoft Teams" className="h-5 w-5 shrink-0 object-contain" />
                                     <span>Microsoft Teams Meeting · {fmt(s.date_time)}</span>
                                   </div>
                                   <div className="flex items-center gap-2">
@@ -1035,7 +1035,7 @@ function StudentDashboard() {
                             >
                               <div className="absolute inset-x-0 top-0 z-10 h-px" style={{ background: stripeColor }} />
                               <img
-                                src={teamsLogo.url}
+                                src={teamsLogo}
                                 alt=""
                                 aria-hidden
                                 className="pointer-events-none absolute -right-3 top-1/2 z-0 h-[155%] w-auto -translate-y-1/2 select-none object-contain opacity-[0.05]"
@@ -1071,7 +1071,7 @@ function StudentDashboard() {
 
                               <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
                                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                  <img src={teamsLogo.url} alt="Microsoft Teams" className="h-5 w-5 shrink-0 object-contain" />
+                                  <img src={teamsLogo} alt="Microsoft Teams" className="h-5 w-5 shrink-0 object-contain" />
                                   <span>Microsoft Teams Meeting · {fmt(club.date)}</span>
                                 </div>
                                 <div className="flex items-center gap-2">
@@ -1123,7 +1123,7 @@ function StudentDashboard() {
           {/* Verbo Experiences */}
           <PremiumCard hover className="group card-gradient-violet relative overflow-visible">
             <img
-              src={experiencesClubs.url}
+              src={experiencesClubs}
               alt="Two students laughing together during a live conversation club"
               className="shadow-elevated pointer-events-none absolute right-2 top-[-28%] w-[48%] -rotate-6 rounded-2xl object-cover"
             />

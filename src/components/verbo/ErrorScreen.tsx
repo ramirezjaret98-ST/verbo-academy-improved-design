@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { PrimaryButton, GhostButton } from "@/components/verbo/ui";
-import verbotError from "@/assets/Verbot_error.svg.asset.json";
+import verbotError from "@/assets/Verbot_error.svg";
 
 /** Navy used across the brand for primary actions. */
 const NAVY = "#01304a";
@@ -42,7 +42,7 @@ export function ErrorScreen({
         {/* Mascot — cropped from the top, same treatment as the other Verbots. */}
         <div className="mb-6 h-40 w-40 overflow-hidden sm:h-48 sm:w-48">
           <img
-            src={verbotError.url}
+            src={verbotError}
             alt=""
             aria-hidden
             className="h-auto w-full -translate-y-[6%] select-none object-contain"

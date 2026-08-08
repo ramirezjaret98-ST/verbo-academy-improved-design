@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/dialog";
 import { GhostButton, PrimaryButton, AccentModalHeader } from "@/components/verbo/ui";
 import { ShieldAlert } from "lucide-react";
-import verbotReport from "@/assets/Verbot_report.svg.asset.json";
+import verbotReport from "@/assets/Verbot_report.svg";
 
 /** Same red the design system resolves for `bg-destructive`. */
 const DESTRUCTIVE = "#dc2626";
@@ -125,7 +125,7 @@ export function ReportConductModal({ studentId, open, onClose, watermarkImageUrl
               icon={ShieldAlert}
               eyebrow="MISCONDUCT REPORT"
               title="Report misconduct"
-              watermark={{ type: "image", src: watermarkImageUrl ?? verbotReport.url }}
+              watermark={{ type: "image", src: watermarkImageUrl ?? verbotReport }}
               onClose={handleClose}
             />
 

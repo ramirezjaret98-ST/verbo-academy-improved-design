@@ -4,12 +4,12 @@ import { Logo } from "@/components/verbo/Logo";
 import { Footer } from "@/components/verbo/Footer";
 import { Preloader } from "@/components/verbo/Preloader";
 import { ArrowRight, Gift, MessageCircle, MessageSquare, Zap } from "lucide-react";
-import heroImage from "@/assets/hero_image.png.asset.json";
-import yellowCardImage from "@/assets/yello_card_image.webp.asset.json";
-import purpleCardImage from "@/assets/purple_card_image.webp.asset.json";
-import redCardImage from "@/assets/red_card_image.webp.asset.json";
-import greenCardImage from "@/assets/green_card_image.webp.asset.json";
-import navyCardImage from "@/assets/navy_card_image.webp.asset.json";
+import heroImage from "@/assets/hero_image.png";
+import yellowCardImage from "@/assets/yello_card_image.webp";
+import purpleCardImage from "@/assets/purple_card_image.webp";
+import redCardImage from "@/assets/red_card_image.webp";
+import greenCardImage from "@/assets/green_card_image.webp";
+import navyCardImage from "@/assets/navy_card_image.webp";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -169,7 +169,7 @@ function Landing() {
                   style={{ animationDelay: "0ms" }}
                 >
                   <img
-                    src={heroImage.url}
+                    src={heroImage}
                     alt="Professional students with notebooks and backpack ready to learn"
                     className="h-full w-full object-contain"
                   />
@@ -250,7 +250,7 @@ function Landing() {
                   tone="navy"
                   imageSide="left"
                   variants={item}
-                  image={{ src: yellowCardImage.url, alt: "Student learning on his phone" }}
+                  image={{ src: yellowCardImage, alt: "Student learning on his phone" }}
                   artClassName="sm:left-[-5%] sm:bottom-[-7%] sm:h-[102%]"
                   title="Learn on Your Own Terms"
                   body={
@@ -267,7 +267,7 @@ function Landing() {
                   tone="navy"
                   imageSide="right"
                   variants={item}
-                  image={{ src: purpleCardImage.url, alt: "Two people talking in English" }}
+                  image={{ src: purpleCardImage, alt: "Two people talking in English" }}
                   artClassName="sm:right-0 sm:bottom-[-4%] sm:h-[92%]"
                   watermarks={
                     <>
@@ -297,7 +297,7 @@ function Landing() {
                   imageSide="bottom"
                   variants={item}
                   className="md:col-span-2 lg:col-span-1 lg:row-span-2"
-                  image={{ src: redCardImage.url, alt: "Students taking on challenges together" }}
+                  image={{ src: redCardImage, alt: "Students taking on challenges together" }}
                   artClassName="sm:left-1/2 sm:-translate-x-1/2 sm:bottom-0 sm:h-[64%]"
                   
                   watermarks={
@@ -327,7 +327,7 @@ function Landing() {
                   tone="navy"
                   imageSide="right"
                   variants={item}
-                  image={{ src: greenCardImage.url, alt: "Student celebrating her progress" }}
+                  image={{ src: greenCardImage, alt: "Student celebrating her progress" }}
                   artClassName="sm:right-0 sm:bottom-[-7%] sm:h-[102%]"
                   title="Track real, tangible progress"
                   body={
@@ -343,7 +343,7 @@ function Landing() {
                   tone="light"
                   imageSide="left"
                   variants={item}
-                  image={{ src: navyCardImage.url, alt: "Verbo Academy instructors" }}
+                  image={{ src: navyCardImage, alt: "Verbo Academy instructors" }}
                   artClassName="sm:left-[-2%] sm:bottom-[-2%] sm:h-[97%]"
                   
 

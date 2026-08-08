@@ -5,7 +5,7 @@ import { ChevronRight } from "lucide-react";
 import { EVENT_KIND_META, type CalendarEvent } from "@/lib/calendar-events";
 import { userById } from "@/lib/mock-data";
 import { getLessonPlan } from "@/lib/lesson-plans-store";
-import nextUpArt from "@/assets/Verbot_up_next.svg.asset.json";
+import nextUpArt from "@/assets/Verbot_up_next.svg";
 
 function fmtDT(iso: string) {
   return new Date(iso).toLocaleString([], { weekday: "short", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
@@ -38,7 +38,7 @@ export function NextEventCard({ events, onEventClick }: { events: CalendarEvent[
     >
       <div className="card-gradient-lime pointer-events-none absolute inset-0 z-0 overflow-hidden rounded-3xl border border-border shadow-floating" />
       <img
-        src={nextUpArt.url}
+        src={nextUpArt}
         alt=""
         aria-hidden="true"
         className="pointer-events-none absolute bottom-0 right-0 z-[1] h-[92%] w-auto select-none object-contain object-bottom"

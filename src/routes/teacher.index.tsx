@@ -7,9 +7,9 @@ import { AccentModal, AccentModalHeader, AccentModalFooter, AnimatedNumber, Card
 import { SkeletonStatCards, useHydrated } from "@/components/verbo/skeletons";
 
 import { rankLabel } from "@/lib/staff-profile-store";
-import alertIconAsset from "@/assets/Alert.svg.asset.json";
-import planIconAsset from "@/assets/plan.svg.asset.json";
-import completeIconAsset from "@/assets/complete.svg.asset.json";
+import alertIconAsset from "@/assets/Alert.svg";
+import planIconAsset from "@/assets/plan.svg";
+import completeIconAsset from "@/assets/complete.svg";
 
 import { CalendarClock, ClipboardCheck, FileEdit, X, Lock, Plus, Trash2, Download, CheckCircle2, Mic, PenLine, Ear, BookOpen, ChevronRight, Video, Star, AlertTriangle, AlertCircle, Trophy, CalendarDays, Users, Wallet, Sparkles as SparklesIcon, GraduationCap, type LucideIcon } from "lucide-react";
 import { savePerformance, type PerformanceRating } from "@/lib/performance-store";
@@ -34,15 +34,15 @@ import { loadClubReports, subscribeClubReports, type ClubReport } from "@/lib/cl
 import { ClubReportModal, type ClubReportEventInput } from "@/components/verbo/ClubReportModal";
 import { RatingTrendModal } from "@/components/verbo/RatingTrendModal";
 import { getCoverageNoteForStudent } from "@/lib/coverage-notes-store";
-import studentsIconAsset from "@/assets/students_assigned.svg.asset.json";
-import upcomingIconAsset from "@/assets/Upcoming_sessions.svg.asset.json";
-import starIconAsset from "@/assets/Star.svg.asset.json";
-import performanceIconAsset from "@/assets/performance.svg.asset.json";
-import availabilityIconAsset from "@/assets/availability.svg.asset.json";
-import tailoredIconAsset from "@/assets/vip-tailored.svg.asset.json";
+import studentsIconAsset from "@/assets/students_assigned.svg";
+import upcomingIconAsset from "@/assets/Upcoming_sessions.svg";
+import starIconAsset from "@/assets/Star.svg";
+import performanceIconAsset from "@/assets/performance.svg";
+import availabilityIconAsset from "@/assets/availability.svg";
+import tailoredIconAsset from "@/assets/vip-tailored.svg";
 
-import clubsIconAsset from "@/assets/clubs.svg.asset.json";
-import balanceIconAsset from "@/assets/balance.svg.asset.json";
+import clubsIconAsset from "@/assets/clubs.svg";
+import balanceIconAsset from "@/assets/balance.svg";
 
 export const Route = createFileRoute("/teacher/")({
   // Optional deep-link from the Calendar page → auto-open the Session Report
@@ -547,7 +547,7 @@ function TeacherDashboard() {
         <Link to="/teacher/students" className="verbo-td-in verbo-td-press block cursor-pointer" style={{ animationDelay: "0ms" }}>
           <HeroStatCard className="!items-start border border-border bg-card">
             <div className="absolute right-4 top-4 flex items-center justify-center sm:right-6 sm:top-6">
-              <img src={studentsIconAsset.url} alt="" className="h-10 w-10 sm:h-[52px] sm:w-[52px]" />
+              <img src={studentsIconAsset} alt="" className="h-10 w-10 sm:h-[52px] sm:w-[52px]" />
             </div>
             <div className="relative w-full">
               <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground sm:text-xs">
@@ -563,7 +563,7 @@ function TeacherDashboard() {
         <Link to="/teacher/calendar" className="verbo-td-in verbo-td-press block cursor-pointer" style={{ animationDelay: "45ms" }}>
           <HeroStatCard className="!items-start border border-border bg-card">
             <div className="absolute right-4 top-4 flex items-center justify-center sm:right-6 sm:top-6">
-              <img src={upcomingIconAsset.url} alt="" className="h-10 w-10 sm:h-[52px] sm:w-[52px]" />
+              <img src={upcomingIconAsset} alt="" className="h-10 w-10 sm:h-[52px] sm:w-[52px]" />
             </div>
             <div className="relative w-full">
               <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground sm:text-xs">
@@ -587,7 +587,7 @@ function TeacherDashboard() {
             style={{ ["--verbo-focus-pulse-color" as any]: ratingGlow } as React.CSSProperties}
           >
             <div className="absolute right-4 top-4 flex items-center justify-center sm:right-6 sm:top-6">
-              <img src={starIconAsset.url} alt="" className="h-10 w-10 sm:h-[52px] sm:w-[52px]" />
+              <img src={starIconAsset} alt="" className="h-10 w-10 sm:h-[52px] sm:w-[52px]" />
             </div>
             <div className="relative w-full">
               <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground sm:text-xs">
@@ -606,7 +606,7 @@ function TeacherDashboard() {
             style={{ ["--verbo-focus-pulse-color" as any]: performanceGlow } as React.CSSProperties}
           >
             <div className="absolute right-4 top-4 flex items-center justify-center sm:right-6 sm:top-6">
-              <img src={performanceIconAsset.url} alt="" className="h-10 w-10 sm:h-[52px] sm:w-[52px]" />
+              <img src={performanceIconAsset} alt="" className="h-10 w-10 sm:h-[52px] sm:w-[52px]" />
             </div>
             <div className="relative w-full">
               <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground sm:text-xs">
@@ -648,7 +648,7 @@ function TeacherDashboard() {
             title: "Needs Your Attention",
             sub: attention.length === 0 ? "You're all caught up" : `${attention.length} item${attention.length === 1 ? "" : "s"} need review`,
             gradient: "card-gradient-crimson",
-            icon: alertIconAsset.url,
+            icon: alertIconAsset,
             count: attention.length,
             pulse: attention.length > 0 ? CRIMSON : null,
           },
@@ -658,7 +658,7 @@ function TeacherDashboard() {
             title: "Plan Your Upcoming Sessions",
             sub: `${toPlanAll.length} session${toPlanAll.length === 1 ? "" : "s"} to plan`,
             gradient: "card-gradient-violet",
-            icon: planIconAsset.url,
+            icon: planIconAsset,
             count: toPlanAll.length,
             pulse: null,
           },
@@ -668,7 +668,7 @@ function TeacherDashboard() {
             title: "Complete Your Sessions",
             sub: `${awaitingCompletion.length + pendingClubEvents.length} session${awaitingCompletion.length + pendingClubEvents.length === 1 ? "" : "s"} awaiting completion`,
             gradient: "card-gradient-lime",
-            icon: completeIconAsset.url,
+            icon: completeIconAsset,
             count: awaitingCompletion.length + pendingClubEvents.length,
             pulse: null,
           },
@@ -955,10 +955,10 @@ function TeacherDashboard() {
             <span className="text-[11px] font-medium text-primary-foreground/60">Jump straight in</span>
           </div>
           <div className="grid divide-y divide-border sm:grid-cols-2 sm:divide-y-0 lg:grid-cols-4">
-            <QuickAction to="/teacher/availability" iconSrc={availabilityIconAsset.url} label="My Availability" hint="Set your weekly slots" delay={0} />
-            <QuickAction to="/teacher/clubs" iconSrc={clubsIconAsset.url} label="Available Clubs" hint="Claim open sessions" delay={45} />
-            <QuickAction to="/teacher/financial" iconSrc={balanceIconAsset.url} label="My Balance" hint="Earnings & payouts" delay={90} />
-            <QuickAction to="/teacher/tailored-content" iconSrc={tailoredIconAsset.url} label="Tailored Content" hint="Prepare your personalized sessions" delay={135} />
+            <QuickAction to="/teacher/availability" iconSrc={availabilityIconAsset} label="My Availability" hint="Set your weekly slots" delay={0} />
+            <QuickAction to="/teacher/clubs" iconSrc={clubsIconAsset} label="Available Clubs" hint="Claim open sessions" delay={45} />
+            <QuickAction to="/teacher/financial" iconSrc={balanceIconAsset} label="My Balance" hint="Earnings & payouts" delay={90} />
+            <QuickAction to="/teacher/tailored-content" iconSrc={tailoredIconAsset} label="Tailored Content" hint="Prepare your personalized sessions" delay={135} />
             {hasVipStudent && (
               <QuickAction to="/teacher/vip" icon={GraduationCap} label="Course Builder VIP" hint="Design VIP tracks" delay={180} />
 

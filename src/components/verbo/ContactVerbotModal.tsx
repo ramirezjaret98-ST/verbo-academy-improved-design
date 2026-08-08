@@ -1,14 +1,14 @@
 import { AccentModal } from "@/components/verbo/ui";
 
-import contactIcon from "@/assets/contact.svg.asset.json";
-import contactRobotIcon from "@/assets/contact-robot.png.asset.json";
+import contactIcon from "@/assets/contact.svg";
+import contactRobotIcon from "@/assets/contact-robot.png";
 
-import supportIcon from "@/assets/support.svg.asset.json";
-import academicIcon from "@/assets/academic.svg.asset.json";
-import instagramIcon from "@/assets/Instagram_Logo_Effect.svg.asset.json";
-import facebookIcon from "@/assets/Facebook_Animated_Icon.svg.asset.json";
-import linkedinIcon from "@/assets/linkedin_icon.svg.asset.json";
-import websiteIcon from "@/assets/Logo.svg.asset.json";
+import supportIcon from "@/assets/support.svg";
+import academicIcon from "@/assets/academic.svg";
+import instagramIcon from "@/assets/Instagram_Logo_Effect.svg";
+import facebookIcon from "@/assets/Facebook_Animated_Icon.svg";
+import linkedinIcon from "@/assets/linkedin_icon.svg";
+import websiteIcon from "@/assets/Logo.svg";
 import { openContactModal, closeContactModal, useContactModalOpen } from "@/lib/contact-modal";
 
 interface ContactOption {
@@ -28,12 +28,12 @@ interface ContactOption {
  * side — they are used verbatim, no message is built here.
  */
 const OPTIONS: ContactOption[] = [
-  { label: "Support", description: "Account, billing, or platform questions", href: "https://wa.link/zomggz", iconSrc: supportIcon.url, color: "#5fca16" },
-  { label: "Academic team", description: "Questions about your classes or content", href: "https://wa.link/638ofg", iconSrc: academicIcon.url, color: "#01304a" },
-  { label: "Instagram", description: "See what we're up to", href: "https://www.instagram.com/verbo_language_solutions", iconSrc: instagramIcon.url, color: "#a34ac0" },
-  { label: "Facebook", description: "See what we're up to", href: "https://www.facebook.com/people/Verbo-Language-Solutions/61576604487318/", iconSrc: facebookIcon.url, color: "#1877f2" },
-  { label: "LinkedIn", description: "Connect with us", href: "https://www.linkedin.com/company/verbo-language-solutions/", iconSrc: linkedinIcon.url, color: "#0a66c2" },
-  { label: "Our website", description: "Learn more about Verbo", href: "https://verbolanguagesolutions.com/", iconSrc: websiteIcon.url, color: "#f38934", wide: true, pulse: true },
+  { label: "Support", description: "Account, billing, or platform questions", href: "https://wa.link/zomggz", iconSrc: supportIcon, color: "#5fca16" },
+  { label: "Academic team", description: "Questions about your classes or content", href: "https://wa.link/638ofg", iconSrc: academicIcon, color: "#01304a" },
+  { label: "Instagram", description: "See what we're up to", href: "https://www.instagram.com/verbo_language_solutions", iconSrc: instagramIcon, color: "#a34ac0" },
+  { label: "Facebook", description: "See what we're up to", href: "https://www.facebook.com/people/Verbo-Language-Solutions/61576604487318/", iconSrc: facebookIcon, color: "#1877f2" },
+  { label: "LinkedIn", description: "Connect with us", href: "https://www.linkedin.com/company/verbo-language-solutions/", iconSrc: linkedinIcon, color: "#0a66c2" },
+  { label: "Our website", description: "Learn more about Verbo", href: "https://verbolanguagesolutions.com/", iconSrc: websiteIcon, color: "#f38934", wide: true, pulse: true },
 ];
 
 /** Navbar trigger — reused in the Student, Teacher and Admin panels. */
@@ -53,7 +53,7 @@ export function ContactVerbotButton({ variant = "light" }: { variant?: "light" |
         style={{ boxShadow: "0 0 18px 6px rgba(95,202,22,0.35)", backgroundColor: "rgba(95,202,22,0.14)" }}
       />
       <img
-        src={contactIcon.url}
+        src={contactIcon}
         alt=""
         aria-hidden
         className={`relative h-8 w-8 select-none object-contain ${variant === "dark" ? "" : ""}`}
@@ -71,7 +71,7 @@ export function ContactVerbotModal() {
     <AccentModal
       background="linear-gradient(135deg, #01304a 0%, #024a6e 100%)"
       iconTint="#ffffff"
-      logoSrc={contactRobotIcon.url}
+      logoSrc={contactRobotIcon}
       eyebrow="Contact VERBOT"
       title="Need help or want to say hi?"
       watermark={{ type: "text", value: "HELLO" }}
