@@ -3273,6 +3273,13 @@ export type Database = {
           video_call_link: string
         }[]
       }
+      legacy_id_lookup: {
+        Args: never
+        Returns: {
+          id: string
+          legacy_id: string
+        }[]
+      }
       replace_teacher_availability: {
         Args: { p_blocks: Json; p_confirmed_at: string; p_teacher_id: string }
         Returns: undefined
