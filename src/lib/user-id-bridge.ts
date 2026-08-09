@@ -6,6 +6,31 @@
 // Any store migrating a `student_id`/`teacher_id`/`admin_id` uuid column
 // should use this instead of inventing its own lookup, so every store stays
 // consistent and the mapping is only fetched/cached once.
+//
+// 2026-08-08 fix: this used to fetch the mapping via a plain
+// `supabase.from("app_users").select("id, legacy_id")`. That's fine for an
+// admin session (the `app_users_select` RLS policy lets admin read every
+// row), but for a TEACHER or STUDENT session that same policy only returns
+// the CALLER's own row (`id = auth.uid() OR is_admin()`) — so the bridge
+// silently ended up with a map containing only the signed-in user's own
+// mapping. Any lookup for someone ELSE's id (e.g. a teacher resolving a
+// student's UUID, or vice versa) then fell through to the raw-UUID
+// fallback in `uuidToLegacySync`/returned `null` from `legacyToUuid`,
+// breaking cross-user id resolution for every non-admin session — the
+// actual root cause behind a real bug where a teacher's own roster (and
+// anything else keyed by another user's legacy id) came up empty even
+// though the underlying data/RLS/assignment were all correct. Fixed by
+// reading through the new `legacy_id_lookup()` RPC instead — a
+// `SECURITY DEFINER` function (same "peek" pattern as
+// `user_avatar_for_peek()`/`teacher_profile_for_peek()`) that returns
+// `id`/`legacy_id` for every user with no row filter and no other columns.
+// `legacy_id` is just an internal join key (no more sensitive than a UUID
+// on its own — already broadcast this way for avatars via
+// `user_avatar_for_peek()`), but that RPC also returns `avatar_url`, and in
+// this project some of those are multi-megabyte base64 data URLs — calling
+// it just to read two small columns would pull that entire payload on every
+// bridge hydrate. `legacy_id_lookup()` returns only the two columns this
+// file actually needs.
 import { supabase } from "@/integrations/supabase/client";
 
 let legacyToUuidMap = new Map<string, string>();
@@ -17,7 +42,7 @@ async function hydrate(): Promise<void> {
   if (hydrated) return;
   if (hydratePromise) return hydratePromise;
   hydratePromise = (async () => {
-    const { data, error } = await supabase.from("app_users").select("id, legacy_id");
+    const { data, error } = await supabase.rpc("legacy_id_lookup");
     if (error) {
       console.error("[user-id-bridge] failed to load app_users ids", error);
       hydratePromise = null;
