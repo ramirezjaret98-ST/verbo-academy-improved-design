@@ -121,9 +121,9 @@ export function Footer({ nav = [] }: { nav?: FooterNavGroup[] }) {
           <Logo dark />
           <div className="flex flex-col gap-3 text-[11px] font-light uppercase tracking-[0.16em] text-white/45 md:flex-row md:items-center md:gap-8">
             <span>© 2026 Verbo Language Solutions. All rights reserved.</span>
-            <span className={placeholderCls} aria-disabled="true">
+            <Link to="/terms" className={linkCls}>
               Terms &amp; Conditions
-            </span>
+            </Link>
             <Link to="/privacy" className={linkCls}>
               Privacy Policy
             </Link>
