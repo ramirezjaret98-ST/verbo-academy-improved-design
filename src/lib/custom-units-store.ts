@@ -31,6 +31,13 @@ export interface CustomUnit {
   kind: CustomUnitKind;
   /** Explicit ordering within a (kind, student). Falls back to created_at. */
   order?: number;
+  /** Optional intro video — same slot as the institutional catalog's
+   *  video_url, but never required (VIP/Tailored units are per-student and
+   *  free-form by design, see plan_elite_verbo_academy memory). */
+  video_url?: string;
+  /** Optional free-text section label so Admin can visually group units
+   *  (e.g. "Block 1") without forcing the fixed 3x10 institutional structure. */
+  block?: string;
 }
 
 export const CUSTOM_UNITS_EVENT = "verbo:custom-units-updated";
@@ -48,6 +55,8 @@ function fromUnitRow(row: UnitRow): CustomUnit {
     created_at: row.created_at,
     kind: row.kind,
     order: row.position ?? undefined,
+    video_url: row.video_url ?? undefined,
+    block: row.block ?? undefined,
   };
 }
 
@@ -150,6 +159,8 @@ export function addCustomUnit(
   title: string,
   fileUrl: string,
   fileName?: string,
+  videoUrl?: string,
+  block?: string,
 ): CustomUnit {
   const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
   const order = unitsCache.filter((u) => u.kind === kind && u.student_id === studentId).length;
@@ -162,6 +173,8 @@ export function addCustomUnit(
     created_at: new Date().toISOString(),
     kind,
     order,
+    video_url: videoUrl,
+    block,
   };
   unitsCache = [...unitsCache, unit];
   notify();
@@ -183,6 +196,8 @@ export function addCustomUnit(
         file_url: fileUrl,
         file_name: fileName ?? null,
         position: order,
+        video_url: videoUrl ?? null,
+        block: block ?? null,
       })
       .select()
       .single();
@@ -234,6 +249,8 @@ export async function addCustomUnitsBulk(
         file_url: u.file_url,
         file_name: u.file_name ?? null,
         position: u.order ?? null,
+        video_url: u.video_url ?? null,
+        block: u.block ?? null,
       })),
     )
     .select();
@@ -275,6 +292,8 @@ export function validateBulkUnits(
     if (!title) { errs.push(`${tag}: falta title.`); return; }
     const fileUrl = typeof o.file_url === "string" ? o.file_url.trim() : "";
     const fileName = o.file_name !== undefined ? str(o.file_name) : undefined;
+    const videoUrl = typeof o.video_url === "string" ? o.video_url.trim() || undefined : undefined;
+    const block = o.block !== undefined ? str(o.block) || undefined : undefined;
     const order = typeof o.order === "number" && Number.isFinite(o.order) ? o.order : base + seq;
     seq += 1;
     valid.push({
@@ -286,6 +305,8 @@ export function validateBulkUnits(
       created_at: new Date().toISOString(),
       kind,
       order,
+      video_url: videoUrl,
+      block,
     });
   });
 
@@ -307,6 +328,8 @@ export function updateCustomUnit(
     if (patch.file_url !== undefined) dbPatch.file_url = patch.file_url;
     if (patch.file_name !== undefined) dbPatch.file_name = patch.file_name ?? null;
     if (patch.order !== undefined) dbPatch.position = patch.order;
+    if (patch.video_url !== undefined) dbPatch.video_url = patch.video_url ?? null;
+    if (patch.block !== undefined) dbPatch.block = patch.block ?? null;
     const numericId = Number(id);
     const { error } = await supabase.from("custom_units").update(dbPatch).eq("id", numericId);
     if (error) {

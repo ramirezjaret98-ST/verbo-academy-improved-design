@@ -30,8 +30,15 @@ export function unitsForStudent(studentId: string): VipUnit[] {
   return customUnitsForStudent("vip", studentId);
 }
 
-export function addVipUnit(studentId: string, title: string, fileUrl: string, fileName?: string): VipUnit {
-  return addCustomUnit("vip", studentId, title, fileUrl, fileName);
+export function addVipUnit(
+  studentId: string,
+  title: string,
+  fileUrl: string,
+  fileName?: string,
+  videoUrl?: string,
+  block?: string,
+): VipUnit {
+  return addCustomUnit("vip", studentId, title, fileUrl, fileName, videoUrl, block);
 }
 
 export function updateVipUnit(id: string, patch: Partial<Omit<VipUnit, "id" | "student_id" | "created_at">>) {

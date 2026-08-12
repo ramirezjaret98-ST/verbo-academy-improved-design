@@ -31,8 +31,15 @@ export function tailoredUnitsForStudent(studentId: string): TailoredUnit[] {
   return customUnitsForStudent("tailored", studentId);
 }
 
-export function addTailoredUnit(studentId: string, title: string, fileUrl: string, fileName?: string): TailoredUnit {
-  return addCustomUnit("tailored", studentId, title, fileUrl, fileName);
+export function addTailoredUnit(
+  studentId: string,
+  title: string,
+  fileUrl: string,
+  fileName?: string,
+  videoUrl?: string,
+  block?: string,
+): TailoredUnit {
+  return addCustomUnit("tailored", studentId, title, fileUrl, fileName, videoUrl, block);
 }
 
 export function updateTailoredUnit(id: string, patch: Partial<Omit<TailoredUnit, "id" | "student_id" | "created_at">>) {
