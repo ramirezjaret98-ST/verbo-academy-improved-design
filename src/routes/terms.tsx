@@ -5,7 +5,7 @@ import { Logo } from "@/components/verbo/Logo";
 export const Route = createFileRoute("/terms")({
   head: () => ({
     meta: [
-      { title: "Terms & Conditions — Verbo Language Solutions" },
+      { title: "Terms & Conditions | Verbo Language Solutions" },
       {
         name: "description",
         content:
@@ -89,16 +89,16 @@ function TermsPage() {
           Solutions and what we expect from you as a student on the platform. If you signed a
           separate service agreement with us (for example, for an Enterprise, GO, International,
           or VIP program), that agreement covers your specific pricing, package, and payment
-          terms — these Terms &amp; Conditions cover how the platform itself works and how we
+          terms. These Terms &amp; Conditions cover how the platform itself works and how we
           expect everyone to behave on it. If the two ever conflict on a specific point, your
           signed agreement takes priority.
         </P>
 
         <section className="mt-12">
-          <SectionTitle>01 — Your Account</SectionTitle>
+          <SectionTitle>01. Your Account</SectionTitle>
           <P>
             Your account is personal and yours alone. Don't share your login with anyone else,
-            and don't use someone else's account — including a classmate's, a coworker's, or a
+            and don't use someone else's account, including a classmate's, a coworker's, or a
             family member's. You're responsible for anything that happens under your account, so
             keep your password private and let us know right away if you think someone else has
             access to it.
@@ -111,51 +111,63 @@ function TermsPage() {
         </section>
 
         <section className="mt-10">
-          <SectionTitle>02 — What's Included In Your Access</SectionTitle>
+          <SectionTitle>02. What's Included In Your Access</SectionTitle>
           <P>
-            Verbo runs several programs — Enterprise, GO, International, and VIP/Tailored Content
-            — and within each one you're enrolled in a specific access plan (Core, Advance, Elite,
+            Verbo runs several programs (Enterprise, GO, International, and VIP/Tailored Content),
+            and within each one you're enrolled in a specific access plan (Core, Advance, Elite,
             or Signature) that determines things like how many sessions, clubs, and workshops you
-            can book per month. The exact package you're entitled to — number of sessions, levels,
-            duration, and price — is the one described in your enrollment or your company's
-            service agreement, not this page. This page covers the rules of using the platform
-            itself.
+            can book per month. The exact package you're entitled to, including number of
+            sessions, levels, duration, and price, is the one described in your enrollment or
+            your company's service agreement, not this page. This page covers the rules of using
+            the platform itself.
           </P>
         </section>
 
         <section className="mt-10">
-          <SectionTitle>03 — Scheduling, Rescheduling &amp; Cancellations</SectionTitle>
+          <SectionTitle>03. Scheduling, Rescheduling &amp; Cancellations</SectionTitle>
+          <P>
+            Any cancellation or rescheduling request must go exclusively through Verbo Academy's
+            official channels (see Contact Us, Section 13). We don't process these directly with
+            a teacher. We're committed to always securing and honoring your scheduled time slot,
+            but moving a session to a new time is subject to availability, and it doesn't come
+            with any compensation if a preferred new time isn't available.
+          </P>
           <P>
             Sessions, clubs, and workshops need to be booked, changed, or cancelled at least{" "}
             <strong className="text-white">24 hours in advance</strong>. This applies no matter
-            the reason — including work commitments, personal matters, or anything else. We know
+            the reason, including work commitments, personal matters, or anything else. We know
             that's not always convenient, but it's what lets us keep schedules fair for teachers
             and other students, and it applies the same way to everyone.
           </P>
           <P>
+            You have <strong className="text-white">30 calendar days</strong> from a session's
+            original date to reschedule it. Once that window closes, the session can no longer be
+            rescheduled and is not refundable.
+          </P>
+          <P>
             Some session types (like Spotlight Sessions) are limited-availability and tied
             directly to a teacher's time. If you cancel one of these with less than 24 hours'
-            notice, you lose the session credit and we may apply a late-cancellation charge —
-            converting a group session into a Spotlight Session doesn't refund the credit either,
+            notice, you lose the session credit and we may apply a late-cancellation charge.
+            Converting a group session into a Spotlight Session doesn't refund the credit either,
             since the seat is already reserved for you.
           </P>
           <P>
             You're responsible for having a stable internet connection, a working device, and an
             up-to-date video call app for your sessions. If you miss a session or show up late
             because of a problem on your end (bad connection, an old device, an outdated app),
-            that session still counts as delivered — we won't automatically reschedule or refund
-            it. If the problem is on our side (a platform outage, a teacher not showing up, and
-            similar cases), we'll make it right and reschedule at no cost to you.
+            that session still counts as delivered, and we won't automatically reschedule or
+            refund it. If the problem is on our side (a platform outage, a teacher not showing up,
+            and similar cases), we'll make it right and reschedule at no cost to you.
           </P>
         </section>
 
         <section className="mt-10">
-          <SectionTitle>04 — Payments</SectionTitle>
+          <SectionTitle>04. Payments</SectionTitle>
           <P>
             Payment terms, due dates, and what happens if a payment is late are set out in your
             enrollment or your company's service agreement, and we'll always tell you clearly if
             access is at risk because of an unpaid balance before we act on it. Your payment
-            obligations don't change based on personal, financial, or work circumstances — if
+            obligations don't change based on personal, financial, or work circumstances. If
             you're going through something difficult, talk to us. We may be able to work
             something out, but that's a courtesy we offer at our discretion, not something built
             into these Terms.
@@ -163,10 +175,10 @@ function TermsPage() {
         </section>
 
         <section className="mt-10">
-          <SectionTitle>05 — Working With Teachers &amp; Staff</SectionTitle>
+          <SectionTitle>05. Working With Teachers &amp; Staff</SectionTitle>
           <P>
             Everything related to payments, rescheduling, changes to your plan, or special
-            requests needs to go through Verbo's official channels — not directly with a teacher,
+            requests needs to go through Verbo's official channels, not directly with a teacher,
             even informally, even outside class hours. This applies to every member of our team,
             without exception. Any arrangement that isn't confirmed in writing by our
             administrative team doesn't count, no matter who agreed to it verbally.
@@ -178,7 +190,7 @@ function TermsPage() {
               "Asking a teacher directly for a discount, a makeup class, or a schedule change instead of going through official channels.",
               <>
                 Offering, arranging, or accepting private lessons with a Verbo teacher outside the
-                platform — during your enrollment, and for 12 months after it ends. This is a
+                platform, during your enrollment and for 12 months after it ends. This is a
                 serious violation and can result in immediate account termination without refund.
               </>,
             ]}
@@ -186,7 +198,7 @@ function TermsPage() {
         </section>
 
         <section className="mt-10">
-          <SectionTitle>06 — Conduct &amp; Community Standards</SectionTitle>
+          <SectionTitle>06. Conduct &amp; Community Standards</SectionTitle>
           <P>
             We want every session, club, and workshop to feel safe and professional for students,
             teachers, and staff alike.
@@ -220,17 +232,17 @@ function TermsPage() {
         </section>
 
         <section className="mt-10">
-          <SectionTitle>07 — Course Content &amp; Intellectual Property</SectionTitle>
+          <SectionTitle>07. Course Content &amp; Intellectual Property</SectionTitle>
           <P>
             All course materials, curricula, activities, and content on the platform belong to
             Verbo Language Solutions. Your access gives you a personal license to use them for
-            your own learning — it isn't a license to copy, resell, or share them with anyone
+            your own learning. It isn't a license to copy, resell, or share them with anyone
             else, during your enrollment or afterward.
           </P>
         </section>
 
         <section className="mt-10">
-          <SectionTitle>08 — Teacher Assignment</SectionTitle>
+          <SectionTitle>08. Teacher Assignment</SectionTitle>
           <P>
             We may assign, rotate, or substitute teachers as needed to keep your sessions running
             reliably. That's part of how we operate the platform and isn't a change to your plan
@@ -239,29 +251,30 @@ function TermsPage() {
         </section>
 
         <section className="mt-10">
-          <SectionTitle>09 — No Guaranteed Results</SectionTitle>
+          <SectionTitle>09. No Guaranteed Results</SectionTitle>
           <P>
             Verbo is committed to giving you a well-structured program and qualified teachers, but
-            how quickly you improve depends on a lot of factors we don't control — how much you
-            practice, your starting point, and your consistency, among others. We don't guarantee
-            a specific outcome, score, or timeline, and we make reasonable efforts to keep the
-            platform available and reliable but can't promise it will be free of interruptions.
+            how quickly you improve depends on a lot of factors we don't control, like how much
+            you practice, your starting point, and your consistency, among others. We don't
+            guarantee a specific outcome, score, or timeline, and we make reasonable efforts to
+            keep the platform available and reliable but can't promise it will be free of
+            interruptions.
           </P>
         </section>
 
         <section className="mt-10">
-          <SectionTitle>10 — Suspension &amp; Termination</SectionTitle>
+          <SectionTitle>10. Suspension &amp; Termination</SectionTitle>
           <P>
             We can suspend or terminate access to the platform for violations of these Terms, for
             unresolved non-payment under your service agreement, or for conduct that puts other
             students, teachers, or staff at risk. Where these Terms say a violation costs you your
-            refund or credit, that's what applies — the specific financial terms of ending your
+            refund or credit, that's what applies. The specific financial terms of ending your
             enrollment early are set out in your service agreement.
           </P>
         </section>
 
         <section className="mt-10">
-          <SectionTitle>11 — Changes To These Terms</SectionTitle>
+          <SectionTitle>11. Changes To These Terms</SectionTitle>
           <P>
             We may update these Terms from time to time as the platform evolves. When we make a
             meaningful change, we'll update the date at the top of this page and let you know
@@ -271,36 +284,44 @@ function TermsPage() {
         </section>
 
         <section className="mt-10">
-          <SectionTitle>12 — Governing Law &amp; Disputes</SectionTitle>
+          <SectionTitle>12. Governing Law &amp; Disputes</SectionTitle>
           <P>
             These Terms are governed by the laws of Mexico. Any dispute that can't be resolved
-            directly between you and Verbo will be submitted to the courts of{" "}
-            <span className="text-white/70">
-              [CIUDAD, ESTADO — PLAZA DONDE OPERA VERBO]
-            </span>
-            , Mexico, and both parties waive any other jurisdiction that might otherwise apply —
+            directly between you and Verbo will be submitted to the courts of Apizaco, Tlaxcala,
+            Mexico, and both parties waive any other jurisdiction that might otherwise apply,
             including for students located outside of Mexico.
           </P>
         </section>
 
         <section className="mt-10">
-          <SectionTitle>13 — Contact Us</SectionTitle>
-          <P>
-            Questions about these Terms, or about your account? Reach us through the official
-            channels listed in the footer of this site (WhatsApp, or our social media pages), or
-            through your assigned administrator.
-          </P>
+          <SectionTitle>13. Contact Us</SectionTitle>
+          <P>Questions about these Terms, or about your account? Reach us through:</P>
+          <ul className="mt-4 space-y-2 pl-1 text-sm leading-relaxed" style={{ color: "#cbd5e1" }}>
+            <li>
+              <span className="text-white/80">WhatsApp (official line):</span>{" "}
+              <a href="https://wa.me/522461152136" className="text-[#f7b54a] hover:underline">
+                (+52) 246 115 2136
+              </a>
+            </li>
+            <li>
+              <span className="text-white/80">General inquiries:</span>{" "}
+              <a href="mailto:info@verbolanguagesolutions.com" className="text-[#f7b54a] hover:underline">
+                info@verbolanguagesolutions.com
+              </a>
+            </li>
+            <li>
+              <span className="text-white/80">Academic / scheduling matters:</span>{" "}
+              <a href="mailto:academic@verbolanguagesolutions.com" className="text-[#f7b54a] hover:underline">
+                academic@verbolanguagesolutions.com
+              </a>
+            </li>
+          </ul>
         </section>
 
         <div className="mt-16 border-t border-white/5 pt-8">
-          <p className="text-xs leading-relaxed text-white/30">
-            This document is a legal base prepared with the assistance of AI for Verbo Language
-            Solutions. We recommend it be reviewed by a licensed Mexican corporate attorney before
-            being relied on in an actual dispute.
-          </p>
           <Link
             to="/"
-            className="mt-8 inline-flex items-center gap-2 text-sm font-medium text-white/70 transition-colors duration-200 hover:text-[#f38934]"
+            className="inline-flex items-center gap-2 text-sm font-medium text-white/70 transition-colors duration-200 hover:text-[#f38934]"
           >
             <ArrowLeft className="h-4 w-4" />
             Back to Home Page
