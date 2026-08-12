@@ -1227,6 +1227,44 @@ export type Database = {
           },
         ]
       }
+      custom_course_meta: {
+        Row: {
+          cover_image: string | null
+          created_at: string
+          id: number
+          kind: Database["public"]["Enums"]["custom_unit_kind"]
+          student_id: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          cover_image?: string | null
+          created_at?: string
+          id?: number
+          kind: Database["public"]["Enums"]["custom_unit_kind"]
+          student_id: string
+          title?: string
+          updated_at?: string
+        }
+        Update: {
+          cover_image?: string | null
+          created_at?: string
+          id?: number
+          kind?: Database["public"]["Enums"]["custom_unit_kind"]
+          student_id?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "custom_course_meta_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "app_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       custom_unit_completions: {
         Row: {
           completed_at: string
@@ -1262,6 +1300,7 @@ export type Database = {
       }
       custom_units: {
         Row: {
+          block: string | null
           created_at: string
           file_name: string | null
           file_url: string
@@ -1270,8 +1309,10 @@ export type Database = {
           position: number | null
           student_id: string
           title: string
+          video_url: string | null
         }
         Insert: {
+          block?: string | null
           created_at?: string
           file_name?: string | null
           file_url: string
@@ -1280,8 +1321,10 @@ export type Database = {
           position?: number | null
           student_id: string
           title: string
+          video_url?: string | null
         }
         Update: {
+          block?: string | null
           created_at?: string
           file_name?: string | null
           file_url?: string
@@ -1290,6 +1333,7 @@ export type Database = {
           position?: number | null
           student_id?: string
           title?: string
+          video_url?: string | null
         }
         Relationships: [
           {
