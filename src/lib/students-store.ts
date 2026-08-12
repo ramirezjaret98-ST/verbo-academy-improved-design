@@ -263,15 +263,60 @@ export function setStudentVideoLink(studentId: string, link: string) {
 }
 
 /** Adjust an individual student's remaining_sessions by `delta` (can be negative).
- *  Result is clamped to [0, hired_sessions]. Persists via patchStudentProfile
- *  and broadcasts STUDENTS_EVENT. */
+ *  Result is clamped to [0, hired_sessions].
+ *
+ *  2026-08-12 fix: this used to go through `patchStudentProfile`, which issues
+ *  a plain `app_users` UPDATE as the CALLER. That works when the caller is
+ *  the student themself or an admin (matches `app_users_update_self` RLS:
+ *  `id = auth.uid() OR is_admin()`), but the real-world caller here is most
+ *  often a TEACHER submitting a Session Report for their own student —
+ *  neither the row's own id nor an admin, so RLS silently drops the write
+ *  (PostgREST returns 0 rows affected with no error). The optimistic local
+ *  mutation made it LOOK like it worked in the teacher's own browser, but
+ *  nothing persisted, so the student's real `remaining_sessions` in Supabase
+ *  never moved (confirmed live: two real "absent" reports submitted by a
+ *  teacher, remaining_sessions stayed unchanged). Now goes through the
+ *  `adjust_remaining_sessions` RPC (`SECURITY DEFINER`, same "peek/action"
+ *  pattern as `accept_lightning`/`upsert_session_member_statuses`), which
+ *  checks `private.is_admin() OR private.teaches_student(...)` instead — so
+ *  a teacher acting on their own assigned student is authorized, and the
+ *  clamped math happens server-side (source of truth), not just locally. */
 export function adjustRemainingSessions(studentId: string, delta: number) {
   const u = USERS.find((x) => x.id === studentId);
   if (!u) return;
   const hired = u.hired_sessions ?? 0;
   const current = u.remaining_sessions ?? 0;
   const next = Math.max(0, Math.min(hired, current + delta));
-  patchStudentProfile(studentId, { remaining_sessions: next });
+  // Optimistic local update so the UI (this session's own tab) reflects the
+  // change immediately, same as the rest of this store's writes.
+  u.remaining_sessions = next;
+  if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent(STUDENTS_EVENT));
+
+  void (async () => {
+    const uuid = await legacyToUuid(studentId);
+    if (uuid === null) {
+      // Locally-registered-only student (no real app_users row) — nothing to
+      // persist server-side, the optimistic mutation above is all there is.
+      return;
+    }
+    const { data, error } = await supabase.rpc("adjust_remaining_sessions", {
+      p_student_id: uuid,
+      p_delta: delta,
+    });
+    if (error) {
+      console.error("[students-store] failed to adjust remaining_sessions", error);
+      u.remaining_sessions = current; // roll back the optimistic mutation
+      if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent(STUDENTS_EVENT));
+      return;
+    }
+    // Reconcile with the server's own clamped value (source of truth) in
+    // case of a race with another concurrent adjustment.
+    const row = (Array.isArray(data) ? data[0] : data) as { remaining_sessions?: number } | null;
+    if (row && typeof row.remaining_sessions === "number" && u.remaining_sessions !== row.remaining_sessions) {
+      u.remaining_sessions = row.remaining_sessions;
+      if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent(STUDENTS_EVENT));
+    }
+  })();
 }
 
 /** Toggle a completed level into "Reopened for Review" (read-only student access). */
