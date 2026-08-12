@@ -24,7 +24,8 @@ import {
   DIFFICULTY_ORDER,
   loadChallenges,
   subscribeChallenges,
-  challengesFor,
+  challengesForAccount,
+  challengeProductsFor,
   categoryColor,
 } from "@/lib/challenges-store";
 import { loadFlashChallenges } from "@/lib/flash-challenges-store";
@@ -101,8 +102,10 @@ function Page() {
     return subscribeStudents(refresh);
   }, [teacherId]);
 
+  // VIP has no dedicated catalog — preview the same union of content-bearing
+  // products a VIP student actually sees (see challenges-store.ts).
   const productChallenges = useMemo(
-    () => challenges.filter((c) => c.product === productId),
+    () => challenges.filter((c) => challengeProductsFor(productId).includes(c.product)),
     [challenges, productId],
   );
 
@@ -195,7 +198,7 @@ function Page() {
   );
 
   if (difficulty) {
-    const list = challengesFor(challenges, productId, difficulty);
+    const list = challengesForAccount(challenges, productId, difficulty);
     const availableCategories = Array.from(
       new Set(list.map((c) => c.category).filter((c): c is string => !!c)),
     );

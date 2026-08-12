@@ -54,6 +54,8 @@ import {
   loadChallenges,
   subscribeChallenges,
   challengesFor,
+  challengeProductsFor,
+  challengesForAccount,
 } from "@/lib/challenges-store";
 import { totalCompletedChallenges } from "@/lib/student-model";
 import {
@@ -696,8 +698,11 @@ function Page() {
   const gradient = PRODUCT_GRADIENTS[productId] ?? PRODUCT_GRADIENTS.enterprise;
   const hasPremiumAccess = PREMIUM_ACCESS.includes(student.access_plan ?? "");
 
+  // VIP has no dedicated Challenges catalog of its own — it reads the union
+  // of every content-bearing product (same engine, same content an Elite
+  // student already sees), instead of an always-empty exact-match filter.
   const productChallenges = useMemo(
-    () => challenges.filter((c) => c.product === productId),
+    () => challenges.filter((c) => challengeProductsFor(productId).includes(c.product)),
     [challenges, productId],
   );
 
@@ -724,7 +729,7 @@ function Page() {
 
   /* ---------------- Screen 2: challenge list ---------------- */
   if (difficulty) {
-    const list = challengesFor(challenges, productId, difficulty);
+    const list = challengesForAccount(challenges, productId, difficulty);
     const availableCategories = Array.from(
       new Set(list.map((c) => c.category).filter((c): c is string => !!c)),
     );

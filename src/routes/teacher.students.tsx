@@ -11,7 +11,7 @@ import {
 import { hydrateStudents, subscribeStudents } from "@/lib/students-store";
 import { groupOfStudent, subscribeGroups, effectiveSessionCounts, sessionProgressFor } from "@/lib/groups-store";
 import {
-  loadChallenges, subscribeChallenges, challengesFor, categoryColor,
+  loadChallenges, subscribeChallenges, challengesForAccount, categoryColor,
   DIFFICULTY_META, DIFFICULTY_ORDER,
   type Challenge, type ChallengeProductId, type DifficultyId,
 } from "@/lib/challenges-store";
@@ -696,7 +696,7 @@ function StudentDetailModal({
               {/* Difficulty filter cards — only the selected tier expands. */}
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                 {DIFFICULTY_ORDER.map((diff) => {
-                  const count = challengesFor(challenges, challengeProductId, diff).length;
+                  const count = challengesForAccount(challenges, challengeProductId, diff).length;
                   const active = openDifficulty === diff;
                   return (
                     <button
@@ -721,7 +721,7 @@ function StudentDetailModal({
               </div>
 
               {openDifficulty && (() => {
-                const list = challengesFor(challenges, challengeProductId, openDifficulty);
+                const list = challengesForAccount(challenges, challengeProductId, openDifficulty);
                 if (list.length === 0) {
                   return (
                     <p className="text-xs text-muted-foreground">
@@ -756,7 +756,7 @@ function StudentDetailModal({
                 </p>
               )}
 
-              {DIFFICULTY_ORDER.every((d) => challengesFor(challenges, challengeProductId, d).length === 0) && (
+              {DIFFICULTY_ORDER.every((d) => challengesForAccount(challenges, challengeProductId, d).length === 0) && (
                 <p className="text-xs text-muted-foreground">
                   No challenges published yet for this product.
                 </p>
