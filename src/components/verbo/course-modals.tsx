@@ -473,6 +473,69 @@ function PhaseGroup({ label, list, onRemove, onEdit, editingId, showTag }: {
     </div>
   );
 }
+/** Read-only activities viewer — Teacher's window into VIP/Tailored unit
+ *  activities now that content management is Admin-only (2026-08-12 permission
+ *  revert). Same pre/post grouping as ActivityModal, but no create form and no
+ *  edit/delete controls (those would silently fail against the tightened RLS
+ *  anyway — better to not show buttons that don't work). */
+export function ActivityViewModal({ unitId, unitTitle, onClose, accent }: {
+  unitId: string;
+  unitTitle: string;
+  onClose: () => void;
+  accent?: ModalAccent;
+}) {
+  const existing = useMemo(() => activitiesForUnit(unitId), [unitId]);
+  const preList = existing.filter((a) => phaseOf(a) === "pre");
+  const postList = existing.filter((a) => phaseOf(a) === "post");
+
+  return (
+    <ModalShell title="Activities" subtitle={`${unitTitle} · view only`} onClose={onClose} width="max-w-lg" accent={accent}>
+      <div className="space-y-1 p-6">
+        {existing.length === 0 && (
+          <div className="rounded-lg border border-dashed border-border bg-secondary/30 p-4 text-center text-xs text-muted-foreground">
+            No activities built for this unit yet.
+          </div>
+        )}
+        <ReadOnlyPhaseGroup label="Pre-Session" list={preList} />
+        <ReadOnlyPhaseGroup label="Post-Session" list={postList} showTag />
+      </div>
+      <ModalFooter>
+        <GhostButton onClick={onClose}>Close</GhostButton>
+      </ModalFooter>
+    </ModalShell>
+  );
+}
+
+function ReadOnlyPhaseGroup({ label, list, showTag }: { label: string; list: Activity[]; showTag?: boolean }) {
+  if (list.length === 0) return null;
+  return (
+    <div className="mt-3 first:mt-0">
+      <div className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{label} · {list.length}</div>
+      <ul className="space-y-2">
+        {list.map((a) => (
+          <li key={a.id} className="flex items-center justify-between gap-2 rounded-lg border border-border bg-background px-3 py-2">
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5">
+                <span className="truncate text-xs font-semibold text-foreground">{a.name}</span>
+                {showTag && <Pill tone="warning">Post-Session</Pill>}
+              </div>
+              <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                <span>{EXERCISE_LABELS[a.type]}</span>
+                {a.category && (
+                  <>
+                    <span>·</span>
+                    <span className={isMandatoryCategory(a.category) ? "font-semibold text-accent" : ""}>{categoryLabel(a.category)}</span>
+                  </>
+                )}
+              </div>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 export function BulkUploadModal({ unitId, unitTitle, onClose, onImported, zClass }: {
   unitId: string;
   unitTitle: string;
