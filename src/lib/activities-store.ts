@@ -311,6 +311,10 @@ export interface UnitAccessEvent {
 }
 
 let activitiesCache: Activity[] = [];
+// Temp (optimistic) activity ids that were deleted before their insert
+// round-tripped — see addActivity()/removeActivity(). Module-level because
+// both functions need to see the same set across independent calls.
+const pendingTempDeletes = new Set<string>();
 // The three per-student maps keep the exact legacy shapes, keyed by
 // `${legacyStudentId}::${unitId|activityId}` so every old read helper stays
 // a trivial lookup. RLS already limits the rows each session can see.
@@ -499,6 +503,24 @@ export function addActivity(a: Activity) {
       return;
     }
     const saved = fromActivityRow(data);
+    if (pendingTempDeletes.delete(tempId)) {
+      // The teacher deleted this activity before the insert round-tripped —
+      // removeActivity() couldn't target it (it had no real numeric id yet),
+      // so it queued the delete here instead of just dropping it from the
+      // cache. Finish that delete for real now that we know the saved row's
+      // id, and never let it enter the cache (that was the "keeps
+      // reappearing" bug: the DB row was never actually deleted).
+      void supabase
+        .from("activities")
+        .delete()
+        .eq("id", Number(saved.id))
+        .then(({ error: delError }) => {
+          if (delError) {
+            console.error("[activities-store] failed to delete just-created activity", delError);
+          }
+        });
+      return;
+    }
     activitiesCache = activitiesCache.map((x) => (x.id === tempId ? saved : x));
     notify();
   })();
@@ -566,6 +588,17 @@ export function updateActivity(id: string, patch: Partial<Omit<Activity, "id" | 
 
 
 export function removeActivity(id: string) {
+  if (id.startsWith("temp-")) {
+    // Optimistic row whose insert hasn't round-tripped yet — it has no real
+    // numeric id to delete. Deleting `Number("temp-...")` (NaN) used to fail
+    // silently and roll the cache back, so the activity reappeared once the
+    // in-flight insert landed (the DB row was never actually removed). Hide
+    // it locally and queue the delete for when addActivity() gets the real id.
+    pendingTempDeletes.add(id);
+    activitiesCache = activitiesCache.filter((a) => a.id !== id);
+    notify();
+    return;
+  }
   const prev = activitiesCache;
   activitiesCache = activitiesCache.filter((a) => a.id !== id);
   notify();
