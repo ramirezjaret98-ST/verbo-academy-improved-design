@@ -34,7 +34,7 @@ import {
   loadContentIssueReports, CONTENT_ISSUE_EVENT,
 } from "./content-issue-reports-store";
 import { assignedStudentIdsFor } from "./assignments-store";
-import { loadChallenges, CHALLENGES_EVENT } from "./challenges-store";
+import { loadChallenges, CHALLENGES_EVENT, challengeProductsFor } from "./challenges-store";
 import { STUDENTS_EVENT } from "./students-store";
 import {
   loadStudentRequests, REQUESTS_EVENT,
@@ -766,11 +766,15 @@ function studentNotifications(studentId: string): Notification[] {
   }
 
   // ---- New Challenge available (for the student's product) --------------
+  // VIP has no dedicated catalog — it reads the union of every
+  // content-bearing product, so "new challenge" notifications fire from any
+  // of those instead of an always-false exact-match on "vip".
   const studentProduct = uu?.product;
   if (studentProduct) {
+    const eligibleProducts = challengeProductsFor(studentProduct);
     for (const ch of loadChallenges()) {
       if (!ch.created_at) continue;
-      if (ch.product !== studentProduct) continue;
+      if (!eligibleProducts.includes(ch.product)) continue;
       out.push({
         id: `new-challenge:${ch.id}`,
         kind: "new_challenge_available",

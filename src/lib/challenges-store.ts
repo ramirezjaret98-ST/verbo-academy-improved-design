@@ -243,6 +243,36 @@ export function challengesFor(list: Challenge[], product: ChallengeProductId, di
     .sort((a, b) => challengeNum(a.id) - challengeNum(b.id));
 }
 
+/** Products that own a real Challenges catalog. VIP is a premium 1-to-1
+ *  course, not a group cohort with its own weekly content track, so it has
+ *  no dedicated Challenges of its own — by design, not a migration gap. */
+export const CHALLENGE_CONTENT_PRODUCTS: ChallengeProductId[] = ["go", "enterprise", "international"];
+
+/** Which product bucket(s) an account reads Challenges from. Every product
+ *  reads its own bucket 1:1, except VIP: VIP accounts read the UNION of
+ *  every content-bearing product (see CHALLENGE_CONTENT_PRODUCTS) — the same
+ *  catalog, same premium-gating, an Elite-tier student already gets. No VIP
+ *  content is created; this just points VIP at the existing engine. */
+export function challengeProductsFor(product: ChallengeProductId): ChallengeProductId[] {
+  return product === "vip" ? CHALLENGE_CONTENT_PRODUCTS : [product];
+}
+
+/** Union-aware counterpart to challengesFor() for read-only student/teacher
+ *  views. Admin's editor (admin.challenges.tsx) keeps calling challengesFor()
+ *  directly with an exact product, since content is still authored per
+ *  product — this wrapper only changes what a VIP account is SHOWN. */
+export function challengesForAccount(
+  list: Challenge[],
+  product: ChallengeProductId,
+  difficulty: DifficultyId,
+): Challenge[] {
+  const products = challengeProductsFor(product);
+  if (products.length === 1) return challengesFor(list, products[0], difficulty);
+  return products
+    .flatMap((p) => challengesFor(list, p, difficulty))
+    .sort((a, b) => challengeNum(a.id) - challengeNum(b.id));
+}
+
 export function challengeNum(id: string): number {
   const m = id.match(/-C(\d+)$/);
   return m ? parseInt(m[1], 10) : 0;
