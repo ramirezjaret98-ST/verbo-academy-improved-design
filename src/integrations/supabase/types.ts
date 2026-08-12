@@ -3292,6 +3292,74 @@ export type Database = {
           unit_id: string
         }[]
       }
+      adjust_remaining_sessions: {
+        Args: { p_delta: number; p_student_id: string }
+        Returns: {
+          access_plan: Database["public"]["Enums"]["access_plan"] | null
+          addon_bookclubs_per_month: number | null
+          addon_insights_per_month: number | null
+          addon_spotlight_per_month: number | null
+          addon_workshops_enabled: boolean | null
+          admin_notes: string | null
+          admin_type: Database["public"]["Enums"]["admin_type"] | null
+          attendance_percentage: number | null
+          availability_request_at: string | null
+          availability_request_note: string | null
+          avatar_url: string | null
+          bookclub_strikes: number | null
+          company: string | null
+          contracted_levels: string[] | null
+          created_at: string
+          current_level: string | null
+          current_roadmap_level: string | null
+          cycle_start: string | null
+          email: string
+          focus: string | null
+          freeze_end: string | null
+          freeze_start: string | null
+          hire_date: string | null
+          hired_sessions: number | null
+          hourly_rate: number | null
+          hours_cycle: number | null
+          hours_month: number | null
+          id: string
+          insights_strikes: number | null
+          last_mystery_box_opened_at: string | null
+          legacy_id: string | null
+          member_since: string | null
+          monthly_amount: number | null
+          must_change_password: boolean
+          mystery_box_pick_id: number | null
+          name: string
+          next_payment: string | null
+          payment_day: number | null
+          payment_frequency:
+            | Database["public"]["Enums"]["payment_frequency"]
+            | null
+          plan_punctuality: number | null
+          product: Database["public"]["Enums"]["product_id"] | null
+          product_type: Database["public"]["Enums"]["product_type"] | null
+          qualified_products: Database["public"]["Enums"]["product_id"][] | null
+          rating: number | null
+          remaining_sessions: number | null
+          reopened_levels: string[] | null
+          report_punctuality: number | null
+          reschedule_custom_hours: number | null
+          reschedule_custom_pct: number | null
+          reschedule_policy: string | null
+          role: Database["public"]["Enums"]["user_role"]
+          session_duration: number | null
+          sessions_auto: boolean | null
+          sessions_per_week: number | null
+          status: Database["public"]["Enums"]["student_status"] | null
+          teacher_status: Database["public"]["Enums"]["teacher_status"] | null
+          tier_frozen_days: number | null
+          tier_frozen_since: string | null
+          tier_reset_at: string | null
+          updated_at: string
+          video_call_link: string | null
+        }
+      }
       group_profile_for_teacher: {
         Args: never
         Returns: {
