@@ -28,6 +28,8 @@ const NAV_GROUPS: NavGroup[] = [
   ]},
   { label: "Content", items: [
     { to: "/admin/courses",    label: "Courses" },
+    { to: "/admin/vip",        label: "Course Builder VIP" },
+    { to: "/admin/tailored-content", label: "Tailored Content" },
     { to: "/admin/workshops",  label: "Focus Workshops" },
     { to: "/admin/challenges", label: "Challenges" },
     { to: "/admin/flash",      label: "Verbo Flash" },

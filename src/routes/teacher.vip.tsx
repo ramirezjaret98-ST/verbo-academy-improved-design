@@ -1,3 +1,8 @@
+// Teacher > Course Builder VIP — READ ONLY since the 2026-08-12 permission
+// revert: Admin manages all VIP content (units, video, files, course card,
+// activities). Teacher keeps this view to plan sessions, but every
+// create/edit/delete/bulk-upload control lives at /admin/vip now (also
+// enforced server-side via RLS, not just hidden here).
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/lib/auth";
@@ -5,21 +10,15 @@ import { USERS } from "@/lib/mock-data";
 import { hydrateStudents, subscribeStudents } from "@/lib/students-store";
 import { assignedStudentIdsFor, hydrateAssignments, subscribeAssignments } from "@/lib/assignments-store";
 import {
-  unitsForStudent, addVipUnit, updateVipUnit, removeVipUnit,
-  subscribeVipUnits, subscribeVipUnitCompletion, vipUnitDoneMap, type VipUnit,
+  unitsForStudent, subscribeVipUnits, subscribeVipUnitCompletion, vipUnitDoneMap,
 } from "@/lib/vip-courses-store";
+import { courseMetaFor, subscribeCourseMeta } from "@/lib/custom-course-meta-store";
 import { loadSessions, subscribeSessions } from "@/lib/sessions-store";
-import { uploadContentFile } from "@/lib/content-uploads";
-import { loadLessonPlans, subscribeLessonPlans } from "@/lib/lesson-plans-store";
-import {
-  ActivityModal, BulkUploadUnitsModal, Field, ModalFooter, ModalShell, inputCls,
-  type ModalAccent,
-} from "@/components/verbo/course-modals";
-import { Card, GhostButton, PrimaryButton, Pill } from "@/components/verbo/ui";
+import { ActivityViewModal, type ModalAccent } from "@/components/verbo/course-modals";
+import { Card, GhostButton, Pill } from "@/components/verbo/ui";
 import { loadActivities } from "@/lib/activities-store";
 import {
-  Plus, Crown, ArrowLeft, Sparkles, Pencil, Trash2, Lock, Unlock,
-  FileDown, Link2, Upload, CheckCircle2,
+  Crown, ArrowLeft, Sparkles, Lock, Unlock, FileDown, CheckCircle2, Video, ImageIcon, LayoutGrid,
 } from "lucide-react";
 
 export const Route = createFileRoute("/teacher/vip")({
@@ -42,10 +41,10 @@ function Page() {
     const unsubV = subscribeVipUnits(() => tick((n) => n + 1));
     const unsubX = subscribeSessions(() => tick((n) => n + 1));
     const unsubC = subscribeVipUnitCompletion(() => tick((n) => n + 1));
-    const unsubP = subscribeLessonPlans(() => tick((n) => n + 1));
+    const unsubM = subscribeCourseMeta(() => tick((n) => n + 1));
     hydrateAssignments();
     const unsubA = subscribeAssignments(() => tick((n) => n + 1));
-    return () => { unsubS(); unsubV(); unsubX(); unsubC(); unsubP(); unsubA(); };
+    return () => { unsubS(); unsubV(); unsubX(); unsubC(); unsubM(); unsubA(); };
   }, []);
 
   if (!user) return null;
@@ -70,7 +69,7 @@ function Page() {
         </div>
       );
     }
-    return <StudentBuilder studentId={student.id} studentName={student.name} onBack={() => navigate({ to: "/teacher/vip", search: () => ({ student: undefined }) })} />;
+    return <StudentView studentId={student.id} studentName={student.name} onBack={() => navigate({ to: "/teacher/vip", search: () => ({ student: undefined }) })} />;
   }
 
   return (
@@ -78,7 +77,7 @@ function Page() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight text-foreground">Course Builder VIP</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Personalized courses for your VIP students. Add units week by week.
+          Personalized courses for your VIP students — view only. Admin manages the content.
         </p>
       </div>
 
@@ -131,21 +130,24 @@ function Page() {
   );
 }
 
-// ============================================================================
-// PER-STUDENT COURSE BUILDER
-// ============================================================================
-function StudentBuilder({ studentId, studentName, onBack }: {
+const VIP_ACCENT: ModalAccent = {
+  background: "linear-gradient(135deg, #f38934 0%, #c2410c 100%)",
+  solid: "#f38934",
+  icon: Crown,
+  eyebrow: "VIP Course Builder",
+};
+
+function StudentView({ studentId, studentName, onBack }: {
   studentId: string; studentName: string; onBack: () => void;
 }) {
-  const [unitModal, setUnitModal] = useState<{ mode: "create" | "edit"; unit?: VipUnit } | null>(null);
   const [actModalUnit, setActModalUnit] = useState<{ unitId: string; unitTitle: string } | null>(null);
-  const [actRev, setActRev] = useState(0);
-  const [bulkOpen, setBulkOpen] = useState(false);
+  const [rev, setRev] = useState(0);
 
-  const units = useMemo(() => unitsForStudent(studentId), [studentId, actRev, unitModal]);
-  const allActivities = useMemo(() => loadActivities(), [actRev, unitModal]);
-  const doneMap = useMemo(() => vipUnitDoneMap(), [studentId, actRev, unitModal]);
-  const sessions = useMemo(() => loadSessions(), [studentId, actRev, unitModal]);
+  const units = useMemo(() => unitsForStudent(studentId), [studentId, rev]);
+  const allActivities = useMemo(() => loadActivities(), [rev]);
+  const doneMap = useMemo(() => vipUnitDoneMap(), [studentId, rev]);
+  const sessions = useMemo(() => loadSessions(), [rev]);
+  const courseMeta = useMemo(() => courseMetaFor("vip", studentId), [studentId, rev]);
   const doneCount = units.filter((u) => doneMap[u.id]).length;
 
   return (
@@ -157,30 +159,27 @@ function StudentBuilder({ studentId, studentName, onBack }: {
         <ArrowLeft className="h-4 w-4" /> Back to VIP students
       </button>
 
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex items-center gap-4">
+        {courseMeta.cover_image ? (
+          <img src={courseMeta.cover_image} alt="" className="h-14 w-24 shrink-0 rounded-lg object-cover" />
+        ) : (
+          <div className="flex h-14 w-24 shrink-0 items-center justify-center rounded-lg bg-secondary text-muted-foreground">
+            <ImageIcon className="h-5 w-5" />
+          </div>
+        )}
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-            {studentName} · VIP Course
-          </h1>
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">{studentName} · {courseMeta.title}</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            {units.length} {units.length === 1 ? "unit" : "units"} built · {doneCount}/{units.length} done.
+            {units.length} {units.length === 1 ? "unit" : "units"} · {doneCount}/{units.length} done.
             Units are marked done via the Session Report of the linked Performance Session.
           </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <GhostButton onClick={() => setBulkOpen(true)}>
-            <Upload className="h-3.5 w-3.5" /> Bulk Upload
-          </GhostButton>
-          <PrimaryButton onClick={() => setUnitModal({ mode: "create" })}>
-            <Plus className="h-3.5 w-3.5" /> Add Unit
-          </PrimaryButton>
         </div>
       </div>
 
       <Card className="!p-0">
         {units.length === 0 && (
           <div className="px-6 py-10 text-center text-sm text-muted-foreground">
-            No units yet. Click “+ Add Unit” to build the first one.
+            No units yet — Admin hasn't built this course.
           </div>
         )}
         {units.map((u, i) => {
@@ -193,8 +192,13 @@ function StudentBuilder({ studentId, studentName, onBack }: {
           return (
             <div key={u.id} className={`flex items-center justify-between gap-4 px-6 py-4 ${i ? "border-t border-border" : ""}`}>
               <div className="min-w-0">
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <span className="text-xs text-muted-foreground">Unit {i + 1}</span>
+                  {u.block && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-secondary px-2 py-0.5 text-[11px] font-medium text-foreground">
+                      <LayoutGrid className="h-3 w-3" /> {u.block}
+                    </span>
+                  )}
                   {done ? (
                     <span className="inline-flex items-center gap-1 rounded-full bg-success/10 px-2 py-0.5 text-[11px] font-medium text-success">
                       <CheckCircle2 className="h-3 w-3" /> Done
@@ -211,6 +215,11 @@ function StudentBuilder({ studentId, studentName, onBack }: {
                 </div>
                 <div className="mt-1 text-sm font-medium text-foreground truncate">{u.title}</div>
                 <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                  {u.video_url && (
+                    <span className="inline-flex items-center gap-1 text-foreground">
+                      <Video className="h-3 w-3" /> Video attached
+                    </span>
+                  )}
                   {u.file_url ? (
                     <a
                       href={u.file_url}
@@ -236,165 +245,23 @@ function StudentBuilder({ studentId, studentName, onBack }: {
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <PrimaryButton onClick={() => setActModalUnit({ unitId: u.id, unitTitle: u.title })}>
+                <GhostButton onClick={() => setActModalUnit({ unitId: u.id, unitTitle: u.title })}>
                   <Sparkles className="h-3.5 w-3.5" /> Activities
-                </PrimaryButton>
-                <button
-                  onClick={() => setUnitModal({ mode: "edit", unit: u })}
-                  className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-[#f38934]"
-                  aria-label="Edit unit"
-                >
-                  <Pencil className="h-4 w-4" />
-                </button>
-                <button
-                  onClick={() => {
-                    if (confirm(`Delete unit “${u.title}”? This does not delete its activities.`)) {
-                      removeVipUnit(u.id);
-                      setActRev((r) => r + 1);
-                    }
-                  }}
-                  className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-destructive"
-                  aria-label="Delete unit"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
+                </GhostButton>
               </div>
             </div>
           );
         })}
       </Card>
 
-      {bulkOpen && (
-        <BulkUploadUnitsModal
-          kind="vip"
-          studentId={studentId}
-          unitLabel="VIP unit"
-          onClose={() => { setBulkOpen(false); setActRev((r) => r + 1); }}
-          onImported={() => setActRev((r) => r + 1)}
-        />
-      )}
-      {unitModal && (
-        <VipUnitModal
-          editingUnit={unitModal.mode === "edit" ? unitModal.unit : undefined}
-          onClose={() => setUnitModal(null)}
-          onCreate={(title, fileUrl, fileName) => {
-            addVipUnit(studentId, title, fileUrl, fileName);
-            setUnitModal(null);
-          }}
-          onUpdate={(id, title, fileUrl, fileName) => {
-            updateVipUnit(id, { title, file_url: fileUrl, file_name: fileName });
-            setUnitModal(null);
-          }}
-        />
-      )}
       {actModalUnit && (
-        <ActivityModal
+        <ActivityViewModal
           unitId={actModalUnit.unitId}
           unitTitle={actModalUnit.unitTitle}
           accent={VIP_ACCENT}
-          onClose={() => { setActModalUnit(null); setActRev((r) => r + 1); }}
+          onClose={() => { setActModalUnit(null); setRev((r) => r + 1); }}
         />
       )}
     </div>
-  );
-}
-
-const VIP_ACCENT: ModalAccent = {
-  background: "linear-gradient(135deg, #f38934 0%, #c2410c 100%)",
-  solid: "#f38934",
-  icon: Crown,
-  eyebrow: "VIP Course Builder",
-};
-
-function VipUnitModal({ editingUnit, onClose, onCreate, onUpdate }: {
-  editingUnit?: VipUnit;
-  onClose: () => void;
-  onCreate: (title: string, fileUrl: string, fileName?: string) => void;
-  onUpdate: (id: string, title: string, fileUrl: string, fileName?: string) => void;
-}) {
-  const isEdit = !!editingUnit;
-  const [title, setTitle] = useState(isEdit ? editingUnit!.title : "");
-  const [fileUrl, setFileUrl] = useState(isEdit ? editingUnit!.file_url : "");
-  const [fileName, setFileName] = useState(isEdit ? (editingUnit!.file_name ?? "") : "");
-  const [source, setSource] = useState<"url" | "upload">("url");
-  const [uploading, setUploading] = useState(false);
-  const [uploadError, setUploadError] = useState("");
-
-  const handleFile = async (file?: File) => {
-    if (!file) return;
-    setUploading(true);
-    setUploadError("");
-    const res = await uploadContentFile(file, "vip-units");
-    setUploading(false);
-    if (!res.ok) { setUploadError(res.error); return; }
-    setFileUrl(res.url);
-    setFileName(res.fileName);
-  };
-
-  const handleSave = () => {
-    if (!title.trim()) return;
-    if (isEdit) onUpdate(editingUnit!.id, title.trim(), fileUrl.trim(), fileName.trim() || undefined);
-    else onCreate(title.trim(), fileUrl.trim(), fileName.trim() || undefined);
-  };
-
-  return (
-    <ModalShell
-      title={isEdit ? "Edit Unit" : "New Unit"}
-      subtitle={isEdit ? "Update this unit. Activities remain untouched." : "Name this week’s topic and attach the downloadable material."}
-      accent={VIP_ACCENT}
-      onClose={onClose}
-    >
-      <div className="space-y-4 p-6">
-        <Field label="Unit Title">
-          <input value={title} onChange={(e) => setTitle(e.target.value)} className={inputCls} placeholder="e.g. Board meeting vocabulary" />
-        </Field>
-
-        <Field label="Downloadable File">
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={() => setSource("url")}
-              className={`flex items-center justify-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${source === "url" ? "border-accent bg-accent/10 text-foreground" : "border-border bg-background text-muted-foreground hover:bg-secondary"}`}
-            >
-              <Link2 className="h-4 w-4" /> File URL
-            </button>
-            <button
-              type="button"
-              onClick={() => setSource("upload")}
-              className={`flex items-center justify-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${source === "upload" ? "border-accent bg-accent/10 text-foreground" : "border-border bg-background text-muted-foreground hover:bg-secondary"}`}
-            >
-              <Upload className="h-4 w-4" /> Upload File
-            </button>
-          </div>
-          {source === "url" ? (
-            <input
-              value={fileUrl}
-              onChange={(e) => setFileUrl(e.target.value)}
-              className={`${inputCls} mt-2`}
-              placeholder="e.g., https://cloud.storage/... or public document link"
-            />
-          ) : (
-            <div className="mt-2 space-y-1.5">
-              <label className="flex h-16 w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-secondary/40 text-sm text-muted-foreground transition-colors hover:bg-secondary">
-                <Upload className="h-4 w-4" />
-                {uploading ? "Uploading…" : fileName || "Click to upload a file"}
-                <input type="file" className="sr-only" disabled={uploading} onChange={(e) => handleFile(e.target.files?.[0])} />
-              </label>
-              {uploadError && <p className="text-xs text-destructive">{uploadError}</p>}
-            </div>
-          )}
-        </Field>
-
-        <Field label="File Label" hint="Optional. Shown as the download link text.">
-          <input value={fileName} onChange={(e) => setFileName(e.target.value)} className={inputCls} placeholder="e.g., Unit 1 – Study Guide.pdf" />
-        </Field>
-      </div>
-      <ModalFooter>
-        <GhostButton onClick={onClose}>Cancel</GhostButton>
-        <PrimaryButton disabled={!title.trim() || uploading} onClick={handleSave}>
-          {isEdit ? "Save Changes" : "Create Unit"}
-        </PrimaryButton>
-      </ModalFooter>
-    </ModalShell>
   );
 }

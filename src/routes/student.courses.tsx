@@ -122,9 +122,10 @@ import { groupsByStudentId } from "@/lib/groups-store";
 import {
   tailoredUnitsForStudent, tailoredUnitDoneMap,
   subscribeTailoredUnits, subscribeTailoredUnitCompletion,
-  type TailoredUnit,
 } from "@/lib/tailored-content-store";
-import { CheckCircle2 as CheckCircle2Icon } from "lucide-react";
+import { courseMetaFor, subscribeCourseMeta } from "@/lib/custom-course-meta-store";
+import { loadSessions, subscribeSessions } from "@/lib/sessions-store";
+import { CourseCardHero, CustomUnitsList, CustomUnitDetail } from "./student.my-course";
 
 
 export const Route = createFileRoute("/student/courses")({
@@ -256,7 +257,9 @@ function computeUnitStates(level: CourseLevel, studentId: string, readOnly: bool
 type View =
   | { kind: "levels" }
   | { kind: "units"; levelId: string; readOnly: boolean }
-  | { kind: "unit"; levelId: string; unitId: string; readOnly: boolean };
+  | { kind: "unit"; levelId: string; unitId: string; readOnly: boolean }
+  | { kind: "tailored-units" }
+  | { kind: "tailored-unit"; unitId: string };
 
 function Page() {
   const { user } = useAuth();
@@ -290,6 +293,8 @@ function Page() {
   useEffect(() => subscribeActivities(() => setRev((r) => r + 1)), []);
   useEffect(() => subscribeTailoredUnits(() => setRev((r) => r + 1)), []);
   useEffect(() => subscribeTailoredUnitCompletion(() => setRev((r) => r + 1)), []);
+  useEffect(() => subscribeCourseMeta(() => setRev((r) => r + 1)), []);
+  useEffect(() => subscribeSessions(() => setRev((r) => r + 1)), []);
 
   const productId = user?.product ? PRODUCT_TO_COURSE[user.product] : undefined;
   if (!productId) {
@@ -331,6 +336,63 @@ function Page() {
     }
     setRev((r) => r + 1);
   };
+
+  if (view.kind === "tailored-unit") {
+    const tailoredUnits = user ? tailoredUnitsForStudent(user.id) : [];
+    const idx = tailoredUnits.findIndex((u) => u.id === view.unitId);
+    const unit = idx >= 0 ? tailoredUnits[idx] : undefined;
+    if (!user || !unit) { setView({ kind: "tailored-units" }); return null; }
+    const doneMap = tailoredUnitDoneMap();
+    const done = !!doneMap[unit.id];
+    const prevDone = idx === 0 || !!doneMap[tailoredUnits[idx - 1].id];
+    const unlocked = done || prevDone;
+    const nextUnit = tailoredUnits[idx + 1];
+    return (
+      <div className="space-y-4">
+        <CurriculumBreadcrumb
+          items={[
+            { label: "Dashboard", to: "/student" },
+            { label: "Learning Path", onClick: () => setView({ kind: "levels" }) },
+            { label: "Tailored Content", onClick: () => setView({ kind: "tailored-units" }) },
+            { label: unit.title },
+          ]}
+        />
+        <CustomUnitDetail
+          unit={unit}
+          studentId={user.id}
+          unlocked={unlocked}
+          done={done}
+          onBack={() => setView({ kind: "tailored-units" })}
+          onOpenNext={nextUnit ? () => setView({ kind: "tailored-unit", unitId: nextUnit.id }) : undefined}
+        />
+      </div>
+    );
+  }
+
+  if (view.kind === "tailored-units") {
+    const tailoredUnits = user ? tailoredUnitsForStudent(user.id) : [];
+    const doneMap = tailoredUnitDoneMap();
+    const sessions = loadSessions();
+    return (
+      <div className="space-y-4">
+        <CurriculumBreadcrumb
+          items={[
+            { label: "Dashboard", to: "/student" },
+            { label: "Learning Path", onClick: () => setView({ kind: "levels" }) },
+            { label: "Tailored Content" },
+          ]}
+        />
+        <CustomUnitsList
+          title="Learning Path"
+          units={tailoredUnits}
+          doneMap={doneMap}
+          sessions={sessions}
+          onBack={() => setView({ kind: "levels" })}
+          onOpenUnit={(u) => setView({ kind: "tailored-unit", unitId: u.id })}
+        />
+      </div>
+    );
+  }
 
   if (view.kind === "unit") {
     const level = levels.find((l) => l.id === view.levelId);
@@ -386,6 +448,8 @@ function Page() {
   const events = user ? loadEvents(user.id) : [];
   const tailoredUnits = user && user.access_plan === "Elite" ? tailoredUnitsForStudent(user.id) : [];
   const showTailored = user?.access_plan === "Elite" && tailoredUnits.length > 0;
+  const tailoredDoneCount = tailoredUnits.filter((u) => tailoredUnitDoneMap()[u.id]).length;
+  const tailoredMeta = user ? courseMetaFor("tailored", user.id) : null;
   return (
     <>
       <CurriculumBreadcrumb
@@ -401,7 +465,24 @@ function Page() {
         states={states}
         contracted={contracted}
         events={events}
-        tailoredSection={showTailored ? <TailoredContentSection units={tailoredUnits} /> : null}
+        tailoredSection={
+          showTailored ? (
+            <div className="space-y-3">
+              <div className="inline-flex items-center gap-1.5 rounded-full bg-accent/10 px-2.5 py-0.5 text-[11px] font-semibold text-accent">
+                <Sparkles className="h-3 w-3" /> Elite · Tailored Content
+              </div>
+              <CourseCardHero
+                title={tailoredMeta?.title ?? "Tailored Content"}
+                coverImage={tailoredMeta?.cover_image}
+                unitsCount={tailoredUnits.length}
+                doneCount={tailoredDoneCount}
+                badgeLabel="Tailored Content"
+                badgeIcon={Sparkles}
+                onOpen={() => setView({ kind: "tailored-units" })}
+              />
+            </div>
+          ) : null
+        }
         onOpen={(level, state) => {
           if (state.kind === "locked_progress" || state.kind === "locked_not_contracted" || state.kind === "completed") return;
           setView({ kind: "units", levelId: level.id, readOnly: state.readOnly });
@@ -411,82 +492,6 @@ function Page() {
         <LevelCompletionModal level={completionModal} studentName={user?.name ?? "Student"} product={user?.product ?? ""} onClose={() => setCompletionModal(null)} />
       )}
     </>
-  );
-}
-
-function TailoredContentSection({ units }: { units: TailoredUnit[] }) {
-  const doneMap = tailoredUnitDoneMap();
-  const doneCount = units.filter((u) => doneMap[u.id]).length;
-  return (
-    <div className="space-y-3">
-      <div className="flex flex-wrap items-end justify-between gap-2">
-        <div>
-          <div className="inline-flex items-center gap-1.5 rounded-full bg-accent/10 px-2.5 py-0.5 text-[11px] font-semibold text-accent">
-            <Sparkles className="h-3 w-3" /> Elite · Tailored Content
-          </div>
-          <h2 className="mt-2 text-lg font-semibold tracking-tight text-foreground">Tailored Content</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Extra units your teacher has built for you. Each unit unlocks once the previous one is
-            completed in a Performance Session.
-          </p>
-        </div>
-        <div className="text-right">
-          <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Progress</div>
-          <div className="mt-0.5 text-sm font-semibold text-foreground">
-            {doneCount} / {units.length} <span className="font-normal text-muted-foreground">units</span>
-          </div>
-        </div>
-      </div>
-      <Card className="!p-0">
-        {units.map((u, i) => {
-          const done = !!doneMap[u.id];
-          const prevDone = i === 0 || !!doneMap[units[i - 1].id];
-          const unlocked = done || prevDone;
-          return (
-            <div
-              key={u.id}
-              className={`flex items-center justify-between gap-4 px-6 py-4 ${i ? "border-t border-border" : ""} ${unlocked ? "" : "opacity-70"}`}
-            >
-              <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-muted-foreground">Unit {i + 1}</span>
-                  {done ? (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-success/10 px-2 py-0.5 text-[11px] font-medium text-success">
-                      <CheckCircle2Icon className="h-3 w-3" /> Done
-                    </span>
-                  ) : unlocked ? (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-success/10 px-2 py-0.5 text-[11px] font-medium text-success">
-                      Unlocked
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-                      <Lock className="h-3 w-3" /> Locked until previous unit completed
-                    </span>
-                  )}
-                </div>
-                <div className="mt-1 text-sm font-medium text-foreground truncate">{u.title}</div>
-                <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                  {unlocked && u.file_url ? (
-                    <a
-                      href={u.file_url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex items-center gap-1 text-accent hover:underline"
-                    >
-                      <Download className="h-3 w-3" /> {u.file_name || "Download material"}
-                    </a>
-                  ) : unlocked ? (
-                    <span className="italic">No material attached yet</span>
-                  ) : (
-                    <span className="italic">Material unlocks when this unit is available</span>
-                  )}
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </Card>
-    </div>
   );
 }
 
@@ -1190,7 +1195,7 @@ function getYouTubeEmbed(url: string): string | null {
 function isVimeo(url: string): boolean {
   try { return new URL(url).hostname.includes("vimeo.com"); } catch { return false; }
 }
-function UnitVideoPlayer({ url }: { url: string }) {
+export function UnitVideoPlayer({ url }: { url: string }) {
   const yt = getYouTubeEmbed(url);
   if (yt) return <iframe src={yt} title="Lesson video" allowFullScreen className="absolute inset-0 h-full w-full border-0" />;
   if (isVimeo(url)) return <iframe src={url.replace("vimeo.com", "player.vimeo.com/video")} title="Lesson video" allowFullScreen className="absolute inset-0 h-full w-full border-0" />;
