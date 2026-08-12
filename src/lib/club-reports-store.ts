@@ -26,6 +26,7 @@
 // `bookingsForStudent` in club-bookings-store.ts), which is a separate,
 // slightly larger fix left for a future lote.
 import { supabase } from "@/integrations/supabase/client";
+import { registerRehydrate } from "@/lib/auth-rehydrate";
 import type { Database } from "@/integrations/supabase/types";
 import { hydrateUserIdBridge, legacyToUuid, uuidToLegacySync } from "@/lib/user-id-bridge";
 
@@ -90,6 +91,12 @@ async function hydrate(): Promise<void> {
   notify();
 }
 
+function invalidateAndRehydrate() {
+  hydrated = false;
+  hydratePromise = null;
+  void hydrate();
+}
+
 let realtimeStarted = false;
 function ensureRealtime() {
   if (realtimeStarted || typeof window === "undefined") return;
@@ -102,7 +109,7 @@ function ensureRealtime() {
       void hydrate();
     })
     .subscribe();
-}
+  registerRehydrate(invalidateAndRehydrate);}
 
 if (typeof window !== "undefined") {
   void hydrate();

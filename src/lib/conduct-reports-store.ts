@@ -10,6 +10,7 @@
 // a single global cache hydrated once + kept in sync via Postgres Realtime
 // (same pattern as `content-issue-reports-store.ts`).
 import { supabase } from "@/integrations/supabase/client";
+import { registerRehydrate } from "@/lib/auth-rehydrate";
 import type { Database } from "@/integrations/supabase/types";
 import { hydrateUserIdBridge, legacyToUuid, uuidToLegacySync } from "@/lib/user-id-bridge";
 
@@ -88,6 +89,12 @@ async function hydrate(): Promise<void> {
   notify();
 }
 
+function invalidateAndRehydrate() {
+  hydrated = false;
+  hydratePromise = null;
+  void hydrate();
+}
+
 if (typeof window !== "undefined") {
   void hydrate();
   supabase
@@ -97,7 +104,7 @@ if (typeof window !== "undefined") {
       void hydrate();
     })
     .subscribe();
-}
+  registerRehydrate(invalidateAndRehydrate);}
 
 export function addConductReport(input: {
   reporterId: string;

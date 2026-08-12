@@ -16,6 +16,7 @@
 // the rest of this migration instead of a per-student Map.
 import { useSyncExternalStore } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { registerRehydrate } from "@/lib/auth-rehydrate";
 import type { Database } from "@/integrations/supabase/types";
 import { hydrateUserIdBridge, legacyToUuid, uuidToLegacySync } from "@/lib/user-id-bridge";
 import { loadClubs, type Club, type ClubType } from "./clubs-store";
@@ -97,6 +98,12 @@ async function hydrate(): Promise<void> {
   notify();
 }
 
+function invalidateAndRehydrate() {
+  hydrated = false;
+  hydratePromise = null;
+  void hydrate();
+}
+
 if (typeof window !== "undefined") {
   void hydrate();
   supabase
@@ -106,7 +113,7 @@ if (typeof window !== "undefined") {
       void hydrate();
     })
     .subscribe();
-}
+  registerRehydrate(invalidateAndRehydrate);}
 
 export function loadBookings(): ClubBooking[] {
   if (!hydrated) void hydrate();

@@ -22,6 +22,7 @@
 // must tolerate partial data — teachers only rate the subskills actually
 // worked on.
 import { supabase } from "@/integrations/supabase/client";
+import { registerRehydrate } from "@/lib/auth-rehydrate";
 import { hydrateUserIdBridge, legacyToUuid, uuidToLegacySync } from "@/lib/user-id-bridge";
 
 export interface PerformanceRating {
@@ -91,17 +92,21 @@ async function hydrate(): Promise<void> {
   hydratePromise = null;
 }
 
+function invalidateAndRehydrate() {
+  hydrated = false;
+  hydratePromise = null;
+  void hydrate().then(notify);
+}
+
 let realtimeStarted = false;
 function ensureRealtime() {
   if (realtimeStarted || typeof window === "undefined") return;
   realtimeStarted = true;
   supabase
     .channel("performance-ratings-changes")
-    .on("postgres_changes", { event: "*", schema: "public", table: "performance_ratings" }, () => {
-      hydrated = false;
-      void hydrate().then(notify);
-    })
+    .on("postgres_changes", { event: "*", schema: "public", table: "performance_ratings" }, invalidateAndRehydrate)
     .subscribe();
+  registerRehydrate(invalidateAndRehydrate);
 }
 
 /** Kicks off hydration (and realtime, in the browser). Safe to call

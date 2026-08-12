@@ -19,6 +19,7 @@
 // see these, by design (matches the reviewed schema/RLS checklist).
 import { useSyncExternalStore } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { registerRehydrate } from "@/lib/auth-rehydrate";
 import type { Database } from "@/integrations/supabase/types";
 import { legacyToUuid, hydrateUserIdBridge, uuidToLegacySync } from "@/lib/user-id-bridge";
 
@@ -79,6 +80,12 @@ async function hydrate(): Promise<void> {
   return hydratePromise;
 }
 
+function invalidateAndRehydrate() {
+  hydrated = false;
+  hydratePromise = null;
+  void hydrate();
+}
+
 let realtimeStarted = false;
 function ensureRealtime() {
   if (realtimeStarted || typeof window === "undefined") return;
@@ -95,7 +102,7 @@ function ensureRealtime() {
       },
     )
     .subscribe();
-}
+  registerRehydrate(invalidateAndRehydrate);}
 
 if (typeof window !== "undefined") {
   void hydrate();

@@ -12,6 +12,7 @@
 // `app_users_update_self` RLS policy).
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { registerRehydrate } from "@/lib/auth-rehydrate";
 import { legacyToUuid } from "./user-id-bridge";
 
 const EVT = "verbo:avatars-updated";
@@ -54,6 +55,12 @@ async function hydrate(): Promise<void> {
   return hydratePromise;
 }
 
+function invalidateAndRehydrate() {
+  hydrated = false;
+  hydratePromise = null;
+  void hydrate();
+}
+
 let realtimeStarted = false;
 function ensureRealtime() {
   if (realtimeStarted || typeof window === "undefined") return;
@@ -66,7 +73,7 @@ function ensureRealtime() {
       void hydrate();
     })
     .subscribe();
-}
+  registerRehydrate(invalidateAndRehydrate);}
 
 if (typeof window !== "undefined") {
   void hydrate();

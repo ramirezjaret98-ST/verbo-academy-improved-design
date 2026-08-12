@@ -9,6 +9,7 @@
 // uses the real base composite / refusal count fed in by the caller.
 // ============================================================================
 import { supabase } from "@/integrations/supabase/client";
+import { registerRehydrate } from "@/lib/auth-rehydrate";
 import { type User } from "./mock-data";
 import { loadSessions } from "./sessions-store";
 import { latestOverride } from "./teacher-kpi-overrides-store";
@@ -70,6 +71,12 @@ async function hydrate(): Promise<void> {
   return hydratePromise;
 }
 
+function invalidateAndRehydrate() {
+  hydrated = false;
+  hydratePromise = null;
+  void hydrate();
+}
+
 let realtimeStarted = false;
 function ensureRealtime() {
   if (realtimeStarted || typeof window === "undefined") return;
@@ -86,7 +93,7 @@ function ensureRealtime() {
       },
     )
     .subscribe();
-}
+  registerRehydrate(invalidateAndRehydrate);}
 
 if (typeof window !== "undefined") {
   // Kick off hydration eagerly — `getRealSnapshot()` is called synchronously

@@ -15,6 +15,7 @@
 // banners for each other.
 import { useSyncExternalStore } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { registerRehydrate } from "@/lib/auth-rehydrate";
 import type { Database } from "@/integrations/supabase/types";
 import { hydrateUserIdBridge, legacyToUuid, uuidToLegacySync } from "@/lib/user-id-bridge";
 import type { Role } from "./mock-data";
@@ -105,6 +106,14 @@ async function hydrateDismissals(): Promise<void> {
   notify();
 }
 
+function invalidateAndRehydrate() {
+  hydrated = false;
+  hydratePromise = null;
+  dismissedHydrated = false;
+  dismissedHydratePromise = null;
+  void Promise.all([hydrate(), hydrateDismissals()]);
+}
+
 if (typeof window !== "undefined") {
   void hydrate();
   void hydrateDismissals();
@@ -122,7 +131,7 @@ if (typeof window !== "undefined") {
       void hydrateDismissals();
     })
     .subscribe();
-}
+  registerRehydrate(invalidateAndRehydrate);}
 
 export function loadAnnouncements(): Announcement[] {
   if (!hydrated) void hydrate();

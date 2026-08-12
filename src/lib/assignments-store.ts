@@ -25,6 +25,7 @@
 // to have rows with more than one teacher — `setAssignment` enforces the
 // single-teacher rule by removing any other row for that student first.
 import { supabase } from "@/integrations/supabase/client";
+import { registerRehydrate } from "@/lib/auth-rehydrate";
 import { legacyToUuid, uuidToLegacySync, hydrateUserIdBridge } from "./user-id-bridge";
 
 export const ASSIGNMENTS_EVENT = "verbo:assignments-updated";
@@ -68,6 +69,12 @@ async function hydrate(): Promise<void> {
   return hydratePromise;
 }
 
+function invalidateAndRehydrate() {
+  hydrated = false;
+  hydratePromise = null;
+  void hydrate();
+}
+
 let realtimeStarted = false;
 function ensureRealtime() {
   if (realtimeStarted || typeof window === "undefined") return;
@@ -80,7 +87,7 @@ function ensureRealtime() {
       void hydrate();
     })
     .subscribe();
-}
+  registerRehydrate(invalidateAndRehydrate);}
 
 if (typeof window !== "undefined") {
   void hydrate();

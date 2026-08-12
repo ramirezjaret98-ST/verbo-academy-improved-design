@@ -13,6 +13,7 @@
 // return value against the current cache, updates it optimistically, then
 // inserts in the background.
 import { supabase } from "@/integrations/supabase/client";
+import { registerRehydrate } from "@/lib/auth-rehydrate";
 import { legacyToUuid, uuidToLegacySync, hydrateUserIdBridge } from "./user-id-bridge";
 
 export const BADGE_UNLOCK_SEEN_EVENT = "verbo:badge-unlock-seen-updated";
@@ -58,6 +59,12 @@ async function hydrate(): Promise<void> {
   return hydratePromise;
 }
 
+function invalidateAndRehydrate() {
+  hydrated = false;
+  hydratePromise = null;
+  void hydrate();
+}
+
 let realtimeStarted = false;
 function ensureRealtime() {
   if (realtimeStarted || typeof window === "undefined") return;
@@ -70,7 +77,7 @@ function ensureRealtime() {
       void hydrate();
     })
     .subscribe();
-}
+  registerRehydrate(invalidateAndRehydrate);}
 
 if (typeof window !== "undefined") {
   void hydrate();

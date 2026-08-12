@@ -16,6 +16,7 @@
 // in-memory cache, hydrated once and kept fresh via Postgres Realtime;
 // `saveLessonPlan` stays optimistic and synchronous in its public signature.
 import { supabase } from "@/integrations/supabase/client";
+import { registerRehydrate } from "@/lib/auth-rehydrate";
 import type { Database } from "@/integrations/supabase/types";
 import { loadSessions } from "./sessions-store";
 import { activeMembersOf } from "./groups-store";
@@ -103,6 +104,12 @@ async function hydrate(): Promise<void> {
   notify();
 }
 
+function invalidateAndRehydrate() {
+  hydrated = false;
+  hydratePromise = null;
+  void hydrate();
+}
+
 let realtimeStarted = false;
 function ensureRealtime() {
   if (realtimeStarted || typeof window === "undefined") return;
@@ -115,7 +122,7 @@ function ensureRealtime() {
       void hydrate();
     })
     .subscribe();
-}
+  registerRehydrate(invalidateAndRehydrate);}
 
 if (typeof window !== "undefined") {
   void hydrate();

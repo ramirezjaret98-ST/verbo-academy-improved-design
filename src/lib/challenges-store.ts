@@ -19,6 +19,7 @@
 // last-synced cache and only upserts/deletes what actually changed. Callers
 // don't need to change — same signature, same call sites.
 import { supabase } from "@/integrations/supabase/client";
+import { registerRehydrate } from "@/lib/auth-rehydrate";
 import type { Database } from "@/integrations/supabase/types";
 
 export type ChallengeProductId = "go" | "enterprise" | "international" | "vip";
@@ -128,6 +129,12 @@ async function hydrate(): Promise<void> {
   notify();
 }
 
+function invalidateAndRehydrate() {
+  hydrated = false;
+  hydratePromise = null;
+  void hydrate();
+}
+
 if (typeof window !== "undefined") {
   void hydrate();
   supabase
@@ -141,7 +148,7 @@ if (typeof window !== "undefined") {
       },
     )
     .subscribe();
-}
+  registerRehydrate(invalidateAndRehydrate);}
 
 export function loadChallenges(): Challenge[] {
   if (!hydrated) void hydrate();

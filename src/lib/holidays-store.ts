@@ -12,6 +12,7 @@
 // `removeHoliday`) talk to Supabase directly and are therefore async.
 import { useSyncExternalStore } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { registerRehydrate } from "@/lib/auth-rehydrate";
 import type { Database } from "@/integrations/supabase/types";
 
 export interface Holiday {
@@ -69,6 +70,12 @@ async function hydrate(): Promise<void> {
   return hydratePromise;
 }
 
+function invalidateAndRehydrate() {
+  hydrated = false;
+  hydratePromise = null;
+  void hydrate();
+}
+
 let realtimeStarted = false;
 function ensureRealtime() {
   if (realtimeStarted || typeof window === "undefined") return;
@@ -85,7 +92,7 @@ function ensureRealtime() {
       },
     )
     .subscribe();
-}
+  registerRehydrate(invalidateAndRehydrate);}
 
 if (typeof window !== "undefined") {
   // Kick off hydration eagerly so plain (non-hook) readers like

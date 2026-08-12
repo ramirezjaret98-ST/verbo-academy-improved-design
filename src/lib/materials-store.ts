@@ -25,6 +25,7 @@
 import { useSyncExternalStore } from "react";
 import { MATERIALS, type MaterialType } from "./mock-data";
 import { supabase } from "@/integrations/supabase/client";
+import { registerRehydrate } from "@/lib/auth-rehydrate";
 import type { Database } from "@/integrations/supabase/types";
 
 export type RestrictProduct = "go" | "enterprise" | "international";
@@ -245,6 +246,12 @@ async function hydrate(): Promise<void> {
   notify();
 }
 
+function invalidateAndRehydrate() {
+  hydrated = false;
+  hydratePromise = null;
+  void hydrate();
+}
+
 if (typeof window !== "undefined") {
   void hydrate();
   supabase
@@ -258,7 +265,7 @@ if (typeof window !== "undefined") {
       },
     )
     .subscribe();
-}
+  registerRehydrate(invalidateAndRehydrate);}
 
 export function loadMaterials(): StoredMaterial[] {
   if (!hydrated) void hydrate();
