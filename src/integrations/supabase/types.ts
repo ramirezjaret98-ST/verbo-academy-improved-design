@@ -221,6 +221,7 @@ export type Database = {
           created_at: string
           current_level: string | null
           current_roadmap_level: string | null
+          custom_price: number | null
           cycle_start: string | null
           email: string
           failed_login_attempts: number
@@ -247,6 +248,7 @@ export type Database = {
           payment_frequency:
             | Database["public"]["Enums"]["payment_frequency"]
             | null
+          phone: string | null
           plan_punctuality: number | null
           product: Database["public"]["Enums"]["product_id"] | null
           product_type: Database["public"]["Enums"]["product_type"] | null
@@ -288,6 +290,7 @@ export type Database = {
           created_at?: string
           current_level?: string | null
           current_roadmap_level?: string | null
+          custom_price?: number | null
           cycle_start?: string | null
           email: string
           failed_login_attempts?: number
@@ -314,6 +317,7 @@ export type Database = {
           payment_frequency?:
             | Database["public"]["Enums"]["payment_frequency"]
             | null
+          phone?: string | null
           plan_punctuality?: number | null
           product?: Database["public"]["Enums"]["product_id"] | null
           product_type?: Database["public"]["Enums"]["product_type"] | null
@@ -357,6 +361,7 @@ export type Database = {
           created_at?: string
           current_level?: string | null
           current_roadmap_level?: string | null
+          custom_price?: number | null
           cycle_start?: string | null
           email?: string
           failed_login_attempts?: number
@@ -383,6 +388,7 @@ export type Database = {
           payment_frequency?:
             | Database["public"]["Enums"]["payment_frequency"]
             | null
+          phone?: string | null
           plan_punctuality?: number | null
           product?: Database["public"]["Enums"]["product_id"] | null
           product_type?: Database["public"]["Enums"]["product_type"] | null
@@ -2022,6 +2028,35 @@ export type Database = {
           },
         ]
       }
+      notification_settings: {
+        Row: {
+          admin_emails: string[]
+          id: boolean
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          admin_emails?: string[]
+          id?: boolean
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          admin_emails?: string[]
+          id?: boolean
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_settings_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "app_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payment_log_entries: {
         Row: {
           amount: number
@@ -3318,8 +3353,10 @@ export type Database = {
           created_at: string
           current_level: string | null
           current_roadmap_level: string | null
+          custom_price: number | null
           cycle_start: string | null
           email: string
+          failed_login_attempts: number
           focus: string | null
           freeze_end: string | null
           freeze_start: string | null
@@ -3332,6 +3369,7 @@ export type Database = {
           insights_strikes: number | null
           last_mystery_box_opened_at: string | null
           legacy_id: string | null
+          login_locked_at: string | null
           member_since: string | null
           monthly_amount: number | null
           must_change_password: boolean
@@ -3342,6 +3380,7 @@ export type Database = {
           payment_frequency:
             | Database["public"]["Enums"]["payment_frequency"]
             | null
+          phone: string | null
           plan_punctuality: number | null
           product: Database["public"]["Enums"]["product_id"] | null
           product_type: Database["public"]["Enums"]["product_type"] | null
@@ -3397,6 +3436,7 @@ export type Database = {
           video_call_link: string
         }[]
       }
+      is_login_locked: { Args: { p_email: string }; Returns: boolean }
       legacy_id_lookup: {
         Args: never
         Returns: {
@@ -3404,6 +3444,8 @@ export type Database = {
           legacy_id: string
         }[]
       }
+      record_failed_login: { Args: { p_email: string }; Returns: Json }
+      record_successful_login: { Args: { p_email: string }; Returns: undefined }
       replace_teacher_availability: {
         Args: { p_blocks: Json; p_confirmed_at: string; p_teacher_id: string }
         Returns: undefined
@@ -3443,24 +3485,6 @@ export type Database = {
           status: Database["public"]["Enums"]["student_status"]
           video_call_link: string
         }[]
-      }
-      is_login_locked: {
-        Args: {
-          p_email: string
-        }
-        Returns: boolean
-      }
-      record_failed_login: {
-        Args: {
-          p_email: string
-        }
-        Returns: Json
-      }
-      record_successful_login: {
-        Args: {
-          p_email: string
-        }
-        Returns: undefined
       }
       student_set_session_status: {
         Args: {
