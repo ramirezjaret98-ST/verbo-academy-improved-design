@@ -39,6 +39,9 @@ import {
   subscribeCustomUnits,
   subscribeCompletion,
   readCompletionMap,
+  customUnitAccessOverride,
+  setCustomUnitAccess,
+  resolveCustomUnitUnlock,
 } from "@/lib/custom-units-store";
 import {
   type CustomCourseMeta,
@@ -51,7 +54,7 @@ import {
   type ModalAccent,
 } from "@/components/verbo/course-modals";
 import { Card, GhostButton, PrimaryButton, Pill } from "@/components/verbo/ui";
-import { loadActivities } from "@/lib/activities-store";
+import { loadActivities, subscribeActivities } from "@/lib/activities-store";
 
 export interface CustomUnitAdminConfig {
   kind: CustomUnitKind;
@@ -185,6 +188,7 @@ function StudentBuilder({ config, studentId, studentName, onBack }: {
   studentName: string;
   onBack: () => void;
 }) {
+  const { user: actor } = useAuth();
   const [unitModal, setUnitModal] = useState<{ mode: "create" | "edit"; unit?: CustomUnit } | null>(null);
   const [actModalUnit, setActModalUnit] = useState<{ unitId: string; unitTitle: string } | null>(null);
   const [cardModalOpen, setCardModalOpen] = useState(false);
@@ -195,9 +199,16 @@ function StudentBuilder({ config, studentId, studentName, onBack }: {
     const unsubC = subscribeCompletion(config.kind, () => setRev((r) => r + 1));
     const unsubP = subscribeLessonPlans(() => setRev((r) => r + 1));
     const unsubX = subscribeSessions(() => setRev((r) => r + 1));
-    return () => { unsubC(); unsubP(); unsubX(); };
+    const unsubA = subscribeActivities(() => setRev((r) => r + 1)); // unit_access_events overrides
+    return () => { unsubC(); unsubP(); unsubX(); unsubA(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [config.kind]);
+
+  const toggleAccess = (unitId: string, action: "unlocked" | "locked") => {
+    if (!actor) return;
+    setCustomUnitAccess(studentId, unitId, action, actor.id, "admin");
+    setRev((r) => r + 1);
+  };
 
   const units = useMemo(() => customUnitsForStudent(config.kind, studentId), [config.kind, studentId, rev, unitModal]);
   const allActivities = useMemo(() => loadActivities(), [rev, unitModal]);
@@ -254,7 +265,8 @@ function StudentBuilder({ config, studentId, studentName, onBack }: {
           const count = allActivities.filter((a) => a.unit_id === u.id).length;
           const done = !!doneMap[u.id];
           const prevDone = i === 0 || !!doneMap[units[i - 1].id];
-          const unlocked = done || prevDone;
+          const override = customUnitAccessOverride(studentId, u.id);
+          const unlocked = resolveCustomUnitUnlock(done, prevDone, override);
           const doneRec = doneMap[u.id];
           const doneSession = doneRec ? sessions.find((s) => s.id === doneRec.session_id) : undefined;
           return (
@@ -273,11 +285,11 @@ function StudentBuilder({ config, studentId, studentName, onBack }: {
                     </span>
                   ) : unlocked ? (
                     <span className="inline-flex items-center gap-1 rounded-full bg-success/10 px-2 py-0.5 text-[11px] font-medium text-success">
-                      <Unlock className="h-3 w-3" /> Unlocked
+                      <Unlock className="h-3 w-3" /> {override === "unlocked" ? "Unlocked by admin" : "Unlocked"}
                     </span>
                   ) : (
                     <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-                      <Lock className="h-3 w-3" /> Locked until previous unit completed
+                      <Lock className="h-3 w-3" /> {override === "locked" ? "Locked by admin" : "Locked until previous unit completed"}
                     </span>
                   )}
                 </div>
@@ -313,6 +325,28 @@ function StudentBuilder({ config, studentId, studentName, onBack }: {
                 </div>
               </div>
               <div className="flex items-center gap-2">
+                <div className="inline-flex shrink-0 overflow-hidden rounded-lg border border-border">
+                  <button
+                    type="button"
+                    onClick={() => toggleAccess(u.id, "unlocked")}
+                    aria-pressed={override === "unlocked"}
+                    title="Force unlock this unit for this student"
+                    aria-label="Force unlock unit"
+                    className={`flex h-9 w-9 items-center justify-center transition-colors ${override === "unlocked" ? "bg-success/15 text-success" : "text-muted-foreground hover:bg-secondary"}`}
+                  >
+                    <Unlock className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => toggleAccess(u.id, "locked")}
+                    aria-pressed={override === "locked"}
+                    title="Force lock this unit for this student"
+                    aria-label="Force lock unit"
+                    className={`flex h-9 w-9 items-center justify-center border-l border-border transition-colors ${override === "locked" ? "bg-destructive/15 text-destructive" : "text-muted-foreground hover:bg-secondary"}`}
+                  >
+                    <Lock className="h-4 w-4" />
+                  </button>
+                </div>
                 <PrimaryButton onClick={() => setActModalUnit({ unitId: u.id, unitTitle: u.title })}>
                   <Sparkles className="h-3.5 w-3.5" /> Activities
                 </PrimaryButton>
