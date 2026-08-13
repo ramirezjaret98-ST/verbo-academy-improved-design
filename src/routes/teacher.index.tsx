@@ -26,7 +26,7 @@ import { loadLessonPlans, saveLessonPlan, subscribeLessonPlans, getLessonPlan, t
 import { markVipUnitDone, clearVipUnitDoneForSession } from "@/lib/vip-courses-store";
 import { markTailoredUnitDone, clearTailoredUnitDoneForSession } from "@/lib/tailored-content-store";
 import { computeTeacherKpis, getBonusThreshold } from "@/lib/teacher-kpis";
-import { avgRating } from "@/lib/teacher-model";
+import { avgRating, hydrateTeachers, subscribeTeachers } from "@/lib/teacher-model";
 import { activeStrikeCount } from "@/lib/strikes-store";
 import { listChangeRequests, isTeacherAvailableAt, subscribeAvailability } from "@/lib/availability-store";
 import { loadClubs, subscribeClubs, type Club } from "@/lib/clubs-store";
@@ -137,7 +137,16 @@ function TeacherDashboard() {
     const u8 = subscribeAssignments(() => setAvailTick((n) => n + 1));
     hydrateStudents();
     const u9 = subscribeStudents(() => setAvailTick((n) => n + 1));
-    return () => { u2(); u3(); u4(); u5(); u6(); u7(); u8(); u9(); };
+    // Bug fix (2026-08-13): a REAL (non-seed) teacher account's own USERS
+    // entry (keyed by legacy_id) is only ever pushed by hydrateTeachers() —
+    // and this route never called it. Every consumer of `teacherUser` below
+    // (KPI/Performance card, strikes) silently stayed null forever for any
+    // teacher created after the auth migration (e.g. via admin-create-user),
+    // even though their sessions/data were all correct in the DB. Same root
+    // cause as the "My Balance" page — see teacher.financial.tsx.
+    hydrateTeachers();
+    const u10 = subscribeTeachers(() => setAvailTick((n) => n + 1));
+    return () => { u2(); u3(); u4(); u5(); u6(); u7(); u8(); u9(); u10(); };
   }, []);
 
   // If we arrived with ?report=<id>, auto-open Step 1 for that session

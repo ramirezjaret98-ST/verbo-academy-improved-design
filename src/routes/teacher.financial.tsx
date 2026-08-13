@@ -11,7 +11,7 @@ import { USERS, userById } from "@/lib/mock-data";
 import { loadSessions, subscribeSessions, type ExtSession } from "@/lib/sessions-store";
 import { groupById } from "@/lib/groups-store";
 import {
-  avgRating,
+  avgRating, hydrateTeachers, subscribeTeachers,
 } from "@/lib/teacher-model";
 import { effectiveHourlyRate, teacherTier } from "@/lib/teacher-tiers";
 import {
@@ -94,7 +94,7 @@ const FIN = {
 // --- page -------------------------------------------------------------------
 function MyBalancePage() {
   const { user } = useAuth();
-  const [, force] = useState(0);
+  const [tick, force] = useState(0);
   const bump = () => force((n) => n + 1);
   const [viewMonth, setViewMonth] = useState<Date>(() => firstOfMonth(new Date()));
   const [expanded, setExpanded] = useState<Record<"sessions" | "adjustments" | "bonus", boolean>>({
@@ -104,12 +104,23 @@ function MyBalancePage() {
   const [reportSent, setReportSent] = useState(false);
 
   useEffect(() => subscribeSessions(bump), []);
+  // Bug fix (2026-08-13): this page reads `teacher` from the shared USERS
+  // singleton (keyed by app_users.legacy_id), but nothing on this route
+  // ever populated it for the SIGNED-IN teacher's own account — hydrateTeachers()
+  // was only ever called from student/admin routes. For any teacher created
+  // after the auth migration (real legacy_id like "t1786228602606", not one
+  // of the original "u1".."u8" seed rows already baked into mock-data.ts),
+  // `teacher` below was `null` forever: the page never left "Loading your
+  // balance…", so sessions taught, pay and KPIs never rendered even though
+  // the underlying session data (completed/absent) was correct in the DB.
+  useEffect(() => { hydrateTeachers(); }, []);
+  useEffect(() => subscribeTeachers(bump), []);
 
   // Locate the live teacher record (auth user id).
   const teacher = useMemo(() => {
     if (!user) return null;
     return USERS.find((u) => u.id === user.id && u.role === "teacher") ?? null;
-  }, [user]);
+  }, [user, /* re-derive once hydrateTeachers() populates USERS */ tick]);
 
   const now = new Date();
   const currentMkey = monthKey(now);
