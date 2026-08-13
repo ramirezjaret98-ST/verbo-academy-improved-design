@@ -125,6 +125,7 @@ import {
 } from "@/lib/tailored-content-store";
 import { courseMetaFor, subscribeCourseMeta } from "@/lib/custom-course-meta-store";
 import { loadSessions, subscribeSessions } from "@/lib/sessions-store";
+import { resolveCustomUnitUnlock } from "@/lib/custom-units-store";
 import { CourseCardHero, CustomUnitsList, CustomUnitDetail } from "./student.my-course";
 
 
@@ -345,7 +346,7 @@ function Page() {
     const doneMap = tailoredUnitDoneMap();
     const done = !!doneMap[unit.id];
     const prevDone = idx === 0 || !!doneMap[tailoredUnits[idx - 1].id];
-    const unlocked = done || prevDone;
+    const unlocked = resolveCustomUnitUnlock(done, prevDone, getUnitAccessOverride(user.id, unit.id));
     const nextUnit = tailoredUnits[idx + 1];
     return (
       <div className="space-y-4">
@@ -387,6 +388,7 @@ function Page() {
           units={tailoredUnits}
           doneMap={doneMap}
           sessions={sessions}
+          studentId={user?.id ?? ""}
           onBack={() => setView({ kind: "levels" })}
           onOpenUnit={(u) => setView({ kind: "tailored-unit", unitId: u.id })}
         />

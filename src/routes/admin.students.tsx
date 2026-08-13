@@ -1815,6 +1815,22 @@ function UnitAccessPanel({ student, actorRole }: { student: User; actorRole: "ad
   const level: CourseLevel | undefined = levels.find((l) => l.id === levelId) ?? levels[0];
 
   if (!productId || !product) {
+    if (student.product === "vip") {
+      return (
+        <div className="rounded-lg bg-muted px-3 py-6 text-center text-xs text-muted-foreground">
+          VIP students don't use this institutional Learning Path — unlock or lock their units from{" "}
+          <span className="font-medium text-foreground">Admin → VIP Course Builder</span>, right next to each unit.
+        </div>
+      );
+    }
+    if (student.access_plan === "Elite") {
+      return (
+        <div className="rounded-lg bg-muted px-3 py-6 text-center text-xs text-muted-foreground">
+          This student also has Tailored Content — unlock or lock those units from{" "}
+          <span className="font-medium text-foreground">Admin → Tailored Content</span>, right next to each unit.
+        </div>
+      );
+    }
     return (
       <div className="rounded-lg bg-muted px-3 py-6 text-center text-xs text-muted-foreground">
         This student's product does not have a self-study Learning Path (Course Progress applies to GO, Enterprise and International).
@@ -1831,6 +1847,12 @@ function UnitAccessPanel({ student, actorRole }: { student: User; actorRole: "ad
 
   return (
     <div className="space-y-4">
+      {student.access_plan === "Elite" && (
+        <div className="rounded-lg bg-muted px-3 py-2 text-xs text-muted-foreground">
+          This student also has Tailored Content — unlock or lock those units from{" "}
+          <span className="font-medium text-foreground">Admin → Tailored Content</span>, right next to each unit.
+        </div>
+      )}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-xs text-muted-foreground">
           Unlock or lock any unit for this student. Milestone units (10, 20, 30) are locked by default until unlocked here.

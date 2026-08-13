@@ -17,7 +17,8 @@ import { courseMetaFor, subscribeCourseMeta } from "@/lib/custom-course-meta-sto
 import { loadSessions, subscribeSessions } from "@/lib/sessions-store";
 import { ActivityViewModal, type ModalAccent } from "@/components/verbo/course-modals";
 import { Card, GhostButton, Pill } from "@/components/verbo/ui";
-import { loadActivities } from "@/lib/activities-store";
+import { loadActivities, subscribeActivities } from "@/lib/activities-store";
+import { customUnitAccessOverride, resolveCustomUnitUnlock } from "@/lib/custom-units-store";
 import {
   Sparkles, ArrowLeft, Lock, Unlock, FileDown, CheckCircle2, Video, ImageIcon, LayoutGrid,
 } from "lucide-react";
@@ -43,9 +44,10 @@ function Page() {
     const unsubX = subscribeSessions(() => tick((n) => n + 1));
     const unsubC = subscribeTailoredUnitCompletion(() => tick((n) => n + 1));
     const unsubM = subscribeCourseMeta(() => tick((n) => n + 1));
+    const unsubO = subscribeActivities(() => tick((n) => n + 1)); // unit_access_events overrides
     hydrateAssignments();
     const unsubA = subscribeAssignments(() => tick((n) => n + 1));
-    return () => { unsubS(); unsubT(); unsubX(); unsubC(); unsubM(); unsubA(); };
+    return () => { unsubS(); unsubT(); unsubX(); unsubC(); unsubM(); unsubO(); unsubA(); };
   }, []);
 
   if (!user) return null;
@@ -193,7 +195,8 @@ function StudentView({ studentId, studentName, onBack }: {
           const count = allActivities.filter((a) => a.unit_id === u.id).length;
           const done = !!doneMap[u.id];
           const prevDone = i === 0 || !!doneMap[units[i - 1].id];
-          const unlocked = done || prevDone;
+          const override = customUnitAccessOverride(studentId, u.id);
+          const unlocked = resolveCustomUnitUnlock(done, prevDone, override);
           const doneRec = doneMap[u.id];
           const doneSession = doneRec ? sessions.find((s) => s.id === doneRec.session_id) : undefined;
           return (
@@ -212,11 +215,11 @@ function StudentView({ studentId, studentName, onBack }: {
                     </span>
                   ) : unlocked ? (
                     <span className="inline-flex items-center gap-1 rounded-full bg-success/10 px-2 py-0.5 text-[11px] font-medium text-success">
-                      <Unlock className="h-3 w-3" /> Unlocked
+                      <Unlock className="h-3 w-3" /> {override === "unlocked" ? "Unlocked by admin" : "Unlocked"}
                     </span>
                   ) : (
                     <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-                      <Lock className="h-3 w-3" /> Locked until previous unit completed
+                      <Lock className="h-3 w-3" /> {override === "locked" ? "Locked by admin" : "Locked until previous unit completed"}
                     </span>
                   )}
                 </div>

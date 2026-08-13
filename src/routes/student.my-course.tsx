@@ -24,6 +24,7 @@ import {
 } from "@/lib/vip-courses-store";
 import { courseMetaFor, subscribeCourseMeta } from "@/lib/custom-course-meta-store";
 import { loadSessions, subscribeSessions } from "@/lib/sessions-store";
+import { customUnitAccessOverride, resolveCustomUnitUnlock } from "@/lib/custom-units-store";
 import {
   MANDATORY_CATEGORIES,
   activitiesForUnit,
@@ -76,7 +77,7 @@ function Page() {
     if (!unit) { setView({ kind: "units" }); return null; }
     const done = !!doneMap[unit.id];
     const prevDone = idx === 0 || !!doneMap[units[idx - 1].id];
-    const unlocked = done || prevDone;
+    const unlocked = resolveCustomUnitUnlock(done, prevDone, customUnitAccessOverride(user.id, unit.id));
     const nextUnit = units[idx + 1];
     return (
       <CustomUnitDetail
@@ -97,6 +98,7 @@ function Page() {
         units={units}
         doneMap={doneMap}
         sessions={sessions}
+        studentId={user.id}
         onBack={() => setView({ kind: "card" })}
         onOpenUnit={(u) => setView({ kind: "unit", unitId: u.id })}
       />
@@ -189,12 +191,13 @@ export function CourseCardHero({
 /* Units list — grouped by optional Block label                               */
 /* -------------------------------------------------------------------------- */
 export function CustomUnitsList<T extends VipUnit>({
-  title, units, doneMap, sessions, onBack, onOpenUnit,
+  title, units, doneMap, sessions, studentId, onBack, onOpenUnit,
 }: {
   title: string;
   units: T[];
   doneMap: Record<string, { session_id: string; completed_at: string }>;
   sessions: { id: string; date_time: string }[];
+  studentId: string;
   onBack: () => void;
   onOpenUnit: (u: T) => void;
 }) {
@@ -241,7 +244,7 @@ export function CustomUnitsList<T extends VipUnit>({
                   const i = units.indexOf(u);
                   const done = !!doneMap[u.id];
                   const prevDone = i === 0 || !!doneMap[units[i - 1].id];
-                  const unlocked = done || prevDone;
+                  const unlocked = resolveCustomUnitUnlock(done, prevDone, customUnitAccessOverride(studentId, u.id));
                   const doneRec = doneMap[u.id];
                   const doneSession = doneRec ? sessions.find((s) => s.id === doneRec.session_id) : undefined;
                   return (
