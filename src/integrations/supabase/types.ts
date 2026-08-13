@@ -3406,6 +3406,10 @@ export type Database = {
         Args: { p_base_composite?: number }
         Returns: undefined
       }
+      student_convert_session_to_spotlight: {
+        Args: { p_original_session_id: number; p_spotlight_context: string }
+        Returns: number
+      }
       student_profile_for_teacher: {
         Args: never
         Returns: {
@@ -3433,6 +3437,14 @@ export type Database = {
           status: Database["public"]["Enums"]["student_status"]
           video_call_link: string
         }[]
+      }
+      student_set_session_status: {
+        Args: {
+          p_cancellation_note?: string
+          p_session_id: number
+          p_status: Database["public"]["Enums"]["ext_session_status"]
+        }
+        Returns: undefined
       }
       teacher_profile_for_peek: {
         Args: never
