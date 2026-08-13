@@ -18,6 +18,11 @@ interface AuthCtx {
     email: string,
     password: string,
     remember: boolean,
+    /** Cloudflare Turnstile token (2026-08-13 security batch). Only required
+     *  once Jaret enables "CAPTCHA protection" in the Supabase Auth
+     *  dashboard — until then Supabase Auth ignores it if present and
+     *  doesn't require it if absent. */
+    captchaToken?: string,
   ) => Promise<{ ok: true; role: Role; must_change_password: boolean } | { ok: false; error: string }>;
 
   logout: () => void;
@@ -228,7 +233,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const login: AuthCtx["login"] = async (email, password, _remember) => {
+  const login: AuthCtx["login"] = async (email, password, _remember, captchaToken) => {
     // NOTE: Supabase's client (src/integrations/supabase/client.ts) always
     // persists the session to localStorage with auto-refresh — the
     // "Remember me" checkbox no longer changes storage duration the way the
@@ -257,7 +262,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       };
     }
 
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+      options: captchaToken ? { captchaToken } : undefined,
+    });
     if (error || !data.user) {
       const { data: attemptData, error: attemptError } = await supabase.rpc("record_failed_login", {
         p_email: normalizedEmail,
