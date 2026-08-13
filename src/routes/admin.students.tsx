@@ -9,6 +9,7 @@ import {
   SESSIONS_PER_LEVEL, MAX_INSIGHT_STRIKES, MAX_BOOKCLUB_STRIKES,
   getProduct, focusesForProduct, getFocus, getAccessPlan,
   suggestDuration, nextPaymentDate, nextPaymentDateAfterToday, daysUntil, paymentUrgency,
+  defaultMonthlyPrice,
   type ProductId, type AccessPlanId,
   accessPlanPillStyle,
 } from "@/lib/student-model";
@@ -22,7 +23,7 @@ import { useAvatar } from "@/lib/avatar-store";
 import {
   Plus, X, Eye, EyeOff, KeyRound, Mail, Phone, Building2, CalendarDays, GraduationCap,
   Users, Briefcase, Compass, Globe, Crown, Copy, Check, Snowflake, Ban, Play, Unlock,
-  Sparkles, Wand2, Pencil, Video, Repeat, Clock, CreditCard, ShieldAlert,
+  Sparkles, Wand2, Pencil, Video, Repeat, Clock, CreditCard, ShieldAlert, CircleDollarSign,
   Search, ArrowUpDown, Filter, Gauge, Lightbulb, Layers, Trash2,
 } from "lucide-react";
 import {
@@ -663,6 +664,9 @@ type FormState = {
   sessions_per_week: number; session_duration: number;
   reschedule_policy: string; reschedule_custom_hours: number; reschedule_custom_pct: number;
   payment_day: number; cycle_start: string;
+  /** Raw text input for the negotiated monthly price override — empty string
+   *  means "use the plan default" (see `defaultMonthlyPrice`). */
+  custom_price: string;
   video_call_link: string;
   teacher_id: string;
   // Add-ons
@@ -707,6 +711,7 @@ function StudentFormModal({
     reschedule_custom_pct: initial?.reschedule_custom_pct ?? 25,
     payment_day: initial?.payment_day ?? 1,
     cycle_start: initial?.cycle_start ?? "",
+    custom_price: initial?.custom_price != null ? String(initial.custom_price) : "",
     video_call_link: initial?.video_call_link ?? "",
     teacher_id: existingTeacher,
     addon_insights_per_month: initial?.addon_insights_per_month ?? 0,
@@ -848,6 +853,7 @@ function StudentFormModal({
         reschedule_policy: "",
         payment_day: 1,
         cycle_start: "",
+        custom_price: "",
         video_call_link: "",
         teacher_id: "",
         addon_insights_per_month: pt === "insights" ? (prev.addon_insights_per_month || 1) : 0,
@@ -891,6 +897,7 @@ function StudentFormModal({
       reschedule_custom_pct: isPerf && isCustomReschedule ? Number(f.reschedule_custom_pct) : undefined,
       payment_day: isPerf ? (Number(f.payment_day) || undefined) : undefined,
       cycle_start: isPerf ? (f.cycle_start || undefined) : undefined,
+      custom_price: isPerf ? (f.custom_price.trim() !== "" ? Number(f.custom_price) : null) : undefined,
       video_call_link: isPerf ? f.video_call_link.trim() : undefined,
       status: initial?.status ?? "active",
       must_change_password: initial ? initial.must_change_password : true,
@@ -1179,6 +1186,29 @@ function StudentFormModal({
                   <input type="date" value={f.cycle_start} onChange={(e) => set("cycle_start", e.target.value)} className={inputCls} />
                   {nextPayPreview && <p className="mt-1 text-[10.5px] text-muted-foreground">Next payment: {nextPayPreview.toLocaleDateString()}</p>}
                 </Field>
+
+                <Field label="Price (per month, MXN)" icon={<CircleDollarSign className="h-3.5 w-3.5" />} className="md:col-span-2">
+                  {(() => {
+                    const planDefault = defaultMonthlyPrice(f.access_plan || undefined, f.sessions_per_week);
+                    return (
+                      <>
+                        <input
+                          type="number"
+                          min={0}
+                          value={f.custom_price}
+                          onChange={(e) => set("custom_price", e.target.value)}
+                          placeholder={`Default: $${planDefault.toLocaleString()} MXN`}
+                          className={inputCls}
+                        />
+                        <p className="mt-1 text-[10.5px] text-muted-foreground">
+                          {f.custom_price.trim()
+                            ? "Custom price for this student — overrides the plan default."
+                            : `Using plan default: $${planDefault.toLocaleString()} MXN/month (${f.access_plan || "no plan"}, ${f.sessions_per_week}×/week). Type an amount to set a negotiated price, or leave blank.`}
+                        </p>
+                      </>
+                    );
+                  })()}
+                </Field>
               </div>
             </div>
 
@@ -1461,6 +1491,10 @@ function StudentDetailModal({
                   <Info label="Cadence" value={`${student.sessions_per_week ?? "—"}×/week · ${student.session_duration ?? "—"} min`} />
                   <Info label="Reschedule policy" value={student.reschedule_policy ?? accessPlan?.reschedulePolicy ?? "—"} />
                   <Info label="Next payment" value={nextPay ? nextPay.toLocaleDateString() : "—"} emphasis />
+                  <Info
+                    label="Price / month"
+                    value={`$${expectedAmountForStudent(student).toLocaleString()} MXN${student.custom_price != null ? " · custom" : " · plan default"}`}
+                  />
                   {groupInfo && <Info label="Group" value={groupInfo.group.name} />}
                   {(groupInfo?.group.company_client || student.company) && (
                     <Info label="Company" value={groupInfo?.group.company_client ?? student.company ?? "—"} />
