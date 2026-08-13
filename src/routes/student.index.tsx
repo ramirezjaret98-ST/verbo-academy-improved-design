@@ -18,6 +18,7 @@ import { userById } from "@/lib/mock-data";
 import { hydrateTeachers } from "@/lib/teacher-model";
 import { effectiveSessionCounts, groupOfStudent } from "@/lib/groups-store";
 import { subscribeSessions, getSessionsSnapshot, getServerSessionsSnapshot, submitStudentRating, studentAttendance, type ExtSession, type ExtSessionStatus } from "@/lib/sessions-store";
+import { withinConnectWindow, CONNECT_HINT } from "@/lib/session-connect";
 import {
   getPerformanceSnapshot,
   getServerPerformanceSnapshot,
@@ -1005,10 +1006,15 @@ function StudentDashboard() {
                                     </button>
                                     <button
                                       type="button"
-                                      title="Connect"
+                                      title={withinConnectWindow(s.date_time, s.duration_minutes) ? "Connect" : CONNECT_HINT}
                                       aria-label="Connect"
-                                      onClick={() => window.open(s.teams_link, "_blank")}
-                                      className="flex h-8 w-8 items-center justify-center rounded-full bg-success text-success-foreground shadow-soft transition-opacity hover:opacity-90 active:scale-[0.97]"
+                                      disabled={!withinConnectWindow(s.date_time, s.duration_minutes)}
+                                      onClick={() => { if (withinConnectWindow(s.date_time, s.duration_minutes)) window.open(s.teams_link, "_blank"); }}
+                                      className={`flex h-8 w-8 items-center justify-center rounded-full shadow-soft transition-opacity active:scale-[0.97] ${
+                                        withinConnectWindow(s.date_time, s.duration_minutes)
+                                          ? "bg-success text-success-foreground hover:opacity-90"
+                                          : "cursor-not-allowed bg-secondary text-muted-foreground"
+                                      }`}
                                     >
                                       <Video className="h-4 w-4" />
                                     </button>
@@ -1398,20 +1404,33 @@ function StudentDashboard() {
                       )}
                     </section>
                   </div>
-                  <div className="flex flex-wrap justify-end gap-2 border-t border-border bg-secondary/30 px-6 py-4">
-                    <GhostButton
-                      onClick={() => { setClassDetail(null); setCantAttendFor(s); }}
-                    >
-                      <X className="h-3.5 w-3.5" /> Can't attend
-                    </GhostButton>
-                    <PrimaryButton
-                      className="verbo-btn-glow"
-                      style={{ backgroundColor: theme.solid, color: "#fff", boxShadow: `0 8px 20px -6px ${theme.solid}` }}
-                      onClick={() => s.teams_link && window.open(s.teams_link, "_blank")}
-                    >
-                      <Video className="h-3.5 w-3.5" /> Connect
-                    </PrimaryButton>
-                  </div>
+                  {withinConnectWindow(s.date_time, s.duration_minutes) ? (
+                    <div className="flex flex-wrap justify-end gap-2 border-t border-border bg-secondary/30 px-6 py-4">
+                      <GhostButton
+                        onClick={() => { setClassDetail(null); setCantAttendFor(s); }}
+                      >
+                        <X className="h-3.5 w-3.5" /> Can't attend
+                      </GhostButton>
+                      <PrimaryButton
+                        className="verbo-btn-glow"
+                        accentColor="#5fca16"
+                        onClick={() => s.teams_link && window.open(s.teams_link, "_blank")}
+                      >
+                        <Video className="h-3.5 w-3.5" /> Connect
+                      </PrimaryButton>
+                    </div>
+                  ) : (
+                    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border bg-secondary/30 px-6 py-4">
+                      <p className="text-xs text-muted-foreground">
+                        Nothing to do yet — we'll let you know here as soon as it's time to join.
+                      </p>
+                      <GhostButton
+                        onClick={() => { setClassDetail(null); setCantAttendFor(s); }}
+                      >
+                        <X className="h-3.5 w-3.5" /> Can't attend
+                      </GhostButton>
+                    </div>
+                  )}
                 </>
               );
             }

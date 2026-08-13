@@ -34,6 +34,7 @@ import {
   SUB_STATUS_META, lastCoveredSummaryFor,
   type ExtSession, type ExtSessionStatus,
 } from "@/lib/sessions-store";
+import { withinConnectWindow, CONNECT_HINT } from "@/lib/session-connect";
 import { CalendarView } from "@/components/verbo/CalendarView";
 import {
   studentCalendarEvents, CALENDAR_STATUS_META, EVENT_KIND_META, calendarEventTheme,
@@ -456,12 +457,9 @@ function StatPill({ icon, label, value, tone = "violet", progressPct }: {
 // plan (same data pattern as the Dashboard "Class Details" modal), never on
 // the status string alone. "Connect" only activates 5 minutes before start.
 // ---------------------------------------------------------------------------
-/** True from 5 minutes before the start until the session's end time. */
-function withinConnectWindow(iso: string, durationMinutes: number): boolean {
-  const h = hoursUntil(iso);
-  return h <= 5 / 60 && h > -(durationMinutes / 60);
-}
-const CONNECT_HINT = "Activates 5 minutes before your session.";
+// withinConnectWindow / CONNECT_HINT now live in @/lib/session-connect so the
+// Dashboard (student.index.tsx) can share the exact same gate — see that
+// file's header comment for why this used to be the only place it worked.
 
 function ConnectButton({
   enabled, onClick, className,
