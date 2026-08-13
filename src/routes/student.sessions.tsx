@@ -29,9 +29,8 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
 import { USERS, userById } from "@/lib/mock-data";
-import { adjustRemainingSessions } from "@/lib/students-store";
 import {
-  loadSessions, subscribeSessions, updateSession,
+  loadSessions, subscribeSessions, studentSetSessionStatus,
   SUB_STATUS_META, lastCoveredSummaryFor,
   type ExtSession, type ExtSessionStatus,
 } from "@/lib/sessions-store";
@@ -881,19 +880,23 @@ function SpotlightFormModal({ studentId, onClose }: { studentId: string; onClose
           </p>
           <div className="mt-6 flex justify-end gap-2">
             <GhostButton onClick={() => setConfirmOverlap(null)}>Return</GhostButton>
-            <PrimaryButton onClick={() => {
-              convertSessionToSpotlight({
+            <PrimaryButton onClick={async () => {
+              // Group sessions aren't supported by this RPC yet (see
+              // groups-store.ts migration notes) — that path still uses the
+              // old client-side credit bump since there's no real group data
+              // to exercise it against today. Individual students' credit
+              // refund now happens server-side, atomically, inside the RPC.
+              const g = groupOfStudent(studentId);
+              const ok = await convertSessionToSpotlight({
                 originalSessionId: confirmOverlap.session.id,
                 spotlightContext: context.trim(),
               });
-              // Refund the credit (as if never scheduled). Group students
-              // share a single counter on the Group, individual students have
-              // it on their own User record.
-              const g = groupOfStudent(studentId);
+              if (!ok) {
+                toast.error("Couldn't replace the session — please try again.");
+                return;
+              }
               if (g) {
                 incrementGroupRemaining(g.group.id);
-              } else {
-                adjustRemainingSessions(studentId, 1);
               }
               // Core freemium: consume the one-shot courtesy credit.
               if (studentUser?.access_plan === "Core" && !freemiumUsed(studentId, "spotlight")) {
@@ -1086,7 +1089,7 @@ function CancelSpotlightModal({ session, onClose }: { session: ExtSession; onClo
     const note = late
       ? "Cancelled by student with less than 24h notice — teacher paid."
       : "Cancelled by student with 24h+ notice — no payment.";
-    updateSession(session.id, { status: "cancelled", cancellation_note: note });
+    studentSetSessionStatus(session.id, "cancelled", note);
     if (late) {
       const teacher = USERS.find((u) => u.id === session.teacher_id);
       if (teacher) {
