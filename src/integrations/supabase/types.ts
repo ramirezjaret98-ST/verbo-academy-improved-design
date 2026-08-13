@@ -223,6 +223,7 @@ export type Database = {
           current_roadmap_level: string | null
           cycle_start: string | null
           email: string
+          failed_login_attempts: number
           focus: string | null
           freeze_end: string | null
           freeze_start: string | null
@@ -235,6 +236,7 @@ export type Database = {
           insights_strikes: number | null
           last_mystery_box_opened_at: string | null
           legacy_id: string | null
+          login_locked_at: string | null
           member_since: string | null
           monthly_amount: number | null
           must_change_password: boolean
@@ -288,6 +290,7 @@ export type Database = {
           current_roadmap_level?: string | null
           cycle_start?: string | null
           email: string
+          failed_login_attempts?: number
           focus?: string | null
           freeze_end?: string | null
           freeze_start?: string | null
@@ -300,6 +303,7 @@ export type Database = {
           insights_strikes?: number | null
           last_mystery_box_opened_at?: string | null
           legacy_id?: string | null
+          login_locked_at?: string | null
           member_since?: string | null
           monthly_amount?: number | null
           must_change_password?: boolean
@@ -355,6 +359,7 @@ export type Database = {
           current_roadmap_level?: string | null
           cycle_start?: string | null
           email?: string
+          failed_login_attempts?: number
           focus?: string | null
           freeze_end?: string | null
           freeze_start?: string | null
@@ -367,6 +372,7 @@ export type Database = {
           insights_strikes?: number | null
           last_mystery_box_opened_at?: string | null
           legacy_id?: string | null
+          login_locked_at?: string | null
           member_since?: string | null
           monthly_amount?: number | null
           must_change_password?: boolean
@@ -3437,6 +3443,24 @@ export type Database = {
           status: Database["public"]["Enums"]["student_status"]
           video_call_link: string
         }[]
+      }
+      is_login_locked: {
+        Args: {
+          p_email: string
+        }
+        Returns: boolean
+      }
+      record_failed_login: {
+        Args: {
+          p_email: string
+        }
+        Returns: Json
+      }
+      record_successful_login: {
+        Args: {
+          p_email: string
+        }
+        Returns: undefined
       }
       student_set_session_status: {
         Args: {
