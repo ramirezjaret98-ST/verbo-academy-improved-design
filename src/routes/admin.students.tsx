@@ -40,6 +40,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { invalidateUserIdBridge } from "@/lib/user-id-bridge";
 import { RotateCcw, Unlock as UnlockIcon, Lock as LockIcon, Trophy } from "lucide-react";
+import { ResetPasswordModal } from "@/components/verbo/ResetPasswordModal";
 import { useAuth } from "@/lib/auth";
 import { loadCourses, subscribeCourses, type CourseLevel } from "@/lib/product-courses-store";
 import { reportsForStudent, subscribeStudentReports } from "@/lib/student-reports-store";
@@ -1296,6 +1297,7 @@ function StudentDetailModal({
   const [showLink, setShowLink] = useState(false);
   const [copied, setCopied] = useState(false);
   const [panel, setPanel] = useState<"none" | "reassign" | "freeze" | "delete">("none");
+  const [resetPwOpen, setResetPwOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [teacherId, setTeacherId] = useState(assignedTeacherIdFor(student.id) ?? "");
@@ -1646,6 +1648,7 @@ function StudentDetailModal({
         <div className="flex flex-wrap items-center gap-2 border-t border-border bg-secondary/30 px-5 py-4 sm:px-7">
           <GhostButton onClick={onEdit} className="verbo-sdm-action !py-1.5 !text-xs"><Pencil className="h-3.5 w-3.5" /> Edit profile</GhostButton>
           <GhostButton onClick={() => { patch({ must_change_password: true }); alert("This user will be asked to set a new password the next time they log in."); }} className="verbo-sdm-action !py-1.5 !text-xs"><KeyRound className="h-3.5 w-3.5" /> Require Password Reset</GhostButton>
+          <GhostButton onClick={() => setResetPwOpen(true)} className="verbo-sdm-action !py-1.5 !text-xs"><RotateCcw className="h-3.5 w-3.5" /> Reset Password</GhostButton>
           <button
             onClick={() => setPanel((p) => (p === "reassign" ? "none" : "reassign"))}
             className="verbo-sdm-action inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-all hover:brightness-110"
@@ -1712,6 +1715,9 @@ function StudentDetailModal({
           )}
         </div>
       </div>
+      {resetPwOpen && (
+        <ResetPasswordModal userId={student.id} userName={student.name} onClose={() => setResetPwOpen(false)} />
+      )}
     </Overlay>
   );
 }

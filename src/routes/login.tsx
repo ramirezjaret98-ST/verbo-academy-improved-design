@@ -4,7 +4,8 @@ import { useAuth } from "@/lib/auth";
 import { Logo } from "@/components/verbo/Logo";
 import { PhotoPlaceholder } from "@/components/verbo/ui";
 import logoSrc from "@/assets/verbo-logo.png";
-import { ArrowLeft, X } from "lucide-react";
+import { ArrowLeft, X, Mail, Check } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 /** Animated eye that opens/closes its lid instead of toggling a slash. */
 function EyeToggle({ open }: { open: boolean }) {
@@ -65,6 +66,7 @@ function LoginPage() {
   const [overlay, setOverlay] = useState<{ x: number; y: number } | null>(null);
   const [overlayOpen, setOverlayOpen] = useState(false);
   const [tilt, setTilt] = useState({ x: 0, y: 0 });
+  const [forgotOpen, setForgotOpen] = useState(false);
 
   const btnRef = useRef<HTMLButtonElement>(null);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
@@ -206,9 +208,13 @@ function LoginPage() {
                 />
                 Remember me for 30 days
               </label>
-              <a href="#" className="text-xs text-[#01304a]/70 transition-colors hover:text-[#01304a] hover:underline">
+              <button
+                type="button"
+                onClick={() => setForgotOpen(true)}
+                className="text-xs text-[#01304a]/70 transition-colors hover:text-[#01304a] hover:underline"
+              >
                 Forgot your password?
-              </a>
+              </button>
             </div>
 
             <div className="verbo-error-slot" data-open={error ? "true" : "false"} aria-live="polite">
@@ -387,8 +393,88 @@ function LoginPage() {
           }}
         />
       )}
+
+      {forgotOpen && <ForgotPasswordModal onClose={() => setForgotOpen(false)} />}
     </div>
 
 
+  );
+}
+
+/** "Forgot your password?" — sends Supabase's built-in recovery email, which
+ *  links to /reset-password. Always shows the same success message
+ *  regardless of whether the email matched an account, so this can't be used
+ *  to probe which emails are registered. */
+function ForgotPasswordModal({ onClose }: { onClose: () => void }) {
+  const [email, setEmail] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [sent, setSent] = useState(false);
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (submitting || !email.trim()) return;
+    setSubmitting(true);
+    await supabase.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    setSubmitting(false);
+    setSent(true);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#01304a]/40 p-4 backdrop-blur-sm">
+      <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-elevated">
+        <div className="flex items-center justify-between">
+          <h3 className="text-base font-semibold text-[#01304a]">Reset your password</h3>
+          <button onClick={onClose} className="rounded-md p-1 text-[#01304a]/60 hover:bg-secondary" aria-label="Close">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        {sent ? (
+          <div className="mt-4 space-y-4">
+            <div className="flex items-start gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-sm text-emerald-800">
+              <Check className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>If an account exists for that email, we've sent a link to reset the password. Check your inbox (and spam folder).</span>
+            </div>
+            <button
+              onClick={onClose}
+              className="w-full rounded-lg bg-[#f38934] px-4 py-2.5 text-sm font-semibold text-white shadow-soft"
+            >
+              Done
+            </button>
+          </div>
+        ) : (
+          <form onSubmit={submit} className="mt-4 space-y-4">
+            <p className="text-sm text-[#01304a]/70">
+              Enter the email on your account and we'll send you a link to set a new password.
+            </p>
+            <div className="verbo-field">
+              <label className="text-xs font-semibold uppercase tracking-wider text-[#01304a]">Email</label>
+              <div className="relative mt-1.5">
+                <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#01304a]/40" />
+                <input
+                  type="email"
+                  required
+                  autoFocus
+                  disabled={submitting}
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full rounded-lg border border-[#01304a]/15 bg-white py-2.5 pl-9 pr-3 text-sm text-[#01304a] placeholder:text-[#01304a]/40 focus:outline-none"
+                  placeholder="name@company.com"
+                />
+              </div>
+            </div>
+            <button
+              type="submit"
+              disabled={submitting || !email.trim()}
+              className="w-full rounded-lg bg-[#f38934] px-4 py-2.5 text-sm font-semibold text-white shadow-soft disabled:opacity-60"
+            >
+              {submitting ? "Sending…" : "Send reset link"}
+            </button>
+          </form>
+        )}
+      </div>
+    </div>
   );
 }

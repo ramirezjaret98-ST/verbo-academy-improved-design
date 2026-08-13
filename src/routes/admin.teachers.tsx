@@ -33,6 +33,7 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { HeroStatCard, Pill, AccentModal, AccentModalFooter, GhostButton, PrimaryButton } from "@/components/verbo/ui";
+import { ResetPasswordModal } from "@/components/verbo/ResetPasswordModal";
 import { useAuth } from "@/lib/auth";
 import { getAdminType } from "@/lib/admin-roles";
 import { KpiOverrideModal } from "@/components/verbo/KpiOverrideModal";
@@ -462,6 +463,7 @@ function TeacherDetailModal({
   const [deleteConfirming, setDeleteConfirming] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [resetPwOpen, setResetPwOpen] = useState(false);
 
   // Editable fields
   const [rate, setRate] = useState(String(effectiveHourlyRate(t)));
@@ -835,6 +837,7 @@ function TeacherDetailModal({
           <div className="shrink-0 flex flex-wrap items-center gap-2 border-t border-border bg-secondary/30 px-6 py-4">
             <GhostBtn onClick={onEdit}><Pencil className="h-3.5 w-3.5" strokeWidth={1.75} /> Edit profile</GhostBtn>
             <GhostBtn onClick={() => { onPersist({ ...t, must_change_password: true }); alert("This user will be asked to set a new password the next time they log in."); }}><KeyRound className="h-3.5 w-3.5" strokeWidth={1.75} /> Require Password Reset</GhostBtn>
+            <GhostBtn onClick={() => setResetPwOpen(true)}><Undo2 className="h-3.5 w-3.5" strokeWidth={1.75} /> Reset Password</GhostBtn>
             <span className="flex-1" />
             {status === "frozen" ? (
               <GhostBtn onClick={() => onPersist(applyStatusPatch(t, "active"))}><Play className="h-3.5 w-3.5" strokeWidth={1.75} /> Reactivate</GhostBtn>
@@ -877,6 +880,10 @@ function TeacherDetailModal({
           onClose={() => setOverrideTarget(null)}
           onSaved={() => { forceTick((n) => n + 1); setOverrideTarget(null); }}
         />
+      )}
+
+      {resetPwOpen && (
+        <ResetPasswordModal userId={t.id} userName={t.name} onClose={() => setResetPwOpen(false)} />
       )}
     </Overlay>
   );

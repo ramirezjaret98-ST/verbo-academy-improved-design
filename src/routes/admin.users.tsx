@@ -1,6 +1,6 @@
 import { createFileRoute, Navigate, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { UserPlus, Pencil, X, ShieldCheck, ShieldAlert, Eye, EyeOff } from "lucide-react";
+import { UserPlus, Pencil, X, ShieldCheck, ShieldAlert, Eye, EyeOff, KeyRound } from "lucide-react";
 import { USERS, type User, type AdminType } from "@/lib/mock-data";
 import { Card, SectionTitle, PrimaryButton, GhostButton, Pill } from "@/components/verbo/ui";
 import { useAuth } from "@/lib/auth";
@@ -9,6 +9,7 @@ import {
   createInternalUser, updateInternalUser,
   isUserDeactivated, setUserDeactivated,
 } from "@/lib/admin-roles";
+import { ResetPasswordModal } from "@/components/verbo/ResetPasswordModal";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/admin/users")({
@@ -47,6 +48,7 @@ function UsersPage() {
   const rows = useMemo(() => USERS.slice(), []);
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<User | null>(null);
+  const [resetPwFor, setResetPwFor] = useState<User | null>(null);
 
   if (adminType && adminType !== "super_admin") {
     return <Navigate to="/admin" />;
@@ -113,6 +115,12 @@ function UsersPage() {
                             <Pencil className="h-3.5 w-3.5" /> Edit
                           </button>
                         )}
+                        <button
+                          onClick={() => setResetPwFor(u)}
+                          className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2.5 py-1 text-xs hover:bg-secondary"
+                        >
+                          <KeyRound className="h-3.5 w-3.5" /> Reset Password
+                        </button>
                         {u.id !== user?.id && (
                           <button
                             onClick={() => {
@@ -144,6 +152,9 @@ function UsersPage() {
       )}
       {editing && (
         <EditUserModal user={editing} onClose={() => setEditing(null)} />
+      )}
+      {resetPwFor && (
+        <ResetPasswordModal userId={resetPwFor.id} userName={resetPwFor.name} onClose={() => setResetPwFor(null)} />
       )}
     </div>
   );
