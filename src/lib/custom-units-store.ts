@@ -17,7 +17,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { registerRehydrate } from "@/lib/auth-rehydrate";
 import type { Database } from "@/integrations/supabase/types";
-import { sanitizeText } from "./activities-store";
+import { sanitizeText, getUnitAccessOverride, setUnitAccess, type UnitAccessAction } from "./activities-store";
 import { hydrateUserIdBridge, legacyToUuid, uuidToLegacySync } from "@/lib/user-id-bridge";
 
 export type CustomUnitKind = "vip" | "tailored";
@@ -158,6 +158,42 @@ export function findCustomUnitById(id: string): CustomUnit | undefined {
  *  hydration below. Safe to call redundantly. */
 export function hydrateCustomUnits(): Promise<void> {
   return hydrate();
+}
+
+/**
+ * Admin (and, in principle, teacher) manual unlock/lock override for a VIP or
+ * Tailored unit. Without this, access is purely sequential — a unit only
+ * unlocks once the previous one is marked done, with no way for Admin to
+ * open something early or hold something back (unlike the institutional
+ * catalog, which already has exactly this via `unit_access_events`).
+ *
+ * Reuses that same `unit_access_events` table/log instead of a new one —
+ * `unit_id` there is a free-text column with no FK to the institutional
+ * catalog, and custom_units ids (numeric Supabase primary keys, e.g. "482")
+ * never collide with catalog ids (e.g. "go-l1-u5"), so no migration was
+ * needed. Confirmed 2026-08-13 at Jaret's request, especially for VIP.
+ */
+export function customUnitAccessOverride(studentId: string, unitId: string): UnitAccessAction | null {
+  return getUnitAccessOverride(studentId, unitId);
+}
+
+export function setCustomUnitAccess(
+  studentId: string,
+  unitId: string,
+  action: UnitAccessAction,
+  actorId: string,
+  actorRole: "admin" | "teacher",
+): void {
+  setUnitAccess(studentId, unitId, action, actorId, actorRole);
+}
+
+/** A unit the student already completed stays reachable for review even if
+ *  Admin later locks it — locking only withholds units not yet done. */
+export function resolveCustomUnitUnlock(done: boolean, prevDone: boolean, override: UnitAccessAction | null): boolean {
+  if (done) return true;
+  if (override === "locked") return false;
+  if (override === "unlocked") return true;
+  return prevDone;
 }
 
 export function addCustomUnit(
