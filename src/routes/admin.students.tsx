@@ -1713,6 +1713,15 @@ function StudentDetailModal({
           <GhostButton onClick={onEdit} className="verbo-sdm-action !py-1.5 !text-xs"><Pencil className="h-3.5 w-3.5" /> Edit profile</GhostButton>
           <GhostButton onClick={() => { patch({ must_change_password: true }); alert("This user will be asked to set a new password the next time they log in."); }} className="verbo-sdm-action !py-1.5 !text-xs"><KeyRound className="h-3.5 w-3.5" /> Require Password Reset</GhostButton>
           <GhostButton onClick={() => setResetPwOpen(true)} className="verbo-sdm-action !py-1.5 !text-xs"><RotateCcw className="h-3.5 w-3.5" /> Reset Password</GhostButton>
+          {student.login_locked_at ? (
+            <GhostButton
+              onClick={() => patch({ failed_login_attempts: 0, login_locked_at: null })}
+              className="verbo-sdm-action !py-1.5 !text-xs"
+              style={{ color: "#b45309" }}
+            >
+              <UnlockIcon className="h-3.5 w-3.5" /> Unlock account (locked after 3 failed logins)
+            </GhostButton>
+          ) : null}
           <button
             onClick={() => setPanel((p) => (p === "reassign" ? "none" : "reassign"))}
             className="verbo-sdm-action inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-all hover:brightness-110"

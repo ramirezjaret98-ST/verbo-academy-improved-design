@@ -29,7 +29,7 @@ import {
   Plus, X, Eye, EyeOff, Star, Users, Clock, KeyRound, Snowflake, Ban, Play,
   Pencil, Search, Filter, ArrowUpDown, Check, AlertTriangle, Mail, Phone, ShieldAlert,
   CheckCircle2, CalendarClock, ChevronRight, UserX, Wallet, FileDown, CircleDollarSign, Trophy,
-  ShieldCheck, Zap, Briefcase, Undo2, Trash2,
+  ShieldCheck, Zap, Briefcase, Undo2, Trash2, Unlock,
 } from "lucide-react";
 import { waLink } from "@/lib/phone-utils";
 import type { LucideIcon } from "lucide-react";
@@ -850,6 +850,14 @@ function TeacherDetailModal({
             <GhostBtn onClick={onEdit}><Pencil className="h-3.5 w-3.5" strokeWidth={1.75} /> Edit profile</GhostBtn>
             <GhostBtn onClick={() => { onPersist({ ...t, must_change_password: true }); alert("This user will be asked to set a new password the next time they log in."); }}><KeyRound className="h-3.5 w-3.5" strokeWidth={1.75} /> Require Password Reset</GhostBtn>
             <GhostBtn onClick={() => setResetPwOpen(true)}><Undo2 className="h-3.5 w-3.5" strokeWidth={1.75} /> Reset Password</GhostBtn>
+            {t.login_locked_at ? (
+              <GhostBtn
+                onClick={() => onPersist({ ...t, failed_login_attempts: 0, login_locked_at: null })}
+                style={{ color: "#b45309" }}
+              >
+                <Unlock className="h-3.5 w-3.5" strokeWidth={1.75} /> Unlock account (locked after 3 failed logins)
+              </GhostBtn>
+            ) : null}
             <span className="flex-1" />
             {status === "frozen" ? (
               <GhostBtn onClick={() => onPersist(applyStatusPatch(t, "active"))}><Play className="h-3.5 w-3.5" strokeWidth={1.75} /> Reactivate</GhostBtn>

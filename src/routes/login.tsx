@@ -161,9 +161,12 @@ function LoginPage() {
 
           <form onSubmit={onSubmit} className="mt-8 space-y-4">
             <div className="verbo-field verbo-signin-rise" style={{ animationDelay: "200ms" }}>
-              <label className="text-xs font-semibold uppercase tracking-wider text-[#01304a]">Email</label>
+              <label htmlFor="login-email" className="text-xs font-semibold uppercase tracking-wider text-[#01304a]">Email</label>
               <input
+                id="login-email"
+                name="email"
                 type="email"
+                autoComplete="username"
                 required
                 disabled={submitting}
                 value={email}
@@ -173,10 +176,13 @@ function LoginPage() {
               />
             </div>
             <div className="verbo-field verbo-signin-rise" style={{ animationDelay: "260ms" }}>
-              <label className="text-xs font-semibold uppercase tracking-wider text-[#01304a]">Password</label>
+              <label htmlFor="login-password" className="text-xs font-semibold uppercase tracking-wider text-[#01304a]">Password</label>
               <div className="relative">
                 <input
+                  id="login-password"
+                  name="password"
                   type={showPassword ? "text" : "password"}
+                  autoComplete="current-password"
                   required
                   disabled={submitting}
                   value={password}
@@ -454,7 +460,10 @@ function ForgotPasswordModal({ onClose }: { onClose: () => void }) {
               <div className="relative mt-1.5">
                 <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#01304a]/40" />
                 <input
+                  id="forgot-email"
+                  name="email"
                   type="email"
+                  autoComplete="username"
                   required
                   autoFocus
                   disabled={submitting}
