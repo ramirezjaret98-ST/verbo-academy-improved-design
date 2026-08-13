@@ -6,6 +6,13 @@ import { PhotoPlaceholder } from "@/components/verbo/ui";
 import logoSrc from "@/assets/verbo-logo.png";
 import { ArrowLeft, X, Mail, Check } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { Turnstile } from "@marsidev/react-turnstile";
+
+/** Cloudflare Turnstile site key (2026-08-13 security batch) — public value,
+ *  safe to ship client-side. Undefined until `VITE_TURNSTILE_SITE_KEY` is
+ *  set, in which case the widget simply doesn't render and nothing is
+ *  required — safe to deploy before the key exists. */
+const TURNSTILE_SITE_KEY = import.meta.env["VITE_TURNSTILE_SITE_KEY"] as string | undefined;
 
 /** Animated eye that opens/closes its lid instead of toggling a slash. */
 function EyeToggle({ open }: { open: boolean }) {
@@ -67,6 +74,11 @@ function LoginPage() {
   const [overlayOpen, setOverlayOpen] = useState(false);
   const [tilt, setTilt] = useState({ x: 0, y: 0 });
   const [forgotOpen, setForgotOpen] = useState(false);
+  // Cloudflare Turnstile (2026-08-13 security batch). `captchaKey` is bumped
+  // after every submit attempt to force-remount the widget — Turnstile
+  // tokens are single-use, so a fresh one is needed for each try.
+  const [captchaToken, setCaptchaToken] = useState("");
+  const [captchaKey, setCaptchaKey] = useState(0);
 
   const btnRef = useRef<HTMLButtonElement>(null);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
@@ -98,7 +110,10 @@ function LoginPage() {
     setError("");
     setBtnState("loading");
     later(async () => {
-      const res = await login(email.trim(), password, remember);
+      const res = await login(email.trim(), password, remember, captchaToken || undefined);
+      // Single-use token either way — force a fresh widget for the next try.
+      setCaptchaToken("");
+      setCaptchaKey((k) => k + 1);
       if (!res.ok) {
         setError(res.error);
         setBtnState("error");
@@ -235,12 +250,23 @@ function LoginPage() {
               </div>
             </div>
 
+            {TURNSTILE_SITE_KEY ? (
+              <div className="flex justify-center">
+                <Turnstile
+                  key={captchaKey}
+                  siteKey={TURNSTILE_SITE_KEY}
+                  onSuccess={(token) => setCaptchaToken(token)}
+                  onExpire={() => setCaptchaToken("")}
+                  onError={() => setCaptchaToken("")}
+                />
+              </div>
+            ) : null}
 
             <div className="flex justify-center">
               <button
                 ref={btnRef}
                 type="submit"
-                disabled={submitting}
+                disabled={submitting || (!!TURNSTILE_SITE_KEY && !captchaToken)}
                 aria-busy={btnState === "loading"}
                 className={`${btnState === "idle" ? "verbo-cta-shimmer verbo-btn-glow" : ""} ${btnState === "error" ? "verbo-btn-shake" : ""} relative flex h-12 items-center justify-center overflow-hidden text-sm font-semibold text-white shadow-soft outline-none active:scale-[0.97]`}
                 style={{
@@ -415,14 +441,20 @@ function ForgotPasswordModal({ onClose }: { onClose: () => void }) {
   const [email, setEmail] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [sent, setSent] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState("");
+  const [captchaKey, setCaptchaKey] = useState(0);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (submitting || !email.trim()) return;
+    if (TURNSTILE_SITE_KEY && !captchaToken) return;
     setSubmitting(true);
     await supabase.auth.resetPasswordForEmail(email.trim(), {
       redirectTo: `${window.location.origin}/reset-password`,
+      captchaToken: captchaToken || undefined,
     });
+    setCaptchaToken("");
+    setCaptchaKey((k) => k + 1);
     setSubmitting(false);
     setSent(true);
   };
@@ -474,9 +506,20 @@ function ForgotPasswordModal({ onClose }: { onClose: () => void }) {
                 />
               </div>
             </div>
+            {TURNSTILE_SITE_KEY ? (
+              <div className="flex justify-center">
+                <Turnstile
+                  key={captchaKey}
+                  siteKey={TURNSTILE_SITE_KEY}
+                  onSuccess={(token) => setCaptchaToken(token)}
+                  onExpire={() => setCaptchaToken("")}
+                  onError={() => setCaptchaToken("")}
+                />
+              </div>
+            ) : null}
             <button
               type="submit"
-              disabled={submitting || !email.trim()}
+              disabled={submitting || !email.trim() || (!!TURNSTILE_SITE_KEY && !captchaToken)}
               className="w-full rounded-lg bg-[#f38934] px-4 py-2.5 text-sm font-semibold text-white shadow-soft disabled:opacity-60"
             >
               {submitting ? "Sending…" : "Send reset link"}
