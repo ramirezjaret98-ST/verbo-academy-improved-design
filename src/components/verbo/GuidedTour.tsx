@@ -19,6 +19,10 @@ export interface TourStep {
   eyebrow: string;
   title: string;
   body: string;
+  /** Runs once when the tour enters this step — e.g. open a modal so the real target exists in the DOM. */
+  onEnter?: () => void;
+  /** Runs when the tour leaves this step (Next/Back/Skip/Finish/close) — e.g. close that modal again. */
+  onLeave?: () => void;
 }
 
 interface Rect {
@@ -69,6 +73,17 @@ export function GuidedTour({
     if (active) setIndex(0);
   }, [active]);
 
+  // Per-step side effects: e.g. a step can open a modal that its own target
+  // lives inside (onEnter), then close it again once the tour moves past
+  // that step in any direction — Next, Back, Skip, Finish, or unmount
+  // (onLeave, via the effect cleanup, which React always runs).
+  useEffect(() => {
+    if (!active || !step) return;
+    step.onEnter?.();
+    return () => { step.onLeave?.(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active, index]);
+
   // Locate + track the target element for spotlighted steps: scrolls it into
   // view, then measures its rect and keeps it in sync on resize/scroll.
   // Retries briefly in case the element mounts a beat after the tour opens.
@@ -85,9 +100,15 @@ export function GuidedTour({
         attempts.current += 1;
         if (attempts.current < 20) { raf = requestAnimationFrame(tryMeasure); return; }
         // Couldn't find the target after ~1/3s — skip this step rather than
-        // showing a spotlight pointing at nothing.
+        // showing a spotlight pointing at nothing. If it's the LAST step,
+        // skipping would mean "advance to the same index" (a no-op) and leave
+        // the full-screen click-blocker mounted with nothing visible to close
+        // it — e.g. a student with no upcoming sessions reaching the "Can't
+        // Attend" step, whose target only exists once its modal opens. Close
+        // the whole tour instead so nothing gets stuck.
         setRect(null);
-        setIndex((i) => (i < steps.length - 1 ? i + 1 : i));
+        if (index >= steps.length - 1) onClose();
+        else setIndex((i) => i + 1);
         return;
       }
       el.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "center" });
