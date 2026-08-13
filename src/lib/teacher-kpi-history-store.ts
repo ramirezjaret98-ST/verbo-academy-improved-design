@@ -115,15 +115,17 @@ function saveRealSnapshot(teacherId: string, monthKey: string, patch: RealMonthl
   void (async () => {
     const teacherUuid = await legacyToUuid(teacherId);
     if (!teacherUuid) return; // no real account linked yet — cache-only, nothing to persist
-    const { error } = await supabase.from("teacher_kpi_monthly_snapshots").upsert(
-      {
-        teacher_id: teacherUuid,
-        month_key: monthKey,
-        base_composite: next.baseComposite ?? null,
-        refusals: next.refusals ?? null,
-      },
-      { onConflict: "teacher_id,month_key" },
-    );
+    // Goes through the `save_teacher_kpi_snapshot` RPC instead of writing the
+    // table directly: refusals are always recomputed server-side from real
+    // session data (never trusted from the client), base_composite is
+    // clamped 0-100 server-side, and the RPC only ever targets the CURRENT
+    // calendar month (server clock), so a teacher can never rewrite an
+    // already-closed historical month. Direct table writes for the
+    // `teacher_id = auth.uid()` case were removed from RLS — this RPC is
+    // now the only path.
+    const { error } = await supabase.rpc("save_teacher_kpi_snapshot", {
+      p_base_composite: next.baseComposite,
+    });
     if (error) {
       console.error("[teacher-kpi-history-store] failed to persist monthly snapshot", error);
     }
