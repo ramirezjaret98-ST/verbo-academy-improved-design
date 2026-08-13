@@ -3359,6 +3359,12 @@ export type Database = {
           updated_at: string
           video_call_link: string | null
         }
+        SetofOptions: {
+          from: "*"
+          to: "app_users"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       group_profile_for_teacher: {
         Args: never
@@ -3394,6 +3400,10 @@ export type Database = {
       }
       replace_teacher_availability: {
         Args: { p_blocks: Json; p_confirmed_at: string; p_teacher_id: string }
+        Returns: undefined
+      }
+      save_teacher_kpi_snapshot: {
+        Args: { p_base_composite?: number }
         Returns: undefined
       }
       student_profile_for_teacher: {
