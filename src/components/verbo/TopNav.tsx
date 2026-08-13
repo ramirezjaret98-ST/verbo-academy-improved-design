@@ -345,6 +345,7 @@ export function TopNav({ items, variant = "light" }: { items: NavEntry[]; varian
           <div className="relative min-w-0 flex-1">
             <nav
               ref={(el) => { navRef.current = el; if (el) scrollRef.current = el; }}
+              data-tour="nav-menu"
               className="relative hidden items-center gap-1 md:flex h-16 overflow-x-auto scrollbar-none"
             >
               {isDark && (
@@ -398,6 +399,7 @@ export function TopNav({ items, variant = "light" }: { items: NavEntry[]; varian
               />
               <button
                 type="button"
+                data-tour="profile-button"
                 onClick={() => canEditProfile && setProfileOpen(true)}
                 disabled={!canEditProfile}
                 className={`flex h-9 w-9 overflow-hidden items-center justify-center rounded-full text-sm font-bold text-white transition-all bg-[#f38934] ${
@@ -418,6 +420,7 @@ export function TopNav({ items, variant = "light" }: { items: NavEntry[]; varian
               {user && <NotificationsBell variant={variant} />}
               <button
                 type="button"
+                data-tour="profile-button"
                 onClick={() => canEditProfile && setProfileOpen(true)}
                 disabled={!canEditProfile}
                 className={`flex h-9 w-9 overflow-hidden items-center justify-center rounded-full text-sm font-bold text-white transition-all bg-secondary text-foreground ${

@@ -28,7 +28,7 @@ import {
 } from "@/lib/student-requests-store";
 import { isTeacherAvailableAt, findAvailableStartSlots } from "@/lib/availability-store";
 import { GhostButton, PrimaryButton } from "@/components/verbo/ui";
-import { X, AlertTriangle, CalendarClock, ArrowLeft } from "lucide-react";
+import { X, AlertTriangle, CalendarClock, ArrowLeft, ShieldCheck } from "lucide-react";
 
 export function hoursUntil(iso: string): number {
   return (new Date(iso).getTime() - Date.now()) / 36e5;
@@ -193,6 +193,15 @@ function SessionCancellationModal({
             your booked sessions without penalty. You've used <strong>{used} of {quota}</strong> reschedules this cycle.
           </p>
         </div>
+        {/* Quiet reinforcement, independent of the Verbot tour: confirms the
+         *  student is in the right place at the exact moment they're taking
+         *  the correct action, so the message lands even if they skipped/never
+         *  opened the tour. See memory: students often try to reschedule by
+         *  messaging Admin directly on WhatsApp instead of using this flow. */}
+        <p className="mt-2.5 flex items-start gap-1.5 text-xs font-medium text-emerald-700">
+          <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          This is the official way to reschedule — it's tracked automatically and your teacher is notified right away.
+        </p>
         {isGroup && (
           <p className="mt-2 rounded-md bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-900 ring-1 ring-amber-200">
             This is a group session. Your decision only affects your seat and counts against your monthly quota — the class will continue for the remaining members unless every member opts out.

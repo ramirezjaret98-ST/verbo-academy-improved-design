@@ -41,6 +41,7 @@ export function ContactVerbotButton({ variant = "light" }: { variant?: "light" |
   return (
     <button
       type="button"
+      data-tour="help-button"
       onClick={openContactModal}
       aria-label="Contact VERBOT"
       title="Contact VERBOT"

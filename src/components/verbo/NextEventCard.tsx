@@ -33,6 +33,7 @@ export function NextEventCard({ events, onEventClick }: { events: CalendarEvent[
   return (
     <button
       type="button"
+      data-tour="next-event-card"
       onClick={() => onEventClick(next)}
       className="group relative flex h-full min-h-[200px] w-full cursor-pointer flex-col justify-between overflow-hidden rounded-3xl p-6 text-left transition-transform duration-200 verbo-card-hover active:scale-[0.99]"
     >
