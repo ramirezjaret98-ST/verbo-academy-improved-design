@@ -625,6 +625,11 @@ export function submitSessionReport(input: {
   subStatus?: AttendanceSubStatus | null;
   subskills: Record<string, number>;
   reportComments?: string;
+  /** Required "Class notes" write-up from the report form. Previously this
+   *  was only ever baked into the generated PDF and never persisted to a
+   *  queryable column — Admin had no way to see it without opening the PDF.
+   *  Now saved to `sessions.notes` alongside everything else. */
+  notes?: string;
 }): ExtSession | null {
   const prev = sessionsCache.find((s) => s.id === input.sessionId);
   if (!prev) return null;
@@ -637,6 +642,7 @@ export function submitSessionReport(input: {
     report_submitted_at: new Date().toISOString(),
     report_locked: true,
     report_comments: input.reportComments?.trim() ? input.reportComments.trim() : prev.report_comments,
+    notes: input.notes?.trim() ? input.notes.trim() : prev.notes,
   };
   updateSession(input.sessionId, patch);
 
