@@ -47,6 +47,8 @@ import spotlightArt from "@/assets/spotlight1.png";
 import nextUpArt from "@/assets/Verbot_up_next.svg";
 import { getLessonPlan } from "@/lib/lesson-plans-store";
 import { NextEventCard } from "@/components/verbo/NextEventCard";
+import { VerbotHelpBubble } from "@/components/verbo/VerbotHelpBubble";
+import type { TourStep } from "@/components/verbo/GuidedTour";
 import { resolvePlanTopic } from "@/lib/product-courses-store";
 import { unitsForStudent } from "@/lib/vip-courses-store";
 import { tailoredUnitsForStudent } from "@/lib/tailored-content-store";
@@ -91,6 +93,27 @@ const CLUB_KINDS: CalendarEventKind[] = ["insight", "book_club"];
 
 
 
+
+// On-demand Verbot help for this page — never fires on its own, only the
+// speech-bubble nudge below auto-peeks once. Priority ask from Jaret: stop
+// students from messaging Admin directly on WhatsApp to reschedule — they
+// have to use "Can't Attend" inside a session's own details instead.
+const SESSIONS_TOUR_STEPS: TourStep[] = [
+  {
+    id: "next-event",
+    target: '[data-tour="next-event-card"]',
+    eyebrow: "Up next",
+    title: "This card always shows what's coming up",
+    body: "Tap it any time to open the full details of your next session — including how to reschedule it.",
+  },
+  {
+    id: "reschedule-policy",
+    target: '[data-tour="reschedule-policy"]',
+    eyebrow: "Reschedule policy",
+    title: "This is the only way to reschedule",
+    body: "Open any session's details and tap “Can't Attend.” It checks your plan's notice window and monthly limit automatically, and lets your teacher know right away — no WhatsApp needed. Miss the notice window and the session is marked absent per policy.",
+  },
+];
 
 function Page() {
   const { user } = useAuth();
@@ -187,6 +210,11 @@ function Page() {
 
   return (
     <div className="space-y-8">
+      <VerbotHelpBubble
+        tourId="sessions-help"
+        steps={SESSIONS_TOUR_STEPS}
+        nudgeText="Need to move a session? I've got you →"
+      />
       <div className="flex flex-col items-start justify-between gap-4 lg:flex-row lg:items-center">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">Sessions &amp; Events</h1>
@@ -261,6 +289,7 @@ function Page() {
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <StatPill
+          dataTour="reschedule-policy"
           icon={<CalendarClock className="h-4 w-4" />}
           label="Reschedule Policy"
           value={`${policy.noticeHours}h notice · up to ${policy.maxPct}% of monthly sessions`}
@@ -402,16 +431,18 @@ const STAT_PILL_TONES: Record<StatPillTone, {
   },
 };
 
-function StatPill({ icon, label, value, tone = "violet", progressPct }: {
+function StatPill({ icon, label, value, tone = "violet", progressPct, dataTour }: {
   icon: React.ReactNode;
   label: string;
   value: string;
   tone?: StatPillTone;
   progressPct?: number;
+  dataTour?: string;
 }) {
   const t = STAT_PILL_TONES[tone];
   return (
     <div
+      data-tour={dataTour}
       className="group relative overflow-hidden rounded-2xl border border-border bg-card p-4 shadow-soft transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-elevated"
       style={{ background: `linear-gradient(135deg, ${t.tint} 0%, var(--card) 60%)` }}
     >

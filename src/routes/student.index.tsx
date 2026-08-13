@@ -96,6 +96,7 @@ import soundWavesIconAsset from "@/assets/sound-waves.svg";
 import bookIconAsset from "@/assets/book-icon.svg";
 import { useAvatar } from "@/lib/avatar-store";
 import { ProfilePeekCard } from "@/components/verbo/ProfilePeekCard";
+import { DashboardWelcomeTour } from "@/components/verbo/DashboardWelcomeTour";
 
 const MACRO_ICON_ASSETS: Record<string, string> = {
   Speaking: micIconAsset,
@@ -462,6 +463,7 @@ function StudentDashboard() {
 
   return (
     <div className="space-y-10">
+      <DashboardWelcomeTour />
       <header className="verbo-fade-up motion-reduce:animate-none flex flex-wrap items-center justify-between gap-4" style={{ animationDelay: "0ms" }}>
         <div className="flex items-center gap-3">
           <img
@@ -508,6 +510,7 @@ function StudentDashboard() {
         <SkeletonStatCards count={3} className="grid gap-4 md:grid-cols-[1fr_1.6fr_1fr]" />
       ) : (
       <section
+        data-tour="dashboard-kpis"
         className="verbo-fade-up motion-reduce:animate-none grid gap-4 md:grid-cols-[1fr_1.6fr_1fr]"
         style={{ animationDelay: "60ms" }}
       >
