@@ -3,13 +3,13 @@ import { useEffect, useMemo, useState } from "react";
 import {
   ChevronLeft, ChevronRight, CreditCard, ExternalLink,
   Wallet, CircleDollarSign, Clock, TrendingUp, type LucideIcon,
-  AlertTriangle,
+  AlertTriangle, Download, ShieldCheck,
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, ReferenceLine,
 } from "recharts";
 import { Pill } from "@/components/verbo/ui";
-import { USERS, type User } from "@/lib/mock-data";
+import { USERS, SESSIONS, userById, type User } from "@/lib/mock-data";
 import { hydrateStudents } from "@/lib/students-store";
 import {
   loadGroups, loadGroupMembers, markGroupAsPaid, subscribeGroups,
@@ -22,6 +22,9 @@ import {
 } from "@/lib/payments-log";
 import { nextPaymentDate } from "@/lib/student-model";
 import { DEFAULT_HOURLY_RATE, teacherStatus } from "@/lib/teacher-model";
+import { downloadJson, todayStamp } from "@/lib/log-retention";
+import { useAuth } from "@/lib/auth";
+import { getAdminType } from "@/lib/admin-roles";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/admin/financial/money-lab")({
@@ -61,6 +64,8 @@ function expectedPayDateInMonth(paymentDay: number | undefined, viewMonth: Date)
 // Page
 // ---------------------------------------------------------------------------
 function MoneyLabPage() {
+  const { user } = useAuth();
+  const isSuperAdmin = getAdminType(user) === "super_admin";
   const [, force] = useState(0);
   const bump = () => force((n) => n + 1);
   const [viewMonth, setViewMonth] = useState<Date>(() => firstOfMonth(new Date()));
@@ -256,6 +261,123 @@ function MoneyLabPage() {
       toast.success("Marked as paid");
     }
     bump();
+  };
+
+  // -------------------- Data Exports (super admin only) --------------------
+  // Raw-data dumps for accounting / monthly reports — Jaret's own plan is to
+  // hand these files to a separate Cowork session for analysis later, so the
+  // shape here is a plain JSON snapshot, not a formatted report. Financial
+  // numbers are pulled straight from the already-computed `incomeRows` /
+  // `expenseRows` (not recomputed) so the export always matches exactly what
+  // this page shows on screen for the selected month.
+  const exportFinancialSummary = () => {
+    downloadJson(`verbo-financial-summary-${mkey}-${todayStamp()}.json`, {
+      month: mkey,
+      generated_at: new Date().toISOString(),
+      summary: {
+        expected_income: expectedIncome,
+        received_income: receivedIncome,
+        outstanding,
+        expenses_total: expensesTotal,
+        net,
+      },
+      income: incomeRows.map((r) => {
+        const student = r.entityType === "individual" ? USERS.find((u) => u.id === r.entityId) : undefined;
+        return {
+          type: r.typeLabel,
+          name: r.name,
+          company: r.subtitle ?? null,
+          email: student?.email ?? null,
+          phone: student?.phone ?? null,
+          access_plan: student?.access_plan ?? null,
+          amount: r.amount,
+          status: r.status,
+          date: r.date ? r.date.toISOString() : null,
+          date_is_expected: r.dateIsExpected,
+        };
+      }),
+      expenses: expenseRows.map((r) => ({
+        teacher: r.name,
+        std_hours: r.stdHours,
+        std_pay: r.stdPay,
+        adjustments: r.adjustments,
+        total: r.total,
+      })),
+    });
+    toast.success("Financial summary downloaded");
+  };
+
+  const exportStudentsRoster = () => {
+    const students = USERS.filter((u) => u.role === "student");
+    downloadJson(`verbo-students-roster-${todayStamp()}.json`, {
+      generated_at: new Date().toISOString(),
+      count: students.length,
+      students: students.map((s) => ({
+        id: s.id,
+        name: s.name,
+        email: s.email,
+        phone: s.phone ?? null,
+        company: s.company ?? null,
+        status: s.status ?? "active",
+        product: s.product ?? null,
+        focus: s.focus ?? null,
+        access_plan: s.access_plan ?? null,
+        monthly_price: expectedAmountForStudent(s),
+        price_is_custom: s.custom_price != null,
+        hired_sessions: s.hired_sessions ?? 0,
+        remaining_sessions: s.remaining_sessions ?? 0,
+        sessions_per_week: s.sessions_per_week ?? null,
+        session_duration: s.session_duration ?? null,
+        payment_day: s.payment_day ?? null,
+        cycle_start: s.cycle_start ?? null,
+        next_payment: s.next_payment ?? null,
+        member_since: s.member_since ?? null,
+      })),
+    });
+    toast.success("Students roster downloaded");
+  };
+
+  const exportTeachersRoster = () => {
+    const rosterTeachers = USERS.filter((u) => u.role === "teacher");
+    downloadJson(`verbo-teachers-roster-${todayStamp()}.json`, {
+      generated_at: new Date().toISOString(),
+      count: rosterTeachers.length,
+      teachers: rosterTeachers.map((t) => ({
+        id: t.id,
+        name: t.name,
+        email: t.email,
+        phone: t.phone ?? null,
+        status: teacherStatus(t),
+        // Same rate this page's Expenses table uses (`t.hourly_rate ??
+        // DEFAULT_HOURLY_RATE`) — kept identical so this export always
+        // matches the numbers already on screen.
+        hourly_rate: t.hourly_rate ?? DEFAULT_HOURLY_RATE,
+        hours_month: t.hours_month ?? 0,
+        adjustments_total: (t.adjustments ?? []).reduce((sum, a) => sum + a.amount, 0),
+      })),
+    });
+    toast.success("Teachers roster downloaded");
+  };
+
+  const exportSessionsThisMonth = () => {
+    const rows = SESSIONS
+      .filter((s) => monthKey(new Date(s.date_time)) === mkey)
+      .map((s) => ({
+        id: s.id,
+        date_time: s.date_time,
+        student: userById(s.student_id)?.name ?? s.student_id,
+        teacher: userById(s.teacher_id)?.name ?? s.teacher_id,
+        status: s.status,
+        duration_minutes: s.duration_minutes,
+        origin: s.origin ?? "course",
+      }));
+    downloadJson(`verbo-sessions-${mkey}-${todayStamp()}.json`, {
+      month: mkey,
+      generated_at: new Date().toISOString(),
+      count: rows.length,
+      sessions: rows,
+    });
+    toast.success("Sessions export downloaded");
   };
 
   // -------------------- Render --------------------
@@ -536,6 +658,55 @@ function MoneyLabPage() {
           </div>
         )}
       </section>
+
+      {/* Data Exports — super admin only. Raw JSON snapshots for accounting /
+          monthly reports, meant to be handed to a separate Cowork session for
+          analysis later (per Jaret) rather than a formatted report. */}
+      {isSuperAdmin && (
+        <section
+          className="verbo-admin-section rounded-2xl border border-border bg-card p-5 sm:p-6"
+          style={{ "--verbo-admin-i": 5 } as React.CSSProperties}
+        >
+          <div className="mb-4 flex items-center gap-2.5">
+            <span
+              className="flex h-8 w-8 items-center justify-center rounded-full"
+              style={{ background: `color-mix(in oklab, ${NAVY} 12%, transparent)`, color: NAVY }}
+              aria-hidden
+            >
+              <Download className="h-4 w-4" strokeWidth={1.6} />
+            </span>
+            <div>
+              <h2 className="text-base font-semibold tracking-[-0.01em] text-foreground">Data Exports</h2>
+              <p className="text-[11px] font-light text-muted-foreground">
+                Raw JSON snapshots for accounting or monthly reports — Super Admin only.
+              </p>
+            </div>
+            <span className="ml-auto inline-flex items-center gap-1 rounded-full border border-border px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+              <ShieldCheck className="h-3 w-3" /> Super Admin
+            </span>
+          </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {[
+              { label: "Financial summary", sub: `Income + expenses · ${labelOf(viewMonth)}`, onClick: exportFinancialSummary },
+              { label: "Sessions", sub: `Session-level detail · ${labelOf(viewMonth)}`, onClick: exportSessionsThisMonth },
+              { label: "Students roster", sub: "All students, current snapshot", onClick: exportStudentsRoster },
+              { label: "Teachers roster", sub: "All teachers, current snapshot", onClick: exportTeachersRoster },
+            ].map((btn) => (
+              <button
+                key={btn.label}
+                type="button"
+                onClick={btn.onClick}
+                className="verbo-admin-press flex flex-col items-start gap-2 rounded-xl border border-border bg-background px-4 py-3.5 text-left transition-colors hover:border-accent/40 hover:bg-secondary/40"
+              >
+                <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-foreground">
+                  <Download className="h-3.5 w-3.5 text-accent" /> {btn.label}
+                </span>
+                <span className="text-[11px] font-light text-muted-foreground">{btn.sub}</span>
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   );
 }
