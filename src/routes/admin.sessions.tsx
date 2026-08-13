@@ -20,7 +20,7 @@ import {
 } from "@/lib/students-store";
 import { Card, Pill, PrimaryButton, GhostButton, SectionTitle, AccentModal } from "@/components/verbo/ui";
 import type { LucideIcon } from "lucide-react";
-import { CalendarPlus, ChevronDown, ChevronUp, X, Pencil, AlertTriangle, Users, Building2, UserCheck, CalendarClock } from "lucide-react";
+import { CalendarPlus, ChevronDown, ChevronUp, X, Pencil, AlertTriangle, Users, Building2, UserCheck, CalendarClock, FileText, Star } from "lucide-react";
 import { effectiveSessionCounts } from "@/lib/groups-store";
 import { CandidatesModal } from "@/components/verbo/CandidatesModal";
 import { RescheduleModal } from "@/components/verbo/RescheduleModal";
@@ -671,6 +671,7 @@ function SessionRow({
   const [absentCause, setAbsentCause] = useState<"student" | "teacher">(session.absent_cause ?? "student");
   const [candidatesOpen, setCandidatesOpen] = useState(false);
   const [rescheduleOpen, setRescheduleOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
 
   const renderStatus = (s: ExtSessionStatus) => {
     const meta = STATUS_META[s] ?? STATUS_META.scheduled;
@@ -713,6 +714,15 @@ function SessionRow({
         </td>
         <td className="px-4 py-3">
           <div className="flex justify-end gap-1.5">
+            {session.report_submitted_at && (
+              <button
+                onClick={() => setReportOpen(true)}
+                className="inline-flex cursor-pointer items-center gap-1 rounded-md bg-[#01304a] px-2 py-1 text-[11px] font-semibold text-white transition-opacity hover:opacity-90"
+                title="View Session Report"
+              >
+                <FileText className="h-3 w-3" /> View Report
+              </button>
+            )}
             {session.needs_substitute && (
               <button
                 onClick={() => setCandidatesOpen(true)}
@@ -732,6 +742,9 @@ function SessionRow({
             <button onClick={onEdit} className="cursor-pointer rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground" title="Edit">
               <Pencil className="h-3.5 w-3.5" />
             </button>
+            {reportOpen && (
+              <SessionReportModal session={session} onClose={() => setReportOpen(false)} />
+            )}
             {candidatesOpen && (
               <CandidatesModal sessionId={session.id} onClose={() => setCandidatesOpen(false)} />
             )}
@@ -806,6 +819,103 @@ function SessionRow({
   );
 }
 
+/** Read-only view of everything a teacher submitted for a session's report —
+ *  previously Admin had no screen for this at all (bug reported 2026-08-12).
+ *  Class Notes / the Note for the Student are the queryable columns; the PDF
+ *  link opens the same branded report the teacher generated at submit time
+ *  (has the full pedagogical write-up + entries even for older sessions
+ *  submitted before Class Notes started being saved as text). */
+function SessionReportModal({ session, onClose }: { session: ExtSession; onClose: () => void }) {
+  const teacher = userById(session.teacher_id);
+  const student = userById(session.student_id);
+  const dt = new Date(session.date_time);
+  const hasWrittenContent = Boolean(session.notes?.trim() || session.report_comments?.trim());
+
+  return (
+    <AccentModal
+      background="linear-gradient(150deg, #01304a 0%, #02466b 100%)"
+      iconTint="#01304a"
+      icon={FileText}
+      eyebrow="Session Report"
+      title={
+        <>
+          <span>{student?.name ?? "Student"}</span>
+          <span className="mt-0.5 block text-sm font-normal text-white/80">
+            with {teacher?.name ?? "Teacher"}
+          </span>
+        </>
+      }
+      watermark={{ type: "icon", icon: FileText }}
+      maxWidth="max-w-lg"
+      zClass="z-[70]"
+      onClose={onClose}
+    >
+      <div className="max-h-[75vh] space-y-4 overflow-y-auto p-6 text-sm">
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Date">
+            {dt.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric", year: "numeric" })}
+          </Field>
+          <Field label="Attendance">
+            <span className="capitalize">{session.status}</span>
+            {session.absent_cause && (
+              <span className="text-muted-foreground"> · {session.absent_cause === "teacher" ? "Teacher" : "Student"} caused</span>
+            )}
+          </Field>
+        </div>
+
+        {session.notes?.trim() && (
+          <div>
+            <div className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Class Notes</div>
+            <p className="whitespace-pre-wrap rounded-lg border border-border bg-secondary/40 px-3 py-2.5 text-foreground">
+              {session.notes}
+            </p>
+          </div>
+        )}
+
+        {session.report_comments?.trim() && (
+          <div>
+            <div className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Note for the Student</div>
+            <p className="whitespace-pre-wrap rounded-lg border border-border bg-secondary/40 px-3 py-2.5 text-foreground">
+              {session.report_comments}
+            </p>
+          </div>
+        )}
+
+        {!hasWrittenContent && !session.report_pdf_url && (
+          <div className="rounded-lg border border-dashed border-border px-3 py-4 text-center text-muted-foreground">
+            No written report content was saved for this session.
+          </div>
+        )}
+
+        {session.report_pdf_url && (
+          <a
+            href={session.report_pdf_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-[#01304a] px-3.5 py-2 text-xs font-semibold text-white transition-opacity hover:opacity-90"
+          >
+            <FileText className="h-3.5 w-3.5" /> Open full PDF report
+          </a>
+        )}
+
+        {typeof session.student_rating === "number" && (
+          <div>
+            <div className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Student's Rating of This Session</div>
+            <div className="flex items-center gap-1.5 rounded-lg border border-border bg-secondary/40 px-3 py-2.5 text-foreground">
+              <Star className="h-3.5 w-3.5 fill-current text-amber-500" />
+              <span className="font-medium">{session.student_rating} / 5</span>
+              {session.student_comment && <span className="text-muted-foreground">— "{session.student_comment}"</span>}
+            </div>
+          </div>
+        )}
+
+        <div className="text-xs text-muted-foreground">
+          Report submitted {session.report_submitted_at ? new Date(session.report_submitted_at).toLocaleString() : "—"}
+        </div>
+      </div>
+    </AccentModal>
+  );
+}
 
 /** Solid section banner, same pattern as the Teacher/Group modals. */
 function SectionBanner({ icon: Icon, label, color }: { icon: LucideIcon; label: string; color: string }) {

@@ -477,6 +477,7 @@ function TeacherDashboard() {
     absentCause?: "student" | "teacher",
     subStatus?: AttendanceSubStatus | null,
     reportComments?: string,
+    notes?: string,
   ) => {
     if (!user) return;
     const session = sessions.find((s) => s.id === sessionId);
@@ -494,6 +495,7 @@ function TeacherDashboard() {
       subStatus: subStatus ?? null,
       subskills,
       reportComments,
+      notes,
     });
     const plan = getLessonPlan(sessionId);
     if (plan?.vip_unit_id) {
@@ -1291,7 +1293,7 @@ function ReportModal({ session, perf, subskills, onClose, onSubmit }: {
   perf: PerformanceRating;
   subskills: Record<string, number>;
   onClose: () => void;
-  onSubmit: (id: string, attendance: Attendance, perf: PerformanceRating, subskills: Record<string, number>, absentCause?: "student" | "teacher", subStatus?: AttendanceSubStatus | null, reportComments?: string) => void;
+  onSubmit: (id: string, attendance: Attendance, perf: PerformanceRating, subskills: Record<string, number>, absentCause?: "student" | "teacher", subStatus?: AttendanceSubStatus | null, reportComments?: string, notes?: string) => void;
 }) {
   const student = userById(session.student_id);
   const [attendance, setAttendance] = useState<Attendance>("present");
@@ -1323,7 +1325,7 @@ function ReportModal({ session, perf, subskills, onClose, onSubmit }: {
   const handleSubmit = () => {
     if (!canSubmit) return;
     setSubmitted(true);
-    onSubmit(session.id, attendance, perf, subskills, isAbsent ? absentCause : undefined, isAbsent ? absentSub : null, isAbsent ? undefined : (studentNote.trim() || undefined));
+    onSubmit(session.id, attendance, perf, subskills, isAbsent ? absentCause : undefined, isAbsent ? absentSub : null, isAbsent ? undefined : (studentNote.trim() || undefined), notes.trim());
 
     // Generate the same branded report as a PDF and store it so the student
     // can download their own copy later (the "Download PDF" button below
