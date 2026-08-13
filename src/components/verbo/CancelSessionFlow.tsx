@@ -14,6 +14,7 @@ import { USERS, userById } from "@/lib/mock-data";
 import {
   applyGroupMemberCancellation,
   updateSession,
+  studentSetSessionStatus,
   loadSessions,
   lastCoveredSummaryFor,
   type ExtSession,
@@ -72,7 +73,7 @@ export function CantAttendRouter({
       updateSession(session.id, { member_statuses: nextMemberStatuses });
       toast("You've been marked Absent. The session continues for the other members.");
     } else {
-      updateSession(session.id, { status: "absent" });
+      studentSetSessionStatus(session.id, "absent");
       toast("Session marked as Absent.");
     }
     onClose();
@@ -86,7 +87,7 @@ export function CantAttendRouter({
           : "You've cancelled this group session. Credit forfeited. The class continues for the remaining members.",
       );
     } else {
-      updateSession(session.id, { status: "cancelled" });
+      studentSetSessionStatus(session.id, "cancelled");
       toast("Session cancelled. Credit forfeited.");
     }
     onClose();
@@ -309,7 +310,7 @@ export function RescheduleRequestModal({ session, onClose }: { session: ExtSessi
           : "Reschedule Request published. The group session continues for the remaining members.",
       );
     } else {
-      updateSession(session.id, { status: "pending_reschedule" });
+      studentSetSessionStatus(session.id, "pending_reschedule");
       toast.success("Reschedule Request published. Teachers have been notified.");
     }
     onClose();
