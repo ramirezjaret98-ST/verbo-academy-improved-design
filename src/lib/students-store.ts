@@ -44,6 +44,7 @@ function readRegisteredStudents(): User[] {
 export interface StudentProfileFields {
   current_level?: string;
   attendance_percentage?: number;
+  phone?: string;
   company?: string;
   member_since?: string;
   hired_sessions?: number;
@@ -87,6 +88,7 @@ const STUDENT_PROFILE_FIELD_KEYS: (keyof StudentProfileFields)[] = [
   "must_change_password",
   "current_level",
   "attendance_percentage",
+  "phone",
   "company",
   "member_since",
   "hired_sessions",

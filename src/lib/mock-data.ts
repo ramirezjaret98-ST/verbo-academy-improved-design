@@ -38,6 +38,10 @@ export interface User {
   id: string;
   name: string;
   email: string;
+  /** Contact phone number — informational only, no format enforced. Shown to
+   *  admin in the Student/Teacher Info panels; used to build a WhatsApp
+   *  (wa.me) link when present. */
+  phone?: string;
   password: string;
   role: Role;
   /** When true, the user is forced to change their password on next sign-in

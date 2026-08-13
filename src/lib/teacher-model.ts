@@ -184,6 +184,7 @@ function writeTeacherOverrides(map: Record<string, Partial<User>>) {
  *  `app_users` columns actually used by this profile). Keep in sync with the
  *  `User` interface in mock-data.ts. */
 export interface TeacherProfileFields {
+  phone?: string;
   qualified_products?: QualifiedProduct[];
   hourly_rate?: number;
   teacher_status?: TeacherStatus;
@@ -207,6 +208,7 @@ export interface TeacherProfileFields {
  *  PostgREST never sees an unknown column — they stay localStorage-only,
  *  see patchTeacherProfile below). */
 const TEACHER_PROFILE_FIELD_KEYS: (keyof TeacherProfileFields)[] = [
+  "phone",
   "qualified_products", "hourly_rate", "teacher_status", "hire_date",
   "tier_frozen_since", "tier_frozen_days", "tier_reset_at", "rating",
   "plan_punctuality", "report_punctuality", "hours_month", "hours_cycle",
