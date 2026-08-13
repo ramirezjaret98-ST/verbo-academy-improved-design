@@ -15,11 +15,12 @@ import {
 import { teachersForProduct, teachersForProductSorted, hydrateTeachers } from "@/lib/teacher-model";
 import { teacherTier } from "@/lib/teacher-tiers";
 import { PLAN_DEFAULTS } from "@/lib/club-bookings-store";
+import { waLink } from "@/lib/phone-utils";
 
 import { AccentModal, AccentModalFooter, Card, GhostButton, PrimaryButton } from "@/components/verbo/ui";
 import { useAvatar } from "@/lib/avatar-store";
 import {
-  Plus, X, Eye, EyeOff, KeyRound, Mail, Building2, CalendarDays, GraduationCap,
+  Plus, X, Eye, EyeOff, KeyRound, Mail, Phone, Building2, CalendarDays, GraduationCap,
   Users, Briefcase, Compass, Globe, Crown, Copy, Check, Snowflake, Ban, Play, Unlock,
   Sparkles, Wand2, Pencil, Video, Repeat, Clock, CreditCard, ShieldAlert,
   Search, ArrowUpDown, Filter, Gauge, Lightbulb, Layers, Trash2,
@@ -650,7 +651,7 @@ function Tag({ children, className = "", style }: { children: React.ReactNode; c
 // REGISTER / EDIT FORM MODAL  (stepped card selection)
 // ===========================================================================
 type FormState = {
-  name: string; email: string; password: string; member_since: string;
+  name: string; email: string; phone: string; password: string; member_since: string;
   company: string;
   product_type: "performance" | "workshops" | "insights";
   product: ProductId | "";
@@ -686,6 +687,7 @@ function StudentFormModal({
   const [f, setF] = useState<FormState>(() => ({
     name: initial?.name ?? "",
     email: initial?.email ?? "",
+    phone: initial?.phone ?? "",
     password: initial?.password ?? "",
     member_since: initial?.member_since ?? "",
     company: initial?.company ?? "",
@@ -866,6 +868,7 @@ function StudentFormModal({
       id,
       name: f.name.trim(),
       email: f.email.trim(),
+      phone: f.phone.trim() || undefined,
       password: f.password,
       role: "student",
       product_type: f.product_type,
@@ -1239,6 +1242,15 @@ function StudentFormModal({
                 />
                 {emailFormatError && <p className="mt-1 text-xs text-destructive">Enter a valid email address</p>}
               </Field>
+              <Field label="Phone" icon={<Phone className="h-3.5 w-3.5" />}>
+                <input
+                  type="tel"
+                  value={f.phone}
+                  onChange={(e) => set("phone", e.target.value)}
+                  placeholder="+52 55 1234 5678"
+                  className={inputCls}
+                />
+              </Field>
               <Field label="Initial Password" icon={<KeyRound className="h-3.5 w-3.5" />}>
                 <div className="relative">
                   <input type={showPassword ? "text" : "password"} value={f.password} onChange={(e) => set("password", e.target.value)} placeholder="Set a password" className={`${inputCls} pr-9`} />
@@ -1410,6 +1422,24 @@ function StudentDetailModal({
               <Section title="Contract" index={0}>
                 <div className="grid grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols-2">
                   <Info label="Email" value={student.email} />
+                  <div>
+                    <div className={infoLabelCls}>Phone</div>
+                    <div className="mt-1.5">
+                      {student.phone ? (
+                        <a
+                          href={waLink(student.phone)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 text-sm font-medium text-foreground/90 hover:text-primary hover:underline"
+                          title="Open chat on WhatsApp"
+                        >
+                          <Phone className="h-3.5 w-3.5" /> {student.phone}
+                        </a>
+                      ) : (
+                        <span className="text-sm text-foreground/90">—</span>
+                      )}
+                    </div>
+                  </div>
                   <Info label="CEFR Level" value={student.current_level ?? "—"} />
                   <Info label="Product" value={product?.name ?? "—"} />
                   <Info label="Focus" value={student.focus ?? "—"} />

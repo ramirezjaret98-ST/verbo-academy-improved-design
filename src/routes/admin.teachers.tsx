@@ -27,10 +27,11 @@ import {
 } from "@/lib/availability-store";
 import {
   Plus, X, Eye, EyeOff, Star, Users, Clock, KeyRound, Snowflake, Ban, Play,
-  Pencil, Search, Filter, ArrowUpDown, Check, AlertTriangle, Mail, ShieldAlert,
+  Pencil, Search, Filter, ArrowUpDown, Check, AlertTriangle, Mail, Phone, ShieldAlert,
   CheckCircle2, CalendarClock, ChevronRight, UserX, Wallet, FileDown, CircleDollarSign, Trophy,
   ShieldCheck, Zap, Briefcase, Undo2, Trash2,
 } from "lucide-react";
+import { waLink } from "@/lib/phone-utils";
 import type { LucideIcon } from "lucide-react";
 import { HeroStatCard, Pill, AccentModal, AccentModalFooter, GhostButton, PrimaryButton } from "@/components/verbo/ui";
 import { ResetPasswordModal } from "@/components/verbo/ResetPasswordModal";
@@ -545,6 +546,17 @@ function TeacherDetailModal({
               <div className="min-w-0">
                 <h2 className="truncate text-[22px] font-semibold leading-tight tracking-tight text-white">{t.name}</h2>
                 <p className="mt-0.5 truncate text-xs text-white/60">{t.email}</p>
+                {t.phone && (
+                  <a
+                    href={waLink(t.phone)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-0.5 inline-flex items-center gap-1 truncate text-xs text-white/60 hover:text-white hover:underline"
+                    title="Open chat on WhatsApp"
+                  >
+                    <Phone className="h-3 w-3" /> {t.phone}
+                  </a>
+                )}
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -1394,6 +1406,7 @@ function TeacherFormModal({
   const editing = !!initial;
   const [name, setName] = useState(initial?.name ?? "");
   const [email, setEmail] = useState(initial?.email ?? "");
+  const [phone, setPhone] = useState(initial?.phone ?? "");
   const [password, setPassword] = useState(initial?.password ?? "");
   const [showPw, setShowPw] = useState(false);
   const [rate, setRate] = useState(String(initial ? effectiveHourlyRate(initial) : 120));
@@ -1419,6 +1432,7 @@ function TeacherFormModal({
       id: initial?.id ?? `t${Date.now()}`,
       name: name.trim(),
       email: email.trim(),
+      phone: phone.trim() || undefined,
       password,
       role: "teacher",
       hourly_rate: Number(rate) || 120,
@@ -1452,6 +1466,9 @@ function TeacherFormModal({
         </Field>
         <Field label="Email" icon={<Mail className="h-3.5 w-3.5" />}>
           <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className={inputCls} placeholder="jane@verbo.com" />
+        </Field>
+        <Field label="Phone" icon={<Phone className="h-3.5 w-3.5" />}>
+          <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} className={inputCls} placeholder="+52 55 1234 5678" />
         </Field>
         <Field label="Initial password" icon={<KeyRound className="h-3.5 w-3.5" />}>
           <div className="relative">
