@@ -180,9 +180,9 @@ function dayKey(iso: string) {
   return dayKeyOf(new Date(iso));
 }
 
-function PremiumCard({ children, className = "", hover = false, style }: { children: React.ReactNode; className?: string; hover?: boolean; style?: React.CSSProperties }) {
+function PremiumCard({ children, className = "", hover = false, style, dataTour }: { children: React.ReactNode; className?: string; hover?: boolean; style?: React.CSSProperties; dataTour?: string }) {
   return (
-    <div style={style} className={`rounded-3xl border border-border p-6 verbo-card ${hover ? "verbo-card-hover" : ""} ${className}`}>
+    <div data-tour={dataTour} style={style} className={`rounded-3xl border border-border p-6 verbo-card ${hover ? "verbo-card-hover" : ""} ${className}`}>
       {children}
     </div>
   );
@@ -703,7 +703,7 @@ function StudentDashboard() {
 
 
       {/* Linguistic Asset Performance — replaces Performance Metrics + Quote of the Week */}
-      <section className="verbo-fade-up motion-reduce:animate-none" style={{ animationDelay: "120ms" }}>
+      <section data-tour="linguistic-performance" className="verbo-fade-up motion-reduce:animate-none" style={{ animationDelay: "120ms" }}>
         <PremiumCard>
           <div className="mb-5 flex items-center justify-between gap-4">
             <h3 className="text-base font-semibold tracking-tight" style={{ color: "#01304a" }}>
@@ -763,7 +763,7 @@ function StudentDashboard() {
         {/* LEFT COLUMN ~65% */}
         <div className="verbo-fade-up motion-reduce:animate-none space-y-8" style={{ animationDelay: "180ms" }}>
           {/* Current Course */}
-          <div>
+          <div data-tour="current-course">
             <SectionTitle>Current Course</SectionTitle>
             <PremiumCard hover className="group verbo-card-hover relative flex flex-col items-start justify-between gap-6 overflow-hidden md:flex-row md:items-center">
               <div
@@ -865,7 +865,7 @@ function StudentDashboard() {
 
 
             return (
-              <div>
+              <div data-tour="upcoming-sessions-widget">
                 <SectionTitle>Upcoming Sessions</SectionTitle>
                 <PremiumCard>
                 <div className="grid grid-cols-7 gap-2">
@@ -1130,7 +1130,7 @@ function StudentDashboard() {
         {/* RIGHT SIDEBAR ~35% */}
         <aside className="verbo-fade-up motion-reduce:animate-none space-y-6" style={{ animationDelay: "240ms" }}>
           {/* Verbo Experiences */}
-          <PremiumCard hover className="group card-gradient-violet relative overflow-visible">
+          <PremiumCard dataTour="verbo-experiences" hover className="group card-gradient-violet relative overflow-visible">
             <img
               src={experiencesClubs}
               alt="Two students laughing together during a live conversation club"
@@ -1164,7 +1164,7 @@ function StudentDashboard() {
 
 
           {/* Quick Review Dock */}
-          <PremiumCard hover>
+          <PremiumCard dataTour="quick-review-dock" hover>
             <div className="mb-4 flex items-center justify-between">
               <h3 className="text-sm font-semibold tracking-tight" style={{ color: "#01304a" }}>
                 Quick Review Dock
@@ -1205,7 +1205,7 @@ function StudentDashboard() {
       </section>
 
       {/* History */}
-      <section className="verbo-fade-up motion-reduce:animate-none" style={{ animationDelay: "300ms" }}>
+      <section data-tour="session-history" className="verbo-fade-up motion-reduce:animate-none" style={{ animationDelay: "300ms" }}>
         <SectionTitle>Session History</SectionTitle>
         <PremiumCard className="verbo-card-hover">
           <div className="hidden md:grid md:grid-cols-[1fr_1fr_110px_140px] gap-4 px-4 pb-3 text-[10px] uppercase tracking-wider text-muted-foreground">

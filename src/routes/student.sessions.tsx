@@ -98,22 +98,40 @@ const CLUB_KINDS: CalendarEventKind[] = ["insight", "book_club"];
 // speech-bubble nudge below auto-peeks once. Priority ask from Jaret: stop
 // students from messaging Admin directly on WhatsApp to reschedule — they
 // have to use "Can't Attend" inside a session's own details instead.
-const SESSIONS_TOUR_STEPS: TourStep[] = [
-  {
-    id: "next-event",
-    target: '[data-tour="next-event-card"]',
-    eyebrow: "Up next",
-    title: "This card always shows what's coming up",
-    body: "Tap it any time to open the full details of your next session — including how to reschedule it.",
-  },
-  {
-    id: "reschedule-policy",
-    target: '[data-tour="reschedule-policy"]',
-    eyebrow: "Reschedule policy",
-    title: "This is the only way to reschedule",
-    body: "Open any session's details and tap “Can't Attend.” It checks your plan's notice window and monthly limit automatically, and lets your teacher know right away — no WhatsApp needed. Miss the notice window and the session is marked absent per policy.",
-  },
-];
+//
+// The last step actually opens the next session's real details modal
+// (`onEnter`, by clicking the same NextEventCard button a student would) and
+// spotlights the real "Can't Attend" button inside it, then closes the modal
+// again on `onLeave` — no more pointing at a non-clickable policy pill and
+// calling it "the way to reschedule" (feedback from Jaret 2026-08-13: that
+// read as misleading since the pill itself isn't clickable).
+function buildSessionsTourSteps(closeEventModal: () => void): TourStep[] {
+  return [
+    {
+      id: "next-event",
+      target: '[data-tour="next-event-card"]',
+      eyebrow: "Up next",
+      title: "This card always shows what's coming up",
+      body: "Tap it any time to open the full details of your next session.",
+    },
+    {
+      id: "reschedule-policy",
+      target: '[data-tour="reschedule-policy"]',
+      eyebrow: "Reschedule policy",
+      title: "Your notice window and monthly limit",
+      body: "This is just for reference — how much notice you need to give, and how many reschedules you get per month. I'll show you where to actually use it next.",
+    },
+    {
+      id: "cant-attend",
+      target: '[data-tour="cant-attend-button"]',
+      eyebrow: "How to reschedule",
+      title: "This is the only way to reschedule",
+      body: "Tap “Can't Attend” inside any session's details — like this. It checks your policy automatically and lets your teacher know right away, no WhatsApp needed. Miss the notice window and the session is marked absent per policy.",
+      onEnter: () => (document.querySelector('[data-tour="next-event-card"]') as HTMLElement | null)?.click(),
+      onLeave: closeEventModal,
+    },
+  ];
+}
 
 function Page() {
   const { user } = useAuth();
@@ -212,7 +230,7 @@ function Page() {
     <div className="space-y-8">
       <VerbotHelpBubble
         tourId="sessions-help"
-        steps={SESSIONS_TOUR_STEPS}
+        steps={buildSessionsTourSteps(() => setSelected(null))}
         nudgeText="Need to move a session? I've got you →"
       />
       <div className="flex flex-col items-start justify-between gap-4 lg:flex-row lg:items-center">
@@ -719,15 +737,27 @@ function EventDetailsModal({
                   <ConnectButton className="flex-1" enabled={connectOpen} onClick={connect} />
                   <button
                     type="button"
+                    data-tour="cant-attend-button"
                     onClick={() => session && onCantAttend(session)}
                     className="inline-flex flex-1 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-full bg-destructive px-4 py-2 text-sm font-medium text-destructive-foreground shadow-sm transition-opacity hover:opacity-90 active:scale-[0.97]"
                   >
-                    <X className="h-4 w-4" /> Cancel
+                    <X className="h-4 w-4" /> Can't Attend
                   </button>
                 </div>
               </>
             ) : (
-              <GhostButton className="w-full justify-center" onClick={onClose}>Close</GhostButton>
+              // No lesson plan yet (common for sessions further out) — Connect
+              // isn't relevant this far ahead, but the student should still be
+              // able to reschedule/cancel with plenty of notice, not just once
+              // a plan exists. Explicit ask from Jaret 2026-08-13.
+              <button
+                type="button"
+                data-tour="cant-attend-button"
+                onClick={() => session && onCantAttend(session)}
+                className="inline-flex w-full items-center justify-center gap-2 whitespace-nowrap rounded-full bg-destructive px-4 py-2 text-sm font-medium text-destructive-foreground shadow-sm transition-opacity hover:opacity-90 active:scale-[0.97]"
+              >
+                <X className="h-4 w-4" /> Can't Attend
+              </button>
             )
           ) : canConnectSpotlight ? (
             <div className="flex gap-2">
