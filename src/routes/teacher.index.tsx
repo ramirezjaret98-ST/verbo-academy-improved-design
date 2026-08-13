@@ -16,10 +16,11 @@ import completeIconAsset from "@/assets/complete.svg";
 import { CalendarClock, ClipboardCheck, FileEdit, X, Lock, Plus, Trash2, Download, CheckCircle2, Mic, PenLine, Ear, BookOpen, ChevronRight, Video, Star, AlertTriangle, AlertCircle, Trophy, CalendarDays, Users, Wallet, Sparkles as SparklesIcon, GraduationCap, type LucideIcon } from "lucide-react";
 import { savePerformance, type PerformanceRating } from "@/lib/performance-store";
 import { MACRO_SKILLS as SHARED_MACRO_SKILLS, skillKey as sharedSkillKey, type BaseKey as SharedBaseKey } from "@/lib/skills-taxonomy";
-import { submitSessionReport, updateSession, loadSessions, subscribeSessions, SUB_STATUS_META, isJustificationWindowOpen, type ExtSession, type AttendanceSubStatus } from "@/lib/sessions-store";
+import { submitSessionReport, updateSession, loadSessions, subscribeSessions, notifySessionEvent, SUB_STATUS_META, isJustificationWindowOpen, type ExtSession, type AttendanceSubStatus } from "@/lib/sessions-store";
 import { PlanModal } from "@/components/verbo/PlanModal";
 import { downloadSessionReportPdf, sessionReportPdfBlob, sessionReportFileName } from "@/lib/session-report-pdf";
 import { uploadContentFile } from "@/lib/content-uploads";
+import { supabase } from "@/integrations/supabase/client";
 
 import { subscribeCourses, computeCurrentProgress } from "@/lib/product-courses-store";
 import { loadLessonPlans, saveLessonPlan, subscribeLessonPlans, getLessonPlan, type LessonPlan } from "@/lib/lesson-plans-store";
@@ -1354,13 +1355,28 @@ function ReportModal({ session, perf, subskills, onClose, onSubmit }: {
         const file = new File([blob], sessionReportFileName(reportInput), { type: "application/pdf" });
         const result = await uploadContentFile(file, "session-reports");
         if (result.ok) {
+          // Awaited (not the fire-and-forget updateSession() path) so the
+          // notify-session-event call right below is guaranteed to see
+          // report_pdf_url already persisted — it re-reads the session row
+          // server-side to build the email, so a race here would mean the
+          // student's "your report is ready" email ships without the PDF
+          // link. updateSession() still runs too, for the optimistic
+          // local-cache update every other consumer of this store expects.
           updateSession(session.id, { report_pdf_url: result.url });
+          await supabase.from("sessions").update({ report_pdf_url: result.url }).eq("id", Number(session.id));
         } else {
           console.error("[ReportModal] failed to store session report PDF", result.error);
         }
       } catch (err) {
         console.error("[ReportModal] failed to generate session report PDF", err);
       }
+      // 2026-08-13 fix: submitting a Final Session Report never notified
+      // anyone outside the app — the student had no idea a report existed
+      // unless they happened to open Verbo Academy and find it themselves.
+      // Fires regardless of whether the PDF upload above succeeded; the
+      // Edge Function re-reads the session and just omits the PDF link if
+      // report_pdf_url isn't set yet.
+      notifySessionEvent(session.id, "report_ready");
     })();
   };
 

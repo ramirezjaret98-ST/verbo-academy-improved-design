@@ -1,6 +1,6 @@
 import { createFileRoute, Navigate, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { UserPlus, Pencil, X, ShieldCheck, ShieldAlert, Eye, EyeOff, KeyRound } from "lucide-react";
+import { UserPlus, Pencil, X, ShieldCheck, ShieldAlert, Eye, EyeOff, KeyRound, Mail, Plus, Trash2 } from "lucide-react";
 import { USERS, type User, type AdminType } from "@/lib/mock-data";
 import { Card, SectionTitle, PrimaryButton, GhostButton, Pill } from "@/components/verbo/ui";
 import { useAuth } from "@/lib/auth";
@@ -10,6 +10,10 @@ import {
   isUserDeactivated, setUserDeactivated,
 } from "@/lib/admin-roles";
 import { ResetPasswordModal } from "@/components/verbo/ResetPasswordModal";
+import {
+  getAdminNotificationEmails, hydrateNotificationSettings,
+  subscribeNotificationSettings, setAdminNotificationEmails,
+} from "@/lib/notification-settings-store";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/admin/users")({
@@ -147,6 +151,13 @@ function UsersPage() {
         </div>
       </Card>
 
+      {/* 2026-08-13: Jaret's bug report — cancellations/reschedules/session
+       *  reports had no email trail at all, and the one hardcoded recipient
+       *  (admin@verbo.com) wasn't even his own inbox and couldn't be changed
+       *  from inside the app. This card is that missing control — Super
+       *  Admin only, same access level as the rest of this page. */}
+      {adminType === "super_admin" && <NotificationSettingsCard />}
+
       {createOpen && (
         <CreateUserModal onClose={() => setCreateOpen(false)} />
       )}
@@ -157,6 +168,105 @@ function UsersPage() {
         <ResetPasswordModal userId={resetPwFor.id} userName={resetPwFor.name} onClose={() => setResetPwFor(null)} />
       )}
     </div>
+  );
+}
+
+/** Editable list of addresses that receive the system notification emails
+ *  (session cancellations, reschedule requests, "can't attend") sent by the
+ *  `notify-session-event` Edge Function — see notification-settings-store.ts.
+ *  Backed by `public.notification_settings`, a single-row setting only a
+ *  Super Admin can write to (enforced server-side by RLS too, not just this
+ *  page gate). */
+function NotificationSettingsCard() {
+  const [emails, setEmails] = useState<string[]>(() => getAdminNotificationEmails());
+  const [draft, setDraft] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    hydrateNotificationSettings();
+    return subscribeNotificationSettings(() => setEmails(getAdminNotificationEmails()));
+  }, []);
+
+  const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  const addEmail = () => {
+    const v = draft.trim().toLowerCase();
+    if (!v) return;
+    if (!emailPattern.test(v)) { toast.error("Correo inválido."); return; }
+    if (emails.includes(v)) { setDraft(""); return; }
+    const next = [...emails, v];
+    setSaving(true);
+    setAdminNotificationEmails(next);
+    setEmails(next);
+    setDraft("");
+    setSaving(false);
+    toast.success("Correo agregado.");
+  };
+
+  const removeEmail = (e: string) => {
+    const next = emails.filter((x) => x !== e);
+    setSaving(true);
+    setAdminNotificationEmails(next);
+    setEmails(next);
+    setSaving(false);
+    toast.success("Correo eliminado.");
+  };
+
+  return (
+    <Card className="p-5">
+      <div className="flex items-start gap-3">
+        <div className="rounded-lg bg-secondary p-2"><Mail className="h-4 w-4 text-foreground" /></div>
+        <div className="min-w-0 flex-1">
+          <h3 className="text-sm font-semibold text-foreground">Correos de notificación (Admin)</h3>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            A estos correos llegan los avisos automáticos de cancelaciones, reagendos y "no puedo asistir" —
+            además del correo del profesor asignado a cada sesión.
+          </p>
+
+          <div className="mt-3 flex flex-wrap gap-2">
+            {emails.length === 0 && (
+              <span className="text-xs text-muted-foreground">Sin correos configurados todavía.</span>
+            )}
+            {emails.map((e) => (
+              <span
+                key={e}
+                className="inline-flex items-center gap-1.5 rounded-full border border-border bg-secondary/50 py-1 pl-3 pr-2 text-xs font-medium text-foreground"
+              >
+                {e}
+                <button
+                  type="button"
+                  onClick={() => removeEmail(e)}
+                  disabled={saving}
+                  className="rounded-full p-0.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                  aria-label={`Quitar ${e}`}
+                >
+                  <Trash2 className="h-3 w-3" />
+                </button>
+              </span>
+            ))}
+          </div>
+
+          <div className="mt-3 flex items-center gap-2">
+            <input
+              type="email"
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addEmail(); } }}
+              placeholder="nuevo-correo@ejemplo.com"
+              className="w-full max-w-xs rounded-lg border border-border bg-background px-3 py-1.5 text-sm outline-none focus:border-accent"
+            />
+            <button
+              type="button"
+              onClick={addEmail}
+              disabled={saving || !draft.trim()}
+              className="inline-flex items-center gap-1 rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs font-semibold hover:bg-secondary disabled:opacity-50"
+            >
+              <Plus className="h-3.5 w-3.5" /> Agregar
+            </button>
+          </div>
+        </div>
+      </div>
+    </Card>
   );
 }
 
