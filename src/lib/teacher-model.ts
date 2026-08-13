@@ -200,6 +200,9 @@ export interface TeacherProfileFields {
   payment_frequency?: PaymentFrequency;
   admin_notes?: string;
   must_change_password?: boolean;
+  /** Login lockout (2026-08-13 security batch) — see `User.failed_login_attempts`. */
+  failed_login_attempts?: number;
+  login_locked_at?: string | null;
 }
 
 /** Every DB-backed teacher profile field — the ONLY keys ever sent to the
@@ -213,6 +216,7 @@ const TEACHER_PROFILE_FIELD_KEYS: (keyof TeacherProfileFields)[] = [
   "tier_frozen_since", "tier_frozen_days", "tier_reset_at", "rating",
   "plan_punctuality", "report_punctuality", "hours_month", "hours_cycle",
   "payment_frequency", "admin_notes", "must_change_password",
+  "failed_login_attempts", "login_locked_at",
 ];
 
 type AppUsersUpdate = Database["public"]["Tables"]["app_users"]["Update"];

@@ -236,9 +236,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Every real login now behaves like "remembered". Flagged for Jaret;
     // revisit if a real distinction is needed later.
     hydrateAdminRoles();
+
+    // Login lockout (2026-08-13 security batch): 3 consecutive failed
+    // attempts blocks further sign-in for this email until an admin clears
+    // it from the Students/Teachers panel. Checked BEFORE calling Supabase
+    // Auth so a locked account never even gets a password check. Both RPCs
+    // are `SECURITY DEFINER` and callable by the `anon` role on purpose —
+    // there is no session yet at this point in the flow.
+    const normalizedEmail = email.trim().toLowerCase();
+    const { data: lockedData, error: lockedError } = await supabase.rpc("is_login_locked", {
+      p_email: normalizedEmail,
+    });
+    if (lockedError) {
+      console.error("[auth] is_login_locked check failed", lockedError);
+    }
+    if (lockedData === true) {
+      return {
+        ok: false,
+        error: "This account is locked after too many failed attempts. Contact your administrator to unlock it.",
+      };
+    }
+
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error || !data.user) {
-      return { ok: false, error: "Invalid credentials. Contact your administrator." };
+      const { data: attemptData, error: attemptError } = await supabase.rpc("record_failed_login", {
+        p_email: normalizedEmail,
+      });
+      if (attemptError) {
+        console.error("[auth] record_failed_login failed", attemptError);
+      }
+      const nowLocked =
+        !!attemptData && typeof attemptData === "object" && (attemptData as { locked?: boolean }).locked === true;
+      return {
+        ok: false,
+        error: nowLocked
+          ? "This account is now locked after too many failed attempts. Contact your administrator to unlock it."
+          : "Invalid credentials. Contact your administrator.",
+      };
     }
     const built = await buildUser(data.user.id, data.user.email ?? email);
     if (!built) {
@@ -253,6 +287,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (isUserDeactivated(built.id)) {
       await supabase.auth.signOut();
       return { ok: false, error: "Account deactivated. Contact your administrator." };
+    }
+    // Successful login — clear any failed-attempt counter for next time.
+    const { error: resetError } = await supabase.rpc("record_successful_login", { p_email: normalizedEmail });
+    if (resetError) {
+      console.error("[auth] record_successful_login failed", resetError);
     }
     if (logoutTimer.current) clearTimeout(logoutTimer.current);
     setIsLoggingOut(false);

@@ -79,6 +79,9 @@ export interface StudentProfileFields {
   addon_workshops_enabled?: boolean;
   /** Login gate — reused by "Require Password Reset" in the admin form. */
   must_change_password?: boolean;
+  /** Login lockout (2026-08-13 security batch) — see `User.failed_login_attempts`. */
+  failed_login_attempts?: number;
+  login_locked_at?: string | null;
 }
 
 /** Every DB-backed student profile field — the ONLY keys ever sent to the
@@ -122,6 +125,8 @@ const STUDENT_PROFILE_FIELD_KEYS: (keyof StudentProfileFields)[] = [
   "addon_bookclubs_per_month",
   "addon_spotlight_per_month",
   "addon_workshops_enabled",
+  "failed_login_attempts",
+  "login_locked_at",
 ];
 
 type AppUsersUpdate = Database["public"]["Tables"]["app_users"]["Update"];

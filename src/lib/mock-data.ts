@@ -47,6 +47,15 @@ export interface User {
   /** When true, the user is forced to change their password on next sign-in
    *  (e.g. new student just registered by an admin). Cleared on completion. */
   must_change_password?: boolean;
+  /** Login lockout (2026-08-13 security batch): count of consecutive failed
+   *  password attempts since the last successful login or admin unlock. Reset
+   *  to 0 by the `record_successful_login` RPC or by an admin "Unlock
+   *  account" action. */
+  failed_login_attempts?: number;
+  /** Set (to the lock timestamp) once `failed_login_attempts` reaches the
+   *  3-attempt threshold — the `login()` flow blocks sign-in while this is
+   *  non-null, regardless of password correctness, until an admin clears it. */
+  login_locked_at?: string | null;
   current_level?: string;
   admin_type?: AdminType; // only meaningful when role === "admin"
   attendance_percentage?: number;
