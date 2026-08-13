@@ -629,8 +629,34 @@ export function studentSetSessionStatus(
       console.error("[sessions-store] student_set_session_status failed", error);
       sessionsCache = sessionsCache.map((s) => (s.id === id ? prev : s));
       notify();
+    } else {
+      // 2026-08-13 fix: a student cancelling/reschedule-requesting/reporting
+      // "can't attend" had NO external signal at all — only the in-app bell
+      // and the calendar, which is how a same-day cancellation went
+      // completely unnoticed by both the teacher and admin. Fires the
+      // teacher+admin notification email (+ a confirmation to the student)
+      // via the notify-session-event Edge Function. Fire-and-forget: the
+      // status change itself already succeeded above, an email hiccup
+      // shouldn't roll that back.
+      notifySessionEvent(numericId, status);
     }
   })();
+}
+
+/** Fires the `notify-session-event` Edge Function for a session status
+ *  change or a freshly-generated report, so the relevant emails go out
+ *  (teacher/admin alert + student confirmation, or the report-ready email).
+ *  Best-effort — logs and swallows failures, never surfaces to the caller. */
+export function notifySessionEvent(
+  sessionId: string | number,
+  kind: "cancelled" | "absent" | "pending_reschedule" | "report_ready",
+): void {
+  const numericId = Number(sessionId);
+  if (!Number.isFinite(numericId)) return;
+  void supabase.functions.invoke("notify-session-event", { body: { sessionId: numericId, kind } })
+    .then(({ error }) => {
+      if (error) console.error("[sessions-store] notify-session-event failed", error);
+    });
 }
 
 /** Atomically converts a student's own overlapping 1:1 session into a
