@@ -25,6 +25,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 import { hydrateUserIdBridge, legacyToUuid, uuidToLegacySync } from "@/lib/user-id-bridge";
+import { defaultMonthlyPrice } from "@/lib/student-model";
 
 import type { User } from "./mock-data";
 import type { Group } from "./groups-store";
@@ -243,23 +244,21 @@ export function deleteOldPayments(cutoffMs: number): void {
 }
 
 // ---------------------------------------------------------------------------
-// Amount derivation — no per-customer price is stored today, so we derive an
-// expected monthly amount from access plan tier. Easy to swap for a real
-// `monthly_amount` field later.
+// Amount derivation — a student's own `custom_price` (per-student override,
+// set by admin for negotiated deals — see students-store.ts) wins when set;
+// otherwise the amount is derived from the official price-per-session table
+// (`PRICE_PER_SESSION` in student-model.ts) × the student's real weekly
+// cadence, via `defaultMonthlyPrice`. Groups have no override field yet (see
+// groups-store.ts header — groups aren't migrated to Supabase), so they
+// always use the plan default × the multi-seat multiplier below.
 // ---------------------------------------------------------------------------
-const PLAN_RATE: Record<string, number> = {
-  Core: 4000,
-  Advance: 6000,
-  Elite: 9000,
-  Signature: 15000,
-};
-const DEFAULT_INDIVIDUAL_RATE = 5000;
 const DEFAULT_GROUP_MULTIPLIER = 1.6; // groups pay more (multi-seat contract)
 
 export function expectedAmountForStudent(u: User): number {
-  return PLAN_RATE[u.access_plan ?? ""] ?? DEFAULT_INDIVIDUAL_RATE;
+  if (u.custom_price != null) return u.custom_price;
+  return defaultMonthlyPrice(u.access_plan, u.sessions_per_week);
 }
 export function expectedAmountForGroup(g: Group): number {
-  const base = PLAN_RATE[g.access_plan ?? ""] ?? DEFAULT_INDIVIDUAL_RATE;
+  const base = defaultMonthlyPrice(g.access_plan, g.sessions_per_week);
   return Math.round(base * DEFAULT_GROUP_MULTIPLIER);
 }

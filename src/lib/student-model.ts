@@ -146,6 +146,42 @@ export function getAccessPlan(id?: string | null): AccessPlanDef | undefined {
   return ACCESS_PLANS.find((p) => p.id === id);
 }
 
+// ----------------------------------------------------------------------------
+// PRICING — official price per session (Fase 1, closed 2026-08-13; MXN, IVA
+// incluido). This is the single source of truth for both the per-level
+// package price and the monthly-price DEFAULT used in payments-log.ts (see
+// `defaultMonthlyPrice`). The actual amount billed to a given student can
+// still be overridden per-student — see `User.custom_price`.
+// ----------------------------------------------------------------------------
+export const PRICE_PER_SESSION: Record<AccessPlanId, number> = {
+  Core: 250,
+  Advance: 365,
+  Elite: 550,
+  Signature: 655,
+};
+
+// A student/group with no access_plan set yet (rare — mid-setup) falls back
+// to Core's rate rather than an arbitrary placeholder.
+export const DEFAULT_PRICE_PER_SESSION = PRICE_PER_SESSION.Core;
+
+// Average weeks per calendar month — used only to turn a weekly cadence into
+// a monthly estimate for the default price preview.
+const AVG_WEEKS_PER_MONTH = 4.33;
+
+/** Default MONTHLY price for a student/group on `plan`, given their real
+ *  weekly cadence (`sessionsPerWeek`): price/session × sessions/week × weeks
+ *  per month, rounded to the nearest 10 MXN. This is only ever the
+ *  *starting point* shown in the admin form and used in The Money Lab when no
+ *  override is set — the actual persisted amount is `User.custom_price` /
+ *  `Group.access_plan`-derived value once the admin negotiates a different
+ *  number. See `expectedAmountForStudent`/`expectedAmountForGroup` in
+ *  payments-log.ts, which prefer `custom_price` over this default. */
+export function defaultMonthlyPrice(plan: AccessPlanId | undefined, sessionsPerWeek: number | undefined): number {
+  const perSession = (plan && PRICE_PER_SESSION[plan]) ?? DEFAULT_PRICE_PER_SESSION;
+  const cadence = sessionsPerWeek && sessionsPerWeek > 0 ? sessionsPerWeek : 2;
+  return Math.round((perSession * cadence * AVG_WEEKS_PER_MONTH) / 10) * 10;
+}
+
 export const RESCHEDULE_PRESETS: string[] = ACCESS_PLANS.map((p) => p.reschedulePolicy);
 
 // ----------------------------------------------------------------------------

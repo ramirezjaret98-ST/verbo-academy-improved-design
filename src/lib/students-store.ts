@@ -63,6 +63,7 @@ export interface StudentProfileFields {
   payment_day?: number;
   cycle_start?: string;
   next_payment?: string;
+  custom_price?: number | null;
   video_call_link?: string;
   status?: "active" | "suspended" | "frozen";
   insights_strikes?: number;
@@ -107,6 +108,7 @@ const STUDENT_PROFILE_FIELD_KEYS: (keyof StudentProfileFields)[] = [
   "payment_day",
   "cycle_start",
   "next_payment",
+  "custom_price",
   "video_call_link",
   "status",
   "insights_strikes",

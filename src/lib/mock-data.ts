@@ -72,6 +72,12 @@ export interface User {
   payment_day?: number; // 1–31
   cycle_start?: string; // ISO date
   next_payment?: string; // ISO date override (set when "marked as paid")
+  /** Negotiated monthly price override (MXN) — when null/unset, the
+   *  effective amount (see `expectedAmountForStudent` in payments-log.ts)
+   *  falls back to the plan default derived from the official
+   *  price-per-session table. `null` is used (not just `undefined`) so
+   *  clearing the override in the admin form actually persists as NULL. */
+  custom_price?: number | null;
   video_call_link?: string;
   status?: "active" | "suspended" | "frozen";
   insights_strikes?: number;
