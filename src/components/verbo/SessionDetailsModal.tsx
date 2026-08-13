@@ -1,7 +1,7 @@
 // Session Details modal used by the Teacher Calendar for Ready and
 // Completed Performance Sessions. Read-only view of the plan/report plus
 // action shortcuts (Join Live Session, Can't Attend, Edit Lesson Plan).
-import { Video, CalendarClock, FileEdit, NotebookPen } from "lucide-react";
+import { Video, CalendarClock, FileEdit, NotebookPen, FileText } from "lucide-react";
 import { GhostButton, PrimaryButton, AccentModalHeader } from "@/components/verbo/ui";
 import type { ExtSession } from "@/lib/sessions-store";
 import type { LessonPlan } from "@/lib/lesson-plans-store";
@@ -123,6 +123,24 @@ export function SessionDetailsModal({
               {comments}
             </div>
           </div>
+          {/* Bug fix (2026-08-13): a teacher who submitted a Session Report
+           *  could only ever see the generated PDF right at submission time
+           *  (the "Download PDF" button lives inside ReportModal's
+           *  submitted-preview screen, which closes for good once the
+           *  teacher navigates away). There was no way back to it — this
+           *  modal (opened from the calendar / Recent Activity for any
+           *  already-completed session) never surfaced `report_pdf_url` at
+           *  all, even though Admin's session detail view always has. */}
+          {mode === "completed" && session.report_pdf_url && (
+            <a
+              href={session.report_pdf_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-accent underline-offset-4 hover:underline"
+            >
+              <FileText className="h-3.5 w-3.5" /> Open full PDF report
+            </a>
+          )}
           {mode === "ready" && onEditPlan && (
             <button
               type="button"
