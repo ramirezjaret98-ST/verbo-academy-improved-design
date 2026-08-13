@@ -595,6 +595,77 @@ export function updateSession(id: string, patch: Partial<ExtSession>) {
   })();
 }
 
+/** Self-service status flip for a student's OWN non-group session — Can't
+ *  Attend (→ absent), Cancel Without Rescheduling (→ cancelled), or a
+ *  Reschedule Request (→ pending_reschedule). Routes through the
+ *  `student_set_session_status` RPC instead of the generic updateSession()
+ *  path: `sessions_write_update` RLS only allows admin/coordinator_ops/the
+ *  owning teacher, so a direct student UPDATE was silently rejected (0 rows,
+ *  no error) — the local cache flipped and a success toast showed, but the
+ *  DB row never actually changed. The RPC validates ownership + a whitelist
+ *  of forward transitions server-side. Optimistic like every other mutator
+ *  in this file (cache flips immediately, rolls back on failure). */
+export function studentSetSessionStatus(
+  id: string,
+  status: Extract<ExtSessionStatus, "absent" | "cancelled" | "pending_reschedule">,
+  cancellationNote?: string,
+) {
+  const prev = sessionsCache.find((s) => s.id === id);
+  if (!prev) return;
+  const next: ExtSession = { ...prev, status, ...(cancellationNote ? { cancellation_note: cancellationNote } : {}) };
+  sessionsCache = sessionsCache.map((s) => (s.id === id ? next : s));
+  notify();
+
+  const numericId = Number(id);
+  if (!Number.isFinite(numericId)) return;
+
+  void (async () => {
+    const { error } = await supabase.rpc("student_set_session_status", {
+      p_session_id: numericId,
+      p_status: status,
+      p_cancellation_note: cancellationNote,
+    });
+    if (error) {
+      console.error("[sessions-store] student_set_session_status failed", error);
+      sessionsCache = sessionsCache.map((s) => (s.id === id ? prev : s));
+      notify();
+    }
+  })();
+}
+
+/** Atomically converts a student's own overlapping 1:1 session into a
+ *  Spotlight session in the same slot, via the
+ *  `student_convert_session_to_spotlight` RPC (SECURITY DEFINER — validates
+ *  ownership + session status server-side, and refunds exactly +1 credit,
+ *  never a caller-supplied amount). Replaces the old 3-call client path
+ *  (updateSession + createSession + adjustRemainingSessions) which RLS
+ *  rejected for a student caller — the UPDATE silently, the INSERT visibly
+ *  (rolled back), and adjust_remaining_sessions with a real error (it only
+ *  authorizes admin/the assigned teacher, not the student themselves).
+ *  Not exported as optimistic: this crosses a status-flip + a brand-new row
+ *  + a credit refund in one server transaction, so on success we just force
+ *  a rehydrate rather than hand-rolling three separate optimistic patches
+ *  for what's a rare, already-confirmed action. Returns the new session's
+ *  id on success, null on failure (nothing changes client-side either way —
+ *  Realtime/rehydrate is the only mutation path here). */
+export async function convertOwnSessionToSpotlight(
+  originalSessionId: string,
+  spotlightContext: string,
+): Promise<string | null> {
+  const numericId = Number(originalSessionId);
+  if (!Number.isFinite(numericId)) return null;
+  const { data, error } = await supabase.rpc("student_convert_session_to_spotlight", {
+    p_original_session_id: numericId,
+    p_spotlight_context: spotlightContext,
+  });
+  if (error || data == null) {
+    console.error("[sessions-store] student_convert_session_to_spotlight failed", error);
+    return null;
+  }
+  invalidateAndRehydrate();
+  return String(data);
+}
+
 /** Persist a student's rating for a completed session. Ratings of 3★ or
  *  below flip `review_status` to "pending" so the session enters the
  *  Flagged Reviews queue in Admin > Teachers. Higher ratings leave

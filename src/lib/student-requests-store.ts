@@ -29,6 +29,7 @@ import {
   loadSessions,
   createSession,
   updateSession,
+  convertOwnSessionToSpotlight,
   type ExtSessionStatus,
 } from "./sessions-store";
 import { getStudentVideoLink } from "./students-store";
@@ -525,32 +526,34 @@ function requireHelpers() {
 // ---------------------------------------------------------------------------
 // Spotlight overlap → Converted to Spotlight.
 // ---------------------------------------------------------------------------
-export function convertSessionToSpotlight(input: {
+/** Converts the student's own overlapping 1:1 session into a Spotlight
+ *  session in the same slot. Previously did this as 3 separate direct
+ *  client writes (updateSession + createSession + adjustRemainingSessions
+ *  elsewhere), every one of which RLS rejects for a student caller — the
+ *  UPDATE silently, the INSERT visibly. Now a single call into the
+ *  `student_convert_session_to_spotlight` RPC (see sessions-store.ts),
+ *  which does the status flip, the new-session insert, AND the +1 credit
+ *  refund atomically and server-validated. Returns false (and leaves
+ *  everything unchanged) if the RPC rejects the request — e.g. the session
+ *  isn't the caller's own, or it's a group session (not supported by this
+ *  flow yet — see groups-store.ts migration notes). */
+export async function convertSessionToSpotlight(input: {
   originalSessionId: string;
   spotlightContext: string;
-}): void {
+}): Promise<boolean> {
   const sessions = loadSessions();
   const orig = sessions.find((s) => s.id === input.originalSessionId);
-  if (!orig) return;
-  // Mark the original session as Converted to Spotlight (no strike, no cancel).
-  updateSession(orig.id, { status: "converted_to_spotlight" as const });
-  // Create the Spotlight session in the same slot with the same teacher.
-  const durationMinutes = Math.min(60, orig.duration_minutes);
-  createSession({
-    student_id: orig.student_id,
-    teacher_id: orig.teacher_id,
-    date_time: orig.date_time,
-    duration_minutes: durationMinutes,
-    teams_link: orig.teams_link,
-    status: "scheduled",
-    origin: "spotlight",
-    notes: `Spotlight (converted) — ${input.spotlightContext}`,
-  });
+  if (!orig) return false;
+
+  const newId = await convertOwnSessionToSpotlight(input.originalSessionId, input.spotlightContext);
+  if (!newId) return false;
+
   recordSpotlightConversion({
     student_id: orig.student_id,
     teacher_id: orig.teacher_id,
     proposed_datetime: orig.date_time,
-    duration_minutes: durationMinutes,
+    duration_minutes: Math.min(60, orig.duration_minutes),
     spotlight_context: input.spotlightContext,
   });
+  return true;
 }
