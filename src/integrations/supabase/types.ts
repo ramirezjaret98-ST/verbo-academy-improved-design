@@ -2319,8 +2319,10 @@ export type Database = {
           review_status: string | null
           status: Database["public"]["Enums"]["ext_session_status"]
           student_comment: string | null
+          student_connected_at: string | null
           student_id: string | null
           student_rating: number | null
+          teacher_connected_at: string | null
           teacher_id: string
           teams_link: string
           updated_at: string
@@ -2356,8 +2358,10 @@ export type Database = {
           review_status?: string | null
           status?: Database["public"]["Enums"]["ext_session_status"]
           student_comment?: string | null
+          student_connected_at?: string | null
           student_id?: string | null
           student_rating?: number | null
+          teacher_connected_at?: string | null
           teacher_id: string
           teams_link: string
           updated_at?: string
@@ -2393,8 +2397,10 @@ export type Database = {
           review_status?: string | null
           status?: Database["public"]["Enums"]["ext_session_status"]
           student_comment?: string | null
+          student_connected_at?: string | null
           student_id?: string | null
           student_rating?: number | null
+          teacher_connected_at?: string | null
           teacher_id?: string
           teams_link?: string
           updated_at?: string
@@ -3443,6 +3449,10 @@ export type Database = {
           id: string
           legacy_id: string
         }[]
+      }
+      log_session_connect: {
+        Args: { p_role: string; p_session_id: number }
+        Returns: undefined
       }
       record_failed_login: { Args: { p_email: string }; Returns: Json }
       record_successful_login: { Args: { p_email: string }; Returns: undefined }
