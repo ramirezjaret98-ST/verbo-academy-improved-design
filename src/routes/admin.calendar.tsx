@@ -225,6 +225,32 @@ function EventDetailsModal({
           )}
           {event.subtitle && <Row label="Details" value={event.subtitle} />}
 
+          {/* 2026-08-14: click-time audit signal — when the teacher and/or
+             *  student clicked their own "Connect"/"Join Live Session"
+             *  button. NOT confirmed Teams attendance (no Graph API
+             *  integration) — a click, nothing more. Only rendered once at
+             *  least one side has a timestamp, so older sessions from
+             *  before this existed don't show a misleading "no connection"
+             *  flag. */}
+          {s && (s.teacher_connected_at || s.student_connected_at) && (
+            <div className="flex items-start gap-3">
+              <div className="w-24 shrink-0 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                Connection
+              </div>
+              <div className="space-y-1 text-xs text-foreground">
+                <div>
+                  <span className="text-muted-foreground">Teacher clicked Connect — </span>
+                  {s.teacher_connected_at ? new Date(s.teacher_connected_at).toLocaleString() : "not yet"}
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Student clicked Connect — </span>
+                  {s.student_connected_at ? new Date(s.student_connected_at).toLocaleString() : "not yet"}
+                </div>
+                <div className="text-muted-foreground/80">Click time, not confirmed Teams attendance.</div>
+              </div>
+            </div>
+          )}
+
           {/* 2026-08-13: once the teacher has submitted a report for this
              *  session, that's the useful thing to open from here — the call
              *  is over, "Open link" leads nowhere. Report + rating replace
