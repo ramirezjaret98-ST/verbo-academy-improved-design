@@ -26,16 +26,18 @@ const NAV_GROUPS: NavGroup[] = [
     { to: "/admin/teachers", label: "Teachers" },
     { to: "/admin/kpis",     label: "KPIs" },
   ]},
-  { label: "Content", items: [
+  { label: "Programs", items: [
     { to: "/admin/courses",    label: "Courses" },
     { to: "/admin/vip",        label: "Course Builder VIP" },
     { to: "/admin/tailored-content", label: "Tailored Content" },
+    { to: "/admin/clubs",      label: "Clubs" },
+  ]},
+  { label: "Engagement", items: [
     { to: "/admin/workshops",  label: "Focus Workshops" },
     { to: "/admin/challenges", label: "Challenges" },
     { to: "/admin/flash",      label: "Verbo Flash" },
     { to: "/admin/materials",  label: "Material Complementario" },
   ]},
-  { label: "Clubs", items: [{ to: "/admin/clubs", label: "Clubs" }] },
   { label: "Calendar", items: [
     { to: "/admin/calendar", label: "Overview" },
     { to: "/admin/holidays", label: "Holidays" },
@@ -43,8 +45,8 @@ const NAV_GROUPS: NavGroup[] = [
   { label: "Financial", items: [
     { to: "/admin/financial/money-lab", label: "The Money Lab" },
   ]},
-  { label: "Users", items: [{ to: "/admin/users", label: "User Management" }] },
-  { label: "Activity", items: [
+  { label: "Administration", items: [
+    { to: "/admin/users", label: "User Management" },
     { to: "/admin/activity-logs", label: "Activity Logs" },
     { to: "/admin/conduct-reports", label: "Conduct Reports" },
     { to: "/admin/content-issue-reports", label: "Technical Issues" },
@@ -60,7 +62,7 @@ function Layout() {
   const visibleGroups = useMemo(() => {
     if (!adminType) return [] as NavGroup[];
     return NAV_GROUPS.filter((g) => {
-      if (g.label === "Users" || g.label === "Activity") return adminType === "super_admin";
+      if (g.label === "Administration") return adminType === "super_admin";
       // A group is visible if any of its items is allowed for this admin type.
       return g.items.some((it) => canAccessAdminPath(adminType, it.to));
     }).map((g) => ({
