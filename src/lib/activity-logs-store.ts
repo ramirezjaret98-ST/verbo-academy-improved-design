@@ -8,6 +8,8 @@
 import { useSyncExternalStore } from "react";
 import { USERS, type Role } from "./mock-data";
 import { loadSessions, SESSIONS_EVENT } from "./sessions-store";
+import { STUDENTS_EVENT } from "./students-store";
+import { TEACHERS_EVENT } from "./teacher-model";
 import { loadClubs, loadReleaseRequests, CLUBS_EVENT, RELEASE_REQUESTS_EVENT } from "./clubs-store";
 import { loadClubReports, CLUB_REPORTS_EVENT } from "./club-reports-store";
 import { loadStrikes, STRIKES_EVENT } from "./strikes-store";
@@ -462,6 +464,13 @@ const SOURCE_EVENTS = [
   SESSIONS_EVENT, CLUBS_EVENT, RELEASE_REQUESTS_EVENT,
   CLUB_REPORTS_EVENT, STRIKES_EVENT, AVAIL_EVENT,
   REPORTS_EVENT, FIN_ISSUES_EVENT, KPI_OVERRIDES_EVENT,
+  // 2026-08-14 fix: real student/teacher names never resolved unless the
+  // admin had already visited Students/Teachers this session (USERS starts
+  // out with only the 8 mock seed rows — see hydrateStudents/hydrateTeachers
+  // in students-store.ts/teacher-model.ts). Without these two events, even
+  // calling those hydrate functions on this page wouldn't refresh already-
+  // rendered rows once the real names arrived.
+  STUDENTS_EVENT, TEACHERS_EVENT,
 ];
 
 function subscribe(cb: () => void): () => void {

@@ -74,6 +74,12 @@ export type NotificationKind =
   | "student_shared_challenge_result"
   | "spotlight_cancelled"
   | "challenge_pending_review"
+  // teacher + admin facing — a student cancelled or was marked Absent on a
+  // regular (non-Spotlight) 1:1 session. 2026-08-14: this had NO in-app
+  // signal at all before this fix (only the email from notify-session-event,
+  // which can land in spam / fail silently if RESEND_API_KEY isn't set) — a
+  // same-day cancellation went unnoticed. See student_cancelled_session.
+  | "student_cancelled_session"
   // admin-facing
   | "needs_substitute"
   | "release_request"
@@ -210,6 +216,30 @@ function teacherNotifications(teacherId: string): Notification[] {
     });
   }
 
+
+  // ---- Regular (non-Spotlight) session cancelled/marked Absent by the ----
+  // student — broadens the Spotlight-only block above. Excludes sessions the
+  // TEACHER themselves cancelled (absent_cause === "teacher", set by
+  // cancelSessionByTeacher) so a teacher never gets pinged about their own
+  // action, and excludes group/workshop sessions (different flow, per-member
+  // statuses live outside the top-level status this reads).
+  for (const s of loadSessions()) {
+    if (s.teacher_id !== teacherId) continue;
+    if (s.origin === "spotlight") continue; // already covered above
+    if (s.origin === "workshop") continue;
+    if (s.group_id) continue;
+    if (s.status !== "cancelled" && s.status !== "absent") continue;
+    if (s.absent_cause === "teacher") continue;
+    out.push({
+      id: `student-session-cancelled:${s.id}`,
+      kind: "student_cancelled_session",
+      title: s.status === "absent" ? "Student marked Absent (late cancellation)" : "Student cancelled a session",
+      body: `${fmtDate(s.date_time)}${s.cancellation_note ? ` — "${s.cancellation_note}"` : ""}`,
+      createdAt: s.date_time,
+      to: "/teacher/calendar",
+      read: false,
+    });
+  }
 
   // ---- Club "Needs Substitute" that matches this teacher -----------------
   // A Created (no teacher_id) upcoming club is treated as an open substitute
@@ -439,6 +469,27 @@ function adminNotifications(): Notification[] {
       kind: "needs_substitute",
       title: "New Needs Substitute case",
       body: `${t?.name ?? "Teacher"} · ${fmtDate(s.date_time)}`,
+      createdAt: s.date_time,
+      to: "/admin/sessions",
+      read: false,
+    });
+  }
+
+  // ---- Student cancelled/marked Absent a session (any 1:1 origin except --
+  // one the teacher themselves caused) — Admin needs this same signal, not
+  // just the teacher. Same filters as the teacher-facing block above.
+  for (const s of loadSessions()) {
+    if (s.origin === "workshop") continue;
+    if (s.group_id) continue;
+    if (s.status !== "cancelled" && s.status !== "absent") continue;
+    if (s.absent_cause === "teacher") continue;
+    const t = USERS.find((u) => u.id === s.teacher_id);
+    const st = USERS.find((u) => u.id === s.student_id);
+    out.push({
+      id: `student-session-cancelled:${s.id}`,
+      kind: "student_cancelled_session",
+      title: s.status === "absent" ? "Student marked Absent (late cancellation)" : "Student cancelled a session",
+      body: `${st?.name ?? "Student"} → ${t?.name ?? "Teacher"} · ${fmtDate(s.date_time)}`,
       createdAt: s.date_time,
       to: "/admin/sessions",
       read: false,
