@@ -8,6 +8,8 @@ import {
   type ActivityKind, type ActorRole,
 } from "@/lib/activity-logs-store";
 import { USERS } from "@/lib/mock-data";
+import { hydrateStudents } from "@/lib/students-store";
+import { hydrateTeachers } from "@/lib/teacher-model";
 import {
   loadKpiOverrides, deleteOldKpiOverrides,
   subscribeKpiOverrides,
@@ -49,6 +51,16 @@ function ActivityLogsPage() {
   hydrateAdminRoles();
   const { user } = useAuth();
   const adminType = getAdminType(user);
+  // 2026-08-14 fix: this page never called these (every other admin page
+  // that needs real names does), so real student/teacher names never
+  // resolved into USERS unless the admin had already visited Students or
+  // Teachers earlier in the session — entries fell back to raw ids. Both are
+  // idempotent/safe on every mount; activity-logs-store now also listens for
+  // STUDENTS_EVENT/TEACHERS_EVENT so rows refresh once the real names land.
+  useEffect(() => {
+    hydrateStudents();
+    hydrateTeachers();
+  }, []);
   const entries = useActivityLog();
 
   const [kind, setKind] = useState<ActivityKind | "all">("all");
