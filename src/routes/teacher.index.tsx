@@ -16,7 +16,7 @@ import completeIconAsset from "@/assets/complete.svg";
 import { CalendarClock, ClipboardCheck, FileEdit, X, Lock, Plus, Trash2, Download, CheckCircle2, Mic, PenLine, Ear, BookOpen, ChevronRight, Video, Star, AlertTriangle, AlertCircle, Trophy, CalendarDays, Users, Wallet, Sparkles as SparklesIcon, GraduationCap, type LucideIcon } from "lucide-react";
 import { savePerformance, type PerformanceRating } from "@/lib/performance-store";
 import { MACRO_SKILLS as SHARED_MACRO_SKILLS, skillKey as sharedSkillKey, type BaseKey as SharedBaseKey } from "@/lib/skills-taxonomy";
-import { submitSessionReport, updateSession, loadSessions, subscribeSessions, notifySessionEvent, SUB_STATUS_META, isJustificationWindowOpen, type ExtSession, type AttendanceSubStatus } from "@/lib/sessions-store";
+import { submitSessionReport, updateSession, loadSessions, subscribeSessions, notifySessionEvent, logSessionConnect, SUB_STATUS_META, isJustificationWindowOpen, type ExtSession, type AttendanceSubStatus } from "@/lib/sessions-store";
 import { PlanModal } from "@/components/verbo/PlanModal";
 import { downloadSessionReportPdf, sessionReportPdfBlob, sessionReportFileName } from "@/lib/session-report-pdf";
 import { uploadContentFile } from "@/lib/content-uploads";
@@ -904,6 +904,7 @@ function TeacherDashboard() {
                         href={s.teams_link}
                         target="_blank"
                         rel="noopener noreferrer"
+                        onClick={() => logSessionConnect(s.id, "teacher")}
                         className="inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-white shadow-sm transition-opacity hover:opacity-90"
                         style={{ backgroundColor: "#5fca16" }}
                       >

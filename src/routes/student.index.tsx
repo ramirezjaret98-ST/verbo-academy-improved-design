@@ -17,7 +17,7 @@ import { useAuth } from "@/lib/auth";
 import { userById } from "@/lib/mock-data";
 import { hydrateTeachers } from "@/lib/teacher-model";
 import { effectiveSessionCounts, groupOfStudent } from "@/lib/groups-store";
-import { subscribeSessions, getSessionsSnapshot, getServerSessionsSnapshot, submitStudentRating, studentAttendance, type ExtSession, type ExtSessionStatus } from "@/lib/sessions-store";
+import { subscribeSessions, getSessionsSnapshot, getServerSessionsSnapshot, submitStudentRating, studentAttendance, logSessionConnect, type ExtSession, type ExtSessionStatus } from "@/lib/sessions-store";
 import { withinConnectWindow, CONNECT_HINT } from "@/lib/session-connect";
 import {
   getPerformanceSnapshot,
@@ -1030,7 +1030,7 @@ function StudentDashboard() {
                                       title={withinConnectWindow(s.date_time, s.duration_minutes) ? "Connect" : CONNECT_HINT}
                                       aria-label="Connect"
                                       disabled={!withinConnectWindow(s.date_time, s.duration_minutes)}
-                                      onClick={() => { if (withinConnectWindow(s.date_time, s.duration_minutes)) window.open(s.teams_link, "_blank"); }}
+                                      onClick={() => { if (withinConnectWindow(s.date_time, s.duration_minutes)) { logSessionConnect(s.id, "student"); window.open(s.teams_link, "_blank"); } }}
                                       className={`flex h-8 w-8 items-center justify-center rounded-full shadow-soft transition-opacity active:scale-[0.97] ${
                                         withinConnectWindow(s.date_time, s.duration_minutes)
                                           ? "bg-success text-success-foreground hover:opacity-90"
@@ -1435,7 +1435,7 @@ function StudentDashboard() {
                       <PrimaryButton
                         className="verbo-btn-glow"
                         accentColor="#5fca16"
-                        onClick={() => s.teams_link && window.open(s.teams_link, "_blank")}
+                        onClick={() => { if (s.teams_link) { logSessionConnect(s.id, "student"); window.open(s.teams_link, "_blank"); } }}
                       >
                         <Video className="h-3.5 w-3.5" /> Connect
                       </PrimaryButton>

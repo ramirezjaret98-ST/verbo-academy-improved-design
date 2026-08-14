@@ -30,7 +30,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
 import { USERS, userById } from "@/lib/mock-data";
 import {
-  loadSessions, subscribeSessions, studentSetSessionStatus,
+  loadSessions, subscribeSessions, studentSetSessionStatus, logSessionConnect,
   SUB_STATUS_META, lastCoveredSummaryFor,
   type ExtSession, type ExtSessionStatus,
 } from "@/lib/sessions-store";
@@ -559,7 +559,9 @@ function EventDetailsModal({
     (status === "scheduled" || status === "ready" || status === "rescheduled");
   const connectOpen = session ? withinConnectWindow(session.date_time, session.duration_minutes) : false;
   const connect = () => {
-    if (session?.teams_link) window.open(session.teams_link, "_blank");
+    if (!session?.teams_link) return;
+    logSessionConnect(session.id, "student");
+    window.open(session.teams_link, "_blank");
   };
 
   const plan = session ? getLessonPlan(session.id) : undefined;
