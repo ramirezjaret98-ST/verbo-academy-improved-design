@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { CalendarDays, X, Video } from "lucide-react";
+import { CalendarDays, X, Video, FileText } from "lucide-react";
 import { USERS, userById } from "@/lib/mock-data";
 import { Card } from "@/components/verbo/ui";
 import { CalendarView } from "@/components/verbo/CalendarView";
@@ -12,6 +12,7 @@ import {
 } from "@/lib/calendar-events";
 import { groupsByStudentId } from "@/lib/groups-store";
 import type { ExtSessionStatus } from "@/lib/sessions-store";
+import { SessionReportModal, hasSessionReport } from "@/components/verbo/SessionReportModal";
 
 const BRAND = "#01304a";
 
@@ -165,6 +166,8 @@ function EventDetailsModal({
     : undefined;
 
   const videoLink = s?.teams_link || (c as { meeting_link?: string } | undefined)?.meeting_link;
+  const showReport = s ? hasSessionReport(s) : false;
+  const [reportOpen, setReportOpen] = useState(false);
 
   // Suppress unused-var warning for teacherIdFilter (kept for symmetry / future).
   void teacherIdFilter;
@@ -172,7 +175,12 @@ function EventDetailsModal({
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center verbo-backdrop p-4"
-      onClick={onClose}
+      // While the Report modal (z-[70]) is stacked on top, ignore backdrop
+      // clicks here — otherwise a click on the Report modal's own backdrop
+      // bubbles up through this div (fixed positioning doesn't change DOM
+      // nesting/bubbling) and closes both modals in one click instead of
+      // just the top one.
+      onClick={reportOpen ? undefined : onClose}
     >
       <div
         className="w-full max-w-lg overflow-hidden rounded-2xl border border-border bg-card shadow-elevated"
@@ -216,21 +224,54 @@ function EventDetailsModal({
             </div>
           )}
           {event.subtitle && <Row label="Details" value={event.subtitle} />}
-          {videoLink && (
+
+          {/* 2026-08-13: once the teacher has submitted a report for this
+             *  session, that's the useful thing to open from here — the call
+             *  is over, "Open link" leads nowhere. Report + rating replace
+             *  the video-call row; the link itself is kept as a small
+             *  secondary reference underneath, not the primary action. */}
+          {showReport && s ? (
             <div className="flex items-start gap-3">
               <div className="w-24 shrink-0 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                Video call
+                Session
               </div>
-              <a
-                href={videoLink}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1.5 text-sm font-medium underline"
-                style={{ color: BRAND }}
-              >
-                <Video className="h-3.5 w-3.5" /> Open link
-              </a>
+              <div className="flex flex-col items-start gap-1.5">
+                <button
+                  onClick={() => setReportOpen(true)}
+                  className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-white transition-opacity hover:opacity-90"
+                  style={{ background: BRAND }}
+                >
+                  <FileText className="h-3.5 w-3.5" /> View Report & Rating
+                </button>
+                {videoLink && (
+                  <a
+                    href={videoLink}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1 text-xs text-muted-foreground underline"
+                  >
+                    <Video className="h-3 w-3" /> Video link
+                  </a>
+                )}
+              </div>
             </div>
+          ) : (
+            videoLink && (
+              <div className="flex items-start gap-3">
+                <div className="w-24 shrink-0 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                  Video call
+                </div>
+                <a
+                  href={videoLink}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1.5 text-sm font-medium underline"
+                  style={{ color: BRAND }}
+                >
+                  <Video className="h-3.5 w-3.5" /> Open link
+                </a>
+              </div>
+            )
           )}
         </div>
 
@@ -238,6 +279,10 @@ function EventDetailsModal({
           Read-only view. Manage sessions from Admin &rsaquo; Sessions.
         </div>
       </div>
+
+      {reportOpen && s && (
+        <SessionReportModal session={s} onClose={() => setReportOpen(false)} />
+      )}
     </div>
   );
 }

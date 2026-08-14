@@ -409,12 +409,30 @@ function StudentDashboard() {
         const triggerAt = end - 10 * 60_000;
         if (now >= triggerAt && now <= end) { setRatingSession(s); return; }
       }
-      setRatingSession(null);
+      // Fallback — 2026-08-13 fix: the window above only fires while the
+      // student happens to have the dashboard open in the last 10 minutes
+      // of their OWN live class, which almost never happens in practice
+      // (they're in the video call, not browsing the app) — audited live,
+      // 0 of 57 real sessions ever got a student_rating. On every dashboard
+      // visit, also offer to rate the most recent COMPLETED session (never
+      // absent/cancelled — nothing to rate there) from the last 7 days that
+      // has no student_rating yet and hasn't been dismissed before. Silent
+      // no-op once the student rates or dismisses it once (same `handled`
+      // set as the live-window path).
+      const RATING_LOOKBACK_MS = 7 * 24 * 60 * 60_000;
+      const recentUnrated = history.find((s) => {
+        if (handled.has(s.id)) return false;
+        if (s.status !== "completed") return false;
+        if (typeof s.student_rating === "number") return false;
+        const end = +new Date(s.date_time) + s.duration_minutes * 60_000;
+        return now - end <= RATING_LOOKBACK_MS && end <= now;
+      });
+      setRatingSession(recentUnrated ?? null);
     };
     tick();
     const id = setInterval(tick, 15_000);
     return () => clearInterval(id);
-  }, [upcoming, handled]);
+  }, [upcoming, history, handled]);
 
   const handleSubmit = (rating: number, note: string) => {
     if (!ratingSession) return;
