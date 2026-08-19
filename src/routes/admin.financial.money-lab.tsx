@@ -3,12 +3,12 @@ import { useEffect, useMemo, useState } from "react";
 import {
   ChevronLeft, ChevronRight, CreditCard, ExternalLink,
   Wallet, CircleDollarSign, Clock, TrendingUp, type LucideIcon,
-  AlertTriangle, Download, ShieldCheck,
+  AlertTriangle, Download, ShieldCheck, Plus, Trash2,
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, ReferenceLine,
 } from "recharts";
-import { Pill } from "@/components/verbo/ui";
+import { Pill, AccentModal, AccentModalFooter, PrimaryButton, GhostButton } from "@/components/verbo/ui";
 import { USERS, SESSIONS, userById, type User } from "@/lib/mock-data";
 import { hydrateStudents } from "@/lib/students-store";
 import {
@@ -17,9 +17,13 @@ import {
 } from "@/lib/groups-store";
 import {
   logPayment, expectedAmountForStudent, expectedAmountForGroup,
-  paymentsForMonth, paymentForEntityInMonth, subscribePayments,
+  paymentsForMonth, paymentsForEntityInMonth, subscribePayments,
   monthKey, loadPayments,
 } from "@/lib/payments-log";
+import {
+  loadManualEntries, manualEntriesForMonth, addManualEntry, deleteManualEntry,
+  subscribeManualEntries, type ManualFinancialEntry, type ManualEntryType,
+} from "@/lib/manual-financial-entries";
 import { nextPaymentDate } from "@/lib/student-model";
 import { DEFAULT_HOURLY_RATE, teacherStatus } from "@/lib/teacher-model";
 import { downloadJson, todayStamp } from "@/lib/log-retention";
@@ -69,10 +73,12 @@ function MoneyLabPage() {
   const [, force] = useState(0);
   const bump = () => force((n) => n + 1);
   const [viewMonth, setViewMonth] = useState<Date>(() => firstOfMonth(new Date()));
+  const [manualModalType, setManualModalType] = useState<ManualEntryType | null>(null);
 
   useEffect(() => { hydrateStudents(); bump(); }, []);
   useEffect(() => subscribeGroups(bump), []);
   useEffect(() => subscribePayments(bump), []);
+  useEffect(() => subscribeManualEntries(bump), []);
 
   const now = new Date();
   const currentMkey = monthKey(now);
@@ -81,10 +87,15 @@ function MoneyLabPage() {
   const isFuture = viewMonth > firstOfMonth(now);
 
   // -------------------- Rosters --------------------
+  // `exclude_from_financials` keeps internal/test/demo accounts (QA
+  // accounts, leftover seed people, an admin's own test student) out of
+  // Expected/Received Income — they aren't real paying customers. See
+  // mock-data.ts and the Financial tab in admin.students.tsx.
   const activeIndividuals: User[] = USERS.filter(
     (u) => u.role === "student"
       && (u.product_type ?? "performance") === "performance"
-      && (u.status ?? "active") !== "suspended",
+      && (u.status ?? "active") !== "suspended"
+      && !u.exclude_from_financials,
   );
   const groups: Group[] = loadGroups();
   const groupMembers = loadGroupMembers();
@@ -115,12 +126,29 @@ function MoneyLabPage() {
 
   const incomeRows: IncomeRow[] = [];
 
+  // Amount + status for an entity in the selected month. Sums EVERY payment
+  // logged for this entity this month (not just the latest one) — a student
+  // on an installment payment plan can legitimately have more than one
+  // payment land in the same calendar month, and if it ever happens again
+  // that "Mark as Paid" gets fired twice by mistake, this at least keeps the
+  // number consistent everywhere on the page instead of silently disagreeing
+  // with the Trend chart (see paymentsForEntityInMonth in payments-log.ts —
+  // this is the 2026-08-19 fix for the Expected/Received Income mismatch).
+  function resolvePaidEntries(entityType: "individual" | "group", entityId: string) {
+    const entries = paymentsForEntityInMonth(entityType, entityId, mkey);
+    if (entries.length === 0) return null;
+    const total = entries.reduce((s, p) => s + p.amount, 0);
+    // Most recent entry drives the displayed date.
+    const latest = entries.reduce((a, b) => (+new Date(a.paid_at) > +new Date(b.paid_at) ? a : b));
+    return { total, latestPaidAt: latest.paid_at };
+  }
+
   for (const s of payingIndividuals) {
     const expected = expectedPayDateInMonth(s.payment_day, viewMonth);
-    const paid = paymentForEntityInMonth("individual", s.id, mkey);
+    const paid = resolvePaidEntries("individual", s.id);
     // Include the row if we expect a payment this month OR one was already paid.
     if (!expected && !paid) continue;
-    const amount = paid?.amount ?? expectedAmountForStudent(s);
+    const amount = paid?.total ?? expectedAmountForStudent(s);
     let status: IncomeRow["status"];
     if (paid) status = "Paid";
     else if (isCurrentMonth && expected && expected < new Date(now.getFullYear(), now.getMonth(), now.getDate())) status = "Overdue";
@@ -135,7 +163,7 @@ function MoneyLabPage() {
       typeLabel: "Individual",
       amount,
       status,
-      date: paid ? new Date(paid.paid_at) : expected,
+      date: paid ? new Date(paid.latestPaidAt) : expected,
       dateIsExpected: !paid,
       payDay: s.payment_day,
     });
@@ -143,9 +171,9 @@ function MoneyLabPage() {
 
   for (const g of payingGroups) {
     const expected = expectedPayDateInMonth(g.payment_day, viewMonth);
-    const paid = paymentForEntityInMonth("group", g.id, mkey);
+    const paid = resolvePaidEntries("group", g.id);
     if (!expected && !paid) continue;
-    const amount = paid?.amount ?? expectedAmountForGroup(g);
+    const amount = paid?.total ?? expectedAmountForGroup(g);
     let status: IncomeRow["status"];
     if (paid) status = "Paid";
     else if (isCurrentMonth && expected && expected < new Date(now.getFullYear(), now.getMonth(), now.getDate())) status = "Overdue";
@@ -160,7 +188,7 @@ function MoneyLabPage() {
       typeLabel: "Group",
       amount,
       status,
-      date: paid ? new Date(paid.paid_at) : expected,
+      date: paid ? new Date(paid.latestPaidAt) : expected,
       dateIsExpected: !paid,
       payDay: g.payment_day,
     });
@@ -168,9 +196,22 @@ function MoneyLabPage() {
 
   incomeRows.sort((a, b) => (a.date?.getTime() ?? 0) - (b.date?.getTime() ?? 0));
 
+  // -------------------- Manual entries (2026-08-19) --------------------
+  // One-off income/expense lines an admin types in by hand — e.g. an
+  // in-person teacher class with no student in the system to bill against.
+  // No Paid/Pending state: adding one means the money already moved, so it
+  // counts immediately toward both Expected and Received Income (income) or
+  // Expenses (expense). Doesn't touch the automatic student-billing /
+  // teacher-hours engines — purely additive/subtractive lines on top.
+  const manualEntriesThisMonth = manualEntriesForMonth(mkey);
+  const manualIncomeRows = manualEntriesThisMonth.filter((e) => e.entry_type === "income");
+  const manualExpenseRows = manualEntriesThisMonth.filter((e) => e.entry_type === "expense");
+  const manualIncomeTotal = manualIncomeRows.reduce((s, e) => s + e.amount, 0);
+  const manualExpenseTotal = manualExpenseRows.reduce((s, e) => s + e.amount, 0);
+
   // -------------------- Summary --------------------
-  const expectedIncome = incomeRows.reduce((s, r) => s + r.amount, 0);
-  const receivedIncome = incomeRows.filter((r) => r.status === "Paid").reduce((s, r) => s + r.amount, 0);
+  const expectedIncome = incomeRows.reduce((s, r) => s + r.amount, 0) + manualIncomeTotal;
+  const receivedIncome = incomeRows.filter((r) => r.status === "Paid").reduce((s, r) => s + r.amount, 0) + manualIncomeTotal;
   const outstanding = Math.max(0, expectedIncome - receivedIncome);
 
   // -------------------- Expenses --------------------
@@ -201,7 +242,7 @@ function MoneyLabPage() {
     };
   }).filter((r) => r.stdPay !== 0 || r.adjustments !== 0);
 
-  const expensesTotal = expenseRows.reduce((s, r) => s + r.total, 0);
+  const expensesTotal = expenseRows.reduce((s, r) => s + r.total, 0) + manualExpenseTotal;
   const net = receivedIncome - expensesTotal;
   // Standard teacher pay is only tracked live for the current month, so past
   // and future months can look artificially profitable. Flag it next to Net.
@@ -214,19 +255,22 @@ function MoneyLabPage() {
     for (let i = 5; i >= 0; i--) {
       const d = addMonths(firstOfMonth(now), -i);
       const mk = monthKey(d);
-      const received = paymentsForMonth(mk).reduce((s, p) => s + p.amount, 0);
+      const manualForMonth = manualEntriesForMonth(mk);
+      const manualIncomeForMonth = manualForMonth.filter((e) => e.entry_type === "income").reduce((s, e) => s + e.amount, 0);
+      const manualExpenseForMonth = manualForMonth.filter((e) => e.entry_type === "expense").reduce((s, e) => s + e.amount, 0);
+      const received = paymentsForMonth(mk).reduce((s, p) => s + p.amount, 0) + manualIncomeForMonth;
       const isCur = mk === currentMkey;
       const expenses = teachers.reduce((sum, t) => {
         const hrs = isCur ? (t.hours_month ?? 0) : 0;
         const pay = hrs * (t.hourly_rate ?? DEFAULT_HOURLY_RATE);
         const a = (t.adjustments ?? []).filter((x) => inMonth(x.date, mk)).reduce((s, x) => s + x.amount, 0);
         return sum + pay + a;
-      }, 0);
+      }, manualExpenseForMonth);
       months.push({ d, mkey: mk, label: d.toLocaleDateString("en-US", { month: "short" }), received, expenses });
     }
     return months;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loadPayments().length, currentMkey]);
+  }, [loadPayments().length, loadManualEntries().length, currentMkey]);
 
   // -------------------- Actions --------------------
   const markIncomePaid = (row: IncomeRow) => {
@@ -261,6 +305,11 @@ function MoneyLabPage() {
       toast.success("Marked as paid");
     }
     bump();
+  };
+
+  const removeManualEntry = (entry: ManualFinancialEntry) => {
+    deleteManualEntry(entry.id);
+    toast.success("Entry removed");
   };
 
   // -------------------- Data Exports (super admin only) --------------------
@@ -303,6 +352,14 @@ function MoneyLabPage() {
         adjustments: r.adjustments,
         total: r.total,
       })),
+      manual_income: manualIncomeRows.map((e) => ({
+        label: e.label, amount: e.amount, date: e.entry_date,
+        linked_student: e.linked_student_name ?? null, notes: e.notes ?? null,
+      })),
+      manual_expenses: manualExpenseRows.map((e) => ({
+        label: e.label, amount: e.amount, date: e.entry_date,
+        linked_teacher: e.linked_teacher_name ?? null, notes: e.notes ?? null,
+      })),
     });
     toast.success("Financial summary downloaded");
   };
@@ -324,6 +381,7 @@ function MoneyLabPage() {
         access_plan: s.access_plan ?? null,
         monthly_price: expectedAmountForStudent(s),
         price_is_custom: s.custom_price != null,
+        excluded_from_financials: s.exclude_from_financials ?? false,
         hired_sessions: s.hired_sessions ?? 0,
         remaining_sessions: s.remaining_sessions ?? 0,
         sessions_per_week: s.sessions_per_week ?? null,
@@ -659,13 +717,51 @@ function MoneyLabPage() {
         )}
       </section>
 
+      {/* Manual entries — one-off income/expense lines added by hand, for
+          anything the automatic student-billing / teacher-hours engines
+          don't cover (e.g. an in-person class with no student record). */}
+      <section
+        className="verbo-admin-section grid grid-cols-1 gap-5 lg:grid-cols-2"
+        style={{ "--verbo-admin-i": 5 } as React.CSSProperties}
+      >
+        <ManualEntryCard
+          type="income"
+          entries={manualIncomeRows}
+          total={manualIncomeTotal}
+          accent={INCOME_ACCENT}
+          viewMonth={viewMonth}
+          onAdd={() => setManualModalType("income")}
+          onRemove={removeManualEntry}
+        />
+        <ManualEntryCard
+          type="expense"
+          entries={manualExpenseRows}
+          total={manualExpenseTotal}
+          accent={EXPENSE_ACCENT}
+          viewMonth={viewMonth}
+          onAdd={() => setManualModalType("expense")}
+          onRemove={removeManualEntry}
+        />
+      </section>
+
+      {manualModalType && (
+        <ManualEntryModal
+          type={manualModalType}
+          viewMonth={viewMonth}
+          teachers={teachers}
+          students={activeIndividuals}
+          onClose={() => setManualModalType(null)}
+          currentUserId={user?.id}
+        />
+      )}
+
       {/* Data Exports — super admin only. Raw JSON snapshots for accounting /
           monthly reports, meant to be handed to a separate Cowork session for
           analysis later (per Jaret) rather than a formatted report. */}
       {isSuperAdmin && (
         <section
           className="verbo-admin-section rounded-2xl border border-border bg-card p-5 sm:p-6"
-          style={{ "--verbo-admin-i": 5 } as React.CSSProperties}
+          style={{ "--verbo-admin-i": 6 } as React.CSSProperties}
         >
           <div className="mb-4 flex items-center gap-2.5">
             <span
@@ -796,6 +892,224 @@ function TrendChart({
         </BarChart>
       </ResponsiveContainer>
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Manual entries — card (list + add/remove) and add modal. 2026-08-19,
+// per Jaret's explicit request to be able to add/remove income and expense
+// line items by hand (e.g. an in-person teacher class with no student record
+// in the system). See manual-financial-entries.ts for the storage layer.
+// ---------------------------------------------------------------------------
+function ManualEntryCard({
+  type, entries, total, accent, viewMonth, onAdd, onRemove,
+}: {
+  type: ManualEntryType;
+  entries: ManualFinancialEntry[];
+  total: number;
+  accent: string;
+  viewMonth: Date;
+  onAdd: () => void;
+  onRemove: (entry: ManualFinancialEntry) => void;
+}) {
+  const isIncome = type === "income";
+  const title = isIncome ? "Manual income" : "Manual expenses";
+  const noun = isIncome ? "income" : "expense";
+
+  return (
+    <div className="verbo-admin-lift relative overflow-hidden rounded-2xl border border-border bg-card">
+      <div
+        className="flex items-center justify-between gap-2 border-b border-border/70 px-5 py-4"
+        style={{ background: `color-mix(in oklab, ${accent} 5%, transparent)` }}
+      >
+        <div>
+          <h3 className="text-sm font-semibold tracking-[-0.01em] text-foreground">{title}</h3>
+          <p className="text-[11px] font-light text-muted-foreground">
+            {labelOf(viewMonth)} · {entries.length} {entries.length === 1 ? "entry" : "entries"}
+          </p>
+        </div>
+        <div className="text-lg font-semibold tabular-nums tracking-[-0.01em]" style={{ color: accent }}>
+          {money(total)}
+        </div>
+      </div>
+
+      <div className="p-4">
+        <button
+          type="button"
+          onClick={onAdd}
+          className="verbo-admin-press mb-3 inline-flex items-center gap-1.5 rounded-full border border-dashed px-3 py-1.5 text-[11px] font-semibold transition-colors hover:bg-secondary/40"
+          style={{ borderColor: accent, color: accent }}
+        >
+          <Plus className="h-3 w-3" strokeWidth={2} /> Add {noun}
+        </button>
+
+        {entries.length === 0 ? (
+          <p className="px-1 py-3 text-[12px] font-light text-muted-foreground">
+            No manual {noun} entries this month.
+          </p>
+        ) : (
+          <ul className="space-y-2">
+            {entries.map((e) => (
+              <li
+                key={e.id}
+                className="flex items-center justify-between gap-2 rounded-xl border border-border/70 px-3 py-2.5"
+              >
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-medium tracking-[-0.01em] text-foreground">{e.label}</div>
+                  <div className="truncate text-[11px] font-light text-muted-foreground">
+                    {new Date(`${e.entry_date}T00:00:00`).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                    {e.linked_teacher_name && ` · ${e.linked_teacher_name}`}
+                    {e.linked_student_name && ` · ${e.linked_student_name}`}
+                  </div>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  <span className="text-sm font-semibold tabular-nums tracking-[-0.01em] text-foreground">{money(e.amount)}</span>
+                  <button
+                    type="button"
+                    onClick={() => onRemove(e)}
+                    aria-label={`Remove ${e.label}`}
+                    className="rounded-full p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" strokeWidth={1.6} />
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ManualEntryModal({
+  type, viewMonth, teachers, students, onClose, currentUserId,
+}: {
+  type: ManualEntryType;
+  viewMonth: Date;
+  teachers: User[];
+  students: User[];
+  onClose: () => void;
+  currentUserId?: string;
+}) {
+  const isIncome = type === "income";
+  const accent = isIncome ? "#5fca16" : "#d97706";
+
+  const [label, setLabel] = useState("");
+  const [amount, setAmount] = useState("");
+  const [date, setDate] = useState(() => {
+    const today = new Date();
+    // Default to today if adding to the current month; otherwise the 1st of
+    // whichever month is being viewed, so it lands in the right bucket.
+    const inViewedMonth = monthKey(today) === monthKey(viewMonth);
+    const d = inViewedMonth ? today : firstOfMonth(viewMonth);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  });
+  const [linkMode, setLinkMode] = useState<"none" | "linked">("none");
+  const [linkedId, setLinkedId] = useState("");
+  const [notes, setNotes] = useState("");
+
+  const isValid = label.trim() !== "" && Number(amount) > 0 && date.trim() !== "";
+  const inputCls = "w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none transition-colors focus:border-accent";
+
+  const handleSave = () => {
+    if (!isValid) return;
+    const linkedTeacher = !isIncome && linkMode === "linked" ? teachers.find((t) => t.id === linkedId) : undefined;
+    const linkedStudent = isIncome && linkMode === "linked" ? students.find((s) => s.id === linkedId) : undefined;
+    addManualEntry({
+      entry_type: type,
+      label: label.trim(),
+      amount: Number(amount),
+      entry_date: date,
+      linked_teacher_id: linkedTeacher?.id,
+      linked_teacher_name: linkedTeacher?.name,
+      linked_student_id: linkedStudent?.id,
+      linked_student_name: linkedStudent?.name,
+      notes: notes.trim() || undefined,
+      createdBy: currentUserId,
+    });
+    toast.success(isIncome ? "Manual income added" : "Manual expense added");
+    onClose();
+  };
+
+  return (
+    <AccentModal
+      background={accent}
+      iconTint={accent}
+      icon={isIncome ? CircleDollarSign : CreditCard}
+      eyebrow="The Money Lab"
+      title={isIncome ? "Add manual income" : "Add manual expense"}
+      onClose={onClose}
+      maxWidth="max-w-lg"
+      zClass="z-[60]"
+    >
+      <div className="space-y-4 p-5">
+        <div>
+          <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Concept</label>
+          <input
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+            placeholder={isIncome ? "e.g. One-time workshop fee" : "e.g. In-person class — Juan Pérez"}
+            className={inputCls}
+          />
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Amount (MXN)</label>
+            <input type="number" min={0} value={amount} onChange={(e) => setAmount(e.target.value)} className={inputCls} />
+          </div>
+          <div>
+            <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Date</label>
+            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inputCls} />
+          </div>
+        </div>
+
+        <div>
+          <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Link to {isIncome ? "a student" : "a teacher"} (optional)
+          </label>
+          <div className="mb-2 inline-flex rounded-lg border border-border bg-secondary/40 p-1">
+            <button
+              type="button"
+              onClick={() => { setLinkMode("none"); setLinkedId(""); }}
+              className={`rounded-md px-3 py-1 text-xs font-semibold transition-colors ${linkMode === "none" ? "bg-[#01304a] text-white" : "text-muted-foreground hover:text-foreground"}`}
+            >
+              None — free entry
+            </button>
+            <button
+              type="button"
+              onClick={() => setLinkMode("linked")}
+              className={`rounded-md px-3 py-1 text-xs font-semibold transition-colors ${linkMode === "linked" ? "bg-[#01304a] text-white" : "text-muted-foreground hover:text-foreground"}`}
+            >
+              {isIncome ? "Existing student" : "Existing teacher"}
+            </button>
+          </div>
+          {linkMode === "linked" && (
+            <select value={linkedId} onChange={(e) => setLinkedId(e.target.value)} className={`${inputCls} cursor-pointer`}>
+              <option value="">{isIncome ? "Select a student" : "Select a teacher"}</option>
+              {(isIncome ? students : teachers).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+          )}
+          <p className="mt-1 text-[10.5px] text-muted-foreground">
+            Purely informational — shown next to the entry for context. It does not change{" "}
+            {isIncome ? "that student's regular billing" : "that teacher's automatic hours/pay calculation"}.
+          </p>
+        </div>
+
+        <div>
+          <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Notes (optional)</label>
+          <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} className={inputCls} />
+        </div>
+      </div>
+
+      <AccentModalFooter accent={accent}>
+        <GhostButton onClick={onClose}>Cancel</GhostButton>
+        <PrimaryButton onClick={handleSave} disabled={!isValid} accentColor={accent}>
+          {isIncome ? "Add income" : "Add expense"}
+        </PrimaryButton>
+      </AccentModalFooter>
+    </AccentModal>
   );
 }
 

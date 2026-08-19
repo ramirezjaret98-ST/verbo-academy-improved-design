@@ -672,6 +672,7 @@ type FormState = {
   /** Raw text input for the negotiated monthly price override — empty string
    *  means "use the plan default" (see `defaultMonthlyPrice`). */
   custom_price: string;
+  exclude_from_financials: boolean;
   video_call_link: string;
   teacher_id: string;
   // Add-ons
@@ -717,6 +718,7 @@ function StudentFormModal({
     payment_day: initial?.payment_day ?? 1,
     cycle_start: initial?.cycle_start ?? "",
     custom_price: initial?.custom_price != null ? String(initial.custom_price) : "",
+    exclude_from_financials: initial?.exclude_from_financials ?? false,
     video_call_link: initial?.video_call_link ?? "",
     teacher_id: existingTeacher,
     addon_insights_per_month: initial?.addon_insights_per_month ?? 0,
@@ -903,6 +905,7 @@ function StudentFormModal({
       payment_day: isPerf ? (Number(f.payment_day) || undefined) : undefined,
       cycle_start: isPerf ? (f.cycle_start || undefined) : undefined,
       custom_price: isPerf ? (f.custom_price.trim() !== "" ? Number(f.custom_price) : null) : undefined,
+      exclude_from_financials: isPerf ? f.exclude_from_financials : undefined,
       video_call_link: isPerf ? f.video_call_link.trim() : undefined,
       status: initial?.status ?? "active",
       must_change_password: initial ? initial.must_change_password : true,
@@ -1214,6 +1217,21 @@ function StudentFormModal({
                     );
                   })()}
                 </Field>
+
+                <Field label="Test / internal account" icon={<ShieldAlert className="h-3.5 w-3.5" />} className="md:col-span-2">
+                  <label className="flex cursor-pointer items-center gap-2.5 rounded-lg border border-border bg-secondary/30 px-3 py-2.5 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={f.exclude_from_financials}
+                      onChange={(e) => set("exclude_from_financials", e.target.checked)}
+                      className="h-4 w-4 rounded border-border accent-[#01304a]"
+                    />
+                    <span className="text-foreground">Exclude from The Money Lab (test/demo account, not a real paying customer)</span>
+                  </label>
+                  <p className="mt-1 text-[10.5px] text-muted-foreground">
+                    Keeps this student out of Expected/Received Income totals without deleting the account — for QA accounts, demo people, or anyone who shouldn't count as real revenue.
+                  </p>
+                </Field>
               </div>
             </div>
 
@@ -1505,6 +1523,9 @@ function StudentDetailModal({
                     label="Price / month"
                     value={`$${expectedAmountForStudent(student).toLocaleString()} MXN${plan ? " · payment plan" : student.custom_price != null ? " · custom" : " · plan default"}`}
                   />
+                  {student.exclude_from_financials && (
+                    <Info label="Money Lab" value="Excluded — test/internal account" emphasis />
+                  )}
                   {groupInfo && <Info label="Group" value={groupInfo.group.name} />}
                   {(groupInfo?.group.company_client || student.company) && (
                     <Info label="Company" value={groupInfo?.group.company_client ?? student.company ?? "—"} />
