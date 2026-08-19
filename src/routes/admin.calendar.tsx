@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { CalendarDays, X, Video, FileText, CalendarClock, RefreshCcw, ClipboardList } from "lucide-react";
+import { CalendarDays, X, Video, FileText, CalendarClock, RefreshCcw, ClipboardList, NotebookPen } from "lucide-react";
 import { USERS, userById } from "@/lib/mock-data";
 import { Card, GhostButton, PrimaryButton } from "@/components/verbo/ui";
 import { CalendarView } from "@/components/verbo/CalendarView";
@@ -17,7 +17,14 @@ import {
 } from "@/lib/sessions-store";
 import { SessionReportModal, hasSessionReport } from "@/components/verbo/SessionReportModal";
 import { RescheduleModal } from "@/components/verbo/RescheduleModal";
-import { getLessonPlan } from "@/lib/lesson-plans-store";
+import { PlanModal } from "@/components/verbo/PlanModal";
+import { getLessonPlan, saveLessonPlan } from "@/lib/lesson-plans-store";
+
+// A session hasn't happened yet in any of these statuses — safe to bump to
+// "ready" after (re)saving its lesson plan, mirroring what the teacher's own
+// Planning modal does. A completed/absent/cancelled/no_show session keeps
+// its real status even if Admin edits its plan after the fact.
+const UPCOMING_STATUSES = new Set<ExtSessionStatus>(["scheduled", "ready", "rescheduled", "rearranged", "pending_reschedule", "delayed"]);
 
 // The same 7 statuses Admin > Sessions offers in its edit dropdown — kept in
 // sync with that page's STATUS_OPTIONS rather than re-deriving it, since this
@@ -208,6 +215,15 @@ function EventDetailsModal({
     setStatusEditing(false);
     onClose();
   };
+
+  // 2026-08-19: Jaret's actual ask — the same editing power the teacher has
+  // via the pencil "Edit lesson plan" on their own calendar (unit/level,
+  // session type, comments — everything `PlanModal` covers), from Admin.
+  // Concrete case he gave: a teacher cancels last-minute with no one to
+  // cover, so Admin ends up giving the class and needs to change what was
+  // planned. Reuses `PlanModal` as-is (same component teacher.calendar.tsx
+  // renders) — no parallel editor built.
+  const [planningOpen, setPlanningOpen] = useState(false);
 
   // Suppress unused-var warning for teacherIdFilter (kept for symmetry / future).
   void teacherIdFilter;
@@ -414,6 +430,12 @@ function EventDetailsModal({
                 >
                   <RefreshCcw className="h-3.5 w-3.5" /> Change status
                 </button>
+                <button
+                  onClick={() => setPlanningOpen(true)}
+                  className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-2.5 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-secondary"
+                >
+                  <NotebookPen className="h-3.5 w-3.5" /> {plan ? "Edit lesson plan" : "Plan session"}
+                </button>
                 {!showReport && (
                   <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
                     <ClipboardList className="h-3 w-3" /> No report yet
@@ -437,6 +459,21 @@ function EventDetailsModal({
           session={s}
           kind={s.group_id ? "group" : "individual"}
           onClose={() => { setRescheduleOpen(false); onClose(); }}
+        />
+      )}
+      {planningOpen && s && (
+        <PlanModal
+          session={s}
+          existing={plan}
+          onClose={() => setPlanningOpen(false)}
+          onSave={(p) => {
+            saveLessonPlan(p);
+            if (UPCOMING_STATUSES.has(s.status as ExtSessionStatus)) {
+              updateSession(s.id, { status: "ready" });
+            }
+            setPlanningOpen(false);
+            onClose();
+          }}
         />
       )}
       {/* Reschedule's own Cancel button also routes through this same

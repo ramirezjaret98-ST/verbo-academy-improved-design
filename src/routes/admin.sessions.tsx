@@ -543,13 +543,27 @@ function StudentSessionsModal({
   };
 
 
-  const applyBulk = (opts: { teamsLink: string; teacherId: string; time: string; days: number[] }) => {
+  const applyBulk = (opts: {
+    teamsLink: string; teacherId: string; time: string; days: number[];
+    sourceDays: number[]; permanent: boolean;
+  }) => {
     // Sync the link back to the student's shared Video Call Link field.
     setStudentVideoLink(studentId, opts.teamsLink);
     const [hh, mm] = opts.time.split(":").map(Number);
     for (const s of sessions) {
       if (s.student_id !== studentId) continue;
       if (["completed", "absent"].includes(s.status)) continue;
+      const dtOriginal = new Date(s.date_time);
+      // 2026-08-19: this used to retarget EVERY future session of the
+      // student onto the new day/time pattern, with no way to leave some
+      // weekdays untouched — e.g. moving just a Friday slot to Saturday
+      // also silently overwrote Monday/Thursday's time to match. Jaret
+      // reported this live (Ericka: Fri→Sat only, Mon/Thu must stay exactly
+      // as-is). `sourceDays` (optional) now filters WHICH of the student's
+      // current sessions this bulk edit is even allowed to touch — empty
+      // means "all", same as before, so nothing changes for the common case
+      // (just updating the link/teacher for everyone).
+      if (opts.sourceDays.length > 0 && !opts.sourceDays.includes(dtOriginal.getDay())) continue;
       const patch: Partial<ExtSession> = { teams_link: opts.teamsLink, teacher_id: opts.teacherId };
       const dt = new Date(s.date_time);
       dt.setHours(hh, mm, 0, 0);
@@ -560,17 +574,20 @@ function StudentSessionsModal({
         }
       }
       patch.date_time = dt.toISOString();
-      // Only flip the status to "rescheduled" when the date/time actually
-      // moved — mirrors the single-session edit's `dateChanged` check above.
-      // Before this fix, applyBulk() marked EVERY affected session as
+      // Only flip the status when the date/time actually moved — mirrors
+      // the single-session edit's `dateChanged` check above. Before an
+      // earlier fix, applyBulk() marked EVERY affected session as
       // "rescheduled" unconditionally, even ones whose computed time landed
-      // back on the exact same instant (e.g. re-running the same bulk
-      // schedule twice, or a day/time combo that didn't change anything) —
-      // confirmed live 2026-08-19: one teacher had 39 sessions stuck on
-      // "rescheduled" after a single bulk edit.
+      // back on the exact same instant — confirmed live 2026-08-19: one
+      // teacher had 39 sessions stuck on "rescheduled" after a single bulk
+      // edit. 2026-08-19 (later same day): `permanent` lets Jaret keep the
+      // result as "Scheduled" for a lasting change to the pattern (e.g. a
+      // student's slot permanently moving to a new day) instead of
+      // "Rescheduled", which reads as a one-off — same choice already
+      // available on the single-session edit above.
       const dateChanged = patch.date_time !== s.date_time;
       if (dateChanged && (s.status === "scheduled" || s.status === "rescheduled" || s.status === "ready" || s.status === "rearranged")) {
-        patch.status = "rescheduled";
+        patch.status = opts.permanent ? "scheduled" : "rescheduled";
       }
       onSave(s.id, patch);
     }
@@ -855,15 +872,26 @@ function BulkEditForm({
   currentTeamsLink: string;
   currentTeacherId: string;
   onCancel: () => void;
-  onApply: (opts: { teamsLink: string; teacherId: string; time: string; days: number[] }) => void;
+  onApply: (opts: {
+    teamsLink: string; teacherId: string; time: string; days: number[];
+    sourceDays: number[]; permanent: boolean;
+  }) => void;
 }) {
   const [teamsLink, setTeamsLink] = useState(currentTeamsLink);
   const [teacherId, setTeacherId] = useState(currentTeacherId);
   const [time, setTime] = useState("19:00");
   const [days, setDays] = useState<number[]>([]);
+  // 2026-08-19: lets this bulk edit target only sessions currently on
+  // specific weekday(s) — e.g. "only my Friday sessions" — instead of
+  // always touching the student's whole future schedule. Empty = all days,
+  // matching the original (unfiltered) behavior.
+  const [sourceDays, setSourceDays] = useState<number[]>([]);
+  const [permanent, setPermanent] = useState(false);
 
   const toggleDay = (d: number) =>
     setDays((prev) => (prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d]));
+  const toggleSourceDay = (d: number) =>
+    setSourceDays((prev) => (prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d]));
 
   return (
     <div className="mb-5 rounded-xl border p-5" style={{ borderColor: BRAND, backgroundColor: "#f5f8fa" }}>
@@ -894,7 +922,7 @@ function BulkEditForm({
             className="mt-1.5 w-full cursor-pointer rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring"
           />
         </Field>
-        <Field label="Change Frequency (optional)">
+        <Field label="Move to day(s) (optional)">
           <div className="mt-1.5 flex flex-wrap gap-2">
             {DAY_LABELS.map((lbl, i) => {
               const v = DAY_INDEX[i];
@@ -916,12 +944,52 @@ function BulkEditForm({
             })}
           </div>
         </Field>
+        <Field label="Only apply to sessions currently on (optional)">
+          <div className="mt-1.5 flex flex-wrap gap-2">
+            {DAY_LABELS.map((lbl, i) => {
+              const v = DAY_INDEX[i];
+              const active = sourceDays.includes(v);
+              return (
+                <button
+                  key={v}
+                  onClick={() => toggleSourceDay(v)}
+                  className="cursor-pointer rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors"
+                  style={
+                    active
+                      ? { backgroundColor: "#f38934", color: "white", borderColor: "#f38934" }
+                      : { backgroundColor: "transparent", color: "var(--foreground)", borderColor: "var(--border)" }
+                  }
+                >
+                  {lbl}
+                </button>
+              );
+            })}
+          </div>
+          <p className="mt-1.5 text-[10px] leading-tight text-muted-foreground">
+            Leave empty to affect every future session (old behavior). Pick e.g. just "Fri" to move only the Friday slot and leave the rest of the student's schedule untouched.
+          </p>
+        </Field>
       </div>
+
+      <label className="mt-4 flex items-start gap-2 rounded-lg border border-border bg-white p-3 text-sm">
+        <input
+          type="checkbox"
+          checked={permanent}
+          onChange={(e) => setPermanent(e.target.checked)}
+          className="mt-0.5 h-4 w-4"
+        />
+        <span className="text-foreground">
+          Permanent change to this student's schedule
+          <span className="block text-xs font-normal text-muted-foreground">
+            Keeps affected sessions as "Scheduled" instead of "Rescheduled" — use this when the new day/time is the new normal, not a one-off.
+          </span>
+        </span>
+      </label>
 
       <div className="mt-5 flex justify-end gap-2">
         <GhostButton onClick={onCancel} className="!px-4 !py-2 text-xs">Cancel</GhostButton>
         <button
-          onClick={() => onApply({ teamsLink, teacherId, time, days })}
+          onClick={() => onApply({ teamsLink, teacherId, time, days, sourceDays, permanent })}
           className="inline-flex cursor-pointer items-center gap-2 rounded-lg px-4 py-2 text-xs font-medium text-white shadow-soft transition-opacity hover:opacity-90"
           style={{ backgroundColor: "#5fca16" }}
         >
