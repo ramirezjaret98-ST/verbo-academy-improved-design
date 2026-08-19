@@ -216,6 +216,27 @@ export function paymentForEntityInMonth(
   );
 }
 
+/** Every payment logged for one entity in one month — plural sibling of
+ *  `paymentForEntityInMonth`. A student on an installment payment plan
+ *  (payment-plans.ts) can legitimately have more than one entry in the same
+ *  month (e.g. two biweekly installments both due in the same calendar
+ *  month), so The Money Lab sums THIS (not just the single most-recent
+ *  entry) for "amount received this month" — see admin.financial.money-lab.tsx.
+ *  2026-08-19: added after finding accidental duplicate "Mark as Paid" log
+ *  rows (same entity/month/amount, seconds apart) were silently inflating
+ *  the Trend chart's raw per-month sum while the summary card's old
+ *  single-entry lookup showed a different, lower number under the exact same
+ *  "Received Income" label — both now go through this one function. */
+export function paymentsForEntityInMonth(
+  entityType: PaidEntityType,
+  entityId: string,
+  mkey: string,
+): PaymentLogEntry[] {
+  return loadPayments().filter(
+    (p) => p.entity_type === entityType && p.entity_id === entityId && p.month === mkey,
+  );
+}
+
 /** Retention pruning: deletes every individual payment older than `cutoffMs`
  *  from Supabase (optimistic, rollback on failure), and prunes group
  *  payments older than `cutoffMs` from localStorage. Replaces the old
