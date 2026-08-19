@@ -224,6 +224,7 @@ export type Database = {
           custom_price: number | null
           cycle_start: string | null
           email: string
+          exclude_from_financials: boolean
           failed_login_attempts: number
           focus: string | null
           freeze_end: string | null
@@ -293,6 +294,7 @@ export type Database = {
           custom_price?: number | null
           cycle_start?: string | null
           email: string
+          exclude_from_financials?: boolean
           failed_login_attempts?: number
           focus?: string | null
           freeze_end?: string | null
@@ -364,6 +366,7 @@ export type Database = {
           custom_price?: number | null
           cycle_start?: string | null
           email?: string
+          exclude_from_financials?: boolean
           failed_login_attempts?: number
           focus?: string | null
           freeze_end?: string | null
@@ -1963,6 +1966,70 @@ export type Database = {
           },
         ]
       }
+      manual_financial_entries: {
+        Row: {
+          amount: number
+          created_at: string
+          created_by: string | null
+          entry_date: string
+          entry_type: string
+          id: number
+          label: string
+          linked_student_id: string | null
+          linked_teacher_id: string | null
+          month: string
+          notes: string | null
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          created_by?: string | null
+          entry_date: string
+          entry_type: string
+          id?: never
+          label: string
+          linked_student_id?: string | null
+          linked_teacher_id?: string | null
+          month: string
+          notes?: string | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          created_by?: string | null
+          entry_date?: string
+          entry_type?: string
+          id?: never
+          label?: string
+          linked_student_id?: string | null
+          linked_teacher_id?: string | null
+          month?: string
+          notes?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "manual_financial_entries_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "app_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "manual_financial_entries_linked_student_id_fkey"
+            columns: ["linked_student_id"]
+            isOneToOne: false
+            referencedRelation: "app_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "manual_financial_entries_linked_teacher_id_fkey"
+            columns: ["linked_teacher_id"]
+            isOneToOne: false
+            referencedRelation: "app_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       materials: {
         Row: {
           category: string
@@ -3472,6 +3539,7 @@ export type Database = {
           custom_price: number | null
           cycle_start: string | null
           email: string
+          exclude_from_financials: boolean
           failed_login_attempts: number
           focus: string | null
           freeze_end: string | null
