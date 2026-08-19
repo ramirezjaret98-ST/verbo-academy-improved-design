@@ -1,5 +1,6 @@
 // Mock database — replace with Lovable Cloud later.
 import { assignedStudentIdsFor } from "./assignments-store";
+import { supabase } from "@/integrations/supabase/client";
 
 export type Role = "student" | "teacher" | "admin";
 export type AdminType = "super_admin" | "coordinator_ops" | "coordinator_fin";
@@ -246,20 +247,25 @@ export const USERS: User[] = [
 ];
 
 // --- Hidden mock/demo users -------------------------------------------
-// The 35 hardcoded people above (Yuki Tanaka, James Carter, etc.) are demo
-// seed data, not real accounts — they have no row in `app_users`/`auth.users`.
-// Admin's "Delete permanently" button correctly detects that (no real
-// Supabase UUID to resolve) and takes the "ghost" cleanup path in
-// `user-deletion.ts`, but that path only removes the entry from THIS array
-// in memory — since `USERS` is reinitialized from this static source every
-// time the module loads (any page reload/new tab), the "deleted" demo
-// person reappears immediately. Real bug behind "Admin deletes a mock
-// student/teacher and they come back" (2026-08-19) — nothing to do with
-// Supabase RLS, since these were never real DB rows to begin with.
+// The people above (Yuki Tanaka, James Carter, etc.) are demo seed data, not
+// real accounts — they have no row in `app_users`/`auth.users`. Admin's
+// "Delete permanently" button correctly detects that (no real Supabase UUID
+// to resolve) and takes the "ghost" cleanup path in `user-deletion.ts`, but
+// that path only removes the entry from THIS array in memory — since `USERS`
+// is reinitialized from this static source every time the module loads (any
+// page reload/new tab), the "deleted" demo person would reappear immediately
+// without something persisting the deletion. Nothing to do with Supabase RLS,
+// since these were never real DB rows to begin with.
 //
-// Fix: persist which mock ids the admin has deleted (localStorage, this
-// browser/device — same scope as the other admin-only local caches in this
-// file's ecosystem) and filter them back out of USERS on every hydrate.
+// 2026-08-19 (original fix): persisted the hidden ids in localStorage.
+// 2026-08-19 (this fix, same day Jaret hit it live): localStorage is scoped
+// to one browser/device — Jaret deleted demo people on his desktop Chrome
+// profile, then found them all back the moment he opened the same Admin
+// pages on his tablet. Moved the source of truth to a tiny Supabase table
+// (`public.hidden_mock_users`, admin-only RLS) so a deletion sticks
+// everywhere. localStorage is kept as an instant *local* cache (so the row
+// disappears the same click, before the network round-trip finishes) and is
+// merged with whatever Supabase returns on hydrate — never the only copy.
 const HIDDEN_MOCK_USERS_KEY = "verbo:hidden-mock-users";
 
 function readHiddenMockUserIds(): string[] {
@@ -272,22 +278,92 @@ function readHiddenMockUserIds(): string[] {
   }
 }
 
-/** Marks a mock/demo USERS entry as permanently deleted for this browser —
- *  called from `deleteUserAccount()` in user-deletion.ts whenever it takes
- *  the "no real Supabase account" ghost-cleanup path. */
-export function hideMockUser(id: string): void {
+function writeHiddenMockUserIds(ids: string[]): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(HIDDEN_MOCK_USERS_KEY, JSON.stringify(ids));
+  } catch { /* noop */ }
+}
+
+let hiddenMockHydrated = false;
+let hiddenMockHydratePromise: Promise<void> | null = null;
+
+/** Broadcasts the SAME event names students-store.ts/teacher-model.ts/
+ *  admin-roles.ts already export as STUDENTS_EVENT/TEACHERS_EVENT/USERS_EVENT
+ *  — reusing those constants would create a circular import (both modules
+ *  already import USERS/pruneHiddenMockUsers FROM this file), so the literal
+ *  strings are duplicated here on purpose. Every Admin list already
+ *  subscribes to these, so this makes a hide-from-another-device show up
+ *  live without those pages needing any changes. */
+function notifyRostersChanged(): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent("verbo:students-updated"));
+  window.dispatchEvent(new CustomEvent("verbo:teachers-updated"));
+  window.dispatchEvent(new CustomEvent("verbo:users-updated"));
+}
+
+async function hydrateHiddenMockUsers(): Promise<void> {
+  if (hiddenMockHydrated) return;
+  if (hiddenMockHydratePromise) return hiddenMockHydratePromise;
+  hiddenMockHydratePromise = (async () => {
+    const { data, error } = await supabase.from("hidden_mock_users").select("id");
+    if (error) {
+      console.error("[mock-data] failed to load hidden_mock_users", error);
+      hiddenMockHydrated = true;
+      return;
+    }
+    const remoteIds = (data ?? []).map((row) => row.id);
+    const merged = Array.from(new Set([...readHiddenMockUserIds(), ...remoteIds]));
+    writeHiddenMockUserIds(merged);
+    hiddenMockHydrated = true;
+  })();
+  await hiddenMockHydratePromise;
+  hiddenMockHydratePromise = null;
+  pruneHiddenMockUsers();
+  notifyRostersChanged();
+}
+
+if (typeof window !== "undefined") {
+  void hydrateHiddenMockUsers();
+  supabase
+    .channel("hidden-mock-users-changes")
+    .on("postgres_changes", { event: "*", schema: "public", table: "hidden_mock_users" }, () => {
+      hiddenMockHydrated = false;
+      void hydrateHiddenMockUsers();
+    })
+    .subscribe();
+}
+
+/** Marks a mock/demo USERS entry as permanently deleted — persisted to
+ *  Supabase (`hidden_mock_users`) so it stays hidden on every device/browser,
+ *  not just this one, plus an immediate localStorage write so THIS tab
+ *  reflects it before the network call resolves. Called from
+ *  `deleteUserAccount()` in user-deletion.ts whenever it takes the "no real
+ *  Supabase account" ghost-cleanup path. Awaited by the caller so a failed
+ *  server-side write can be surfaced instead of silently only working
+ *  locally. */
+export async function hideMockUser(id: string): Promise<void> {
   if (typeof window === "undefined") return;
   const list = readHiddenMockUserIds();
   if (!list.includes(id)) {
-    list.push(id);
-    localStorage.setItem(HIDDEN_MOCK_USERS_KEY, JSON.stringify(list));
+    writeHiddenMockUserIds([...list, id]);
+  }
+  const { error } = await supabase.from("hidden_mock_users").insert({ id });
+  // 23505 = unique_violation — already hidden by another device, not a
+  // failure.
+  if (error && error.code !== "23505") {
+    console.error("[mock-data] failed to persist hidden mock user", id, error);
+    throw error;
   }
 }
 
 /** Removes any previously-deleted demo/mock entries from the live USERS
  *  singleton. Call this at the top of every hydrate*() function (students,
  *  teachers, admin roles) — same "safe to call on every mount" contract as
- *  those functions already have. A no-op once nothing is hidden. */
+ *  those functions already have. A no-op once nothing is hidden. Runs
+ *  synchronously off whatever is cached in localStorage right now — see
+ *  `hydrateHiddenMockUsers` above for how that cache stays in sync with
+ *  Supabase across devices. */
 export function pruneHiddenMockUsers(): void {
   if (typeof window === "undefined") return;
   const hidden = readHiddenMockUserIds();

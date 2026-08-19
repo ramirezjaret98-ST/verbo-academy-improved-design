@@ -83,9 +83,23 @@ export async function deleteUserAccount(user: User): Promise<DeleteUserResult> {
   // Persist the removal so a demo/mock seed entry (no real Supabase account —
   // e.g. one of the hardcoded people in mock-data.ts) doesn't silently come
   // back on the next reload, when USERS reinitializes from its static
-  // source. Harmless no-op for a real account (already gone via cascade
-  // delete above) or a local-only ghost (already scrubbed below).
-  hideMockUser(user.id);
+  // source. Only relevant when there was no real account to begin with
+  // (`uuid` is falsy) — a real account is already fully gone via the cascade
+  // delete above, so there's nothing to persist here for it. Awaited (and
+  // 2026-08-19: now writes to Supabase, not just localStorage) so a failed
+  // sync shows up as a real error instead of silently only working on this
+  // device — see mock-data.ts for why this moved off localStorage-only.
+  if (!uuid) {
+    try {
+      await hideMockUser(user.id);
+    } catch (e) {
+      // Roll back the optimistic local removal — if the server-side write
+      // failed, this entry isn't really gone, so don't show it as deleted.
+      if (idx >= 0) USERS.splice(idx, 0, user);
+      if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent(STUDENTS_EVENT));
+      return { ok: false, error: e instanceof Error ? e.message : "No se pudo guardar la eliminación en el servidor — puede reaparecer en otro dispositivo." };
+    }
+  }
 
   if (user.role === "student") {
     removeFromListKey(REGISTERED_STUDENTS_KEY, user.id);

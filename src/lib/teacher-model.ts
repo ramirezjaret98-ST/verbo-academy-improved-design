@@ -296,6 +296,11 @@ export function patchTeacherProfile(teacherId: string, patch: Partial<User>): vo
  *  same pattern as hydrateStudents(). */
 export function hydrateTeachers(): void {
   if (typeof window === "undefined") return;
+  // Was imported but never called here (see the same fix in
+  // students-store.ts's hydrateStudents()) — the module-load hydrate in
+  // mock-data.ts now covers this too, but calling it here prunes
+  // immediately off whatever's already cached locally.
+  pruneHiddenMockUsers();
   const overrides = readTeacherOverrides();
   USERS.forEach((u) => { if (u.role === "teacher" && overrides[u.id]) Object.assign(u, overrides[u.id]); });
   void (async () => {

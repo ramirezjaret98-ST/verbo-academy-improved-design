@@ -187,6 +187,12 @@ export function patchStudentProfile(studentId: string, patch: Partial<StudentPro
 // in the background. Idempotent — safe to call on every mount.
 export function hydrateStudents() {
   if (typeof window === "undefined") return;
+  // Was imported but never called here — a real gap (this is one of the 3
+  // hydrate*() functions the fix's own comment says to call it from). The
+  // module-load hydrate in mock-data.ts now covers this too, but keeping the
+  // call here matches the documented contract and prunes immediately off
+  // whatever's already cached locally, without waiting on that async fetch.
+  pruneHiddenMockUsers();
   const overrides = readProfileOverrides();
   USERS.forEach((u) => { if (overrides[u.id]) Object.assign(u, overrides[u.id]); });
   readRegisteredStudents().forEach((u) => {
