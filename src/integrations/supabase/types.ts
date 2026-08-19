@@ -1721,6 +1721,32 @@ export type Database = {
           },
         ]
       }
+      hidden_mock_users: {
+        Row: {
+          hidden_at: string
+          hidden_by: string | null
+          id: string
+        }
+        Insert: {
+          hidden_at?: string
+          hidden_by?: string | null
+          id: string
+        }
+        Update: {
+          hidden_at?: string
+          hidden_by?: string | null
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hidden_mock_users_hidden_by_fkey"
+            columns: ["hidden_by"]
+            isOneToOne: false
+            referencedRelation: "app_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       holidays: {
         Row: {
           created_at: string
