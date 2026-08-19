@@ -35,6 +35,11 @@ import { groupsByStudentId, groupOfStudent, removeMember, subscribeGroups, effec
 import { studentAttendance } from "@/lib/sessions-store";
 import { logPayment, expectedAmountForStudent, loadPayments, subscribePayments } from "@/lib/payments-log";
 import {
+  activePlanForStudent, subscribePaymentPlans, createPaymentPlan, markInstallmentPaid,
+  cancelPaymentPlan, updateInstallmentDueDate, computeInstallmentSchedule,
+  type PaymentPlan, type PlanType,
+} from "@/lib/payment-plans";
+import {
   setLevelReopened,
   patchStudentProfile,
   type StudentProfileFields,
@@ -1345,12 +1350,17 @@ function StudentDetailModal({
   const [teacherId, setTeacherId] = useState(assignedTeacherIdFor(student.id) ?? "");
   const [freezeStart, setFreezeStart] = useState(student.freeze_start ?? "");
   const [freezeEnd, setFreezeEnd] = useState(student.freeze_end ?? "");
+  const [planModalOpen, setPlanModalOpen] = useState(false);
 
   // Payment History reads loadPayments() synchronously in render below; the
   // Supabase-backed store hydrates asynchronously, so re-render once it (or
   // any later payment) lands — same convention as subscribeGroups/
   // subscribeStudentReports elsewhere in this file.
   useEffect(() => subscribePayments(() => forceTick((n) => n + 1)), []);
+  // Payment Plan (Feature A, 2026-08-19) — same async-hydration convention.
+  useEffect(() => subscribePaymentPlans(() => forceTick((n) => n + 1)), []);
+  const { user: admin } = useAuth();
+  const plan = activePlanForStudent(student.id);
 
   const avatar = useAvatar(student.id);
   const product = getProduct(student.product);
@@ -1493,7 +1503,7 @@ function StudentDetailModal({
                   <Info label="Next payment" value={nextPay ? nextPay.toLocaleDateString() : "—"} emphasis />
                   <Info
                     label="Price / month"
-                    value={`$${expectedAmountForStudent(student).toLocaleString()} MXN${student.custom_price != null ? " · custom" : " · plan default"}`}
+                    value={`$${expectedAmountForStudent(student).toLocaleString()} MXN${plan ? " · payment plan" : student.custom_price != null ? " · custom" : " · plan default"}`}
                   />
                   {groupInfo && <Info label="Group" value={groupInfo.group.name} />}
                   {(groupInfo?.group.company_client || student.company) && (
@@ -1502,8 +1512,88 @@ function StudentDetailModal({
                 </div>
               </Section>
 
+              {/* Payment Plan (Feature A, 2026-08-19) */}
+              <Section title="Payment Plan" index={1}>
+                {plan ? (
+                  <div className="space-y-4">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Tag className="bg-primary/10 text-primary">
+                        {plan.planType === "single" ? "Single payment" : `${plan.installmentsCount} installments`}
+                      </Tag>
+                      {plan.method && <Tag className="bg-secondary text-secondary-foreground">{plan.method}</Tag>}
+                      <Tag className={plan.status === "active" ? "bg-warning/15 text-foreground" : "bg-success/15 text-success"}>
+                        {plan.status === "active" ? "Active" : "Completed"}
+                      </Tag>
+                      <span className="text-sm font-semibold text-foreground">${plan.totalAmount.toLocaleString()} MXN total</span>
+                    </div>
+                    {plan.planType === "installments" && (
+                      <div className="overflow-hidden rounded-xl border border-border">
+                        <table className="w-full text-left text-[13px]">
+                          <thead className="bg-secondary/40 text-[11px] uppercase tracking-wider text-muted-foreground">
+                            <tr>
+                              <th className="px-3 py-2 font-medium">#</th>
+                              <th className="px-3 py-2 font-medium">Due date</th>
+                              <th className="px-3 py-2 font-medium">Amount</th>
+                              <th className="px-3 py-2 font-medium">Status</th>
+                              <th className="px-3 py-2 font-medium" />
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {plan.installments.map((inst) => (
+                              <tr key={inst.id} className="border-t border-border">
+                                <td className="px-3 py-2">{inst.installmentNumber}</td>
+                                <td className="px-3 py-2">
+                                  <input
+                                    type="date"
+                                    value={inst.dueDate}
+                                    disabled={inst.status === "paid"}
+                                    onChange={(e) => e.target.value && updateInstallmentDueDate(inst.id, e.target.value)}
+                                    className="rounded-md border border-border bg-background px-1.5 py-0.5 text-[12.5px] disabled:opacity-60"
+                                  />
+                                </td>
+                                <td className="px-3 py-2">${inst.amount.toLocaleString()}</td>
+                                <td className="px-3 py-2">
+                                  <Tag className={inst.status === "paid" ? "bg-success/15 text-success" : "bg-warning/15 text-foreground"}>
+                                    {inst.status === "paid" ? "Paid" : "Pending"}
+                                  </Tag>
+                                </td>
+                                <td className="px-3 py-2 text-right">
+                                  {inst.status === "pending" && (
+                                    <button
+                                      onClick={() => markInstallmentPaid(inst.id, student.name)}
+                                      className="rounded-full border border-border px-2.5 py-1 text-[11.5px] font-semibold text-foreground hover:bg-secondary"
+                                    >
+                                      Mark as paid
+                                    </button>
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                    <div className="flex gap-2">
+                      <GhostButton onClick={() => setPlanModalOpen(true)}>Replace plan</GhostButton>
+                      {plan.status === "active" && (
+                        <button onClick={() => cancelPaymentPlan(plan.id)} className="text-[12px] font-medium text-destructive hover:underline">
+                          Cancel plan
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-sm text-muted-foreground">
+                      No payment plan set up — this student is billed the plan default / custom price shown above, monthly.
+                    </p>
+                    <GhostButton onClick={() => setPlanModalOpen(true)}>Set up payment plan</GhostButton>
+                  </div>
+                )}
+              </Section>
+
               {/* Entitlements */}
-              <Section title="Entitlements" index={1}>
+              <Section title="Entitlements" index={2}>
                 <div className="space-y-5">
                   <div>
                     <div className={infoLabelCls}>Clubs access</div>
@@ -1791,6 +1881,134 @@ function StudentDetailModal({
       {resetPwOpen && (
         <ResetPasswordModal userId={student.id} userName={student.name} onClose={() => setResetPwOpen(false)} />
       )}
+      {planModalOpen && (
+        <PaymentPlanModal
+          student={student}
+          createdBy={admin?.id}
+          onClose={() => setPlanModalOpen(false)}
+        />
+      )}
+    </Overlay>
+  );
+}
+
+// ---- Payment Plan setup (Feature A, 2026-08-19) --------------------------
+function PaymentPlanModal({
+  student, createdBy, onClose,
+}: {
+  student: User;
+  createdBy: string | undefined;
+  onClose: () => void;
+}) {
+  const [planType, setPlanType] = useState<PlanType>("single");
+  const [totalAmount, setTotalAmount] = useState(String(expectedAmountForStudent(student)));
+  const [method, setMethod] = useState("");
+  const [installmentsCount, setInstallmentsCount] = useState(3);
+  const [frequencyDays, setFrequencyDays] = useState(30);
+  const [firstDueDate, setFirstDueDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const amount = Number(totalAmount) || 0;
+  const preview = planType === "installments" && amount > 0
+    ? computeInstallmentSchedule(amount, installmentsCount, firstDueDate, frequencyDays)
+    : [];
+
+  const save = async () => {
+    if (!(amount > 0)) { setError("Enter a total amount greater than 0."); return; }
+    setSaving(true);
+    setError(null);
+    const result = await createPaymentPlan({
+      studentId: student.id,
+      studentName: student.name,
+      planType,
+      totalAmount: amount,
+      method: method.trim() || undefined,
+      installmentsCount: planType === "installments" ? installmentsCount : undefined,
+      frequencyDays: planType === "installments" ? frequencyDays : undefined,
+      firstDueDate,
+      createdBy,
+    });
+    setSaving(false);
+    if (!result.ok) { setError(result.error); return; }
+    onClose();
+  };
+
+  return (
+    <Overlay onClose={onClose}>
+      <div className="relative w-full max-w-lg rounded-[24px] bg-card p-6 shadow-floating">
+        <ModalHeader kicker={student.name} title="Set up payment plan" onClose={onClose} />
+        <div className="mt-4 space-y-4">
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              onClick={() => setPlanType("single")}
+              className={`rounded-xl border px-3 py-2.5 text-left text-sm font-semibold transition-colors ${planType === "single" ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:bg-secondary/50"}`}
+            >
+              Single payment
+              <p className="mt-0.5 text-[11px] font-normal text-muted-foreground">One lump sum — recorded as paid immediately, no alerts.</p>
+            </button>
+            <button
+              onClick={() => setPlanType("installments")}
+              className={`rounded-xl border px-3 py-2.5 text-left text-sm font-semibold transition-colors ${planType === "installments" ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:bg-secondary/50"}`}
+            >
+              Installments
+              <p className="mt-0.5 text-[11px] font-normal text-muted-foreground">Split over N payments — due-date reminders in the bell.</p>
+            </button>
+          </div>
+
+          <Field label="Total amount (MXN)">
+            <input type="number" min={0} value={totalAmount} onChange={(e) => setTotalAmount(e.target.value)} className={inputCls} />
+          </Field>
+
+          <Field label="Method (informational only — no interest is calculated)">
+            <input
+              type="text"
+              value={method}
+              onChange={(e) => setMethod(e.target.value)}
+              placeholder="Transferencia, depósito, MSI, meses con intereses…"
+              className={inputCls}
+            />
+          </Field>
+
+          {planType === "installments" ? (
+            <>
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Number of installments">
+                  <input type="number" min={2} value={installmentsCount} onChange={(e) => setInstallmentsCount(Math.max(2, Number(e.target.value)))} className={inputCls} />
+                </Field>
+                <Field label="Frequency (days between payments)">
+                  <input type="number" min={1} value={frequencyDays} onChange={(e) => setFrequencyDays(Math.max(1, Number(e.target.value)))} className={inputCls} />
+                  <p className="mt-1 text-[10.5px] text-muted-foreground">e.g. 30 = monthly, 15 = every two weeks. Each due date can be moved individually afterward.</p>
+                </Field>
+              </div>
+              <Field label="First due date">
+                <input type="date" value={firstDueDate} onChange={(e) => setFirstDueDate(e.target.value)} className={inputCls} />
+              </Field>
+              {preview.length > 0 && (
+                <div className="rounded-lg border border-border bg-secondary/30 p-3 text-[12.5px]">
+                  <p className="mb-1.5 font-semibold text-foreground">Preview</p>
+                  {preview.map((p) => (
+                    <div key={p.installmentNumber} className="flex justify-between py-0.5 text-muted-foreground">
+                      <span>#{p.installmentNumber} · {new Date(p.dueDate + "T00:00:00").toLocaleDateString()}</span>
+                      <span className="font-medium text-foreground">${p.amount.toLocaleString()} MXN</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          ) : (
+            <Field label="Payment date">
+              <input type="date" value={firstDueDate} onChange={(e) => setFirstDueDate(e.target.value)} className={inputCls} />
+            </Field>
+          )}
+
+          {error && <p className="text-xs font-medium text-destructive">{error}</p>}
+        </div>
+        <AccentModalFooter>
+          <GhostButton onClick={onClose} disabled={saving}>Cancel</GhostButton>
+          <PrimaryButton onClick={save} disabled={saving}>{saving ? "Saving…" : "Save payment plan"}</PrimaryButton>
+        </AccentModalFooter>
+      </div>
     </Overlay>
   );
 }

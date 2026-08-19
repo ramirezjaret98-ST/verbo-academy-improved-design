@@ -9,7 +9,8 @@ import {
   teachersForProduct, avgRating, flaggedReviews, pendingReviews,
   PAYMENT_FREQUENCIES, paymentFrequency, defaultPaymentRecords, financialSummary,
   patchTeacherProfile, hydrateTeachers,
-  type QualifiedProduct, type TeacherStatus, type PaymentFrequency,
+  fetchSessionsForPayReview, setSessionExcludedFromPay,
+  type QualifiedProduct, type TeacherStatus, type PaymentFrequency, type PayReviewSession,
 } from "@/lib/teacher-model";
 import { effectiveHourlyRate, teacherTier } from "@/lib/teacher-tiers";
 import { computeTeacherKpis } from "@/lib/teacher-kpis";
@@ -1152,6 +1153,9 @@ function FinancialTab({ t, onPersist, onAddAdjustment }: { t: User; onPersist: (
         </div>
       </div>
 
+      {/* Manual pay review — Feature B, 2026-08-19 */}
+      <ManualPayReviewPanel t={t} onUseTotal={(hours) => onPersist({ ...t, hours_cycle: hours, hours_month: hours })} />
+
       {/* Payment dates */}
       <div>
         <div className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
@@ -1851,6 +1855,139 @@ function ChangeRequestRow({ req }: { req: AvailabilityChangeRequest }) {
       {req.reason && (
         <div className="mt-2 text-xs text-muted-foreground">
           <span className="font-medium text-foreground">Reason:</span> {req.reason}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Manual pay review (Feature B, 2026-08-19) — collapsible sub-section, same
+// pattern as AvailabilityChangeRequestsSection above. Lets an admin pick an
+// exact date range for a teacher's completed sessions (e.g. to align a
+// cutoff with a mid-month hire date) and permanently exclude individual
+// sessions from pay (e.g. an internal test assignment) — WITHOUT touching
+// the automatic hours_cycle/hours_month counter above, unless the admin
+// explicitly clicks "Use this total for the cycle".
+// ---------------------------------------------------------------------------
+function defaultPayReviewRange(): { from: string; to: string } {
+  const now = new Date();
+  const from = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
+  const to = now.toISOString().slice(0, 10);
+  return { from, to };
+}
+
+function ManualPayReviewPanel({ t, onUseTotal }: { t: User; onUseTotal: (hours: number) => void }) {
+  const [open, setOpen] = useState(false);
+  const [{ from, to }, setRange] = useState(defaultPayReviewRange);
+  const [sessions, setSessions] = useState<PayReviewSession[] | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const load = async () => {
+    setLoading(true);
+    const rows = await fetchSessionsForPayReview(t.id, from, to);
+    setSessions(rows);
+    setLoading(false);
+  };
+
+  const toggleExcluded = async (s: PayReviewSession) => {
+    const next = !s.excludedFromPay;
+    setSessions((prev) => prev?.map((x) => (x.id === s.id ? { ...x, excludedFromPay: next } : x)) ?? prev);
+    const ok = await setSessionExcludedFromPay(s.id, next);
+    if (!ok) {
+      setSessions((prev) => prev?.map((x) => (x.id === s.id ? { ...x, excludedFromPay: !next } : x)) ?? prev);
+    }
+  };
+
+  const totalHours = sessions
+    ? Math.round((sessions.filter((s) => !s.excludedFromPay).reduce((sum, s) => sum + s.durationMinutes, 0) / 60) * 100) / 100
+    : null;
+
+  return (
+    <div className="rounded-2xl border border-border bg-card shadow-sm">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center justify-between px-5 py-3 text-left"
+      >
+        <div className="flex items-center gap-2">
+          <CalendarClock className="h-4 w-4 text-accent" />
+          <span className="text-sm font-semibold text-foreground">Manual pay review — custom range &amp; exclusions</span>
+        </div>
+        <ChevronRight className={`h-4 w-4 text-muted-foreground transition-transform ${open ? "rotate-90" : ""}`} />
+      </button>
+      {open && (
+        <div className="space-y-3 border-t border-border px-5 py-4">
+          <p className="text-xs text-muted-foreground">
+            Pick an exact date range for this teacher's completed sessions — useful when the calendar-month cutoff
+            doesn't match reality (e.g. a mid-month hire) — and, if needed, permanently exclude specific sessions
+            from pay (e.g. an internal test assignment). Excluding a session here also removes it from the automatic
+            {" "}<span className="font-medium text-foreground">{`${t.hours_cycle ?? 0}h`}</span> counter above, immediately.
+          </p>
+          <div className="flex flex-wrap items-end gap-2">
+            <Field label="From">
+              <input
+                type="date"
+                value={from}
+                onChange={(e) => setRange((r) => ({ ...r, from: e.target.value }))}
+                className="rounded-lg border border-input bg-background px-2.5 py-1.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+              />
+            </Field>
+            <Field label="To">
+              <input
+                type="date"
+                value={to}
+                onChange={(e) => setRange((r) => ({ ...r, to: e.target.value }))}
+                className="rounded-lg border border-input bg-background px-2.5 py-1.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+              />
+            </Field>
+            <GhostBtn onClick={load}>{loading ? "Loading…" : "Load sessions"}</GhostBtn>
+          </div>
+
+          {sessions && (
+            sessions.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No completed sessions in this range.</p>
+            ) : (
+              <>
+                <div className="max-h-64 overflow-y-auto rounded-lg border border-border">
+                  <table className="w-full text-sm">
+                    <thead className="sticky top-0 bg-secondary/80 text-[10.5px] uppercase tracking-wider text-muted-foreground backdrop-blur">
+                      <tr>
+                        <th className="px-3 py-2 text-left font-semibold">Date</th>
+                        <th className="px-3 py-2 text-left font-semibold">Student</th>
+                        <th className="px-3 py-2 text-right font-semibold">Duration</th>
+                        <th className="px-3 py-2 text-center font-semibold">Counts toward pay</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {sessions.map((s) => (
+                        <tr key={s.id} className={`border-t border-border ${s.excludedFromPay ? "opacity-50" : ""}`}>
+                          <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">{new Date(s.dateTime).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</td>
+                          <td className="px-3 py-2 text-foreground">{s.studentName}</td>
+                          <td className="whitespace-nowrap px-3 py-2 text-right text-foreground">{s.durationMinutes} min</td>
+                          <td className="px-3 py-2 text-center">
+                            <input
+                              type="checkbox"
+                              checked={!s.excludedFromPay}
+                              onChange={() => toggleExcluded(s)}
+                              className="h-4 w-4 cursor-pointer accent-accent"
+                            />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="flex items-center justify-between rounded-lg bg-secondary/30 px-3 py-2.5">
+                  <span className="text-sm text-muted-foreground">
+                    Total for this range: <span className="font-semibold text-foreground">{totalHours}h</span>
+                  </span>
+                  <GhostBtn onClick={() => totalHours != null && onUseTotal(totalHours)}>
+                    Use this total for the cycle
+                  </GhostBtn>
+                </div>
+              </>
+            )
+          )}
         </div>
       )}
     </div>
