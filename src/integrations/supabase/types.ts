@@ -2057,6 +2057,50 @@ export type Database = {
           },
         ]
       }
+      payment_installments: {
+        Row: {
+          amount: number
+          created_at: string
+          due_date: string
+          id: number
+          installment_number: number
+          paid_at: string | null
+          payment_log_entry_id: string | null
+          plan_id: number
+          status: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          due_date: string
+          id?: never
+          installment_number: number
+          paid_at?: string | null
+          payment_log_entry_id?: string | null
+          plan_id: number
+          status?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          due_date?: string
+          id?: never
+          installment_number?: number
+          paid_at?: string | null
+          payment_log_entry_id?: string | null
+          plan_id?: number
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_installments_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "payment_plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payment_log_entries: {
         Row: {
           amount: number
@@ -2101,6 +2145,69 @@ export type Database = {
           },
           {
             foreignKeyName: "payment_log_entries_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "app_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payment_plans: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          first_due_date: string
+          frequency_days: number | null
+          id: number
+          installments_count: number
+          method: string | null
+          notes: string | null
+          plan_type: string
+          status: string
+          student_id: string
+          total_amount: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          first_due_date: string
+          frequency_days?: number | null
+          id?: never
+          installments_count?: number
+          method?: string | null
+          notes?: string | null
+          plan_type: string
+          status?: string
+          student_id: string
+          total_amount: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          first_due_date?: string
+          frequency_days?: number | null
+          id?: never
+          installments_count?: number
+          method?: string | null
+          notes?: string | null
+          plan_type?: string
+          status?: string
+          student_id?: string
+          total_amount?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_plans_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "app_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_plans_student_id_fkey"
             columns: ["student_id"]
             isOneToOne: false
             referencedRelation: "app_users"
@@ -2305,6 +2412,7 @@ export type Database = {
           created_at: string
           date_time: string
           duration_minutes: number
+          excluded_from_pay: boolean
           group_id: number | null
           holiday_makeup: boolean | null
           id: number
@@ -2344,6 +2452,7 @@ export type Database = {
           created_at?: string
           date_time: string
           duration_minutes: number
+          excluded_from_pay?: boolean
           group_id?: number | null
           holiday_makeup?: boolean | null
           id?: never
@@ -2383,6 +2492,7 @@ export type Database = {
           created_at?: string
           date_time?: string
           duration_minutes?: number
+          excluded_from_pay?: boolean
           group_id?: number | null
           holiday_makeup?: boolean | null
           id?: never
@@ -3416,6 +3526,22 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      admin_sessions_for_pay_review: {
+        Args: { p_from: string; p_teacher_id: string; p_to: string }
+        Returns: {
+          date_time: string
+          duration_minutes: number
+          excluded_from_pay: boolean
+          id: number
+          status: Database["public"]["Enums"]["ext_session_status"]
+          student_id: string
+          student_name: string
+        }[]
+      }
+      admin_set_session_excluded_from_pay: {
+        Args: { p_excluded: boolean; p_session_id: number }
+        Returns: undefined
       }
       group_profile_for_teacher: {
         Args: never
