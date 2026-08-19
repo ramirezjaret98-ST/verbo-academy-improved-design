@@ -560,8 +560,18 @@ function StudentSessionsModal({
         }
       }
       patch.date_time = dt.toISOString();
-      if (s.status === "scheduled" || s.status === "rescheduled") patch.status = "rescheduled";
-      else if (s.status === "ready" || s.status === "rearranged") patch.status = "rescheduled";
+      // Only flip the status to "rescheduled" when the date/time actually
+      // moved — mirrors the single-session edit's `dateChanged` check above.
+      // Before this fix, applyBulk() marked EVERY affected session as
+      // "rescheduled" unconditionally, even ones whose computed time landed
+      // back on the exact same instant (e.g. re-running the same bulk
+      // schedule twice, or a day/time combo that didn't change anything) —
+      // confirmed live 2026-08-19: one teacher had 39 sessions stuck on
+      // "rescheduled" after a single bulk edit.
+      const dateChanged = patch.date_time !== s.date_time;
+      if (dateChanged && (s.status === "scheduled" || s.status === "rescheduled" || s.status === "ready" || s.status === "rearranged")) {
+        patch.status = "rescheduled";
+      }
       onSave(s.id, patch);
     }
     setBulkOpen(false);
