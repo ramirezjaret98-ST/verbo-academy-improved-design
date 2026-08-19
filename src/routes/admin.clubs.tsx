@@ -409,7 +409,11 @@ function TopicHistory({ clubs }: { clubs: Club[] }) {
 // ---------------------------------------------------------------------------
 // Create / Edit form panel
 // ---------------------------------------------------------------------------
-function ClubFormPanel({
+// 2026-08-19: exported so the Tablet quick-actions view can reuse this exact
+// form for "assign a teacher to a club" instead of building a parallel mini
+// editor — the companion sees the full club form (per Jaret's choice) but
+// only ever needs to touch the "Assigned teacher" field.
+export function ClubFormPanel({
   initial,
   clubs,
   onClose,

@@ -13,24 +13,23 @@ import { nextPaymentDate, daysUntil, MAX_INSIGHT_STRIKES, getProduct } from "@/l
 import { computeTeacherKpis } from "@/lib/teacher-kpis";
 import { pendingReviews } from "@/lib/teacher-model";
 import { monthlySnapshot } from "@/lib/teacher-kpi-history-store";
-import { loadClubs, subscribeClubs, upcomingCreatedClubs, loadReleaseRequests } from "@/lib/clubs-store";
-import { loadSessions } from "@/lib/sessions-store";
-import { activeStrikeCount } from "@/lib/strikes-store";
-import { loadConductReports } from "@/lib/conduct-reports-store";
-import { loadContentIssueReports } from "@/lib/content-issue-reports-store";
+import { subscribeClubs } from "@/lib/clubs-store";
 import { listChangeRequests } from "@/lib/availability-store";
 import { loadFinancialIssues } from "@/lib/financial-issues-store";
 import {
   useAnnouncements, activeAnnouncements, publishAnnouncement, endAnnouncement,
   ANNOUNCEMENT_MAX, type Audience,
 } from "@/lib/announcements-store";
+import { computeUrgencySignals, type UrgencyItem } from "@/lib/urgent-items";
+import { UrgencyList } from "@/components/verbo/UrgencyList";
+import { getAdminType } from "@/lib/admin-roles";
+import { useAuth } from "@/lib/auth";
 import {
   UserPlus, CalendarPlus, Sparkles, BarChart3, X, CreditCard, Lock,
-  Star, TrendingDown, Users2, Megaphone, ChevronRight, CheckCircle2,
+  Star, TrendingDown, Users2, Megaphone, ChevronRight,
   GraduationCap, CalendarClock, Layers, TrendingUp, AlertTriangle, Eye,
-  UserX, Bug, ShieldAlert, Wallet, CalendarCheck, Flag, Snowflake,
+  Wallet, CalendarCheck, Flag, TabletSmartphone,
 } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
 
 export const Route = createFileRoute("/admin/")({ component: Overview });
 
@@ -83,6 +82,8 @@ function Overview() {
   const navigate = useNavigate();
   const hydrated = useHydrated();
   const [, forceTick] = useState(0);
+  const { user } = useAuth();
+  const isSuperAdmin = getAdminType(user) === "super_admin";
 
   const [metricsOpen, setMetricsOpen] = useState(false);
   const [panel, setPanel] = useState<null | "urgent" | "watch">(null);
@@ -131,102 +132,11 @@ function Overview() {
   
 
   // ---- Urgency derivation (visual grouping only, no new persisted data) -----
-  const now = Date.now();
+  // Categories 1-5 now live in src/lib/urgent-items.ts (shared with the
+  // Tablet quick-actions view) — see that file for the per-category detail.
   const nameOf = (id?: string) => USERS.find((u) => u.id === id)?.name ?? "Unknown";
-  const urgentItems: UrgencyItem[] = [];
-  const watchItems: UrgencyItem[] = [];
-
-  // 1 — Sessions needing a substitute (split by the 8h window).
-  for (const s of loadSessions().filter((x) => x.needs_substitute)) {
-    const ms = +new Date(s.date_time) - now;
-    const base = {
-      id: `sub:${s.id}`,
-      icon: UserX,
-      title: `Substitute needed — ${nameOf(s.student_id)}`,
-      meta: new Date(s.date_time).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }),
-      badge: countdownLabel(ms),
-      ctaLabel: "Sessions",
-      onClick: () => navigate({ to: "/admin/sessions" }),
-    };
-    if (ms <= EIGHT_H) {
-      const t = timeAccent(ms);
-      urgentItems.push({ ...base, accent: t.color, glow: t.glow });
-    } else {
-      watchItems.push({ ...base, accent: NAVY_DEEP });
-    }
-  }
-
-  // 2 — Clubs at risk: no teacher assigned (upcomingCreatedClubs) or a pending
-  //     release request from the assigned teacher.
-  const releaseClubIds = new Set(loadReleaseRequests().map((r) => r.club_id));
-  const allClubs = loadClubs();
-  const atRiskClubs = [
-    ...upcomingCreatedClubs(allClubs),
-    ...allClubs.filter(
-      (c) => c.teacher_id && releaseClubIds.has(c.id) && c.status !== "completed" && c.status !== "cancelled",
-    ),
-  ];
-  for (const c of atRiskClubs) {
-    const ms = +new Date(c.date) - now;
-    const base = {
-      id: `club:${c.id}`,
-      icon: Users2,
-      title: c.title,
-      meta: `${!c.teacher_id ? "No teacher assigned" : "Release requested"} · ${new Date(c.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}`,
-      badge: countdownLabel(ms),
-      ctaLabel: "Clubs",
-      onClick: () => navigate({ to: "/admin/clubs" }),
-    };
-    if (ms <= EIGHT_H) {
-      const t = timeAccent(ms);
-      urgentItems.push({ ...base, accent: t.color, glow: t.glow });
-    } else {
-      watchItems.push({ ...base, accent: NAVY_DEEP });
-    }
-  }
-
-  // 3 — Teachers auto-frozen by 3 active strikes.
-  for (const t of teachers) {
-    if (activeStrikeCount(t.id) < 3) continue;
-    urgentItems.push({
-      id: `strikes:${t.id}`,
-      icon: Snowflake,
-      accent: CRIMSON,
-      title: `${t.name} auto-frozen`,
-      meta: "3 unjustified cancellations",
-      badge: "3 strikes",
-      ctaLabel: "Teachers",
-      onClick: () => navigate({ to: "/admin/teachers", search: { teacher: t.id } }),
-    });
-  }
-
-  // 4 — Unresolved conduct reports (teacher or student targets).
-  for (const r of loadConductReports().filter((x) => x.status === "pending")) {
-    urgentItems.push({
-      id: `conduct:${r.id}`,
-      icon: ShieldAlert,
-      accent: "#b52904",
-      title: `Conduct report — ${nameOf(r.target_id)}`,
-      meta: `${nameOf(r.reporter_id)} · ${r.category}`,
-      badge: r.target_type === "teacher" ? "Teacher" : "Student",
-      ctaLabel: "Review",
-      onClick: () => navigate({ to: "/admin/conduct-reports" }),
-    });
-  }
-
-  // 5 — Unresolved technical / content issues.
-  for (const r of loadContentIssueReports().filter((x) => x.status === "pending")) {
-    urgentItems.push({
-      id: `issue:${r.id}`,
-      icon: Bug,
-      accent: ORCHID,
-      title: `${r.issueType} — ${r.entityTitle}`,
-      meta: `${nameOf(r.studentId)} · ${r.entityType}`,
-      badge: "Bug",
-      ctaLabel: "Issues",
-      onClick: () => navigate({ to: "/admin/content-issue-reports" }),
-    });
-  }
+  const { urgent: urgentItems, watchOverflow } = computeUrgencySignals(navigate);
+  const watchItems: UrgencyItem[] = [...watchOverflow];
 
   // ---- Worth a Look --------------------------------------------------------
   for (const { s, next } of paymentAlerts) {
@@ -358,7 +268,7 @@ function Overview() {
             <p className="mt-1.5 text-sm font-light text-muted-foreground">Operational snapshot across the platform.</p>
           </div>
 
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {quickActions.map((a) => {
               const Icon = a.icon;
               return (
@@ -379,6 +289,26 @@ function Overview() {
                 </button>
               );
             })}
+
+            {/* 2026-08-19: entry point into the Tablet quick-actions view
+               *  (Jaret's driving-companion use case) — solid, distinct from
+               *  the outline pills above so it reads as its own "mode
+               *  switch" rather than one more shortcut. Deliberately not in
+               *  admin.tsx's NAV_GROUPS — reached only from here or a direct
+               *  URL, and gated to super_admin (see admin-roles.ts). */}
+            {isSuperAdmin && (
+              <button
+                type="button"
+                onClick={() => navigate({ to: "/admin/tablet" })}
+                className="inline-flex items-center gap-2 rounded-full py-1.5 pl-2 pr-4 text-sm font-semibold text-white shadow-sm transition-transform active:scale-[0.97]"
+                style={{ background: NAVY_DEEP }}
+              >
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/15">
+                  <TabletSmartphone className="h-[15px] w-[15px]" strokeWidth={1.8} />
+                </span>
+                <span className="whitespace-nowrap tracking-[-0.01em]">Tablet View</span>
+              </button>
+            )}
           </div>
 
         </div>
@@ -547,68 +477,6 @@ function Overview() {
     </div>
   );
 }
-
-// ===========================================================================
-// Urgency building blocks
-// ===========================================================================
-export type UrgencyItem = {
-  id: string;
-  icon: LucideIcon;
-  accent: string;
-  title: string;
-  meta: string;
-  badge: string;
-  ctaLabel: string;
-  onClick: () => void;
-  /** Highest time intensity (<1h or overdue) — pulsing glow on the icon chip. */
-  glow?: boolean;
-};
-
-function UrgencyRow({ item }: { item: UrgencyItem }) {
-  const Icon = item.icon;
-  return (
-    <button
-      onClick={item.onClick}
-      className="group flex w-full items-stretch overflow-hidden rounded-xl border border-border bg-card text-left transition-colors hover:bg-secondary/40"
-    >
-      <span className="w-1.5 shrink-0" style={{ background: item.accent }} aria-hidden />
-      <span className="flex flex-1 items-center gap-3 py-3 pl-3 pr-3">
-        <span
-          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${item.glow ? "animate-report-glow" : ""}`}
-          style={{ background: `${item.accent}1f` }}
-        >
-          <Icon className="h-4 w-4" style={{ color: item.accent }} />
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="block truncate text-sm font-medium text-foreground">{item.title}</span>
-          <span className="block truncate text-xs text-muted-foreground">{item.meta}</span>
-        </span>
-        <span
-          className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold"
-          style={{ background: `${item.accent}1f`, color: item.accent }}
-        >
-          {item.badge}
-        </span>
-        <span className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs font-medium text-foreground transition-colors group-hover:bg-secondary">
-          {item.ctaLabel} <ChevronRight className="h-3 w-3" />
-        </span>
-      </span>
-    </button>
-  );
-}
-
-function UrgencyList({ items, empty }: { items: UrgencyItem[]; empty: string }) {
-  if (items.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center py-10 text-center">
-        <CheckCircle2 className="mb-2 h-8 w-8 text-success" />
-        <p className="text-sm font-medium text-foreground">{empty}</p>
-      </div>
-    );
-  }
-  return <div className="space-y-2">{items.map((it) => <UrgencyRow key={it.id} item={it} />)}</div>;
-}
-
 
 // ===========================================================================
 // 5 — Announcements section

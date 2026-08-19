@@ -129,7 +129,12 @@ function Page() {
   );
 }
 
-function EventDetailsModal({
+// 2026-08-19: exported so the Tablet quick-actions view can open this exact
+// modal (Reschedule / Change status / Edit lesson plan, all wired to the
+// same RescheduleModal/PlanModal/updateSession() this page already uses)
+// for a session picked from its own "today/tomorrow" list or its embedded
+// Calendar Overview, instead of re-building a parallel modal.
+export function EventDetailsModal({
   event,
   teacherIdFilter,
   studentIdFilter,
