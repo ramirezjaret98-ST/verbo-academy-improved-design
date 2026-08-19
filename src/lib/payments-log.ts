@@ -29,6 +29,7 @@ import { defaultMonthlyPrice } from "@/lib/student-model";
 
 import type { User } from "./mock-data";
 import type { Group } from "./groups-store";
+import { currentAmountForStudent } from "./payment-plans";
 
 export type PaidEntityType = "individual" | "group";
 
@@ -244,17 +245,26 @@ export function deleteOldPayments(cutoffMs: number): void {
 }
 
 // ---------------------------------------------------------------------------
-// Amount derivation — a student's own `custom_price` (per-student override,
-// set by admin for negotiated deals — see students-store.ts) wins when set;
-// otherwise the amount is derived from the official price-per-session table
-// (`PRICE_PER_SESSION` in student-model.ts) × the student's real weekly
-// cadence, via `defaultMonthlyPrice`. Groups have no override field yet (see
-// groups-store.ts header — groups aren't migrated to Supabase), so they
-// always use the plan default × the multi-seat multiplier below.
+// Amount derivation. Priority, highest first (2026-08-19 — Feature A):
+//  1. An active payment plan (payment-plans.ts) — the current/next
+//     installment amount (or the lump sum for a single-payment plan). This
+//     REPLACES custom_price as the source of truth once a plan exists for a
+//     student, per Jaret's explicit answer when this was spec'd.
+//  2. `custom_price` — per-student override, set by admin for negotiated
+//     deals (students-store.ts), for students with no plan configured yet.
+//  3. The official price-per-session table (`PRICE_PER_SESSION` in
+//     student-model.ts) × the student's real weekly cadence, via
+//     `defaultMonthlyPrice`.
+// Groups have no override field yet (see groups-store.ts header — groups
+// aren't migrated to Supabase, and no payment plan support for groups
+// either), so they always use the plan default × the multi-seat multiplier
+// below.
 // ---------------------------------------------------------------------------
 const DEFAULT_GROUP_MULTIPLIER = 1.6; // groups pay more (multi-seat contract)
 
 export function expectedAmountForStudent(u: User): number {
+  const planAmount = currentAmountForStudent(u.id);
+  if (planAmount != null) return planAmount;
   if (u.custom_price != null) return u.custom_price;
   return defaultMonthlyPrice(u.access_plan, u.sessions_per_week);
 }

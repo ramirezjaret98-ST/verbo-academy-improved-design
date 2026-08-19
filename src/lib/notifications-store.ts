@@ -54,6 +54,7 @@ import { hasSeenBadgeUnlock, BADGE_UNLOCK_SEEN_EVENT } from "./badge-unlock-seen
 import { BADGES_EVENT as CHALLENGE_BADGES_EVENT } from "./badges-store";
 import { BADGES_EVENT as PROFILE_BADGES_EVENT } from "./profile-badges-store";
 import { SEASONS_EVENT, loadFlashChallenges, FLASH_EVENT } from "./flash-challenges-store";
+import { activePlanForStudent, PAYMENT_PLANS_EVENT } from "./payment-plans";
 
 
 
@@ -99,6 +100,7 @@ export type NotificationKind =
   | "session_changed"
   | "club_opened"
   | "payment_or_sessions_ending_soon"
+  | "installment_payment_due"
   | "new_challenge_available"
   | "badge_unlocked"
   | "challenge_needs_resubmission"
@@ -816,6 +818,34 @@ function studentNotifications(studentId: string): Notification[] {
     }
   }
 
+  // ---- Installment payment due soon (payment plans, "a meses" only) ------
+  // Single-payment plans are recorded as already paid at creation — no
+  // alerts for those (Jaret's spec: "si el alumno paga en una sola
+  // exhibición... no hay alertas ni nada"). Fires once per installment per
+  // day in the 3/2/1/0-day window, bell-only, non-invasive.
+  if (uu) {
+    const plan = activePlanForStudent(studentId);
+    if (plan && plan.planType === "installments" && plan.status === "active") {
+      const todayMidnight = new Date();
+      todayMidnight.setHours(0, 0, 0, 0);
+      for (const inst of plan.installments) {
+        if (inst.status !== "pending") continue;
+        const due = new Date(inst.dueDate + "T00:00:00");
+        const days = Math.round((+due - +todayMidnight) / (24 * 3600 * 1000));
+        if (days < 0 || days > 3) continue;
+        out.push({
+          id: `installment-due:${inst.id}:${days}`,
+          kind: "installment_payment_due",
+          title: days === 0 ? "Your payment is due today" : `Your payment is due in ${days} day${days > 1 ? "s" : ""}`,
+          body: `Installment ${inst.installmentNumber}/${plan.installmentsCount} · $${inst.amount.toLocaleString()} MXN · due ${due.toLocaleDateString(undefined, { month: "short", day: "numeric" })}.`,
+          createdAt: new Date().toISOString(),
+          to: "/student",
+          read: false,
+        });
+      }
+    }
+  }
+
   // ---- New Challenge available (for the student's product) --------------
   // VIP has no dedicated catalog — it reads the union of every
   // content-bearing product, so "new challenge" notifications fire from any
@@ -922,7 +952,7 @@ const SOURCE_EVENTS = [
   REPORTS_EVENT, CONDUCT_REPORTS_EVENT, CONTENT_ISSUE_EVENT, FIN_ISSUES_EVENT, STUDENTS_EVENT, CHALLENGES_EVENT,
   REQUESTS_EVENT, VIP_UNITS_EVENT, TAILORED_UNITS_EVENT, LP_EVENT, LESSON_PLANS_EVENT,
   CHALLENGE_BADGES_EVENT, PROFILE_BADGES_EVENT, SEASONS_EVENT, BADGE_UNLOCK_SEEN_EVENT,
-  FLASH_EVENT,
+  FLASH_EVENT, PAYMENT_PLANS_EVENT,
 ];
 
 function subscribe(cb: () => void): () => void {

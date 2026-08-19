@@ -357,3 +357,71 @@ export function subscribeTeachers(cb: () => void): () => void {
   window.addEventListener(TEACHERS_EVENT, cb);
   return () => window.removeEventListener(TEACHERS_EVENT, cb);
 }
+
+// ----------------------------------------------------------------------------
+// Manual pay review (Feature B, 2026-08-19) — lets an admin inspect a
+// teacher's completed sessions for an arbitrary date range and permanently
+// exclude specific ones from pay (hours_cycle/hours_month), on top of —
+// without touching — the automatic month/cycle accumulation engine above
+// (the sessions_sync_teacher_hours trigger). Driving example: a teacher
+// temporarily assigned to an admin's own test student account — those
+// sessions happened, but shouldn't count toward real pay, and deleting the
+// assignment would cascade-delete real session history (sessions.student_id
+// is ON DELETE CASCADE). Goes through two SECURITY DEFINER RPCs
+// (admin_sessions_for_pay_review / admin_set_session_excluded_from_pay)
+// rather than a direct `sessions` table read/write — coordinator_fin has
+// neither SELECT nor UPDATE on `sessions` under the normal RLS policies
+// (those are scoped to super_admin/coordinator_ops/the owning teacher), and
+// broadening that general policy for this one Financial-only feature isn't
+// worth the exposure. */
+export interface PayReviewSession {
+  id: number;
+  dateTime: string;
+  durationMinutes: number;
+  studentId: string;
+  studentName: string;
+  excludedFromPay: boolean;
+}
+
+/** Every COMPLETED session for `teacherId` with date_time in [from, to]
+ *  (inclusive, calendar dates) — the pool an admin picks exclusions from. */
+export async function fetchSessionsForPayReview(
+  teacherId: string,
+  from: string,
+  to: string,
+): Promise<PayReviewSession[]> {
+  const uuid = await legacyToUuid(teacherId);
+  if (!uuid) return [];
+  const { data, error } = await supabase.rpc("admin_sessions_for_pay_review", {
+    p_teacher_id: uuid,
+    p_from: from,
+    p_to: to,
+  });
+  if (error) {
+    console.error("[teacher-model] failed to load sessions for pay review", error);
+    return [];
+  }
+  return (data ?? []).map((row) => ({
+    id: row.id,
+    dateTime: row.date_time,
+    durationMinutes: row.duration_minutes,
+    studentId: row.student_id ?? "",
+    studentName: row.student_name ?? "—",
+    excludedFromPay: row.excluded_from_pay,
+  }));
+}
+
+/** Toggles a session's excluded_from_pay flag. The sessions_sync_teacher_hours
+ *  trigger picks up the change immediately — hours_cycle/hours_month adjust
+ *  automatically, no separate hours patch needed here. */
+export async function setSessionExcludedFromPay(sessionId: number, excluded: boolean): Promise<boolean> {
+  const { error } = await supabase.rpc("admin_set_session_excluded_from_pay", {
+    p_session_id: sessionId,
+    p_excluded: excluded,
+  });
+  if (error) {
+    console.error("[teacher-model] failed to update excluded_from_pay", error);
+    return false;
+  }
+  return true;
+}
