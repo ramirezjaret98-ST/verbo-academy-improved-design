@@ -85,6 +85,11 @@ export function getAdminType(user: User | null | undefined): AdminType | null {
 
 // Path-prefix based permission check for Admin nav / route access.
 export function canAccessAdminPath(type: AdminType, pathname: string): boolean {
+  // 2026-08-19: Tablet quick-actions view — deliberately super_admin-only
+  // for now (Jaret's own driving-companion use case), regardless of the
+  // super_admin catch-all below. Not in NAV_GROUPS either, so this is the
+  // only gate protecting a coordinator from a direct /admin/tablet URL.
+  if (pathname.startsWith("/admin/tablet")) return type === "super_admin";
   if (type === "super_admin") return true;
   if (type === "coordinator_fin") {
     return pathname.startsWith("/admin/financial") || pathname.startsWith("/admin/kpis");

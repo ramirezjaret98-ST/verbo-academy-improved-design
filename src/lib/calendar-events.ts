@@ -194,7 +194,18 @@ export function adminCalendarEvents(opts?: {
   const teacherId = opts?.teacherId?.trim() || undefined;
   const studentId = opts?.studentId?.trim() || undefined;
   if (!teacherId && !studentId) return [];
+  return collectAdminEvents(teacherId, studentId);
+}
 
+/** 2026-08-19: unfiltered version of adminCalendarEvents() for the Tablet
+ *  quick-actions view's "today/tomorrow" list — there's no teacher/student
+ *  picker there, it just needs everything on the books. Same projection,
+ *  same rules, just without the "at least one filter" guard above. */
+export function allCalendarEvents(): CalendarEvent[] {
+  return collectAdminEvents(undefined, undefined);
+}
+
+function collectAdminEvents(teacherId: string | undefined, studentId: string | undefined): CalendarEvent[] {
   const events: CalendarEvent[] = [];
   const gMap = groupsByStudentId();
 
