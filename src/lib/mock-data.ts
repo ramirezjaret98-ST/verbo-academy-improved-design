@@ -239,6 +239,59 @@ export const USERS: User[] = [
   { id: "u6", name: "Yuki Tanaka", email: "yuki@student.com", password: "", role: "student", current_level: "B2", attendance_percentage: 88, company: "Rakuten", hired_plan: "Core", member_since: "2024-11-20", hired_sessions: 120, remaining_sessions: 82, product: "go", focus: "Global Experience", access_plan: "Core", contracted_levels: ["Kickstart", "Everyday Flow", "Confident Voice", "Culture Master"], current_roadmap_level: "Everyday Flow", sessions_per_week: 2, session_duration: 60, reschedule_policy: "24h notice, max 25% of monthly sessions", payment_day: 20, cycle_start: "2024-11-20", video_call_link: "https://teams.microsoft.com/l/meetup-join/yuki", status: "active", insights_strikes: 0, sessions_auto: true },
 ];
 
+// --- Hidden mock/demo users -------------------------------------------
+// The 35 hardcoded people above (Yuki Tanaka, James Carter, etc.) are demo
+// seed data, not real accounts — they have no row in `app_users`/`auth.users`.
+// Admin's "Delete permanently" button correctly detects that (no real
+// Supabase UUID to resolve) and takes the "ghost" cleanup path in
+// `user-deletion.ts`, but that path only removes the entry from THIS array
+// in memory — since `USERS` is reinitialized from this static source every
+// time the module loads (any page reload/new tab), the "deleted" demo
+// person reappears immediately. Real bug behind "Admin deletes a mock
+// student/teacher and they come back" (2026-08-19) — nothing to do with
+// Supabase RLS, since these were never real DB rows to begin with.
+//
+// Fix: persist which mock ids the admin has deleted (localStorage, this
+// browser/device — same scope as the other admin-only local caches in this
+// file's ecosystem) and filter them back out of USERS on every hydrate.
+const HIDDEN_MOCK_USERS_KEY = "verbo:hidden-mock-users";
+
+function readHiddenMockUserIds(): string[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const list = JSON.parse(localStorage.getItem(HIDDEN_MOCK_USERS_KEY) || "[]");
+    return Array.isArray(list) ? list : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Marks a mock/demo USERS entry as permanently deleted for this browser —
+ *  called from `deleteUserAccount()` in user-deletion.ts whenever it takes
+ *  the "no real Supabase account" ghost-cleanup path. */
+export function hideMockUser(id: string): void {
+  if (typeof window === "undefined") return;
+  const list = readHiddenMockUserIds();
+  if (!list.includes(id)) {
+    list.push(id);
+    localStorage.setItem(HIDDEN_MOCK_USERS_KEY, JSON.stringify(list));
+  }
+}
+
+/** Removes any previously-deleted demo/mock entries from the live USERS
+ *  singleton. Call this at the top of every hydrate*() function (students,
+ *  teachers, admin roles) — same "safe to call on every mount" contract as
+ *  those functions already have. A no-op once nothing is hidden. */
+export function pruneHiddenMockUsers(): void {
+  if (typeof window === "undefined") return;
+  const hidden = readHiddenMockUserIds();
+  if (hidden.length === 0) return;
+  const hiddenSet = new Set(hidden);
+  for (let i = USERS.length - 1; i >= 0; i--) {
+    if (hiddenSet.has(USERS[i].id)) USERS.splice(i, 1);
+  }
+}
+
 // Teacher <-> student assignments used to live here as a hardcoded,
 // never-persisted array (`ASSIGNMENTS`). Moved to `assignments-store.ts`
 // (backed by the real `public.assignments` Supabase table) on 2026-08-08 —

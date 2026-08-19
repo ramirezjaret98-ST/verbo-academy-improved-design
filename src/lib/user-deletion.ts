@@ -8,7 +8,7 @@
 // USERS + localStorage, so a few retries in the same browser leave several
 // look-alike entries with no real account behind most of them) or a real
 // account created by mistake.
-import { USERS, type User } from "./mock-data";
+import { USERS, hideMockUser, type User } from "./mock-data";
 import { supabase } from "@/integrations/supabase/client";
 import { legacyToUuid, invalidateUserIdBridge } from "./user-id-bridge";
 import { STUDENTS_EVENT } from "./students-store";
@@ -80,6 +80,12 @@ export async function deleteUserAccount(user: User): Promise<DeleteUserResult> {
 
   const idx = USERS.findIndex((u) => u.id === user.id);
   if (idx >= 0) USERS.splice(idx, 1);
+  // Persist the removal so a demo/mock seed entry (no real Supabase account —
+  // e.g. one of the hardcoded people in mock-data.ts) doesn't silently come
+  // back on the next reload, when USERS reinitializes from its static
+  // source. Harmless no-op for a real account (already gone via cascade
+  // delete above) or a local-only ghost (already scrubbed below).
+  hideMockUser(user.id);
 
   if (user.role === "student") {
     removeFromListKey(REGISTERED_STUDENTS_KEY, user.id);

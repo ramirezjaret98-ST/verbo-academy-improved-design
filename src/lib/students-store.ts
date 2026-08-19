@@ -7,6 +7,7 @@
 // duplicating it. Editing the link here reflects in Students and vice-versa.
 import {
   USERS,
+  pruneHiddenMockUsers,
   type User,
   type ChallengeSubmission,
   type ChallengeSubmissionFormat,

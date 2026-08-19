@@ -18,7 +18,7 @@
 // confirmed bug found in the pre-launch QA audit — the old version pushed to
 // USERS/localStorage and nothing else, so newly "created" admins/coordinators
 // had no real account at all.
-import { USERS, type User, type Role } from "./mock-data";
+import { USERS, pruneHiddenMockUsers, type User, type Role } from "./mock-data";
 import { patchTeacherProfile } from "./teacher-model";
 import { patchStudentProfile } from "./students-store";
 import { supabase } from "@/integrations/supabase/client";
@@ -58,6 +58,7 @@ const SEEDED: User[] = [
 
 let hydrated = false;
 export function hydrateAdminRoles() {
+  pruneHiddenMockUsers();
   if (hydrated) return;
   hydrated = true;
   // Ensure u1 has super_admin type.
