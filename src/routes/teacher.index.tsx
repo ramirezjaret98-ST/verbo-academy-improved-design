@@ -1348,11 +1348,11 @@ function ReportModal({ session, perf, subskills, onClose, onSubmit }: {
       notes,
       entries: entries
         .filter((e) => e.term.trim().length > 0 && e.explanation.trim().length > 0)
-        .map((e) => ({ id: e.id, type: e.type, content: `${e.term.trim()} — ${e.explanation.trim()}` })),
+        .map((e) => ({ id: e.id, type: e.type, term: e.term.trim(), explanation: e.explanation.trim() })),
     };
     void (async () => {
       try {
-        const blob = sessionReportPdfBlob(reportInput);
+        const blob = await sessionReportPdfBlob(reportInput);
         const file = new File([blob], sessionReportFileName(reportInput), { type: "application/pdf" });
         const result = await uploadContentFile(file, "session-reports");
         if (result.ok) {
@@ -1409,7 +1409,7 @@ function ReportModal({ session, perf, subskills, onClose, onSubmit }: {
             notes={notes}
             entries={entries
               .filter((e) => e.term.trim().length > 0 && e.explanation.trim().length > 0)
-              .map((e) => ({ id: e.id, type: e.type, content: `${e.term.trim()} — ${e.explanation.trim()}` }))}
+              .map((e) => ({ id: e.id, type: e.type, term: e.term.trim(), explanation: e.explanation.trim() }))}
             onClose={onClose}
           />
         ) : (
@@ -1601,7 +1601,7 @@ function ReportModal({ session, perf, subskills, onClose, onSubmit }: {
 }
 
 function ReportPreview({ studentName, dateLabel, status, notes, entries, onClose }: {
-  studentName: string; dateLabel: string; status: SessionStatus; notes: string; entries: { id: string; type: EntryType; content: string }[]; onClose: () => void;
+  studentName: string; dateLabel: string; status: SessionStatus; notes: string; entries: { id: string; type: EntryType; term: string; explanation: string }[]; onClose: () => void;
 }) {
   return (
     <div className="mt-6 space-y-5">
@@ -1614,7 +1614,7 @@ function ReportPreview({ studentName, dateLabel, status, notes, entries, onClose
         <div className="flex items-start justify-between border-b border-border pb-4">
           <div>
             <div className="text-[10px] font-semibold uppercase tracking-[0.18em]" style={{ color: "#01304a" }}>Verbo Language Solutions</div>
-            <h3 className="mt-1 text-lg font-semibold tracking-tight text-foreground">Final Session Report</h3>
+            <h3 className="mt-1 text-lg font-semibold tracking-tight text-foreground">Session Report</h3>
           </div>
           <div className="text-right text-xs text-muted-foreground">
             <div>{dateLabel}</div>
@@ -1638,8 +1638,9 @@ function ReportPreview({ studentName, dateLabel, status, notes, entries, onClose
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-secondary text-left text-[11px] uppercase tracking-wider text-muted-foreground">
-                  <th className="px-3 py-2 font-medium w-[140px]">Type</th>
-                  <th className="px-3 py-2 font-medium">Content</th>
+                  <th className="px-3 py-2 font-medium w-[120px]">Type</th>
+                  <th className="px-3 py-2 font-medium w-[200px]">Word / Phrase</th>
+                  <th className="px-3 py-2 font-medium">Definition / Note</th>
                 </tr>
               </thead>
               <tbody>
@@ -1648,7 +1649,8 @@ function ReportPreview({ studentName, dateLabel, status, notes, entries, onClose
                     <td className="px-3 py-2 align-top">
                       <span className="inline-flex rounded-md px-2 py-0.5 text-xs font-medium" style={{ backgroundColor: "#f3893420", color: "#01304a" }}>{e.type}</span>
                     </td>
-                    <td className="px-3 py-2 text-foreground">{e.content}</td>
+                    <td className="px-3 py-2 align-top font-medium text-foreground">{e.term}</td>
+                    <td className="px-3 py-2 text-foreground">{e.explanation}</td>
                   </tr>
                 ))}
               </tbody>
