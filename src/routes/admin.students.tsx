@@ -42,6 +42,8 @@ import {
 import {
   setLevelReopened,
   patchStudentProfile,
+  hydrateStudents,
+  subscribeStudents,
   type StudentProfileFields,
 } from "@/lib/students-store";
 import { supabase } from "@/integrations/supabase/client";
@@ -148,7 +150,17 @@ function Page() {
       if (!USERS.find((x) => x.id === u.id)) USERS.push(u);
     });
     hydrateTeachers();
+    hydrateStudents();
     forceTick((n) => n + 1);
+    // 2026-08-19 fix: this page was relying entirely on students-store's
+    // module-load auto-hydrate to already be done by the time it mounted —
+    // it never called hydrateStudents() itself nor re-rendered when
+    // hydration/realtime updates finished, so a real student that hydrates
+    // after this page is already open would only appear once some unrelated
+    // event (an assignment/group change) happened to force a re-render.
+    // Same root cause as the Admin Teachers page (see the matching fix
+    // there) — wiring up hydrateStudents()/subscribeStudents() explicitly.
+    return subscribeStudents(() => forceTick((n) => n + 1));
   }, []);
 
   // Deep-link handling from the Admin Overview Quick Actions / snapshot links.

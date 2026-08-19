@@ -8,7 +8,7 @@ import {
   teacherStatus, qualifiedProducts, assignedStudents, activeStudents,
   teachersForProduct, avgRating, flaggedReviews, pendingReviews,
   PAYMENT_FREQUENCIES, paymentFrequency, defaultPaymentRecords, financialSummary,
-  patchTeacherProfile, hydrateTeachers,
+  patchTeacherProfile, hydrateTeachers, subscribeTeachers,
   fetchSessionsForPayReview, setSessionExcludedFromPay,
   type QualifiedProduct, type TeacherStatus, type PaymentFrequency, type PayReviewSession,
 } from "@/lib/teacher-model";
@@ -102,7 +102,16 @@ function Page() {
     forceTick((n) => n + 1);
     const unsub = subscribeStrikes(() => forceTick((n) => n + 1));
     const unsubA = subscribeAssignments(() => forceTick((n) => n + 1));
-    return () => { unsub(); unsubA(); };
+    // 2026-08-19 fix: hydrateTeachers() above resolves asynchronously (it
+    // fetches real Supabase-backed teachers and merges them into USERS), but
+    // nothing here was re-rendering when that finished — this page just
+    // happened to redraw a couple seconds later whenever a strike/assignment
+    // event fired for an unrelated reason, which made a freshly-hydrated
+    // real teacher (e.g. Jonathan) appear to "load slowly". teacher-model.ts
+    // already exports subscribeTeachers() for exactly this; it just wasn't
+    // wired up here.
+    const unsubT = subscribeTeachers(() => forceTick((n) => n + 1));
+    return () => { unsub(); unsubA(); unsubT(); };
   }, []);
 
   // Deep-link from the Admin Overview snapshot (open a teacher profile).
