@@ -23,6 +23,15 @@ export function RescheduleModal({
   }, [session.date_time]);
   const [nextDT, setNextDT] = useState(currentDT);
   const [error, setError] = useState<string | null>(null);
+  // 2026-08-19: this component is only ever opened from the Admin panel
+  // (admin.sessions.tsx / admin.groups.tsx / admin.calendar.tsx — there is
+  // no teacher/student-facing use of it), so "Rescheduled" (implying a
+  // one-off/temporary move) isn't always right — Jaret needs to permanently
+  // move a recurring slot (e.g. a student's Friday class moving to
+  // Saturdays going forward) without it reading as a temporary change.
+  // Defaults to the prior behavior (Rescheduled) so nothing changes unless
+  // explicitly opted into.
+  const [permanent, setPermanent] = useState(false);
 
   const submit = () => {
     if (kind === "group" && !agreed) {
@@ -34,9 +43,12 @@ export function RescheduleModal({
       setError("The assigned teacher is not available at that time (outside their schedule or overlaps another session).");
       return;
     }
-    updateSession(session.id, { date_time: iso, status: "rescheduled" });
-    // Ping Admin on WhatsApp as part of the same confirmation click.
-    window.open("https://wa.link/pqrkgz", "_blank", "noopener,noreferrer");
+    updateSession(session.id, { date_time: iso, status: permanent ? "scheduled" : "rescheduled" });
+    // 2026-08-19: used to also ping Admin's own WhatsApp here — that link is
+    // meant to alert Admin when a TEACHER/STUDENT requests something (see
+    // CantAttendModal.tsx), but every caller of this modal already IS Admin,
+    // so it was just pinging Jaret's own WhatsApp on every admin-side
+    // reschedule. Removed.
     onClose();
   };
 
@@ -78,6 +90,21 @@ export function RescheduleModal({
           />
           <p className="mt-1 text-[10px] text-muted-foreground">All times shown in Mexico City time (GMT-6).</p>
         </div>
+
+        <label className="mt-4 flex items-start gap-2 rounded-lg border border-border bg-secondary/40 p-3 text-sm">
+          <input
+            type="checkbox"
+            checked={permanent}
+            onChange={(e) => setPermanent(e.target.checked)}
+            className="mt-0.5 h-4 w-4"
+          />
+          <span className="text-foreground">
+            Permanent change to this student's schedule
+            <span className="block text-xs font-normal text-muted-foreground">
+              Keeps status as "Scheduled" instead of "Rescheduled" — use this for a lasting change (e.g. moving a recurring slot to a new day), not a one-off move.
+            </span>
+          </span>
+        </label>
 
         {error && (
           <div className="mt-3 flex items-start gap-2 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-xs text-destructive">
