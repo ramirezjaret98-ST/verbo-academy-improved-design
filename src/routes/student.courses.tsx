@@ -491,7 +491,7 @@ function Page() {
         }}
       />
       {completionModal && (
-        <LevelCompletionModal level={completionModal} studentName={user?.name ?? "Student"} product={user?.product ?? ""} onClose={() => setCompletionModal(null)} />
+        <LevelCompletionModal level={completionModal} studentName={user?.name ?? "Student"} product={user?.product ?? ""} studentId={user?.id} onClose={() => setCompletionModal(null)} />
       )}
     </>
   );
@@ -1895,11 +1895,11 @@ function evaluate(activity: Activity, value: string): boolean {
 /* -------------------------------------------------------------------------- */
 /* Level completion modal (confetti + certificate download)                    */
 /* -------------------------------------------------------------------------- */
-function LevelCompletionModal({ level, studentName, product, onClose }: { level: CourseLevel; studentName: string; product: string; onClose: () => void }) {
+function LevelCompletionModal({ level, studentName, product, studentId, onClose }: { level: CourseLevel; studentName: string; product: string; studentId?: string; onClose: () => void }) {
   const [showShare, setShowShare] = useState(false);
 
-  const downloadCertificate = () => {
-    generateLevelCertificate({ studentName, levelName: level.name, product });
+  const downloadCertificate = async () => {
+    await generateLevelCertificate({ studentName, levelName: level.name, product, studentId });
     setShowShare(true);
   };
 
