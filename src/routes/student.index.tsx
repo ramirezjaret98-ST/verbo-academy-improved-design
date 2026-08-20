@@ -29,6 +29,8 @@ import {
 import { loadCourses, subscribeCourses, PRODUCT_META, computeCurrentProgress, resolvePlanTopic } from "@/lib/product-courses-store";
 import { getLessonPlan, subscribeLessonPlans, type LessonPlan } from "@/lib/lesson-plans-store";
 import { unitsForStudent } from "@/lib/vip-courses-store";
+import { paymentsForEntity, subscribePayments, type PaymentLogEntry } from "@/lib/payments-log";
+import { downloadReceiptPdf } from "@/lib/receipt-pdf";
 import { tailoredUnitsForStudent } from "@/lib/tailored-content-store";
 import { subscribeVipUnits, subscribeVipUnitCompletion } from "@/lib/vip-courses-store";
 import { useComputedMacros } from "@/components/verbo/PerformanceAnalytics";
@@ -256,6 +258,33 @@ function StudentDashboard() {
   // truth shared with Student > Performance and Teacher > Mis Alumnos).
   const macros = useComputedMacros(user?.id ?? "");
   const hydrated = useHydrated();
+
+  // Recent Payments card (2026-08-20) — student's own receipts, generated
+  // on-demand client-side (no PDF stored server-side, see receipt-pdf.ts).
+  const [, bumpPayments] = useState(0);
+  useEffect(() => subscribePayments(() => bumpPayments((n) => n + 1)), []);
+  const myPayments = user ? paymentsForEntity("individual", user.id) : [];
+  const [downloadingPaymentId, setDownloadingPaymentId] = useState<string | null>(null);
+  async function handleDownloadReceipt(entry: PaymentLogEntry) {
+    if (!user) return;
+    setDownloadingPaymentId(entry.id);
+    try {
+      await downloadReceiptPdf({
+        student: {
+          id: user.id,
+          name: user.name,
+          product: user.product,
+          accessPlan: user.access_plan,
+          company: user.company,
+        },
+        entry,
+      });
+    } catch (err) {
+      console.error("[StudentDashboard] failed to generate receipt PDF", err);
+    } finally {
+      setDownloadingPaymentId(null);
+    }
+  }
   const [classDetail, setClassDetail] = useState<ExtSession | null>(null);
 
   const [clubCardModal, setClubCardModal] = useState<Club | null>(null);
@@ -1261,6 +1290,51 @@ function StudentDashboard() {
               );
             })}
           </div>
+        </PremiumCard>
+      </section>
+
+      {/* Recent Payments (2026-08-20) — receipts generated on-demand,
+          client-side, from payment_log_entries (own rows only, RLS). */}
+      <section id="recent-payments" data-tour="recent-payments" className="verbo-fade-up motion-reduce:animate-none" style={{ animationDelay: "320ms" }}>
+        <SectionTitle>Recent Payments</SectionTitle>
+        <PremiumCard className="verbo-card-hover">
+          {myPayments.length === 0 ? (
+            <p className="px-4 py-6 text-sm text-muted-foreground">No payments on file yet.</p>
+          ) : (
+            <>
+              <div className="hidden md:grid md:grid-cols-[1fr_1fr_1fr_120px] gap-4 px-4 pb-3 text-[10px] uppercase tracking-wider text-muted-foreground">
+                <div>Date</div>
+                <div>Amount</div>
+                <div>Method</div>
+                <div>Receipt</div>
+              </div>
+              <div className="divide-y divide-border">
+                {myPayments.map((p) => (
+                  <div
+                    key={p.id}
+                    className="grid grid-cols-1 items-center gap-4 rounded-xl px-4 py-4 md:grid-cols-[1fr_1fr_1fr_120px]"
+                  >
+                    <div className="truncate text-sm text-foreground">{fmt(p.paid_at)}</div>
+                    <div className="truncate text-sm font-semibold" style={{ color: "#01304a" }}>
+                      {p.amount.toLocaleString("es-MX", { style: "currency", currency: "MXN", minimumFractionDigits: 0 })} MXN
+                    </div>
+                    <div className="truncate text-sm text-muted-foreground capitalize">{p.method ?? "—"}</div>
+                    <div>
+                      <button
+                        type="button"
+                        onClick={() => handleDownloadReceipt(p)}
+                        disabled={downloadingPaymentId === p.id}
+                        className="inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-xs font-semibold text-foreground transition-colors hover:bg-secondary/40 disabled:opacity-50"
+                      >
+                        <Download className="h-3.5 w-3.5" />
+                        {downloadingPaymentId === p.id ? "Generating…" : "Download"}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
         </PremiumCard>
       </section>
 
