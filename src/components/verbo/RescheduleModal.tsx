@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { CalendarClock, AlertTriangle } from "lucide-react";
+import { CalendarClock, AlertTriangle, XCircle } from "lucide-react";
 import { AccentModal, AccentModalFooter, GhostButton, PrimaryButton } from "./ui";
 import { updateSession, notifySessionEvent, type ExtSession } from "@/lib/sessions-store";
 import { isTeacherAvailableAt } from "@/lib/availability-store";
@@ -32,6 +32,25 @@ export function RescheduleModal({
   // Defaults to the prior behavior (Rescheduled) so nothing changes unless
   // explicitly opted into.
   const [permanent, setPermanent] = useState(false);
+
+  // 2026-08-20 (later same day): the counterpart to "approve" — only
+  // meaningful when the session is actually sitting on a student's own
+  // pending request (never for an admin-initiated proactive move, where
+  // there's nothing to "decline"). Toggles this modal into a small reason
+  // form instead of a second modal, mirroring the "Change status" inline
+  // toggle pattern already used in admin.calendar.tsx.
+  const canDecline = session.status === "pending_reschedule";
+  const [mode, setMode] = useState<"approve" | "decline">("approve");
+  const [declineReason, setDeclineReason] = useState("");
+
+  const declineSubmit = () => {
+    // Reverts to the session's ORIGINAL schedule — no cancellation, no move.
+    updateSession(session.id, { status: "scheduled" });
+    notifySessionEvent(session.id, "reschedule_declined", {
+      ...(declineReason.trim() ? { reason: declineReason.trim() } : {}),
+    });
+    onClose();
+  };
 
   const submit = () => {
     if (kind === "group" && !agreed) {
@@ -73,9 +92,36 @@ export function RescheduleModal({
       onClose={onClose}
     >
       <div className="p-6">
+        {mode === "decline" ? (
+          <>
+            <p className="text-xs text-muted-foreground">
+              The session stays on its original date &amp; time. The student gets an email explaining it couldn't be moved this time, with your reason (if you add one) and an invite to reach out directly.
+            </p>
+            <div className="mt-4">
+              <label className="text-xs font-medium text-foreground">Reason (optional, shown to the student)</label>
+              <textarea
+                value={declineReason}
+                onChange={(e) => setDeclineReason(e.target.value)}
+                rows={3}
+                placeholder="e.g. No hay disponibilidad de profesor en ese rango de fechas"
+                className="mt-1.5 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring"
+              />
+            </div>
+          </>
+        ) : (
+          <>
         <p className="text-xs text-muted-foreground">
           Filtered to slots within the assigned teacher's availability.
         </p>
+        {canDecline && (
+          <button
+            type="button"
+            onClick={() => setMode("decline")}
+            className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-destructive hover:underline"
+          >
+            <XCircle className="h-3.5 w-3.5" /> Can't reschedule this session?
+          </button>
+        )}
 
         {kind === "group" && (
           <label className="mt-4 flex items-start gap-2 rounded-lg border border-border bg-secondary/40 p-3 text-sm">
@@ -121,11 +167,22 @@ export function RescheduleModal({
             <span>{error}</span>
           </div>
         )}
+          </>
+        )}
       </div>
 
       <AccentModalFooter>
-        <GhostButton onClick={onClose}>Cancel</GhostButton>
-        <PrimaryButton onClick={submit} accentColor="#f38934">Confirm Reschedule</PrimaryButton>
+        {mode === "decline" ? (
+          <>
+            <GhostButton onClick={() => setMode("approve")}>Back</GhostButton>
+            <PrimaryButton onClick={declineSubmit} accentColor="#dc2626">Confirm — can't reschedule</PrimaryButton>
+          </>
+        ) : (
+          <>
+            <GhostButton onClick={onClose}>Cancel</GhostButton>
+            <PrimaryButton onClick={submit} accentColor="#f38934">Confirm Reschedule</PrimaryButton>
+          </>
+        )}
       </AccentModalFooter>
     </AccentModal>
   );
