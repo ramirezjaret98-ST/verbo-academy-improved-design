@@ -30,10 +30,33 @@ import { defaultMonthlyPrice } from "@/lib/student-model";
 import type { User } from "./mock-data";
 import type { Group } from "./groups-store";
 import { currentAmountForStudent } from "./payment-plans";
+import { createInvoiceRequestAndNotify } from "./invoice-requests";
 
 export type PaidEntityType = "individual" | "group";
 
-export interface PaymentLogEntry {
+// 2026-08-20 (Feature A7) — payment method + receipt detail, all OPTIONAL
+// regardless of method (Jaret's explicit correction: "haz que todos los
+// campos sean opcionales ya que a veces los depositos no tienen los mismos
+// datos de transferencias y asi"). Which fields the Mark-as-Paid modal shows
+// still varies by method (his earlier answer), but none are required.
+// Individual payments only — persisted to the new payment_log_entries
+// columns; group payments carry these on the localStorage-only entry for
+// display parity, but never generate an invoice_requests row (see
+// invoice-requests.ts header).
+export type PaymentMethod = "transferencia" | "deposito" | "tarjeta" | "efectivo" | "otro";
+
+export interface PaymentDetailFields {
+  method?: PaymentMethod;
+  folio?: string;
+  trackingKey?: string;    // clave de rastreo
+  issuingBank?: string;    // banco emisor
+  receivingBank?: string;  // banco receptor
+  cardLast4?: string;
+  methodDetail?: string;   // free text — referencia, notas, "otro" description
+  receiptPdfUrl?: string;  // filled in later by the PDF-generation phase
+}
+
+export interface PaymentLogEntry extends PaymentDetailFields {
   id: string;
   entity_type: PaidEntityType;
   entity_id: string;
@@ -71,6 +94,14 @@ function mapRow(row: PaymentRow): PaymentLogEntry {
     amount: Number(row.amount),
     paid_at: row.paid_at,
     month: row.month,
+    method: (row.method as PaymentMethod | null) ?? undefined,
+    folio: row.folio ?? undefined,
+    trackingKey: row.tracking_key ?? undefined,
+    issuingBank: row.issuing_bank ?? undefined,
+    receivingBank: row.receiving_bank ?? undefined,
+    cardLast4: row.card_last4 ?? undefined,
+    methodDetail: row.method_detail ?? undefined,
+    receiptPdfUrl: row.receipt_pdf_url ?? undefined,
   };
 }
 
@@ -187,6 +218,13 @@ export function logPayment(input: Omit<PaymentLogEntry, "id" | "month"> & { mont
         amount: input.amount,
         paid_at: input.paid_at,
         month,
+        method: input.method ?? null,
+        folio: input.folio ?? null,
+        tracking_key: input.trackingKey ?? null,
+        issuing_bank: input.issuingBank ?? null,
+        receiving_bank: input.receivingBank ?? null,
+        card_last4: input.cardLast4 ?? null,
+        method_detail: input.methodDetail ?? null,
       })
       .select("*")
       .single();
@@ -199,6 +237,7 @@ export function logPayment(input: Omit<PaymentLogEntry, "id" | "month"> & { mont
     const saved = mapRow(data);
     individualCache = individualCache.map((p) => (p.id === tempId ? saved : p));
     notify();
+    void createInvoiceRequestAndNotify({ paymentLogEntryId: data.id, studentUuid });
   })();
 }
 

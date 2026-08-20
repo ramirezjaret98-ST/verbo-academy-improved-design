@@ -10,7 +10,7 @@
 import { USERS, type User } from "./mock-data";
 import { removeAssignment, setAssignment } from "./assignments-store";
 import { nextPaymentDateAfterToday, type ProductId, type AccessPlanId } from "./student-model";
-import { logPayment, expectedAmountForGroup } from "./payments-log";
+import { logPayment, expectedAmountForGroup, type PaymentDetailFields } from "./payments-log";
 import { patchStudentProfile, type StudentProfileFields } from "./students-store";
 
 export type GroupMemberStatus = "active" | "pending_removal" | "archived";
@@ -246,7 +246,7 @@ function propagateGroupToMembers(before: Group, after: Group) {
   }
 }
 
-export function markGroupAsPaid(id: string) {
+export function markGroupAsPaid(id: string, detail?: PaymentDetailFields) {
   const g = groupById(id); if (!g) return;
   // Log the payment event so The Money Lab (Admin > Financial) can show
   // historical Received Income. This is a shortcut into the same state.
@@ -257,6 +257,7 @@ export function markGroupAsPaid(id: string) {
     company: g.company_client,
     amount: expectedAmountForGroup(g),
     paid_at: new Date().toISOString(),
+    ...detail,
   });
   // Advance to the next real occurrence of the payment day (same calculation
   // used by the individual student flow) so the indicator clears immediately.

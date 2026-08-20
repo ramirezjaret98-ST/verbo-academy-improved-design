@@ -34,6 +34,8 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 import { hydrateUserIdBridge, legacyToUuid, uuidToLegacySync } from "@/lib/user-id-bridge";
+import { createInvoiceRequestAndNotify } from "@/lib/invoice-requests";
+import type { PaymentDetailFields } from "@/lib/payments-log";
 
 export type PlanType = "single" | "installments";
 export type InstallmentStatus = "pending" | "paid";
@@ -285,15 +287,34 @@ export async function createPaymentPlan(
       paid_at: paidAt,
     });
     if (instErr) console.error("[payment-plans] failed to create single installment", instErr);
-    const { error: logErr } = await supabase.from("payment_log_entries").insert({
-      entity_type: "individual",
-      student_id: studentUuid,
-      name: input.studentName,
-      amount: input.totalAmount,
-      paid_at: paidAt,
-      month: paidAt.slice(0, 7),
-    });
-    if (logErr) console.error("[payment-plans] failed to log single-payment as paid", logErr);
+    const { data: logRow, error: logErr } = await supabase
+      .from("payment_log_entries")
+      .insert({
+        entity_type: "individual",
+        student_id: studentUuid,
+        name: input.studentName,
+        amount: input.totalAmount,
+        paid_at: paidAt,
+        month: paidAt.slice(0, 7),
+        method: input.method || null,
+      })
+      .select("id")
+      .single();
+    if (logErr || !logRow) {
+      console.error("[payment-plans] failed to log single-payment as paid", logErr);
+    } else {
+      // 2026-08-20: a single-payment plan is recorded as already paid the
+      // moment it's created (see file header) — there's no separate
+      // "Mark as Paid" click for this path, but it's still a real row in
+      // payment_log_entries, so the student still gets a payment
+      // confirmation + a way to request their invoice, same as any other
+      // individual payment (see invoice-requests.ts).
+      void createInvoiceRequestAndNotify({
+        paymentLogEntryId: logRow.id,
+        studentUuid,
+        installment: { installmentNumber: 1, installmentsCount: 1, planType: "single" },
+      });
+    }
   } else {
     const schedule = computeInstallmentSchedule(
       input.totalAmount,
@@ -325,6 +346,7 @@ export async function createPaymentPlan(
 export async function markInstallmentPaid(
   installmentId: string,
   studentName: string,
+  detail?: PaymentDetailFields,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const instDbId = Number(installmentId.replace("inst-", ""));
   const installment = cache.flatMap((p) => p.installments).find((i) => i.id === installmentId);
@@ -340,15 +362,38 @@ export async function markInstallmentPaid(
 
   const studentUuid = await legacyToUuid(plan.studentId);
   if (studentUuid) {
-    const { error: logErr } = await supabase.from("payment_log_entries").insert({
-      entity_type: "individual",
-      student_id: studentUuid,
-      name: studentName,
-      amount: installment.amount,
-      paid_at: paidAt,
-      month: paidAt.slice(0, 7),
-    });
-    if (logErr) console.error("[payment-plans] failed to log installment payment", logErr);
+    const { data: logRow, error: logErr } = await supabase
+      .from("payment_log_entries")
+      .insert({
+        entity_type: "individual",
+        student_id: studentUuid,
+        name: studentName,
+        amount: installment.amount,
+        paid_at: paidAt,
+        month: paidAt.slice(0, 7),
+        method: detail?.method ?? null,
+        folio: detail?.folio ?? null,
+        tracking_key: detail?.trackingKey ?? null,
+        issuing_bank: detail?.issuingBank ?? null,
+        receiving_bank: detail?.receivingBank ?? null,
+        card_last4: detail?.cardLast4 ?? null,
+        method_detail: detail?.methodDetail ?? null,
+      })
+      .select("id")
+      .single();
+    if (logErr || !logRow) {
+      console.error("[payment-plans] failed to log installment payment", logErr);
+    } else {
+      void createInvoiceRequestAndNotify({
+        paymentLogEntryId: logRow.id,
+        studentUuid,
+        installment: {
+          installmentNumber: installment.installmentNumber,
+          installmentsCount: plan.installmentsCount,
+          planType: "installments",
+        },
+      });
+    }
   }
 
   const stillPending = plan.installments.some((i) => i.id !== installmentId && i.status === "pending");
