@@ -18,8 +18,9 @@ import {
 import {
   logPayment, expectedAmountForStudent, expectedAmountForGroup,
   paymentsForMonth, paymentsForEntityInMonth, subscribePayments,
-  monthKey, loadPayments,
+  monthKey, loadPayments, type PaymentDetailFields,
 } from "@/lib/payments-log";
+import { MarkAsPaidModal } from "@/components/verbo/MarkAsPaidModal";
 import {
   loadManualEntries, manualEntriesForMonth, addManualEntry, deleteManualEntry,
   subscribeManualEntries, type ManualFinancialEntry, type ManualEntryType,
@@ -273,10 +274,15 @@ function MoneyLabPage() {
   }, [loadPayments().length, loadManualEntries().length, currentMkey]);
 
   // -------------------- Actions --------------------
-  const markIncomePaid = (row: IncomeRow) => {
+  // Feature A7 (2026-08-20): opens the shared MarkAsPaidModal instead of
+  // logging immediately, so method/folio/bank detail can be captured here
+  // too — same as Students > Detail and Groups. See payRow state below.
+  const [payRow, setPayRow] = useState<IncomeRow | null>(null);
+
+  const markIncomePaid = (row: IncomeRow, detail: PaymentDetailFields) => {
     if (row.status === "Paid") return;
     if (row.entityType === "group") {
-      markGroupAsPaid(row.entityId);
+      markGroupAsPaid(row.entityId, detail);
       toast.success("Group marked as paid");
     } else {
       const student = USERS.find((u) => u.id === row.entityId);
@@ -292,6 +298,7 @@ function MoneyLabPage() {
         company: student.company,
         amount: expectedAmountForStudent(student),
         paid_at: new Date().toISOString(),
+        ...detail,
       });
       // Persist next_payment via the shared override map used by Students.
       student.next_payment = after.toISOString();
@@ -621,7 +628,7 @@ function MoneyLabPage() {
                     <td className="px-5 py-3 text-right sm:px-6">
                       <button
                         type="button"
-                        onClick={() => markIncomePaid(r)}
+                        onClick={() => setPayRow(r)}
                         disabled={r.status === "Paid"}
                         style={{ background: "#5fca16" }}
                         className="verbo-admin-press inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-40"
@@ -752,6 +759,15 @@ function MoneyLabPage() {
           students={activeIndividuals}
           onClose={() => setManualModalType(null)}
           currentUserId={user?.id}
+        />
+      )}
+
+      {payRow && (
+        <MarkAsPaidModal
+          entityLabel={payRow.name}
+          amount={payRow.amount}
+          onClose={() => setPayRow(null)}
+          onConfirm={(detail) => markIncomePaid(payRow, detail)}
         />
       )}
 

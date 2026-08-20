@@ -26,6 +26,8 @@ import { Card, GhostButton, PrimaryButton, AccentModal, AccentModalFooter } from
 import { loadSessions, addGroupSession, type ExtSession } from "@/lib/sessions-store";
 import { loadHolidays } from "@/lib/holidays-store";
 import { RescheduleModal } from "@/components/verbo/RescheduleModal";
+import { MarkAsPaidModal } from "@/components/verbo/MarkAsPaidModal";
+import { expectedAmountForGroup } from "@/lib/payments-log";
 import { CalendarPlus, AlertTriangle } from "lucide-react";
 
 export const Route = createFileRoute("/admin/groups")({ component: Page });
@@ -118,13 +120,14 @@ function GroupCard({ group, onOpen }: { group: Group; onOpen: () => void }) {
   const payDue = payState !== null;
   const overdue = payState === "overdue";
 
-  const mark = (e: React.MouseEvent) => {
+  const [payModalOpen, setPayModalOpen] = useState(false);
+  const openMark = (e: React.MouseEvent) => {
     e.stopPropagation();
-    markGroupAsPaid(group.id);
-    toast.success("Group marked as paid");
+    setPayModalOpen(true);
   };
 
   return (
+    <>
     <button
       onClick={onOpen}
       className={`group relative flex flex-col rounded-2xl border border-border bg-card p-5 text-left shadow-soft transition-all hover:-translate-y-1 hover:shadow-elevated ${overdue ? "verbo-pay-overdue-glow" : payDue ? "verbo-pay-glow" : ""}`}
@@ -169,13 +172,25 @@ function GroupCard({ group, onOpen }: { group: Group; onOpen: () => void }) {
         <Tag className="bg-secondary text-secondary-foreground">{active}/{group.max_capacity} members</Tag>
         <button
           type="button"
-          onClick={mark}
+          onClick={openMark}
           className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-[11px] font-semibold text-foreground hover:bg-secondary/60"
         >
           <CreditCard className="h-3 w-3" /> Mark as Paid
         </button>
       </div>
     </button>
+    {payModalOpen && (
+      <MarkAsPaidModal
+        entityLabel={group.name}
+        amount={expectedAmountForGroup(group)}
+        onClose={() => setPayModalOpen(false)}
+        onConfirm={(detail) => {
+          markGroupAsPaid(group.id, detail);
+          toast.success("Group marked as paid");
+        }}
+      />
+    )}
+    </>
   );
 }
 
@@ -473,6 +488,7 @@ function GroupDetailModal({ groupId, onClose }: { groupId: string; onClose: () =
   const pending = members.filter((m) => m.status === "pending_removal");
   const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
   const [moveFor, setMoveFor] = useState<string | null>(null);
+  const [payModalOpen, setPayModalOpen] = useState(false);
 
   const patchField = <K extends keyof Group>(k: K, v: Group[K]) => {
     updateGroup(groupId, { [k]: v } as Partial<Group>);
@@ -587,7 +603,7 @@ function GroupDetailModal({ groupId, onClose }: { groupId: string; onClose: () =
               <div className="text-xs font-semibold text-muted-foreground">Progress</div>
               <div className="flex gap-2">
                 <GroupRescheduleButton groupId={groupId} />
-                <PrimaryButton onClick={() => { markGroupAsPaid(groupId); toast.success("Group marked as paid"); }}>
+                <PrimaryButton onClick={() => setPayModalOpen(true)}>
                   <CreditCard className="h-4 w-4" /> Mark as Paid
                 </PrimaryButton>
               </div>
@@ -654,6 +670,15 @@ function GroupDetailModal({ groupId, onClose }: { groupId: string; onClose: () =
           currentGroupId={groupId}
           onClose={() => setMoveFor(null)}
           onMoved={() => { setMoveFor(null); tick((n) => n + 1); }}
+        />
+      )}
+
+      {payModalOpen && (
+        <MarkAsPaidModal
+          entityLabel={g.name}
+          amount={expectedAmountForGroup(g)}
+          onClose={() => setPayModalOpen(false)}
+          onConfirm={(detail) => { markGroupAsPaid(groupId, detail); toast.success("Group marked as paid"); }}
         />
       )}
     </Overlay>

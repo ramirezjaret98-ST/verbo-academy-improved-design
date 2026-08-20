@@ -36,9 +36,11 @@ import { studentAttendance } from "@/lib/sessions-store";
 import { logPayment, expectedAmountForStudent, loadPayments, subscribePayments } from "@/lib/payments-log";
 import {
   activePlanForStudent, subscribePaymentPlans, createPaymentPlan, markInstallmentPaid,
-  cancelPaymentPlan, updateInstallmentDueDate, computeInstallmentSchedule,
-  type PaymentPlan, type PlanType,
+  cancelPaymentPlan, updateInstallmentDueDate, computeInstallmentSchedule, nextPendingInstallment,
+  type PaymentPlan, type PlanType, type PaymentInstallment,
 } from "@/lib/payment-plans";
+import { MarkAsPaidModal } from "@/components/verbo/MarkAsPaidModal";
+import type { PaymentDetailFields } from "@/lib/payments-log";
 import {
   setLevelReopened,
   patchStudentProfile,
@@ -1381,6 +1383,13 @@ function StudentDetailModal({
   const [freezeStart, setFreezeStart] = useState(student.freeze_start ?? "");
   const [freezeEnd, setFreezeEnd] = useState(student.freeze_end ?? "");
   const [planModalOpen, setPlanModalOpen] = useState(false);
+  // Feature A7 (2026-08-20): both Mark-as-Paid entry points (the header
+  // button and the per-installment button in the Payment Plan card) now
+  // open the shared MarkAsPaidModal instead of firing immediately, so the
+  // admin can optionally record method/folio/bank detail for the receipt +
+  // invoicing flow (see MarkAsPaidModal.tsx / invoice-requests.ts).
+  const [payModalOpen, setPayModalOpen] = useState(false);
+  const [payInstallment, setPayInstallment] = useState<PaymentInstallment | null>(null);
 
   // Payment History reads loadPayments() synchronously in render below; the
   // Supabase-backed store hydrates asynchronously, so re-render once it (or
@@ -1432,7 +1441,7 @@ function StudentDetailModal({
     setPanel("none");
   };
 
-  const markPaid = () => {
+  const markPaid = (detail: PaymentDetailFields) => {
     // Advance to the next real occurrence of the payment day so the "next
     // payment" is always in the future and the glow disappears immediately.
     const day = student.payment_day ?? (nextPay ? nextPay.getDate() : 1);
@@ -1445,6 +1454,7 @@ function StudentDetailModal({
       company: student.company,
       amount: expectedAmountForStudent(student),
       paid_at: new Date().toISOString(),
+      ...detail,
     });
     patch({ next_payment: after.toISOString() });
   };
@@ -1593,7 +1603,7 @@ function StudentDetailModal({
                                 <td className="px-3 py-2 text-right">
                                   {inst.status === "pending" && (
                                     <button
-                                      onClick={() => markInstallmentPaid(inst.id, student.name)}
+                                      onClick={() => setPayInstallment(inst)}
                                       className="rounded-full border border-border px-2.5 py-1 text-[11.5px] font-semibold text-foreground hover:bg-secondary"
                                     >
                                       Mark as paid
@@ -1903,7 +1913,7 @@ function StudentDetailModal({
           )}
           {!isGrouped && (
             <button
-              onClick={markPaid}
+              onClick={() => setPayModalOpen(true)}
               className="verbo-sdm-action inline-flex items-center justify-center gap-1.5 rounded-lg bg-success px-3 py-1.5 text-xs font-semibold text-success-foreground shadow-sm transition-opacity hover:opacity-90"
             >
               <CreditCard className="h-3.5 w-3.5" /> Mark as paid
@@ -1913,6 +1923,35 @@ function StudentDetailModal({
       </div>
       {resetPwOpen && (
         <ResetPasswordModal userId={student.id} userName={student.name} onClose={() => setResetPwOpen(false)} />
+      )}
+      {payModalOpen && (
+        <MarkAsPaidModal
+          entityLabel={student.name}
+          amount={expectedAmountForStudent(student)}
+          planContext={
+            plan
+              ? {
+                  installmentNumber: plan.planType === "single" ? 1 : (nextPendingInstallment(plan)?.installmentNumber ?? plan.installmentsCount),
+                  installmentsCount: plan.installmentsCount,
+                  planType: plan.planType,
+                }
+              : undefined
+          }
+          onClose={() => setPayModalOpen(false)}
+          onConfirm={(detail) => markPaid(detail)}
+        />
+      )}
+      {payInstallment && (
+        <MarkAsPaidModal
+          entityLabel={student.name}
+          amount={payInstallment.amount}
+          planContext={plan ? { installmentNumber: payInstallment.installmentNumber, installmentsCount: plan.installmentsCount, planType: plan.planType } : undefined}
+          onClose={() => setPayInstallment(null)}
+          onConfirm={async (detail) => {
+            const res = await markInstallmentPaid(payInstallment.id, student.name, detail);
+            if (!res.ok) throw new Error(res.error);
+          }}
+        />
       )}
       {planModalOpen && (
         <PaymentPlanModal
