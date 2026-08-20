@@ -1768,6 +1768,69 @@ export type Database = {
         }
         Relationships: []
       }
+      invoice_requests: {
+        Row: {
+          billing_email: string | null
+          business_name: string | null
+          cfdi_use: string | null
+          created_at: string
+          id: number
+          payment_log_entry_id: number
+          postal_code: string | null
+          rfc: string | null
+          status: string
+          student_id: string
+          submitted_at: string | null
+          tax_regime: string | null
+          token: string
+        }
+        Insert: {
+          billing_email?: string | null
+          business_name?: string | null
+          cfdi_use?: string | null
+          created_at?: string
+          id?: never
+          payment_log_entry_id: number
+          postal_code?: string | null
+          rfc?: string | null
+          status?: string
+          student_id: string
+          submitted_at?: string | null
+          tax_regime?: string | null
+          token: string
+        }
+        Update: {
+          billing_email?: string | null
+          business_name?: string | null
+          cfdi_use?: string | null
+          created_at?: string
+          id?: never
+          payment_log_entry_id?: number
+          postal_code?: string | null
+          rfc?: string | null
+          status?: string
+          student_id?: string
+          submitted_at?: string | null
+          tax_regime?: string | null
+          token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_requests_payment_log_entry_id_fkey"
+            columns: ["payment_log_entry_id"]
+            isOneToOne: false
+            referencedRelation: "payment_log_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_requests_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "app_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       leaderboard_identities: {
         Row: {
           mode: string
@@ -2197,36 +2260,60 @@ export type Database = {
       payment_log_entries: {
         Row: {
           amount: number
+          card_last4: string | null
           company: string | null
           entity_type: Database["public"]["Enums"]["paid_entity_type"]
+          folio: string | null
           group_id: number | null
           id: number
+          issuing_bank: string | null
+          method: string | null
+          method_detail: string | null
           month: string
           name: string
           paid_at: string
+          receipt_pdf_url: string | null
+          receiving_bank: string | null
           student_id: string | null
+          tracking_key: string | null
         }
         Insert: {
           amount: number
+          card_last4?: string | null
           company?: string | null
           entity_type: Database["public"]["Enums"]["paid_entity_type"]
+          folio?: string | null
           group_id?: number | null
           id?: never
+          issuing_bank?: string | null
+          method?: string | null
+          method_detail?: string | null
           month: string
           name: string
           paid_at?: string
+          receipt_pdf_url?: string | null
+          receiving_bank?: string | null
           student_id?: string | null
+          tracking_key?: string | null
         }
         Update: {
           amount?: number
+          card_last4?: string | null
           company?: string | null
           entity_type?: Database["public"]["Enums"]["paid_entity_type"]
+          folio?: string | null
           group_id?: number | null
           id?: never
+          issuing_bank?: string | null
+          method?: string | null
+          method_detail?: string | null
           month?: string
           name?: string
           paid_at?: string
+          receipt_pdf_url?: string | null
+          receiving_bank?: string | null
           student_id?: string | null
+          tracking_key?: string | null
         }
         Relationships: [
           {
