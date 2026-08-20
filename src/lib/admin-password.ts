@@ -7,6 +7,7 @@
 // form of id they have on hand.
 import { supabase } from "@/integrations/supabase/client";
 import { legacyToUuid } from "./user-id-bridge";
+import { notifyAccountEvent } from "./account-notify";
 
 function looksLikeUuid(v: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
@@ -24,5 +25,9 @@ export async function adminSetPassword(
   if (error || invokeError) {
     return { ok: false, error: invokeError || error?.message || "Failed to reset the password — please try again." };
   }
+  // 2026-08-20: same "tu contraseña fue actualizada" confirmation the
+  // person gets when they reset it themselves (reset-password.tsx) — more
+  // important here, since it's not something they initiated. Fire-and-forget.
+  notifyAccountEvent(uuid, "password_changed");
   return { ok: true, password: (data as { password: string }).password };
 }

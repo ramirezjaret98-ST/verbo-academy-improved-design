@@ -658,14 +658,26 @@ export function studentSetSessionStatus(
 /** Fires the `notify-session-event` Edge Function for a session status
  *  change or a freshly-generated report, so the relevant emails go out
  *  (teacher/admin alert + student confirmation, or the report-ready email).
- *  Best-effort — logs and swallows failures, never surfaces to the caller. */
+ *  Best-effort — logs and swallows failures, never surfaces to the caller.
+ *  2026-08-20: extended with 3 kinds beyond the original 4 (see
+ *  RescheduleModal.tsx and lesson-plans-store.ts for their call sites) — the
+ *  optional `extra.previousDateTime` is display-only (shown as "fecha
+ *  anterior" in the reschedule emails), never used to decide recipients. */
 export function notifySessionEvent(
   sessionId: string | number,
-  kind: "cancelled" | "absent" | "pending_reschedule" | "report_ready",
+  kind:
+    | "cancelled"
+    | "absent"
+    | "pending_reschedule"
+    | "report_ready"
+    | "reschedule_approved"
+    | "admin_rescheduled"
+    | "lesson_plan_ready",
+  extra?: { previousDateTime?: string },
 ): void {
   const numericId = Number(sessionId);
   if (!Number.isFinite(numericId)) return;
-  void supabase.functions.invoke("notify-session-event", { body: { sessionId: numericId, kind } })
+  void supabase.functions.invoke("notify-session-event", { body: { sessionId: numericId, kind, ...(extra ? { extra } : {}) } })
     .then(({ error }) => {
       if (error) console.error("[sessions-store] notify-session-event failed", error);
     });
@@ -938,6 +950,18 @@ export function applyGroupMemberCancellation(
   if (outcome.kind === "unanimous_cancel") patch.status = "cancelled";
   else if (outcome.kind === "unanimous_reschedule") patch.status = "pending_reschedule";
   updateSession(sessionId, patch);
+  // 2026-08-20 fix: group cancellations went through this function (via
+  // updateSession) instead of studentSetSessionStatus, so they never fired
+  // the teacher/admin alert + student confirmation email that 1:1
+  // cancellations already get — a real gap flagged in
+  // fix_logs_notificaciones_cancelacion_2026-08-14. Only fires once the
+  // group actually flips to cancelled/pending_reschedule (unanimity
+  // reached), same as when a real "cancelled"/"pending_reschedule" status
+  // lands on a 1:1 session.
+  const numericId = Number(sessionId);
+  if (Number.isFinite(numericId) && (patch.status === "cancelled" || patch.status === "pending_reschedule")) {
+    notifySessionEvent(numericId, patch.status);
+  }
   return {
     outcome,
     topStatus: (patch.status ?? sess.status) as ExtSessionStatus,

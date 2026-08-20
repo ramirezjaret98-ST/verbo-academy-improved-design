@@ -18,7 +18,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { registerRehydrate } from "@/lib/auth-rehydrate";
 import type { Database } from "@/integrations/supabase/types";
-import { loadSessions } from "./sessions-store";
+import { loadSessions, notifySessionEvent } from "./sessions-store";
 import { activeMembersOf } from "./groups-store";
 import { setUnitAccess } from "./activities-store";
 import { findCustomUnitById, hydrateCustomUnits } from "./custom-units-store";
@@ -141,6 +141,12 @@ export function getLessonPlan(sessionId: string): LessonPlan | undefined {
 
 export function saveLessonPlan(plan: LessonPlan) {
   const prev = plansCache;
+  // 2026-08-20: capture whether a plan already existed for this session
+  // BEFORE the cache is replaced below, so the "tu clase está lista" email
+  // only fires the first time a plan is saved — not on every later edit
+  // (e.g. Admin editing level/unit/comments from the Calendar shortcut, see
+  // fix_planeacion_admin_whatsapp_reagendado_bulk_schedule_2026-08-19).
+  const isFirstSave = !prev.some((p) => p.session_id === plan.session_id);
   plansCache = [...plansCache.filter((p) => p.session_id !== plan.session_id), plan];
   notify();
 
@@ -172,6 +178,9 @@ export function saveLessonPlan(plan: LessonPlan) {
       return;
     }
     autoUnlockPlannedUnit(plan);
+    if (isFirstSave && Number.isFinite(numericSessionId)) {
+      notifySessionEvent(numericSessionId, "lesson_plan_ready");
+    }
   })();
 }
 
