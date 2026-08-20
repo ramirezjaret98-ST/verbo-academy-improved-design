@@ -19,6 +19,7 @@ import { MACRO_SKILLS as SHARED_MACRO_SKILLS, skillKey as sharedSkillKey, type B
 import { submitSessionReport, updateSession, loadSessions, subscribeSessions, notifySessionEvent, logSessionConnect, SUB_STATUS_META, isJustificationWindowOpen, type ExtSession, type AttendanceSubStatus } from "@/lib/sessions-store";
 import { PlanModal } from "@/components/verbo/PlanModal";
 import { downloadSessionReportPdf, sessionReportPdfBlob, sessionReportFileName } from "@/lib/session-report-pdf";
+import { downloadCollaborationPdf, downloadKpiSummaryPdf } from "@/lib/simple-docs-pdf";
 import { uploadContentFile } from "@/lib/content-uploads";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -229,6 +230,43 @@ function TeacherDashboard() {
 
   // KPI/Performance card
   const kpis = teacherUser ? computeTeacherKpis(teacherUser, getBonusThreshold()) : null;
+
+  // Simple branded documents (2026-08-20) — teacher's own collaboration
+  // letter + performance summary, on-demand client-side, same pattern as
+  // the session report download elsewhere in this file.
+  const [downloadingTeacherDoc, setDownloadingTeacherDoc] = useState<"collab" | "kpi" | null>(null);
+  async function handleDownloadCollaboration() {
+    if (!teacherUser) return;
+    setDownloadingTeacherDoc("collab");
+    try {
+      await downloadCollaborationPdf({
+        id: teacherUser.id,
+        name: teacherUser.name,
+        email: teacherUser.email,
+        hireDate: teacherUser.hire_date,
+      });
+    } catch (err) {
+      console.error("[TeacherDashboard] failed to generate collaboration PDF", err);
+    } finally {
+      setDownloadingTeacherDoc(null);
+    }
+  }
+  async function handleDownloadKpiSummary() {
+    if (!teacherUser || !kpis) return;
+    setDownloadingTeacherDoc("kpi");
+    try {
+      await downloadKpiSummaryPdf({
+        teacher: { id: teacherUser.id, name: teacherUser.name, email: teacherUser.email },
+        period: new Date().toLocaleDateString("es-MX", { month: "long", year: "numeric" }),
+        kpis,
+        activeStudentCount: students.length,
+      });
+    } catch (err) {
+      console.error("[TeacherDashboard] failed to generate KPI summary PDF", err);
+    } finally {
+      setDownloadingTeacherDoc(null);
+    }
+  }
   const KPI_GOOD = 85;
   const KPI_CRITICAL = 70;
   const signals = kpis
@@ -988,6 +1026,39 @@ function TeacherDashboard() {
         </div>
       </section>
 
+      <section id="my-documents">
+        <div className="mb-3">
+          <SectionTitle>My Documents</SectionTitle>
+        </div>
+        <Card className="p-4">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <button
+              type="button"
+              onClick={handleDownloadCollaboration}
+              disabled={downloadingTeacherDoc === "collab" || !teacherUser}
+              className="flex items-center justify-between gap-3 rounded-xl border border-border px-4 py-3.5 text-left transition-colors hover:bg-muted/50 disabled:opacity-50"
+            >
+              <div>
+                <div className="text-sm font-bold text-foreground">Constancia de colaboración</div>
+                <div className="text-xs text-muted-foreground">For your own fiscal/admin use</div>
+              </div>
+              <Download className="h-4 w-4 shrink-0 text-muted-foreground" />
+            </button>
+            <button
+              type="button"
+              onClick={handleDownloadKpiSummary}
+              disabled={downloadingTeacherDoc === "kpi" || !teacherUser || !kpis}
+              className="flex items-center justify-between gap-3 rounded-xl border border-border px-4 py-3.5 text-left transition-colors hover:bg-muted/50 disabled:opacity-50"
+            >
+              <div>
+                <div className="text-sm font-bold text-foreground">Resumen de desempeño</div>
+                <div className="text-xs text-muted-foreground">This cycle's performance metrics</div>
+              </div>
+              <Download className="h-4 w-4 shrink-0 text-muted-foreground" />
+            </button>
+          </div>
+        </Card>
+      </section>
 
       <section>
         <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">

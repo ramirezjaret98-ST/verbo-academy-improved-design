@@ -31,6 +31,7 @@ import { getLessonPlan, subscribeLessonPlans, type LessonPlan } from "@/lib/less
 import { unitsForStudent } from "@/lib/vip-courses-store";
 import { paymentsForEntity, subscribePayments, type PaymentLogEntry } from "@/lib/payments-log";
 import { downloadReceiptPdf } from "@/lib/receipt-pdf";
+import { downloadEnrollmentPdf, downloadStatementPdf } from "@/lib/simple-docs-pdf";
 import { tailoredUnitsForStudent } from "@/lib/tailored-content-store";
 import { subscribeVipUnits, subscribeVipUnitCompletion } from "@/lib/vip-courses-store";
 import { useComputedMacros } from "@/components/verbo/PerformanceAnalytics";
@@ -283,6 +284,39 @@ function StudentDashboard() {
       console.error("[StudentDashboard] failed to generate receipt PDF", err);
     } finally {
       setDownloadingPaymentId(null);
+    }
+  }
+
+  // Simple branded documents (2026-08-20) — enrollment letter + full payment
+  // statement, same on-demand client-side pattern as the receipt above.
+  const [downloadingDoc, setDownloadingDoc] = useState<"enrollment" | "statement" | null>(null);
+  async function handleDownloadEnrollment() {
+    if (!user) return;
+    setDownloadingDoc("enrollment");
+    try {
+      await downloadEnrollmentPdf({
+        id: user.id,
+        name: user.name,
+        product: user.product,
+        accessPlan: user.access_plan,
+        currentLevel: user.current_roadmap_level,
+        company: user.company,
+      });
+    } catch (err) {
+      console.error("[StudentDashboard] failed to generate enrollment PDF", err);
+    } finally {
+      setDownloadingDoc(null);
+    }
+  }
+  async function handleDownloadStatement() {
+    if (!user) return;
+    setDownloadingDoc("statement");
+    try {
+      await downloadStatementPdf({ id: user.id, name: user.name });
+    } catch (err) {
+      console.error("[StudentDashboard] failed to generate statement PDF", err);
+    } finally {
+      setDownloadingDoc(null);
     }
   }
   const [classDetail, setClassDetail] = useState<ExtSession | null>(null);
@@ -1335,6 +1369,38 @@ function StudentDashboard() {
               </div>
             </>
           )}
+        </PremiumCard>
+      </section>
+
+      <section id="documents" data-tour="documents" className="verbo-fade-up motion-reduce:animate-none" style={{ animationDelay: "340ms" }}>
+        <SectionTitle>Documents</SectionTitle>
+        <PremiumCard className="verbo-card-hover">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <button
+              type="button"
+              onClick={handleDownloadEnrollment}
+              disabled={downloadingDoc === "enrollment"}
+              className="flex items-center justify-between gap-3 rounded-xl border border-border px-4 py-3.5 text-left transition-colors hover:bg-secondary/40 disabled:opacity-50"
+            >
+              <div>
+                <div className="text-sm font-semibold text-foreground">Constancia de inscripción</div>
+                <div className="text-xs text-muted-foreground">Proof of active enrollment</div>
+              </div>
+              <Download className="h-4 w-4 shrink-0 text-muted-foreground" />
+            </button>
+            <button
+              type="button"
+              onClick={handleDownloadStatement}
+              disabled={downloadingDoc === "statement"}
+              className="flex items-center justify-between gap-3 rounded-xl border border-border px-4 py-3.5 text-left transition-colors hover:bg-secondary/40 disabled:opacity-50"
+            >
+              <div>
+                <div className="text-sm font-semibold text-foreground">Estado de cuenta</div>
+                <div className="text-xs text-muted-foreground">Full payment history</div>
+              </div>
+              <Download className="h-4 w-4 shrink-0 text-muted-foreground" />
+            </button>
+          </div>
         </PremiumCard>
       </section>
 
