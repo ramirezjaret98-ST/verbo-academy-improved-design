@@ -14,6 +14,7 @@ import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { validatePasswordComplexity } from "@/lib/auth";
+import { notifyAccountEvent } from "@/lib/account-notify";
 import { Logo } from "@/components/verbo/Logo";
 import { Loader2, Check, X, AlertTriangle } from "lucide-react";
 
@@ -91,6 +92,11 @@ function ResetPasswordPage() {
     const { data: userData } = await supabase.auth.getUser();
     if (userData?.user) {
       await supabase.from("app_users").update({ must_change_password: false }).eq("id", userData.user.id);
+      // 2026-08-20: security confirmation email — "tu contraseña fue
+      // actualizada" — same as when Admin resets it on someone's behalf
+      // (see adminSetPassword in admin-password.ts). Fire-and-forget, never
+      // blocks the sign-out/redirect below.
+      notifyAccountEvent(userData.user.id, "password_changed");
     }
 
     // Sign out of the temporary recovery session and send them to a normal
