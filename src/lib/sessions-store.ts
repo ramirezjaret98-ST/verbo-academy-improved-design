@@ -662,7 +662,10 @@ export function studentSetSessionStatus(
  *  2026-08-20: extended with 3 kinds beyond the original 4 (see
  *  RescheduleModal.tsx and lesson-plans-store.ts for their call sites) — the
  *  optional `extra.previousDateTime` is display-only (shown as "fecha
- *  anterior" in the reschedule emails), never used to decide recipients. */
+ *  anterior" in the reschedule emails), never used to decide recipients.
+ *  2026-08-20 (later same day): added `reschedule_declined` — the other half
+ *  of RescheduleModal's decline flow (see that file), with an optional
+ *  `extra.reason` Admin can type, also display-only. */
 export function notifySessionEvent(
   sessionId: string | number,
   kind:
@@ -672,8 +675,9 @@ export function notifySessionEvent(
     | "report_ready"
     | "reschedule_approved"
     | "admin_rescheduled"
-    | "lesson_plan_ready",
-  extra?: { previousDateTime?: string },
+    | "lesson_plan_ready"
+    | "reschedule_declined",
+  extra?: { previousDateTime?: string; reason?: string },
 ): void {
   const numericId = Number(sessionId);
   if (!Number.isFinite(numericId)) return;
