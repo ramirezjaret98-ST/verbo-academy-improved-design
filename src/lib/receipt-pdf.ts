@@ -110,7 +110,7 @@ function buildHtml(input: ReceiptInput): string {
     row("Detalle adicional", entry.methodDetail),
   ].join("");
 
-  const totalRow = `<tr><td>Total recibido</td><td>${money(entry.amount)} MXN</td></tr>`;
+  const totalRow = `<tr class="total"><td>Total recibido</td><td>${money(entry.amount)} MXN</td></tr>`;
 
   const invoiceCta = invoiceUrl
     ? `<a class="cta" href="${invoiceUrl}">Solicitar factura</a>`
@@ -151,7 +151,7 @@ function buildHtml(input: ReceiptInput): string {
   table.concept thead th:last-child, table.concept tbody td:last-child{text-align:right;}
   table.concept tbody td{padding:7px 14px;border-bottom:1px solid #e3e9ed;font-size:12px;}
   table.concept tbody tr:nth-child(even){background:#f4f6f8;}
-  table.concept tbody tr:last-child td{border-bottom:none;font-weight:800;color:#01304a;font-size:15px;padding:10px 14px;background:#fff6ec;}
+  table.concept tbody tr.total td{border-bottom:none;font-weight:800;color:#01304a;font-size:15px;padding:10px 14px;background:#fff6ec;}
   .issuer-row{display:flex;align-items:center;gap:14px;background:#f4f6f8;border-radius:14px;padding:12px 20px;}
   .seal{width:52px;height:52px;border-radius:50%;overflow:hidden;flex-shrink:0;}
   .seal img{width:100%;height:100%;object-fit:cover;}
