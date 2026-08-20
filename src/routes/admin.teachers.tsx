@@ -36,6 +36,7 @@ import { waLink } from "@/lib/phone-utils";
 import type { LucideIcon } from "lucide-react";
 import { HeroStatCard, Pill, AccentModal, AccentModalFooter, GhostButton, PrimaryButton } from "@/components/verbo/ui";
 import { ResetPasswordModal } from "@/components/verbo/ResetPasswordModal";
+import { downloadPayrollPdf } from "@/lib/payroll-pdf";
 import { useAuth } from "@/lib/auth";
 import { getAdminType } from "@/lib/admin-roles";
 import { KpiOverrideModal } from "@/components/verbo/KpiOverrideModal";
@@ -986,127 +987,18 @@ function FinancialTab({ t, onPersist, onAddAdjustment }: { t: User; onPersist: (
 
 
   const generatePDF = async () => {
-    const { default: jsPDF } = await import("jspdf");
-    const autoTable = (await import("jspdf-autotable")).default;
-    const doc = new jsPDF();
     const period = cycleLabel();
-
-    const NAVY: [number, number, number] = [1, 48, 74];
-    const ORANGE: [number, number, number] = [243, 137, 52];
-    const W = doc.internal.pageSize.getWidth();
-
-    /* Header band with the Verbo brand mark */
-    doc.setFillColor(...NAVY);
-    doc.rect(0, 0, W, 34, "F");
-    doc.setFillColor(...ORANGE);
-    doc.rect(0, 34, W, 1.6, "F");
-
-    doc.setTextColor(255, 255, 255);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(16);
-    doc.text("VERBO", 14, 16);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(7.5);
-    doc.setTextColor(243, 137, 52);
-    doc.text("LANGUAGE SOLUTIONS", 14, 22, { charSpace: 1.6 });
-
-    doc.setTextColor(255, 255, 255);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(13);
-    doc.text("Payroll Report", W - 14, 16, { align: "right" });
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(9);
-    doc.text(period, W - 14, 22, { align: "right" });
-
-    /* Teacher details block */
-    autoTable(doc, {
-      startY: 44,
-      body: [
-        ["Teacher", t.name],
-        ["Email", t.email],
-        ["Cycle", period],
-        ["Payment frequency", paymentFrequency(t)],
-      ],
-      theme: "plain",
-      styles: { fontSize: 9.5, cellPadding: { top: 1.6, bottom: 1.6, left: 0, right: 4 } },
-      columnStyles: {
-        0: { fontStyle: "bold", textColor: NAVY, cellWidth: 42 },
-        1: { textColor: [60, 60, 60] },
+    await downloadPayrollPdf({
+      teacher: {
+        id: t.id,
+        name: t.name,
+        email: t.email,
+        paymentFrequency: paymentFrequency(t),
       },
+      period,
+      summary,
+      adjustments,
     });
-
-    let y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 10;
-
-    const sectionTitle = (label: string, atY: number) => {
-      doc.setFillColor(...NAVY);
-      doc.rect(14, atY - 5, 3, 6, "F");
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(11);
-      doc.setTextColor(...NAVY);
-      doc.text(label, 20, atY);
-    };
-
-    /* Sessions & earnings breakdown */
-    sectionTitle("Sessions & earnings", y);
-    autoTable(doc, {
-      startY: y + 4,
-      head: [["Concept", "Detail", "Amount (MXN)"]],
-      body: [
-        ["Hours worked (this cycle)", `${summary.hours} h`, "—"],
-        ["Hourly rate", "per hour", money(summary.rate)],
-        ["Subtotal", `${summary.hours} h × ${money(summary.rate)}`, money(summary.subtotal)],
-      ],
-      theme: "grid",
-      styles: { fontSize: 9.5, cellPadding: 2.6, lineColor: [226, 232, 240] },
-      headStyles: { fillColor: NAVY, textColor: 255, fontStyle: "bold" },
-      alternateRowStyles: { fillColor: [246, 249, 251] },
-      columnStyles: { 2: { halign: "right" } },
-    });
-
-    y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 12;
-
-    /* Adjustments */
-    sectionTitle("Adjustments", y);
-    autoTable(doc, {
-      startY: y + 4,
-      head: [["Date", "Reason", "Amount (MXN)"]],
-      body: adjustments.length
-        ? adjustments.map((a) => [new Date(a.date).toLocaleDateString(), a.reason, money(a.amount)])
-        : [["—", "No adjustments applied", "—"]],
-      foot: [["", "Adjustments total", money(summary.adjustments)]],
-      theme: "grid",
-      styles: { fontSize: 9.5, cellPadding: 2.6, lineColor: [226, 232, 240] },
-      headStyles: { fillColor: NAVY, textColor: 255, fontStyle: "bold" },
-      footStyles: { fillColor: [237, 243, 247], textColor: NAVY, fontStyle: "bold" },
-      alternateRowStyles: { fillColor: [246, 249, 251] },
-      columnStyles: { 0: { cellWidth: 28 }, 2: { halign: "right" } },
-    });
-
-    y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 14;
-
-    /* Total banner */
-    doc.setFillColor(...NAVY);
-    doc.roundedRect(14, y, W - 28, 16, 2, 2, "F");
-    doc.setTextColor(255, 255, 255);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(11);
-    doc.text("Total to pay", 20, y + 10.5);
-    doc.setFontSize(13);
-    doc.setTextColor(243, 137, 52);
-    doc.text(`${money(summary.total)} MXN`, W - 20, y + 10.5, { align: "right" });
-
-    /* Footer */
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(8);
-    doc.setTextColor(140, 150, 160);
-    doc.text(
-      `Generated on ${new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })} · verbolanguagesolutions.com`,
-      W / 2,
-      doc.internal.pageSize.getHeight() - 12,
-      { align: "center" },
-    );
-
-    doc.save(`payroll-${t.name.replace(/\s+/g, "-").toLowerCase()}-${period.replace(/\s+/g, "-").toLowerCase()}.pdf`);
   };
 
 
