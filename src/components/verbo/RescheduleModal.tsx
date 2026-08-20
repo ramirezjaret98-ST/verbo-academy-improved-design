@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { CalendarClock, AlertTriangle } from "lucide-react";
 import { AccentModal, AccentModalFooter, GhostButton, PrimaryButton } from "./ui";
-import { updateSession, type ExtSession } from "@/lib/sessions-store";
+import { updateSession, notifySessionEvent, type ExtSession } from "@/lib/sessions-store";
 import { isTeacherAvailableAt } from "@/lib/availability-store";
 
 const HEADER_BG = "linear-gradient(135deg, #01304a 0%, #02466b 100%)";
@@ -43,7 +43,16 @@ export function RescheduleModal({
       setError("The assigned teacher is not available at that time (outside their schedule or overlaps another session).");
       return;
     }
+    // 2026-08-20: this modal is the single real trigger for BOTH "reagendo
+    // aprobado" (Admin resolving a student's own pending_reschedule request)
+    // and "admin_rescheduled" (Admin moving a session on their own
+    // initiative) — same action, different email framing based on the
+    // session's status right before the update. Capture the previous
+    // date_time first so the email can show "fecha anterior" for context.
+    const wasStudentRequest = session.status === "pending_reschedule";
+    const previousDateTime = session.date_time;
     updateSession(session.id, { date_time: iso, status: permanent ? "scheduled" : "rescheduled" });
+    notifySessionEvent(session.id, wasStudentRequest ? "reschedule_approved" : "admin_rescheduled", { previousDateTime });
     // 2026-08-19: used to also ping Admin's own WhatsApp here — that link is
     // meant to alert Admin when a TEACHER/STUDENT requests something (see
     // CantAttendModal.tsx), but every caller of this modal already IS Admin,
