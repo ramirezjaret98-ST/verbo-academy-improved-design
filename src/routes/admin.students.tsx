@@ -250,7 +250,7 @@ function Page() {
     forceTick((n) => n + 1);
   };
 
-  const handleRegister = (u: User, teacherId?: string) => {
+  const handleRegister = (u: User, teacherId?: string, sendWelcomeEmail?: boolean) => {
     USERS.push(u);
     const registered = readRegisteredStudents();
     registered.push(u);
@@ -267,7 +267,12 @@ function Page() {
     // follow-up rather than blocking the admin's flow.
     void (async () => {
       const { data, error } = await supabase.functions.invoke("admin-create-user", {
-        body: { legacyId: u.id, email: u.email, password: u.password, name: u.name, role: "student" },
+        body: {
+          legacyId: u.id, email: u.email, password: u.password, name: u.name, role: "student",
+          // Opt-in per the "Welcome email" checkbox on the form — the
+          // function only sends when this is explicitly true.
+          sendWelcomeEmail: !!sendWelcomeEmail,
+        },
       });
       const invokeError = (data as { error?: string } | null)?.error;
       if (error || invokeError) {
@@ -672,6 +677,10 @@ function Tag({ children, className = "", style }: { children: React.ReactNode; c
 // ===========================================================================
 type FormState = {
   name: string; email: string; phone: string; password: string; member_since: string;
+  /** New-student-only: send the "welcome to Verbo Academy" email (motivational
+   *  message + login credentials table + support contacts) right after this
+   *  account is created. Ignored when editing an existing student. */
+  send_welcome_email: boolean;
   company: string;
   product_type: "performance" | "workshops" | "insights";
   product: ProductId | "";
@@ -703,7 +712,7 @@ function StudentFormModal({
   initial: User | null;
   teachers: User[];
   onClose: () => void;
-  onSave: (u: User, teacherId?: string) => void;
+  onSave: (u: User, teacherId?: string, sendWelcomeEmail?: boolean) => void;
 }) {
   const editing = !!initial;
   const existingTeacher = initial ? assignedTeacherIdFor(initial.id) ?? "" : "";
@@ -713,6 +722,10 @@ function StudentFormModal({
     email: initial?.email ?? "",
     phone: initial?.phone ?? "",
     password: initial?.password ?? "",
+    // Only meaningful for a brand-new student — default to on so the
+    // welcome email is the expected behavior, not something the admin has
+    // to remember to opt into.
+    send_welcome_email: !initial,
     member_since: initial?.member_since ?? "",
     company: initial?.company ?? "",
     product_type: (initial?.product_type as FormState["product_type"]) ?? "performance",
@@ -939,7 +952,7 @@ function StudentFormModal({
     for (const cid of currentIds) if (!targetIds.has(cid)) removeParticipantFromCohort(cid, id);
     for (const cid of targetIds) if (!currentIds.has(cid)) addStudentToCohort(cid, id, u.name);
 
-    onSave(u, isPerf ? (f.teacher_id || undefined) : undefined);
+    onSave(u, isPerf ? (f.teacher_id || undefined) : undefined, !editing ? f.send_welcome_email : undefined);
   };
 
   const isPerf = f.product_type === "performance";
@@ -1326,6 +1339,22 @@ function StudentFormModal({
                   </button>
                 </div>
               </Field>
+              {!editing && (
+                <Field label="Welcome email" icon={<Mail className="h-3.5 w-3.5" />} className="md:col-span-2">
+                  <label className="flex cursor-pointer items-center gap-2.5 rounded-lg border border-border bg-secondary/30 px-3 py-2.5 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={f.send_welcome_email}
+                      onChange={(e) => set("send_welcome_email", e.target.checked)}
+                      className="h-4 w-4 rounded border-border accent-[#01304a]"
+                    />
+                    <span className="text-foreground">Send this student a welcome email with their login credentials once the account is created</span>
+                  </label>
+                  <p className="mt-1 text-[10.5px] text-muted-foreground">
+                    Includes the email/password above in plain text, so only send it through a channel the student actually controls — double-check the email address first.
+                  </p>
+                </Field>
+              )}
               <Field label="Member Since" icon={<CalendarDays className="h-3.5 w-3.5" />}>
                 <input type="date" value={f.member_since} onChange={(e) => set("member_since", e.target.value)} className={inputCls} />
               </Field>
