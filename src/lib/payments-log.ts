@@ -276,6 +276,18 @@ export function paymentsForEntityInMonth(
   );
 }
 
+/** Every payment ever logged for one entity, newest first — used by the
+ *  student's own "Recent Payments" card (receipt-pdf.ts) so they can
+ *  download a receipt for any past payment, not just the current month. */
+export function paymentsForEntity(
+  entityType: PaidEntityType,
+  entityId: string,
+): PaymentLogEntry[] {
+  return loadPayments()
+    .filter((p) => p.entity_type === entityType && p.entity_id === entityId)
+    .sort((a, b) => +new Date(b.paid_at) - +new Date(a.paid_at));
+}
+
 /** Retention pruning: deletes every individual payment older than `cutoffMs`
  *  from Supabase (optimistic, rollback on failure), and prunes group
  *  payments older than `cutoffMs` from localStorage. Replaces the old
