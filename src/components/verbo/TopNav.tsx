@@ -6,6 +6,9 @@ import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { StaffProfileModal } from "./StaffProfileModal";
 import { useAvatar } from "@/lib/avatar-store";
+import { initialsOf } from "@/lib/utils";
+import { hasSeenTour, markTourSeen } from "@/lib/tour-seen-store";
+import { DASHBOARD_TOUR_ID } from "./DashboardWelcomeTour";
 import { NotificationsBell } from "./NotificationsBell";
 import { ContactVerbotButton } from "./ContactVerbotModal";
 import type { User } from "@/lib/mock-data";
@@ -216,6 +219,11 @@ export function TopNav({ items, variant = "light" }: { items: NavEntry[]; varian
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [profileOpen, setProfileOpen] = useState(false);
+  // First-login moment: instead of the old auto-tour, a first-time student
+  // gets nudged straight into their profile modal to complete it. Reuses
+  // DASHBOARD_TOUR_ID's "seen" bookkeeping so an existing student who already
+  // passed the old tour is never re-prompted, and this only ever fires once.
+  const [profileFirstLoginPrompt, setProfileFirstLoginPrompt] = useState(false);
   const isStudent = user?.role === "student";
   const isAdmin = user?.role === "admin";
   const isTeacher = user?.role === "teacher";
@@ -259,6 +267,27 @@ export function TopNav({ items, variant = "light" }: { items: NavEntry[]; varian
       window.removeEventListener("resize", updateFades);
     };
   }, [items, pathname]);
+
+  // First-time student: nudge them into completing their profile instead of
+  // the old auto-tour. Fires once, the very first time they land anywhere
+  // under /student.
+  useEffect(() => {
+    if (!isStudent || !user?.id) return;
+    if (hasSeenTour(user.id, DASHBOARD_TOUR_ID)) return;
+    const t = window.setTimeout(() => {
+      setProfileFirstLoginPrompt(true);
+      setProfileOpen(true);
+    }, 500);
+    return () => window.clearTimeout(t);
+  }, [isStudent, user?.id]);
+
+  const handleProfileOpenChange = (v: boolean) => {
+    setProfileOpen(v);
+    if (!v && profileFirstLoginPrompt && user?.id) {
+      markTourSeen(user.id, DASHBOARD_TOUR_ID);
+      setProfileFirstLoginPrompt(false);
+    }
+  };
 
   // Progressive transparency: fully opaque near the top, fully transparent
   // past FADE_END. Applied straight to the DOM node (no React state) so it
@@ -410,7 +439,7 @@ export function TopNav({ items, variant = "light" }: { items: NavEntry[]; varian
                 {avatar ? (
                   <img src={avatar} alt="" className="h-full w-full object-cover" />
                 ) : (
-                  user?.name?.[0] ?? "?"
+                  <span className="text-xs">{initialsOf(user?.name)}</span>
                 )}
               </button>
             </div>
@@ -431,7 +460,7 @@ export function TopNav({ items, variant = "light" }: { items: NavEntry[]; varian
                 {avatar ? (
                   <img src={avatar} alt="" className="h-full w-full object-cover" />
                 ) : (
-                  user?.name?.[0] ?? "?"
+                  <span className="text-xs">{initialsOf(user?.name)}</span>
                 )}
               </button>
             </>
@@ -452,7 +481,11 @@ export function TopNav({ items, variant = "light" }: { items: NavEntry[]; varian
         </div>
       </div>
       {(isStudent || isAdmin || isTeacher) && (
-        <StaffProfileModal open={profileOpen} onOpenChange={setProfileOpen} />
+        <StaffProfileModal
+          open={profileOpen}
+          onOpenChange={handleProfileOpenChange}
+          promptCompleteProfile={profileFirstLoginPrompt}
+        />
       )}
     </header>
   );

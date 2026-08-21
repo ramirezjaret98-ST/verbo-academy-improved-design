@@ -1,14 +1,18 @@
-// Automatic, one-time welcome tour for the Student Dashboard. Fires the first
-// time a student ever lands on /student, never again after that (see
-// tour-seen-store.ts). Every other Verbot tour in the app is on-demand only
-// (VerbotHelpBubble) — this is the single exception, by design.
+// One-time welcome tour for the Student Dashboard, kept for potential re-use
+// as an on-demand tour. It no longer auto-fires on first login: that trigger
+// (DASHBOARD_TOUR_ID, tour-seen-store) now opens the profile-completion
+// prompt instead — see TopNav.tsx. Every other Verbot tour in the app is
+// on-demand only (VerbotHelpBubble); this one used to be the exception.
 import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { hasSeenTour, markTourSeen } from "@/lib/tour-seen-store";
 import { GuidedTour, type TourStep } from "@/components/verbo/GuidedTour";
 import verbotHi from "@/assets/Verbot_hi.svg";
 
-const DASHBOARD_TOUR_ID = "dashboard-welcome";
+// Exported so TopNav.tsx's first-login profile-completion prompt can reuse
+// the exact same "seen" key — a student who already passed through either
+// flow should never be prompted again.
+export const DASHBOARD_TOUR_ID = "dashboard-welcome";
 
 const STEPS: TourStep[] = [
   {

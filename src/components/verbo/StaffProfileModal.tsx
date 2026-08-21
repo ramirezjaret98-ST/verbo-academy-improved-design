@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { useAuth, validatePasswordComplexity } from "@/lib/auth";
 import { setAvatar, useAvatar } from "@/lib/avatar-store";
+import { initialsOf } from "@/lib/utils";
 import {
   MAX_HEADLINE_CHARS,
   MAX_SPECIALIZATIONS,
@@ -42,11 +43,14 @@ import {
   type LeaderboardIdentityMode,
 } from "@/lib/leaderboard-identity-store";
 import { AchievementsGallery, BadgePickerModal, BadgeVisual } from "./ProfileModal";
-import { Check, KeyRound, Pencil, Plus, Star, Users, Clock, ShieldCheck, X } from "lucide-react";
+import { Check, KeyRound, Pencil, Plus, Sparkles, Star, Users, Clock, ShieldCheck, X } from "lucide-react";
 
 interface Props {
   open: boolean;
   onOpenChange: (v: boolean) => void;
+  /** True when this modal was auto-opened by the first-login nudge (TopNav.tsx),
+   *  rather than the user clicking their avatar. Shows a "complete your profile" banner. */
+  promptCompleteProfile?: boolean;
 }
 
 const STAT_ICON = {
@@ -56,7 +60,7 @@ const STAT_ICON = {
   team: ShieldCheck,
 } as const;
 
-export function StaffProfileModal({ open, onOpenChange }: Props) {
+export function StaffProfileModal({ open, onOpenChange, promptCompleteProfile = false }: Props) {
   const { user, updateProfile } = useAuth();
   const fileRef = useRef<HTMLInputElement>(null);
   const avatar = useAvatar(user?.id);
@@ -130,7 +134,7 @@ export function StaffProfileModal({ open, onOpenChange }: Props) {
 
   if (!user) return null;
 
-  const initial = user.name?.[0] ?? "?";
+  const initial = initialsOf(user.name);
 
   const onPickAvatar = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -261,6 +265,21 @@ export function StaffProfileModal({ open, onOpenChange }: Props) {
             <h2 className="font-display text-2xl font-semibold tracking-tight text-foreground">{user.name}</h2>
             <p className="mt-1 text-sm font-light text-muted-foreground">{rankLabel(user)}</p>
           </div>
+
+          {/* First-login nudge: only shown when this modal was auto-opened
+              on the student's very first visit. */}
+          {promptCompleteProfile && (
+            <div
+              className="verbo-profile-section mt-4 flex items-start gap-3 rounded-2xl border border-orange-200 bg-orange-50 px-4 py-3 text-left"
+              style={{ "--verbo-profile-i": 1 } as React.CSSProperties}
+            >
+              <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-orange-500" />
+              <p className="text-sm text-navy-700">
+                <span className="font-semibold">¡Bienvenido a Verbo!</span> Completa tu perfil — sube tu foto y
+                cuéntanos un poco sobre ti para empezar con el pie derecho.
+              </p>
+            </div>
+          )}
 
           {/* Chips */}
           <div className="verbo-profile-section mt-3 flex flex-wrap items-center justify-center gap-2" style={{ "--verbo-profile-i": 1 } as React.CSSProperties}>

@@ -3,6 +3,7 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { useAuth } from "@/lib/auth";
 import { Award, Lock, Camera, Plus, X } from "lucide-react";
 import { setAvatar, useAvatar } from "@/lib/avatar-store";
+import { initialsOf } from "@/lib/utils";
 import {
   getLeaderboardIdentity,
   setLeaderboardIdentity,
@@ -104,7 +105,7 @@ export function ProfileModal({ open, onOpenChange }: Props) {
   }, [user, open]);
 
   if (!user || !ctx) return null;
-  const initial = user.name?.[0] ?? "?";
+  const initial = initialsOf(user.name);
 
   const onPick = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
