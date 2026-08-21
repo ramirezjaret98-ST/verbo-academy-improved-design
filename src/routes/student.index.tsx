@@ -99,7 +99,8 @@ import soundWavesIconAsset from "@/assets/sound-waves.svg";
 import bookIconAsset from "@/assets/book-icon.svg";
 import { useAvatar } from "@/lib/avatar-store";
 import { ProfilePeekCard } from "@/components/verbo/ProfilePeekCard";
-import { DashboardWelcomeTour } from "@/components/verbo/DashboardWelcomeTour";
+// DashboardWelcomeTour no longer auto-fires here: the first-login moment now
+// opens the profile-completion prompt instead (see TopNav.tsx).
 
 const MACRO_ICON_ASSETS: Record<string, string> = {
   Speaking: micIconAsset,
@@ -544,7 +545,6 @@ function StudentDashboard() {
 
   return (
     <div className="space-y-10">
-      <DashboardWelcomeTour />
       <header className="verbo-fade-up motion-reduce:animate-none flex flex-wrap items-center justify-between gap-4" style={{ animationDelay: "0ms" }}>
         <div className="flex items-center gap-3">
           <img
