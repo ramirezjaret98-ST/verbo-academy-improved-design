@@ -97,6 +97,7 @@ export type NotificationKind =
   | "conduct_report_reviewed"
   | "learning_path_milestone"
   | "session_ready_to_prepare"
+  | "report_ready"
   | "session_changed"
   | "club_opened"
   | "payment_or_sessions_ending_soon"
@@ -741,6 +742,27 @@ function studentNotifications(studentId: string): Notification[] {
       body: `${plan.title} · ${fmtDate(s.date_time)}`,
       createdAt: plan.saved_at,
       to: "/student/sessions",
+      read: false,
+    });
+  }
+
+  // ---- Session report ready ------------------------------------------
+  // Mirrors the same trigger notify-session-event's "report_ready" email
+  // uses (report_submitted_at, set by submitSessionReport() the moment the
+  // teacher submits the Final Session Report) — fires regardless of whether
+  // the PDF itself finished uploading, same as the email. Routes to the
+  // dashboard, where the session's card / Class Details modal has the
+  // "Download report" button once report_pdf_url is set.
+  for (const s of loadSessions()) {
+    if (s.student_id !== studentId) continue;
+    if (!s.report_submitted_at) continue;
+    out.push({
+      id: `report-ready:${s.id}`,
+      kind: "report_ready",
+      title: "Your session report is ready",
+      body: fmtDate(s.date_time),
+      createdAt: s.report_submitted_at,
+      to: "/student",
       read: false,
     });
   }
