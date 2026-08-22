@@ -186,7 +186,20 @@ function TeacherDashboard() {
   const toPlanAll = upcoming.filter((s) => !plans[s.id]);
   const toPlan = toPlanAll.slice(0, 3);
   // Only sessions whose start time has already passed can be reported/completed.
-  const awaitingCompletion = upcoming.filter((s) => now >= +new Date(s.date_time));
+  // 2026-08-22 fix: this used to derive from `upcoming` (status === "scheduled"
+  // only), so a session that already had a lesson plan saved — status flips to
+  // "ready" the moment a plan is saved, well before class — silently fell out
+  // of "Complete Your Sessions" the instant it passed its start time, with no
+  // report ever filled. Teachers now save lesson plans ahead of time far more
+  // consistently (the lesson_plan_ready email nudges them to), so this was
+  // hiding real, common cases, not just an edge case. Sessions still awaiting
+  // a plan (truly "scheduled") and sessions that already have one ("ready")
+  // both belong here — either way, once the class has happened, a report is
+  // still owed. See fix_report_modal_completar_sesiones_planificadas_2026-08-22
+  // for the incident this surfaced from (Ericka Escamilla's sessions).
+  const awaitingCompletion = mySessions.filter(
+    (s) => (s.status === "scheduled" || s.status === "ready") && now >= +new Date(s.date_time),
+  );
 
   // ---- Real-data derivations (cards, Needs Attention, Recent Activity) ----
   const teacherUser = USERS.find((u) => u.id === user.id && u.role === "teacher") ?? null;
@@ -951,12 +964,19 @@ function TeacherDashboard() {
                     )}
                     {showReportControls && (
                       overdue ? (
-                        <button
-                          disabled
-                          className="inline-flex items-center gap-2 rounded-md border border-border bg-muted px-3 py-2 text-sm font-medium text-muted-foreground cursor-not-allowed"
-                        >
-                          <Lock className="h-4 w-4" /> Overdue (Locked)
-                        </button>
+                        // 2026-08-22 fix: this used to be a disabled "Overdue
+                        // (Locked)" button with no way out — once 24h passed,
+                        // the session could never get a report through this
+                        // panel again (the "Needs Your Attention" list next to
+                        // it already lets a teacher submit a late report via
+                        // this same `setEvaluating(s)` call, so the hard block
+                        // here was only inconsistent, not an intentional
+                        // stricter rule). Late is still flagged — via the Lock
+                        // icon/label and the existing strikes system — but no
+                        // longer unrecoverable.
+                        <PrimaryButton accentColor="#dc2626" onClick={() => setEvaluating(s)}>
+                          <Lock className="h-4 w-4" /> Overdue — Fill Report
+                        </PrimaryButton>
                       ) : (
                         <PrimaryButton accentColor={GREEN} onClick={() => setEvaluating(s)}>
                           <FileEdit className="h-4 w-4" /> Fill session report
