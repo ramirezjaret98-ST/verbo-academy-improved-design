@@ -28,7 +28,7 @@ import {
   UserPlus, CalendarPlus, Sparkles, BarChart3, X, CreditCard, Lock,
   Star, TrendingDown, Users2, Megaphone, ChevronRight,
   GraduationCap, CalendarClock, Layers, TrendingUp, AlertTriangle, Eye,
-  Wallet, CalendarCheck, Flag, TabletSmartphone,
+  Wallet, CalendarCheck, Flag, TabletSmartphone, MonitorPlay,
 } from "lucide-react";
 
 export const Route = createFileRoute("/admin/")({ component: Overview });
@@ -246,6 +246,10 @@ function Overview() {
     { label: "Schedule Sessions", icon: CalendarPlus, color: NAVY_DEEP, onClick: () => navigate({ to: "/admin/sessions" }) },
     { label: "Create Club Event", icon: Sparkles, color: GOLD, onClick: () => navigate({ to: "/admin/clubs", search: { new: true } }) },
     { label: "View Metrics", icon: BarChart3, color: "#5fca16", onClick: () => setMetricsOpen(true) },
+    // 2026-08-26: opens the onboarding demo (fake student, fake sessions —
+    // see demo-onboarding.tsx) in a new tab so Jaret can screen-share it on
+    // a call with a brand-new student without touching any real account.
+    { label: "Onboarding Demo", icon: MonitorPlay, color: "#01304a", onClick: () => window.open("/demo-onboarding", "_blank", "noopener") },
   ] as const;
 
   const summaryCards = [
