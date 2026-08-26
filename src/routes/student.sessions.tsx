@@ -73,7 +73,8 @@ import { groupOfStudent, incrementGroupRemaining, effectiveSessionCounts, sessio
 import { useCoreFreemiumGate } from "@/components/verbo/CoreFreemiumFlow";
 import { isSilenced, hasCreditUsed as freemiumUsed, markCreditUsed as markFreemiumUsed } from "@/lib/core-freemium-store";
 import { effectiveHourlyRate, appendTeacherAdjustment } from "@/lib/teacher-tiers";
-import { hydrateTeachers } from "@/lib/teacher-model";
+import { hydrateTeachers, subscribeTeachers } from "@/lib/teacher-model";
+import { hydrateStudents, subscribeStudents } from "@/lib/students-store";
 import { ProfilePeekCard } from "@/components/verbo/ProfilePeekCard";
 import { useAvatar } from "@/lib/avatar-store";
 
@@ -150,7 +151,12 @@ function Page() {
   useEffect(() => subscribeSessions(() => tick((n) => n + 1)), []);
   // Refresh teacher profile fields (ProfilePeekCard + qualified_products /
   // teacher_status filtering in the Spotlight & reschedule flows).
-  useEffect(() => { hydrateTeachers(); }, []);
+  useEffect(() => { hydrateTeachers(); hydrateStudents(); }, []);
+  // 2026-08-26 fix: this page never re-rendered when a demo person got
+  // hidden/updated elsewhere (teacher picker in Spotlight/reschedule, group
+  // classmates), so it could keep showing an already-deleted person.
+  useEffect(() => subscribeTeachers(() => tick((n) => n + 1)), []);
+  useEffect(() => subscribeStudents(() => tick((n) => n + 1)), []);
 
   useEffect(() => {
     if (focusParam !== "clubs") return;

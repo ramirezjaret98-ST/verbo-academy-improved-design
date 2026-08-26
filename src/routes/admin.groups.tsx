@@ -15,7 +15,8 @@ import {
   type ProductId, type AccessPlanId,
   accessPlanPillStyle,
 } from "@/lib/student-model";
-import { teachersForProduct, hydrateTeachers } from "@/lib/teacher-model";
+import { teachersForProduct, hydrateTeachers, subscribeTeachers } from "@/lib/teacher-model";
+import { hydrateStudents, subscribeStudents } from "@/lib/students-store";
 import {
   loadGroups, loadGroupMembers, subscribeGroups, registerGroupWithMembers,
   updateGroup, addMember, removeMember, restoreMember, archiveMember,
@@ -43,8 +44,16 @@ function Page() {
 
   useEffect(() => {
     hydrateTeachers();
+    hydrateStudents();
     tick((n) => n + 1);
-    return subscribeGroups(() => tick((n) => n + 1));
+    // 2026-08-26 fix: this page never re-rendered when a demo/mock person
+    // got hidden (or a real profile changed) anywhere else — member pickers
+    // and rosters here could keep showing already-deleted people until a
+    // hard reload.
+    const unsubGroups = subscribeGroups(() => tick((n) => n + 1));
+    const unsubTeachers = subscribeTeachers(() => tick((n) => n + 1));
+    const unsubStudents = subscribeStudents(() => tick((n) => n + 1));
+    return () => { unsubGroups(); unsubTeachers(); unsubStudents(); };
   }, []);
 
   const groups = loadGroups();

@@ -2,6 +2,9 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { CalendarDays, X, Video, FileText, CalendarClock, RefreshCcw, ClipboardList, NotebookPen } from "lucide-react";
 import { USERS, userById } from "@/lib/mock-data";
+import { subscribeStudents } from "@/lib/students-store";
+import { subscribeTeachers } from "@/lib/teacher-model";
+import { notifySuccess } from "@/lib/notify";
 import { Card, GhostButton, PrimaryButton } from "@/components/verbo/ui";
 import { CalendarView } from "@/components/verbo/CalendarView";
 import {
@@ -38,8 +41,6 @@ const BRAND = "#01304a";
 export const Route = createFileRoute("/admin/calendar")({ component: Page });
 
 function Page() {
-  const teachers = useMemo(() => USERS.filter((u) => u.role === "teacher"), []);
-  const students = useMemo(() => USERS.filter((u) => u.role === "student"), []);
   const [teacherId, setTeacherId] = useState("");
   const [studentId, setStudentId] = useState("");
   const [openEvent, setOpenEvent] = useState<CalendarEvent | null>(null);
@@ -50,6 +51,15 @@ function Page() {
   // can reschedule / change status directly, the calendar needs to reflect
   // that (and any other admin's edits) without a manual refresh.
   useEffect(() => subscribeSessions(() => setTick((n) => n + 1)), []);
+  // 2026-08-26 fix: `teachers`/`students` below used to be memoized with an
+  // empty dep array — frozen forever after the first render, AND never
+  // pruned the hidden demo people from mock-data.ts (a deletion made on
+  // another device/page would never disappear from this picker without a
+  // hard reload). Now recomputed whenever the roster actually changes.
+  useEffect(() => subscribeStudents(() => setTick((n) => n + 1)), []);
+  useEffect(() => subscribeTeachers(() => setTick((n) => n + 1)), []);
+  const teachers = useMemo(() => USERS.filter((u) => u.role === "teacher"), [tick]);
+  const students = useMemo(() => USERS.filter((u) => u.role === "student"), [tick]);
 
   const hasFilter = !!teacherId || !!studentId;
   const events = useMemo(
@@ -218,6 +228,7 @@ export function EventDetailsModal({
       ...(pendingStatus === "absent" ? { absent_cause: pendingAbsentCause } : {}),
     });
     setStatusEditing(false);
+    notifySuccess("Session status updated.");
     onClose();
   };
 
@@ -477,6 +488,7 @@ export function EventDetailsModal({
               updateSession(s.id, { status: "ready" });
             }
             setPlanningOpen(false);
+            notifySuccess("Lesson plan saved.");
             onClose();
           }}
         />

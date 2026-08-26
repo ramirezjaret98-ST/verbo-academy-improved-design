@@ -8,10 +8,10 @@ import { USERS, SESSIONS, type User, type Session } from "@/lib/mock-data";
 import { Card, PrimaryButton, GhostButton, AnimatedNumber, AccentModal } from "@/components/verbo/ui";
 import { SkeletonStatCards, useHydrated } from "@/components/verbo/skeletons";
 
-import { hydrateStudents } from "@/lib/students-store";
+import { hydrateStudents, subscribeStudents } from "@/lib/students-store";
 import { nextPaymentDate, daysUntil, MAX_INSIGHT_STRIKES, getProduct } from "@/lib/student-model";
 import { computeTeacherKpis } from "@/lib/teacher-kpis";
-import { pendingReviews } from "@/lib/teacher-model";
+import { pendingReviews, hydrateTeachers, subscribeTeachers } from "@/lib/teacher-model";
 import { monthlySnapshot } from "@/lib/teacher-kpi-history-store";
 import { subscribeClubs } from "@/lib/clubs-store";
 import { listChangeRequests } from "@/lib/availability-store";
@@ -92,6 +92,7 @@ function Overview() {
     // Hydrate the SAME overrides the Students/Teachers/KPIs pages use so the
     // snapshots read identical data (no duplicate source of truth).
     hydrateStudents();
+    hydrateTeachers();
     const overrides = readLS<Record<string, Partial<User>>>(T_PROFILE_KEY, {});
     USERS.forEach((u) => { if (overrides[u.id]) Object.assign(u, overrides[u.id]); });
     readLS<User[]>(T_REGISTERED_KEY, []).forEach((u) => {
@@ -100,8 +101,18 @@ function Overview() {
     const reviews = readLS<Record<string, Partial<Session>>>(T_REVIEW_KEY, {});
     SESSIONS.forEach((s) => { if (reviews[s.id]) Object.assign(s, reviews[s.id]); });
     forceTick((n) => n + 1);
-    const unsub = subscribeClubs(() => forceTick((n) => n + 1));
-    return unsub;
+    // 2026-08-26 fix: this dashboard is usually the very first page an admin
+    // sees on a new device/browser, and it only ever rendered USERS once at
+    // mount. hydrateStudents()/hydrateTeachers() prune hidden demo people
+    // (mock-data.ts) and refresh real accounts asynchronously — without a
+    // subscription here, a first-time device would show every mock person
+    // (and stale real data) forever on THIS page, even after the prune/fetch
+    // resolved in the background. Same pattern as admin.students.tsx /
+    // admin.teachers.tsx already use.
+    const unsubClubs = subscribeClubs(() => forceTick((n) => n + 1));
+    const unsubStudents = subscribeStudents(() => forceTick((n) => n + 1));
+    const unsubTeachers = subscribeTeachers(() => forceTick((n) => n + 1));
+    return () => { unsubClubs(); unsubStudents(); unsubTeachers(); };
   }, []);
 
   const students = USERS.filter((u) => u.role === "student");

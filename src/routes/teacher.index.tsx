@@ -4,6 +4,7 @@ import { useAuth } from "@/lib/auth";
 import { USERS, studentsOfTeacher, userById, type Session, type SessionStatus } from "@/lib/mock-data";
 import { assignedStudentIdsFor, hydrateAssignments, subscribeAssignments } from "@/lib/assignments-store";
 import { hydrateStudents, subscribeStudents } from "@/lib/students-store";
+import { notifySuccess } from "@/lib/notify";
 import { Gauge } from "lucide-react";
 import { AccentModal, AccentModalHeader, AccentModalFooter, AnimatedNumber, Card, GhostButton, HeroStatCard, Pill, PrimaryButton, SectionTitle } from "@/components/verbo/ui";
 import { SkeletonStatCards, useHydrated } from "@/components/verbo/skeletons";
@@ -569,6 +570,7 @@ function TeacherDashboard() {
     }
     if (attendance !== "absent") savePerformance(sessionId, session?.student_id ?? "", user.id, perf);
     setEditing(null);
+    notifySuccess("Session report submitted.");
   };
 
   const handleSavePlan = (plan: LessonPlan) => {
@@ -578,6 +580,7 @@ function TeacherDashboard() {
     updateSession(plan.session_id, { status: "ready" as any });
     setPlans((prev) => ({ ...prev, [plan.session_id]: plan }));
     setPlanning(null);
+    notifySuccess("Lesson plan saved.");
   };
 
   return (

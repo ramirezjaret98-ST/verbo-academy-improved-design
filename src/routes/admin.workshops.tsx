@@ -22,7 +22,8 @@ import {
   subscribeSessions, syncCohortFieldsToSessions, updateWorkshopSession,
   WORKSHOP_STATUS_META, WORKSHOP_STATUS_OPTIONS,
 } from "@/lib/sessions-store";
-import { hydrateStudents } from "@/lib/students-store";
+import { hydrateStudents, subscribeStudents } from "@/lib/students-store";
+import { hydrateTeachers, subscribeTeachers } from "@/lib/teacher-model";
 
 export const Route = createFileRoute("/admin/workshops")({ component: Page });
 
@@ -31,10 +32,17 @@ function Page() {
   const [openId, setOpenId] = useState<string | null>(null);
   const [tplModal, setTplModal] = useState<{ mode: "create" | "edit"; template?: WorkshopTemplate } | null>(null);
 
+  const [, forceTick] = useState(0);
   useEffect(() => {
     hydrateStudents();
+    hydrateTeachers();
     setTemplates(loadWorkshops());
-    return subscribeWorkshops(() => setTemplates(loadWorkshops()));
+    const unsubWorkshops = subscribeWorkshops(() => setTemplates(loadWorkshops()));
+    // 2026-08-26 fix: a demo person hidden/deleted elsewhere never
+    // disappeared from this page's rosters without a hard reload.
+    const unsubStudents = subscribeStudents(() => forceTick((n) => n + 1));
+    const unsubTeachers = subscribeTeachers(() => forceTick((n) => n + 1));
+    return () => { unsubWorkshops(); unsubStudents(); unsubTeachers(); };
   }, []);
 
   const activeTemplate = openId ? templates.find((t) => t.id === openId) ?? null : null;

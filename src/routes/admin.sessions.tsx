@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { USERS, userById } from "@/lib/mock-data";
 import { assignedTeacherIdFor } from "@/lib/assignments-store";
+import { notifySuccess } from "@/lib/notify";
 import {
   loadSessions,
   createSession,
@@ -540,6 +541,7 @@ function StudentSessionsModal({
       else if (s.status === "ready" || s.status === "rearranged") finalPatch.status = "rescheduled";
     }
     onSave(id, finalPatch);
+    notifySuccess("Session updated.");
   };
 
 
@@ -550,6 +552,7 @@ function StudentSessionsModal({
     // Sync the link back to the student's shared Video Call Link field.
     setStudentVideoLink(studentId, opts.teamsLink);
     const [hh, mm] = opts.time.split(":").map(Number);
+    let touched = 0;
     for (const s of sessions) {
       if (s.student_id !== studentId) continue;
       if (["completed", "absent"].includes(s.status)) continue;
@@ -590,8 +593,10 @@ function StudentSessionsModal({
         patch.status = opts.permanent ? "scheduled" : "rescheduled";
       }
       onSave(s.id, patch);
+      touched++;
     }
     setBulkOpen(false);
+    notifySuccess(`${touched} session${touched === 1 ? "" : "s"} updated.`);
   };
 
   return (

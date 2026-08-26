@@ -4,7 +4,7 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
 import { USERS, SESSIONS, type User, type Session } from "@/lib/mock-data";
-import { avgRating, pendingReviews } from "@/lib/teacher-model";
+import { avgRating, pendingReviews, hydrateTeachers, subscribeTeachers } from "@/lib/teacher-model";
 import {
   computeTeacherKpis, ratingBand, ratingHistory,
   getBonusThreshold, setBonusThreshold,
@@ -101,6 +101,7 @@ function Page() {
 
   useEffect(() => {
     // Hydrate teacher profile overrides + registered teachers + review overrides.
+    hydrateTeachers();
     const overrides = read<Record<string, Partial<User>>>(PROFILE_KEY, {});
     USERS.forEach((u) => { if (overrides[u.id]) Object.assign(u, overrides[u.id]); });
     read<User[]>(REGISTERED_KEY, []).forEach((u) => {
@@ -110,6 +111,10 @@ function Page() {
     SESSIONS.forEach((s) => { if (reviews[s.id]) Object.assign(s, reviews[s.id]); });
     setThreshold(getBonusThreshold());
     forceTick((n) => n + 1);
+    // 2026-08-26 fix: without this, a demo teacher hidden/deleted elsewhere
+    // (or a real profile updated in the background) never disappeared from
+    // this page's KPI table until a hard reload.
+    return subscribeTeachers(() => forceTick((n) => n + 1));
   }, []);
 
   // Deep-link from the Admin Overview snapshot — open the rating chart.

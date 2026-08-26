@@ -44,6 +44,7 @@ import type { KpiMetric } from "@/lib/teacher-kpi-overrides-store";
 import { supabase } from "@/integrations/supabase/client";
 import { invalidateUserIdBridge } from "@/lib/user-id-bridge";
 import { deleteUserAccount } from "@/lib/user-deletion";
+import { notifySuccess, notifyError } from "@/lib/notify";
 
 export const Route = createFileRoute("/admin/teachers")({
   component: Page,
@@ -171,6 +172,9 @@ function Page() {
     if (result.ok) {
       setDetailId(null);
       forceTick((n) => n + 1);
+      notifySuccess(`${t.name} deleted.`);
+    } else {
+      notifyError(result.error, { context: `Deleting ${t.name}` });
     }
     return result;
   };
@@ -211,6 +215,7 @@ function Page() {
       const invokeError = (data as { error?: string } | null)?.error;
       if (error || invokeError) {
         console.error("[admin.teachers] failed to create real auth account", error ?? invokeError);
+        notifyError(invokeError ?? error, { context: `Creating account for ${u.name}` });
         return;
       }
       invalidateUserIdBridge();
@@ -221,12 +226,14 @@ function Page() {
       // why this waits until here instead of firing at the top of
       // registerTeacher.
       studentIds.forEach((sid) => reassignStudent(sid, u.id));
+      notifySuccess(`${u.name} created successfully.`);
     })();
   };
 
   const updateTeacher = (u: User) => {
     persist(u);
     setFormFor(null);
+    notifySuccess(`${u.name} updated.`);
   };
 
   return (

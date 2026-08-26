@@ -17,6 +17,7 @@ import { teachersForProduct, teachersForProductSorted, hydrateTeachers } from "@
 import { teacherTier } from "@/lib/teacher-tiers";
 import { PLAN_DEFAULTS } from "@/lib/club-bookings-store";
 import { waLink } from "@/lib/phone-utils";
+import { notifySuccess, notifyError } from "@/lib/notify";
 
 import { AccentModal, AccentModalFooter, Card, GhostButton, PrimaryButton } from "@/components/verbo/ui";
 import { useAvatar } from "@/lib/avatar-store";
@@ -277,6 +278,12 @@ function Page() {
       const invokeError = (data as { error?: string } | null)?.error;
       if (error || invokeError) {
         console.error("[admin.students] failed to create real auth account", error ?? invokeError);
+        // This is the exact "cascarón" bug class (see Claudia Escamilla,
+        // 2026-08-22 memory): without this, the modal had already closed
+        // looking successful, and the student was left with no real login —
+        // invisible until someone happened to notice later. Now the admin
+        // sees it immediately, with the real error.
+        notifyError(invokeError ?? error, { context: `Creating account for ${u.name}` });
         return;
       }
       invalidateUserIdBridge();
@@ -286,6 +293,7 @@ function Page() {
       // just above) has to exist before this can resolve — that's why this
       // waits until here instead of firing at the top of handleRegister.
       if (teacherId) setAssignment(u.id, teacherId);
+      notifySuccess(`${u.name} created successfully.`);
     })();
   };
 
@@ -295,6 +303,10 @@ function Page() {
     setFormFor(null);
     // keep detail modal in sync
     setDetail((d) => (d && d.id === u.id ? u : d));
+    // persist()'s DB write happens in the background (patchStudentProfile) —
+    // if it fails, notify.ts's error toast fires from there. This confirms
+    // the common case instead of just silently closing the modal.
+    notifySuccess(`${u.name} updated.`);
   };
 
   // Permanently erases the account (real Supabase login + every DB row that
@@ -307,6 +319,9 @@ function Page() {
     if (result.ok) {
       setDetail(null);
       forceTick((n) => n + 1);
+      notifySuccess(`${u.name} deleted.`);
+    } else {
+      notifyError(result.error, { context: `Deleting ${u.name}` });
     }
     return result;
   };

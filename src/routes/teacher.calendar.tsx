@@ -149,6 +149,7 @@ function Page() {
     updateSession(plan.session_id, { status: "ready" });
     setPlans((prev) => ({ ...prev, [plan.session_id]: plan }));
     setPlanning(null);
+    toast.success("Lesson plan saved.");
   };
 
   const goReport = (sessionId: string) => {

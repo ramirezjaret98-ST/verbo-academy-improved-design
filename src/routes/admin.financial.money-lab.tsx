@@ -10,7 +10,7 @@ import {
 } from "recharts";
 import { Pill, AccentModal, AccentModalFooter, PrimaryButton, GhostButton } from "@/components/verbo/ui";
 import { USERS, SESSIONS, userById, type User } from "@/lib/mock-data";
-import { hydrateStudents } from "@/lib/students-store";
+import { hydrateStudents, subscribeStudents } from "@/lib/students-store";
 import {
   loadGroups, loadGroupMembers, markGroupAsPaid, subscribeGroups,
   type Group,
@@ -26,7 +26,7 @@ import {
   subscribeManualEntries, type ManualFinancialEntry, type ManualEntryType,
 } from "@/lib/manual-financial-entries";
 import { nextPaymentDate } from "@/lib/student-model";
-import { DEFAULT_HOURLY_RATE, teacherStatus } from "@/lib/teacher-model";
+import { DEFAULT_HOURLY_RATE, teacherStatus, hydrateTeachers, subscribeTeachers } from "@/lib/teacher-model";
 import { downloadJson, todayStamp } from "@/lib/log-retention";
 import { useAuth } from "@/lib/auth";
 import { getAdminType } from "@/lib/admin-roles";
@@ -76,10 +76,16 @@ function MoneyLabPage() {
   const [viewMonth, setViewMonth] = useState<Date>(() => firstOfMonth(new Date()));
   const [manualModalType, setManualModalType] = useState<ManualEntryType | null>(null);
 
-  useEffect(() => { hydrateStudents(); bump(); }, []);
+  useEffect(() => { hydrateStudents(); hydrateTeachers(); bump(); }, []);
   useEffect(() => subscribeGroups(bump), []);
   useEffect(() => subscribePayments(bump), []);
   useEffect(() => subscribeManualEntries(bump), []);
+  // 2026-08-26 fix: financial figures here (teacher pay, student rosters)
+  // never refreshed on their own when a demo person got hidden or a real
+  // profile changed elsewhere — could keep counting/paying a ghost until a
+  // hard reload.
+  useEffect(() => subscribeStudents(bump), []);
+  useEffect(() => subscribeTeachers(bump), []);
 
   const now = new Date();
   const currentMkey = monthKey(now);
