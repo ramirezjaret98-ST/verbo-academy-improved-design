@@ -3,6 +3,7 @@ import { CalendarClock, AlertTriangle, XCircle } from "lucide-react";
 import { AccentModal, AccentModalFooter, GhostButton, PrimaryButton } from "./ui";
 import { updateSession, notifySessionEvent, type ExtSession } from "@/lib/sessions-store";
 import { isTeacherAvailableAt } from "@/lib/availability-store";
+import { notifySuccess } from "@/lib/notify";
 
 const HEADER_BG = "linear-gradient(135deg, #01304a 0%, #02466b 100%)";
 
@@ -49,6 +50,7 @@ export function RescheduleModal({
     notifySessionEvent(session.id, "reschedule_declined", {
       ...(declineReason.trim() ? { reason: declineReason.trim() } : {}),
     });
+    notifySuccess("Reschedule request declined. The student has been notified.");
     onClose();
   };
 
@@ -77,6 +79,7 @@ export function RescheduleModal({
     // CantAttendModal.tsx), but every caller of this modal already IS Admin,
     // so it was just pinging Jaret's own WhatsApp on every admin-side
     // reschedule. Removed.
+    notifySuccess("Session rescheduled.");
     onClose();
   };
 
