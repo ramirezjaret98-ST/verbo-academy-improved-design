@@ -171,8 +171,24 @@ async function buildUser(authId: string, email: string): Promise<User | null> {
   };
 }
 
+// Last-known role of the logged-in user, cached outside React so plain
+// lib/store modules (which can't call useAuth()) can still tailor a message
+// to "is this an admin or not" — see notify.ts. Updated every time the
+// AuthProvider below changes `user`, via the setUser wrapper just under it.
+// Best-effort only: defaults to null (treated as a non-admin) before the
+// session restores or after logout, which is the safe direction to fail in
+// (never shows a stranger technical error detail).
+let cachedRole: Role | null = null;
+export function getCurrentRole(): Role | null {
+  return cachedRole;
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUserState] = useState<User | null>(null);
+  const setUser = (u: User | null) => {
+    cachedRole = u?.role ?? null;
+    setUserState(u);
+  };
   const [ready, setReady] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const logoutTimer = useRef<ReturnType<typeof setTimeout> | null>(null);

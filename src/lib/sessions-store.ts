@@ -29,6 +29,7 @@ import { saveSubskillEvaluation } from "./performance-store";
 import { decrementGroupRemaining, activeMembersOf } from "./groups-store";
 import { adjustRemainingSessions } from "./students-store";
 import { STATUS_PALETTE, statusTextColor } from "./status-palette";
+import { notifyError } from "@/lib/notify";
 
 
 export type ExtSessionStatus =
@@ -365,6 +366,7 @@ function createSessionInternal(input: Partial<ExtSession> & {
       console.error("[sessions-store] failed to create session", error);
       sessionsCache = sessionsCache.filter((s) => s.id !== tempId);
       notify();
+      notifyError(error, { context: "Creating session" });
       return;
     }
     const created = mapSessionRow(data, [], []);
@@ -480,6 +482,7 @@ export function removeWorkshopSession(id: string) {
       console.error("[sessions-store] failed to remove workshop session", error);
       sessionsCache = prev;
       notify();
+      notifyError(error, { context: "Deleting session" });
     }
   })();
 }
@@ -557,6 +560,7 @@ export function updateSession(id: string, patch: Partial<ExtSession>) {
       if (!ok) {
         sessionsCache = sessionsCache.map((s) => (s.id === id ? prev : s));
         notify();
+        notifyError("Could not save the attendance/status change.", { context: "Updating session" });
       }
     });
     // member_statuses can arrive alongside a top-level status change too
@@ -592,7 +596,10 @@ export function updateSession(id: string, patch: Partial<ExtSession>) {
       const teacherUuid = await legacyToUuid(patch.teacher_id!);
       if (!teacherUuid) return;
       const { error } = await supabase.from("sessions").update({ teacher_id: teacherUuid }).eq("id", numericId);
-      if (error) console.error("[sessions-store] failed to update teacher_id", error);
+      if (error) {
+        console.error("[sessions-store] failed to update teacher_id", error);
+        notifyError(error, { context: "Reassigning session teacher" });
+      }
     })();
   }
 
@@ -603,6 +610,7 @@ export function updateSession(id: string, patch: Partial<ExtSession>) {
       console.error("[sessions-store] failed to update session", error);
       sessionsCache = sessionsCache.map((s) => (s.id === id ? prev : s));
       notify();
+      notifyError(error, { context: "Updating session" });
     }
   })();
 }
@@ -641,6 +649,10 @@ export function studentSetSessionStatus(
       console.error("[sessions-store] student_set_session_status failed", error);
       sessionsCache = sessionsCache.map((s) => (s.id === id ? prev : s));
       notify();
+      // This is exactly the case the comment above documents: the UI may
+      // already have shown an optimistic "done" — this is the correction
+      // when the server actually rejected it.
+      notifyError(error, { context: "Updating your session" });
     } else {
       // 2026-08-13 fix: a student cancelling/reschedule-requesting/reporting
       // "can't attend" had NO external signal at all — only the in-app bell

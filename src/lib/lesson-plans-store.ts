@@ -22,6 +22,7 @@ import { loadSessions, notifySessionEvent } from "./sessions-store";
 import { activeMembersOf } from "./groups-store";
 import { setUnitAccess } from "./activities-store";
 import { findCustomUnitById, hydrateCustomUnits } from "./custom-units-store";
+import { notifyError } from "@/lib/notify";
 
 export type LessonSessionType =
   | "Syllabus content"
@@ -175,6 +176,9 @@ export function saveLessonPlan(plan: LessonPlan) {
       console.error("[lesson-plans-store] failed to save plan", error);
       plansCache = prev;
       notify();
+      // This is the "Complete Your Sessions" save — until now a failure here
+      // was invisible: the modal had already closed looking successful.
+      notifyError(error, { context: "Saving lesson plan" });
       return;
     }
     autoUnlockPlannedUnit(plan);

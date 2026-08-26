@@ -18,6 +18,7 @@ import { addStudentReport } from "./student-reports-store";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 import { hydrateUserIdBridge, legacyToUuid, uuidToLegacySync } from "@/lib/user-id-bridge";
+import { notifyError } from "@/lib/notify";
 
 export type { ChallengeSubmission, ChallengeSubmissionFormat };
 
@@ -178,6 +179,7 @@ export function patchStudentProfile(studentId: string, patch: Partial<StudentPro
       console.error("[students-store] failed to save profile", error);
       if (u) Object.assign(u, prev);
       window.dispatchEvent(new CustomEvent(STUDENTS_EVENT));
+      notifyError(error, { context: "Saving student profile" });
     }
   })();
 }

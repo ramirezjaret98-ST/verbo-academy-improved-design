@@ -9,6 +9,7 @@ import { effectiveHourlyRate, teacherTier } from "./teacher-tiers";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 import { legacyToUuid } from "@/lib/user-id-bridge";
+import { notifyError } from "@/lib/notify";
 
 export const DEFAULT_HOURLY_RATE = 120; // MXN / hour
 export const AVAILABILITY_CHANGE_DAYS = 30; // teacher may request a change once per N days
@@ -283,6 +284,7 @@ export function patchTeacherProfile(teacherId: string, patch: Partial<User>): vo
       console.error("[teacher-model] failed to save teacher profile", error);
       if (u) Object.assign(u, prev);
       window.dispatchEvent(new CustomEvent(TEACHERS_EVENT));
+      notifyError(error, { context: "Saving teacher profile" });
     }
   })();
 }
