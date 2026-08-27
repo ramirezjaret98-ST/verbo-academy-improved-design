@@ -36,18 +36,29 @@ export interface StudentContractRow {
 /** Snapshot de los campos comerciales del alumno tal como existen HOY — se
  *  guarda congelado en `contract_fields` para que un cambio posterior en su
  *  perfil no altere un contrato ya enviado a firmar (ver comentario en la
- *  migración). Admin puede editar estos valores en el modal antes de enviar. */
+ *  migración). Admin puede editar estos valores en el modal antes de enviar.
+ *
+ *  `totalPrice` se semilla desde `custom_price` solo como punto de partida
+ *  razonable — ese campo del perfil modela un precio MENSUAL recurrente
+ *  (Enterprise/GO/International), mientras que el contrato real (ver
+ *  contract-pdf.ts) es de PAGO ÚNICO por el paquete completo (como el de
+ *  Ericka, plan VIP). El admin debe confirmar/ajustar el total real en el
+ *  modal antes de enviar — nunca se manda tal cual sin revisión. */
 export function contractFieldsFromStudent(student: User): ContractFields {
   return {
     studentName: student.name,
     studentEmail: student.email,
+    studentPhone: student.phone,
     company: student.company,
     product: student.product,
     accessPlan: student.access_plan,
     contractedLevels: student.contracted_levels,
+    totalSessions: student.hired_sessions,
     sessionsPerWeek: student.sessions_per_week,
     sessionDuration: student.session_duration,
     reschedulePolicy: student.reschedule_policy,
+    startDate: student.cycle_start,
+    totalPrice: student.custom_price ?? undefined,
     monthlyPrice: student.custom_price ?? undefined,
     paymentDay: student.payment_day,
     cycleStart: student.cycle_start,
@@ -55,7 +66,10 @@ export function contractFieldsFromStudent(student: User): ContractFields {
 }
 
 /** Crea el registro del contrato y dispara el correo de "listo para firmar"
- *  al alumno. Devuelve el token (para mostrarlo/copiarlo en el modal como
+ *  al alumno. El folio (p.ej. "VFP-34-26", mismo formato que el contrato
+ *  real de Jaret) se arma a partir del id autoincremental de la fila una vez
+ *  insertada — por eso es un segundo update en vez de ir en el insert
+ *  inicial. Devuelve el token (para mostrarlo/copiarlo en el modal como
  *  respaldo) o un error legible para notifyError(). */
 export async function createContractAndNotify(opts: {
   studentId: string;
@@ -63,17 +77,30 @@ export async function createContractAndNotify(opts: {
   fields: ContractFields;
 }): Promise<{ ok: true; token: string } | { ok: false; error: string }> {
   const token = crypto.randomUUID();
-  const { error } = await supabase.from("student_contracts").insert({
-    student_id: opts.studentId,
-    created_by: opts.createdBy,
-    token,
-    status: "pending",
-    contract_fields: opts.fields as unknown as Json,
-  });
-  if (error) {
+  const { data: inserted, error } = await supabase
+    .from("student_contracts")
+    .insert({
+      student_id: opts.studentId,
+      created_by: opts.createdBy,
+      token,
+      status: "pending",
+      contract_fields: opts.fields as unknown as Json,
+    })
+    .select("id")
+    .single();
+  if (error || !inserted) {
     console.error("[contracts] failed to create student_contracts row", error);
-    return { ok: false, error: error.message };
+    return { ok: false, error: error?.message ?? "No se pudo crear el contrato." };
   }
+
+  const yy = new Date().getFullYear().toString().slice(-2);
+  const folio = `VFP-${inserted.id}-${yy}`;
+  const fieldsWithFolio: ContractFields = { ...opts.fields, folio };
+  const { error: folioErr } = await supabase
+    .from("student_contracts")
+    .update({ contract_fields: fieldsWithFolio as unknown as Json })
+    .eq("id", inserted.id);
+  if (folioErr) console.error("[contracts] failed to set folio", folioErr);
 
   void supabase.functions
     .invoke("notify-contract-event", { body: { token, kind: "contract_ready" } })
