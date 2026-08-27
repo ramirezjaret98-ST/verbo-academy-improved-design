@@ -18,6 +18,7 @@ import { teacherTier } from "@/lib/teacher-tiers";
 import { PLAN_DEFAULTS } from "@/lib/club-bookings-store";
 import { waLink } from "@/lib/phone-utils";
 import { notifySuccess, notifyError } from "@/lib/notify";
+import { SendContractModal } from "@/components/verbo/SendContractModal";
 
 import { AccentModal, AccentModalFooter, Card, GhostButton, PrimaryButton } from "@/components/verbo/ui";
 import { useAvatar } from "@/lib/avatar-store";
@@ -25,7 +26,7 @@ import {
   Plus, X, Eye, EyeOff, KeyRound, Mail, Phone, Building2, CalendarDays, GraduationCap,
   Users, Briefcase, Compass, Globe, Crown, Copy, Check, Snowflake, Ban, Play, Unlock,
   Sparkles, Wand2, Pencil, Video, Repeat, Clock, CreditCard, ShieldAlert, CircleDollarSign,
-  Search, ArrowUpDown, Filter, Gauge, Lightbulb, Layers, Trash2,
+  Search, ArrowUpDown, Filter, Gauge, Lightbulb, Layers, Trash2, FileSignature,
 } from "lucide-react";
 import {
   type WorkshopCohort, type WorkshopTemplate,
@@ -1421,6 +1422,7 @@ function StudentDetailModal({
   const [copied, setCopied] = useState(false);
   const [panel, setPanel] = useState<"none" | "reassign" | "freeze" | "delete">("none");
   const [resetPwOpen, setResetPwOpen] = useState(false);
+  const [contractModalOpen, setContractModalOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [teacherId, setTeacherId] = useState(assignedTeacherIdFor(student.id) ?? "");
@@ -1890,6 +1892,7 @@ function StudentDetailModal({
           <GhostButton onClick={onEdit} className="verbo-sdm-action !py-1.5 !text-xs"><Pencil className="h-3.5 w-3.5" /> Edit profile</GhostButton>
           <GhostButton onClick={() => { patch({ must_change_password: true }); alert("This user will be asked to set a new password the next time they log in."); }} className="verbo-sdm-action !py-1.5 !text-xs"><KeyRound className="h-3.5 w-3.5" /> Require Password Reset</GhostButton>
           <GhostButton onClick={() => setResetPwOpen(true)} className="verbo-sdm-action !py-1.5 !text-xs"><RotateCcw className="h-3.5 w-3.5" /> Reset Password</GhostButton>
+          <GhostButton onClick={() => setContractModalOpen(true)} className="verbo-sdm-action !py-1.5 !text-xs"><FileSignature className="h-3.5 w-3.5" /> Send Contract</GhostButton>
           {student.login_locked_at ? (
             <GhostButton
               onClick={() => patch({ failed_login_attempts: 0, login_locked_at: null })}
@@ -1967,6 +1970,9 @@ function StudentDetailModal({
       </div>
       {resetPwOpen && (
         <ResetPasswordModal userId={student.id} userName={student.name} onClose={() => setResetPwOpen(false)} />
+      )}
+      {contractModalOpen && (
+        <SendContractModal student={student} onClose={() => setContractModalOpen(false)} />
       )}
       {payModalOpen && (
         <MarkAsPaidModal
