@@ -3,11 +3,11 @@
 // correo al alumno. Ver src/lib/contracts.ts (lógica) y
 // src/routes/firmar-contrato.$token.tsx (lo que ve el alumno).
 import { useState } from "react";
-import { FileSignature, Loader2, Check } from "lucide-react";
+import { FileSignature, Loader2, Check, Eye } from "lucide-react";
 import { GhostButton, PrimaryButton } from "@/components/verbo/ui";
 import { useAuth } from "@/lib/auth";
 import { contractFieldsFromStudent, createContractAndNotify } from "@/lib/contracts";
-import type { ContractFields } from "@/lib/contract-pdf";
+import { renderContractHtml, type ContractFields } from "@/lib/contract-pdf";
 import type { User } from "@/lib/mock-data";
 import { notifyError, notifySuccess } from "@/lib/notify";
 
@@ -16,6 +16,7 @@ export function SendContractModal({ student, onClose }: { student: User; onClose
   const [fields, setFields] = useState<ContractFields>(() => contractFieldsFromStudent(student));
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
+  const [previewing, setPreviewing] = useState(false);
 
   const set = <K extends keyof ContractFields>(key: K, value: ContractFields[K]) =>
     setFields((f) => ({ ...f, [key]: value }));
@@ -31,6 +32,18 @@ export function SendContractModal({ student, onClose }: { student: User; onClose
     }
     notifySuccess(`Contrato enviado a ${student.name} (${student.email}).`);
     setSent(true);
+  };
+
+  const preview = () => {
+    setPreviewing(true);
+    try {
+      const blob = new Blob([renderContractHtml(fields)], { type: "text/html" });
+      const url = URL.createObjectURL(blob);
+      window.open(url, "_blank", "noopener");
+      setTimeout(() => URL.revokeObjectURL(url), 30000);
+    } finally {
+      setPreviewing(false);
+    }
   };
 
   return (
@@ -60,11 +73,17 @@ export function SendContractModal({ student, onClose }: { student: User; onClose
                 Estos datos ya vienen prellenados del perfil del alumno — ajústalos si algo va a ser distinto en este contrato específico antes de enviarlo.
               </p>
               <div className="grid grid-cols-2 gap-3">
+                <Field label="Teléfono">
+                  <input value={fields.studentPhone ?? ""} onChange={(e) => set("studentPhone", e.target.value)} className={inputCls} />
+                </Field>
                 <Field label="Empresa">
                   <input value={fields.company ?? ""} onChange={(e) => set("company", e.target.value)} className={inputCls} />
                 </Field>
                 <Field label="Producto">
                   <input value={fields.product ?? ""} onChange={(e) => set("product", e.target.value)} className={inputCls} />
+                </Field>
+                <Field label='Programa (opcional, ej. "Trayecto Total")'>
+                  <input value={fields.productProgram ?? ""} onChange={(e) => set("productProgram", e.target.value)} className={inputCls} />
                 </Field>
                 <Field label="Plan de acceso">
                   <input value={fields.accessPlan ?? ""} onChange={(e) => set("accessPlan", e.target.value)} className={inputCls} />
@@ -76,33 +95,40 @@ export function SendContractModal({ student, onClose }: { student: User; onClose
                     className={inputCls}
                   />
                 </Field>
-                <Field label="Sesiones por semana">
-                  <input type="number" value={fields.sessionsPerWeek ?? ""} onChange={(e) => set("sessionsPerWeek", e.target.value ? Number(e.target.value) : undefined)} className={inputCls} />
+                <Field label="Número total de sesiones">
+                  <input type="number" value={fields.totalSessions ?? ""} onChange={(e) => set("totalSessions", e.target.value ? Number(e.target.value) : undefined)} className={inputCls} />
                 </Field>
-                <Field label="Duración (min)">
+                <Field label="Duración por sesión (min)">
                   <input type="number" value={fields.sessionDuration ?? ""} onChange={(e) => set("sessionDuration", e.target.value ? Number(e.target.value) : undefined)} className={inputCls} />
                 </Field>
-                <Field label="Precio mensual (MXN)">
-                  <input type="number" value={fields.monthlyPrice ?? ""} onChange={(e) => set("monthlyPrice", e.target.value ? Number(e.target.value) : undefined)} className={inputCls} />
+                <Field label="Modalidad">
+                  <input value={fields.modality ?? "Virtual"} onChange={(e) => set("modality", e.target.value)} className={inputCls} />
                 </Field>
-                <Field label="Día de pago">
-                  <input type="number" min={1} max={31} value={fields.paymentDay ?? ""} onChange={(e) => set("paymentDay", e.target.value ? Number(e.target.value) : undefined)} className={inputCls} />
+                <Field label="Fecha de inicio">
+                  <input type="date" value={fields.startDate?.slice(0, 10) ?? ""} onChange={(e) => set("startDate", e.target.value)} className={inputCls} />
                 </Field>
-                <div className="col-span-2">
-                  <Field label="Política de reagendamiento">
-                    <input value={fields.reschedulePolicy ?? ""} onChange={(e) => set("reschedulePolicy", e.target.value)} className={inputCls} />
-                  </Field>
-                </div>
+                <Field label="Fecha de término estimada">
+                  <input type="date" value={fields.estimatedEndDate?.slice(0, 10) ?? ""} onChange={(e) => set("estimatedEndDate", e.target.value)} className={inputCls} />
+                </Field>
+                <Field label="Precio total del paquete (MXN, pago único)">
+                  <input type="number" value={fields.totalPrice ?? ""} onChange={(e) => set("totalPrice", e.target.value ? Number(e.target.value) : undefined)} className={inputCls} />
+                </Field>
+                <Field label="Fecha límite de pago">
+                  <input type="date" value={fields.paymentDueDate?.slice(0, 10) ?? ""} onChange={(e) => set("paymentDueDate", e.target.value)} className={inputCls} />
+                </Field>
               </div>
-              <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-800">
-                El texto legal completo del contrato todavía es un placeholder pendiente de que Jaret suba la versión final — este envío es funcional para probar el flujo, pero el contenido del documento no es el real todavía.
+              <div className="rounded-lg border border-sky-200 bg-sky-50 px-3 py-2.5 text-xs text-sky-800">
+                El texto legal es el contrato real que confirmaste (Ericka Escamilla, 2026-08-27), con solo estos datos como variables. Está modelado como pago único por el paquete completo — si necesitas mensualidades para otro alumno, avísame antes de enviarlo.
               </div>
             </div>
-            <div className="flex items-center justify-end gap-2 border-t border-border bg-secondary/30 px-5 py-4">
-              <GhostButton onClick={onClose} disabled={sending}>Cancelar</GhostButton>
-              <PrimaryButton onClick={submit} disabled={sending}>
-                {sending ? (<><Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> Enviando…</>) : "Enviar contrato"}
-              </PrimaryButton>
+            <div className="flex items-center justify-between gap-2 border-t border-border bg-secondary/30 px-5 py-4">
+              <GhostButton onClick={preview} disabled={previewing}><Eye className="h-3.5 w-3.5" /> Vista previa</GhostButton>
+              <div className="flex items-center gap-2">
+                <GhostButton onClick={onClose} disabled={sending}>Cancelar</GhostButton>
+                <PrimaryButton onClick={submit} disabled={sending}>
+                  {sending ? (<><Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> Enviando…</>) : "Enviar contrato"}
+                </PrimaryButton>
+              </div>
             </div>
           </>
         )}
