@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.15"
+    PostgrestVersion: "14.17"
   }
   public: {
     Tables: {
@@ -2840,6 +2840,75 @@ export type Database = {
           {
             foreignKeyName: "strikes_teacher_id_fkey"
             columns: ["teacher_id"]
+            isOneToOne: false
+            referencedRelation: "app_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      student_contracts: {
+        Row: {
+          contract_fields: Json
+          created_at: string
+          created_by: string | null
+          id: number
+          pdf_hash: string | null
+          pdf_signed_path: string | null
+          pdf_unsigned_path: string | null
+          signed_at: string | null
+          signer_ip: string | null
+          signer_user_agent: string | null
+          status: string
+          student_id: string
+          token: string
+          voided_at: string | null
+          voided_reason: string | null
+        }
+        Insert: {
+          contract_fields?: Json
+          created_at?: string
+          created_by?: string | null
+          id?: number
+          pdf_hash?: string | null
+          pdf_signed_path?: string | null
+          pdf_unsigned_path?: string | null
+          signed_at?: string | null
+          signer_ip?: string | null
+          signer_user_agent?: string | null
+          status?: string
+          student_id: string
+          token: string
+          voided_at?: string | null
+          voided_reason?: string | null
+        }
+        Update: {
+          contract_fields?: Json
+          created_at?: string
+          created_by?: string | null
+          id?: number
+          pdf_hash?: string | null
+          pdf_signed_path?: string | null
+          pdf_unsigned_path?: string | null
+          signed_at?: string | null
+          signer_ip?: string | null
+          signer_user_agent?: string | null
+          status?: string
+          student_id?: string
+          token?: string
+          voided_at?: string | null
+          voided_reason?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_contracts_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "app_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_contracts_student_id_fkey"
+            columns: ["student_id"]
             isOneToOne: false
             referencedRelation: "app_users"
             referencedColumns: ["id"]
