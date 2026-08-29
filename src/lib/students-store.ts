@@ -17,7 +17,7 @@ import { loadFlashChallenges } from "./flash-challenges-store";
 import { addStudentReport } from "./student-reports-store";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
-import { hydrateUserIdBridge, legacyToUuid, uuidToLegacySync } from "@/lib/user-id-bridge";
+import { getKnownLegacyIds, hydrateUserIdBridge, legacyToUuid, uuidToLegacySync } from "@/lib/user-id-bridge";
 import { notifyError } from "@/lib/notify";
 
 export type { ChallengeSubmission, ChallengeSubmissionFormat };
@@ -184,6 +184,13 @@ export function patchStudentProfile(studentId: string, patch: Partial<StudentPro
   })();
 }
 
+// Static demo student rows hardcoded in mock-data.ts's `USERS` seed array —
+// these never have a real `app_users` row, so `getKnownLegacyIds()` will
+// never include them. Deleting one of these is "Delete permanently" via
+// `hideMockUser()`/`pruneHiddenMockUsers()` instead — see the prune loop in
+// `hydrateStudents()` below, which must never touch these ids.
+const SEED_STUDENT_IDS = new Set(["u4", "u5", "u6"]);
+
 // Apply persisted overrides + locally-registered students onto the USERS
 // singleton, then refresh the DB-backed student profile fields from Supabase
 // in the background. Idempotent — safe to call on every mount.
@@ -264,6 +271,32 @@ export function hydrateStudents() {
     };
     for (const row of selectRes.data ?? []) applyRow(row as unknown as Record<string, unknown>);
     for (const row of rpcRes.data ?? []) applyRow(row as unknown as Record<string, unknown>);
+
+    // 2026-08-29 fix: drop any `USERS` entry for a real student account that
+    // was deleted elsewhere (e.g. by Admin, in a different tab/device). Until
+    // now this loop only ever added/updated rows from `selectRes`/`rpcRes` —
+    // never removed one that stopped coming back — so a deleted student stuck
+    // around as a "ghost" (visible e.g. on the Leaderboard) in any tab that
+    // was already open, until a full page reload rebuilt `USERS` from
+    // scratch. `getKnownLegacyIds()` comes from `legacy_id_lookup()`, a
+    // SECURITY DEFINER RPC with no row filter — reliable for every caller
+    // role, unlike `selectRes`/`rpcRes` above (RLS-limited to admin / the
+    // caller's own row / their own roster), so it's safe to use here even in
+    // a plain student's own session.
+    await hydrateUserIdBridge();
+    const knownIds = getKnownLegacyIds();
+    if (knownIds.size > 0) {
+      const localOnlyIds = new Set(readRegisteredStudents().map((r) => r.id));
+      for (let i = USERS.length - 1; i >= 0; i--) {
+        const u = USERS[i];
+        if (u.role !== "student") continue;
+        if (knownIds.has(u.id)) continue; // still a real account
+        if (SEED_STUDENT_IDS.has(u.id)) continue; // mock/demo — pruneHiddenMockUsers() owns these
+        if (localOnlyIds.has(u.id)) continue; // registered locally, no backend row yet — not deleted
+        USERS.splice(i, 1);
+      }
+    }
+
     if (!selectRes.error || !rpcRes.error) {
       window.dispatchEvent(new CustomEvent(STUDENTS_EVENT));
     }
@@ -702,6 +735,65 @@ if (typeof window !== "undefined") {
       },
     )
     .subscribe();
+}
+
+/* -------------------------------------------------------------------------- */
+/* Leaderboard completion counts (2026-08-29 fix).                             */
+/*                                                                             */
+/* `challenge_submissions_select` RLS only lets a student read their OWN      */
+/* submissions (or their admin/teacher) — so a real student's session can     */
+/* never populate a classmate's `completed_challenges` array, and the         */
+/* Leaderboard would always rank every OTHER student at 0 no matter how many  */
+/* challenges they actually finish. This reads a tiny SECURITY DEFINER RPC    */
+/* (`leaderboard_challenge_completion_counts`) that exposes ONLY a per-student*/
+/* count of approved submissions — nothing else — to any signed-in user, and  */
+/* is the one thing `useLeaderboardRows()` should use for ranking instead of  */
+/* the RLS-limited local array. */
+/* -------------------------------------------------------------------------- */
+
+let leaderboardCompletionCounts: Map<string, number> | null = null;
+let leaderboardCountsHydratePromise: Promise<void> | null = null;
+
+async function hydrateLeaderboardCompletionCounts(): Promise<void> {
+  if (leaderboardCountsHydratePromise) return leaderboardCountsHydratePromise;
+  leaderboardCountsHydratePromise = (async () => {
+    const { data, error } = await supabase.rpc("leaderboard_challenge_completion_counts");
+    if (error) {
+      console.error("[students-store] failed to load leaderboard completion counts", error);
+      return;
+    }
+    const next = new Map<string, number>();
+    for (const row of data ?? []) {
+      if (row.legacy_id) next.set(row.legacy_id, Number(row.completed_count) || 0);
+    }
+    leaderboardCompletionCounts = next;
+  })();
+  await leaderboardCountsHydratePromise;
+  leaderboardCountsHydratePromise = null;
+  if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent(STUDENTS_EVENT));
+}
+
+if (typeof window !== "undefined") {
+  void hydrateLeaderboardCompletionCounts();
+  // Same trigger as the submissions hydrate above — a status change into/out
+  // of "approved" is exactly when a completion count moves.
+  supabase
+    .channel("leaderboard-completion-counts-changes")
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "challenge_submissions" },
+      () => void hydrateLeaderboardCompletionCounts(),
+    )
+    .subscribe();
+}
+
+/** Durable, cross-device count of a student's approved challenge submissions
+ *  (every format), for the Leaderboard ONLY — see comment above. Returns
+ *  `null` until the first fetch resolves so the caller can fall back to the
+ *  local `completed_challenges` count instead of flashing everyone at 0. */
+export function getLeaderboardCompletedCount(legacyId: string): number | null {
+  if (!leaderboardCompletionCounts) return null;
+  return leaderboardCompletionCounts.get(legacyId) ?? 0;
 }
 
 /** Resolves a challenge's frontend code to its real bigint id, using the

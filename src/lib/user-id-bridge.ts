@@ -94,6 +94,17 @@ export function hydrateUserIdBridge(): Promise<void> {
   return hydrate();
 }
 
+/** Every legacy id currently backed by a real `app_users` row, straight from
+ *  `legacy_id_lookup()` — the ONE source in this file that isn't limited by
+ *  `app_users_select` RLS (no row filter, any caller role). Used to tell a
+ *  real, deleted account apart from a mock/demo or not-yet-synced local one
+ *  when pruning stale entries (see `hydrateStudents()` in students-store.ts).
+ *  Only reliable once the cache is warm — call after `await
+ *  hydrateUserIdBridge()` in the same flow, same rule as `uuidToLegacySync`. */
+export function getKnownLegacyIds(): Set<string> {
+  return new Set(legacyToUuidMap.keys());
+}
+
 /** Forces the next `legacyToUuid`/`uuidToLegacy`/`hydrateUserIdBridge` call to
  *  re-fetch from Supabase instead of serving the stale in-memory cache — call
  *  this right after creating a brand-new real account (e.g. via the
