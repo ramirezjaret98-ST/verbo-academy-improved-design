@@ -1,10 +1,27 @@
-// Onboarding demo — 2026-08-26.
+// Onboarding demo — 2026-08-26, updated 2026-08-29.
 //
 // Jaret's ask: a fake student "profile" he can pull up live on a call with a
 // brand-new student to walk them through how the calendar/sessions flow
 // works — real look, real colors, real logic — WITHOUT touching any real
 // account or the database. A deliberate mirror of how this app worked
 // before Supabase was connected (pure mock data), scoped to just this page.
+//
+// 2026-08-29 update, same idea extended per Jaret's follow-up ask:
+//   - The "completed" class now carries a real teacher note + a downloadable
+//     PDF report (a static demo asset, not a Supabase upload), so the
+//     onboarding call can show what a finished session looks like.
+//   - Two of the "scheduled" slots are now genuinely clickable via
+//     "Can't Attend": one today (< 24h out) and one several days out
+//     (24h+ out). Clicking either actually flips that one event's status in
+//     local state — same-day cancellation lands on Absent (unexcused, per
+//     policy), advance-notice cancellation lands on Cancelled (no penalty).
+//     Nothing else on the page reacts to the click and nothing persists.
+//   - Renamed the mock identities to Verbo Student / Verbo Instructor.
+//   - The student card now also shows a filled-in headline + personality
+//     tags, so Jaret can point at "this is what a completed profile looks
+//     like" (there's no self-serve profile editor in the app yet to link to
+//     — see the chat where this was scoped — so this is a read-only mock of
+//     the finished state, same spirit as the rest of the page).
 //
 // Safety, by construction (see security_finding_dev_credentials_exposed —
 // the old "Developer Sandbox" panel that leaked real passwords):
@@ -15,19 +32,21 @@
 //     page load (`useState(() => buildDemoEvents())`) — there is nothing to
 //     persist, so a refresh or closing the tab fully resets it, exactly as
 //     asked ("como lo hacíamos con localStorage, para que al cerrarlo se
-//     reinicie").
+//     reinicie"). The click-to-cancel interaction below only ever mutates
+//     that same in-memory array via setEvents — still no store, no RPC, no
+//     localStorage.
 //   - No entry point anywhere in the real nav — reached only via the
 //     "Onboarding Demo" button on the Admin dashboard (opens in a new tab).
 //   - Reuses the REAL `CalendarView` (already documented as presentation-only
 //     — reads no store) and the real status color system
 //     (`calendar-events.ts` / `status-palette.ts`) so what Jaret shows a
-//     student is pixel-identical to production, but every action inside the
-//     detail modal is inert — it explains what would happen instead of
-//     calling any store/RPC.
+//     student is pixel-identical to production, and the report/rating/notes
+//     blocks below mirror the exact markup used in SessionReportModal /
+//     student.sessions.tsx so this doesn't drift from the real UI.
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import {
-  Sparkles, CalendarClock, Video, RefreshCcw, CircleSlash, Info,
+  Sparkles, CalendarClock, Video, RefreshCcw, CircleSlash, Info, FileText, Star,
 } from "lucide-react";
 import { toast } from "sonner";
 import { CalendarView } from "@/components/verbo/CalendarView";
@@ -38,7 +57,7 @@ import {
   type CalendarEvent,
   type CalendarEventKind,
 } from "@/lib/calendar-events";
-import type { ExtSessionStatus } from "@/lib/sessions-store";
+import type { ExtSession, ExtSessionStatus } from "@/lib/sessions-store";
 import { Logo } from "@/components/verbo/Logo";
 
 export const Route = createFileRoute("/demo-onboarding")({
@@ -49,12 +68,19 @@ export const Route = createFileRoute("/demo-onboarding")({
 });
 
 const DEMO_STUDENT = {
-  name: "Demo Student",
-  initials: "DS",
+  name: "Verbo Student",
+  initials: "VS",
   plan: "Elite",
   level: "B1 — Intermediate",
-  teacher: "Coach Jamie",
+  teacher: "Verbo Instructor",
+  headline: "Marketing lead who wants to run client calls in English with total confidence.",
+  personalityTags: ["Curious", "Talkative", "Focused"],
 };
+
+// Standard notice window used for this demo's cancel simulation. Real
+// students can have a custom reschedule_policy (see app_users.reschedule_policy
+// in the DB); this is just the illustrative default for the walkthrough.
+const POLICY_NOTICE_HOURS = 24;
 
 const STUDENT_KINDS: CalendarEventKind[] = ["class", "spotlight", "insight", "book_club"];
 
@@ -65,31 +91,145 @@ function atTime(daysFromToday: number, hour: number, minute = 0): string {
   return d.toISOString();
 }
 
+/** Precise offset from right now, in hours — used for the two live cancel-demo
+ *  slots so "today, in a few hours" and "well outside the notice window"
+ *  are correct no matter what time of day Jaret runs the demo. */
+function hoursFromNow(hours: number): string {
+  return new Date(Date.now() + hours * 3_600_000).toISOString();
+}
+
+function demoSession(overrides: Partial<ExtSession> & { id: string; date_time: string; status: ExtSessionStatus }): ExtSession {
+  return {
+    student_id: "demo-student",
+    teacher_id: "demo-teacher",
+    duration_minutes: 60,
+    teams_link: "",
+    ...overrides,
+  };
+}
+
 /** One session per canonical status, spread across ~2 weeks, so every color
  *  in the legend actually appears at least once — that's the whole point,
  *  Jaret explicitly asked for "one of each color" to explain the calendar
- *  logic in an onboarding call, not a full realistic schedule. */
+ *  logic in an onboarding call, not a full realistic schedule. Two of the
+ *  "scheduled" slots are wired to the live cancel demo (see POLICY_NOTICE_HOURS
+ *  above and the click handler in DemoOnboardingPage). */
 function buildDemoEvents(): CalendarEvent[] {
-  const classes: { status: ExtSessionStatus; days: number; hour: number }[] = [
-    { status: "completed", days: -6, hour: 10 },
-    { status: "absent", days: -4, hour: 16 },
-    { status: "no_show", days: -3, hour: 9 },
-    { status: "delayed", days: -1, hour: 11 },
-    { status: "cancelled", days: -2, hour: 15 },
-    { status: "scheduled", days: 1, hour: 10 },
-    { status: "ready", days: 2, hour: 16 },
-    { status: "pending_reschedule", days: 4, hour: 9 },
-    { status: "rescheduled", days: 6, hour: 14 },
+  const completedId = "demo-class-completed";
+  const noShowId = "demo-class-no-show";
+  const delayedId = "demo-class-delayed";
+  const cancelledId = "demo-class-cancelled";
+  const readyId = "demo-class-ready";
+  const pendingId = "demo-class-pending";
+  const rescheduledId = "demo-class-rescheduled";
+  const cancelViolateId = "demo-cancel-violate";
+  const cancelComplyId = "demo-cancel-comply";
+
+  const events: CalendarEvent[] = [
+    {
+      id: completedId,
+      kind: "class",
+      date: atTime(-6, 10),
+      duration_minutes: 60,
+      title: "1:1 Performance Session",
+      status: "completed",
+      origin: "course",
+      session: demoSession({
+        id: completedId,
+        date_time: atTime(-6, 10),
+        status: "completed",
+        report_comments:
+          "Great session! We worked on structuring a professional presentation and practiced present perfect vs. past simple. Please review the attached PDF before our next class.",
+        report_pdf_url: "/demo/verbo-session-report.pdf",
+        student_rating: 5,
+        report_submitted_at: atTime(-6, 11),
+      }),
+    },
+    {
+      id: noShowId,
+      kind: "class",
+      date: atTime(-3, 9),
+      duration_minutes: 60,
+      title: "1:1 Performance Session",
+      status: "no_show",
+      origin: "course",
+    },
+    {
+      id: delayedId,
+      kind: "class",
+      date: atTime(-1, 11),
+      duration_minutes: 60,
+      title: "1:1 Performance Session",
+      status: "delayed",
+      origin: "course",
+    },
+    {
+      id: cancelledId,
+      kind: "class",
+      date: atTime(-2, 15),
+      duration_minutes: 60,
+      title: "1:1 Performance Session",
+      status: "cancelled",
+      origin: "course",
+      session: demoSession({
+        id: cancelledId,
+        date_time: atTime(-2, 15),
+        status: "cancelled",
+        cancellation_reason: "personal",
+        cancellation_note: "Cancelled with advance notice — no penalty, reschedule available.",
+      }),
+    },
+    {
+      id: readyId,
+      kind: "class",
+      date: atTime(2, 16),
+      duration_minutes: 60,
+      title: "1:1 Performance Session",
+      status: "ready",
+      origin: "course",
+    },
+    {
+      id: pendingId,
+      kind: "class",
+      date: atTime(4, 9),
+      duration_minutes: 60,
+      title: "1:1 Performance Session",
+      status: "pending_reschedule",
+      origin: "course",
+    },
+    {
+      id: rescheduledId,
+      kind: "class",
+      date: atTime(6, 14),
+      duration_minutes: 60,
+      title: "1:1 Performance Session",
+      status: "rescheduled",
+      origin: "course",
+    },
+    // --- Live cancel demo: click "Can't Attend" on either of these two ---
+    {
+      id: cancelViolateId,
+      kind: "class",
+      date: hoursFromNow(3),
+      duration_minutes: 60,
+      title: "1:1 Performance Session",
+      subtitle: "Try cancelling this one — it's today",
+      status: "scheduled",
+      origin: "course",
+      session: demoSession({ id: cancelViolateId, date_time: hoursFromNow(3), status: "scheduled" }),
+    },
+    {
+      id: cancelComplyId,
+      kind: "class",
+      date: atTime(5, 14),
+      duration_minutes: 60,
+      title: "1:1 Performance Session",
+      subtitle: "Try cancelling this one — it's a few days out",
+      status: "scheduled",
+      origin: "course",
+      session: demoSession({ id: cancelComplyId, date_time: atTime(5, 14), status: "scheduled" }),
+    },
   ];
-  const events: CalendarEvent[] = classes.map((c, i) => ({
-    id: `demo-class-${i}`,
-    kind: "class",
-    date: atTime(c.days, c.hour),
-    duration_minutes: 60,
-    title: "1:1 Performance Session",
-    status: c.status,
-    origin: "course",
-  }));
 
   // One non-class kind so the "Filter by type" chips have something to show
   // too — a Spotlight a few days out.
@@ -117,10 +257,30 @@ const ACTION_COPY: Partial<Record<ExtSessionStatus, string>> = {
   delayed: "The class happened but started late — still counts as attended.",
 };
 
-function DemoSessionModal({ event, onClose }: { event: CalendarEvent; onClose: () => void }) {
+/** Matches the real student.sessions.tsx `canAct` gate: only these statuses
+ *  can still be joined / rescheduled / cancelled by a student. */
+function canStudentAct(status?: ExtSessionStatus): boolean {
+  return status === "scheduled" || status === "ready" || status === "rescheduled";
+}
+
+function DemoSessionModal({
+  event,
+  onClose,
+  onCancelAttempt,
+}: {
+  event: CalendarEvent;
+  onClose: () => void;
+  onCancelAttempt: (event: CalendarEvent) => void;
+}) {
   const theme = calendarEventTheme(event);
   const status = event.status as ExtSessionStatus | undefined;
   const statusLabel = status ? CALENDAR_STATUS_META[status]?.label : undefined;
+  const session = event.session;
+  const isCompleted = status === "completed";
+  const isAbsent = status === "absent";
+  const isCancelled = status === "cancelled";
+  const canAct = canStudentAct(status);
+
   const demoAction = (label: string) =>
     toast(`"${label}" — this is a demo, so nothing was actually changed. In the real app this would take effect immediately.`);
 
@@ -153,6 +313,13 @@ function DemoSessionModal({ event, onClose }: { event: CalendarEvent; onClose: (
             </div>
           </div>
 
+          {event.subtitle && (
+            <div className="flex items-start gap-2 rounded-lg bg-accent/10 p-3 text-xs font-medium text-accent">
+              <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              <span>{event.subtitle}</span>
+            </div>
+          )}
+
           {status && ACTION_COPY[status] && (
             <div className="flex items-start gap-2 rounded-lg bg-secondary/60 p-3 text-xs text-muted-foreground">
               <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
@@ -160,17 +327,73 @@ function DemoSessionModal({ event, onClose }: { event: CalendarEvent; onClose: (
             </div>
           )}
 
-          <div className="flex flex-wrap gap-2 pt-1">
-            <PrimaryButton onClick={() => demoAction("Join class")} className="!px-3.5 !py-2 text-xs">
-              <Video className="mr-1.5 h-3.5 w-3.5" /> Join class
-            </PrimaryButton>
-            <GhostButton onClick={() => demoAction("Reschedule")} className="!px-3.5 !py-2 text-xs">
-              <RefreshCcw className="mr-1.5 h-3.5 w-3.5" /> Reschedule
-            </GhostButton>
-            <GhostButton onClick={() => demoAction("Can't Attend")} className="!px-3.5 !py-2 text-xs">
-              <CircleSlash className="mr-1.5 h-3.5 w-3.5" /> Can&apos;t Attend
-            </GhostButton>
-          </div>
+          {isAbsent && session?.report_comments && (
+            <div>
+              <div className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Teacher's notes</div>
+              <div className="rounded-lg border border-[var(--navy-100)] bg-[var(--navy-50)] p-3.5 text-sm text-muted-foreground">
+                {session.report_comments}
+              </div>
+            </div>
+          )}
+
+          {isCancelled && session?.cancellation_note && (
+            <div>
+              <div className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Cancellation note</div>
+              <div className="rounded-lg border border-[var(--navy-100)] bg-[var(--navy-50)] p-3.5 text-sm text-muted-foreground">
+                {session.cancellation_note}
+              </div>
+            </div>
+          )}
+
+          {isCompleted && (
+            <div className="space-y-3">
+              {session?.report_comments && (
+                <div>
+                  <div className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Note for the Student</div>
+                  <p className="whitespace-pre-wrap rounded-lg border border-border bg-secondary/40 px-3 py-2.5 text-sm text-foreground">
+                    {session.report_comments}
+                  </p>
+                </div>
+              )}
+              {session?.report_pdf_url && (
+                <a
+                  href={session.report_pdf_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-[#01304a] px-3.5 py-2 text-xs font-semibold text-white transition-opacity hover:opacity-90"
+                >
+                  <FileText className="h-3.5 w-3.5" /> Open full PDF report
+                </a>
+              )}
+              {typeof session?.student_rating === "number" && (
+                <div>
+                  <div className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Your rating</div>
+                  <div className="flex items-center gap-1">
+                    {[1, 2, 3, 4, 5].map((n) => (
+                      <Star
+                        key={n}
+                        className={`h-4 w-4 ${n <= session.student_rating! ? "fill-amber-400 text-amber-400" : "text-muted-foreground/40"}`}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {canAct && (
+            <div className="flex flex-wrap gap-2 pt-1">
+              <PrimaryButton onClick={() => demoAction("Join class")} className="!px-3.5 !py-2 text-xs">
+                <Video className="mr-1.5 h-3.5 w-3.5" /> Join class
+              </PrimaryButton>
+              <GhostButton onClick={() => demoAction("Reschedule")} className="!px-3.5 !py-2 text-xs">
+                <RefreshCcw className="mr-1.5 h-3.5 w-3.5" /> Reschedule
+              </GhostButton>
+              <GhostButton onClick={() => onCancelAttempt(event)} className="!px-3.5 !py-2 text-xs">
+                <CircleSlash className="mr-1.5 h-3.5 w-3.5" /> Can&apos;t Attend
+              </GhostButton>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -181,12 +404,51 @@ function DemoOnboardingPage() {
   // Built once per page load — nothing here is read from or written to any
   // store, localStorage included, so there is nothing to reset: closing the
   // tab (or just refreshing) already starts completely fresh next time.
-  const [events] = useState<CalendarEvent[]>(() => buildDemoEvents());
+  // The one exception is the click-to-cancel demo below, which only ever
+  // mutates this same in-memory array via setEvents.
+  const [events, setEvents] = useState<CalendarEvent[]>(() => buildDemoEvents());
   const [selected, setSelected] = useState<CalendarEvent | null>(null);
   const bannerNote = useMemo(
     () => "This page uses made-up sessions only, for walking a new student through how the calendar works. Nothing here reads or writes real data — refreshing or closing this tab resets it.",
     [],
   );
+
+  /** Live simulation of a student cancelling their own class: same-day
+   *  (< POLICY_NOTICE_HOURS) lands on Absent with a teacher note; advance
+   *  notice (>= POLICY_NOTICE_HOURS) lands on Cancelled with no penalty.
+   *  Purely local state — see the file header for why that's safe here. */
+  function handleCancelAttempt(event: CalendarEvent) {
+    const hoursUntil = (new Date(event.date).getTime() - Date.now()) / 3_600_000;
+    const compliant = hoursUntil >= POLICY_NOTICE_HOURS;
+
+    setEvents((prev) =>
+      prev.map((e) => {
+        if (e.id !== event.id) return e;
+        if (compliant) {
+          const nextSession: ExtSession = {
+            ...(e.session as ExtSession),
+            status: "cancelled",
+            cancellation_reason: "personal",
+            cancellation_note: `Cancelled with ${Math.round(hoursUntil)}h notice — within the ${POLICY_NOTICE_HOURS}h reschedule policy, no penalty.`,
+          };
+          return { ...e, status: "cancelled", subtitle: undefined, session: nextSession };
+        }
+        const nextSession: ExtSession = {
+          ...(e.session as ExtSession),
+          status: "absent",
+          absent_cause: "student",
+          report_comments: "We missed you in today's session! No worries — see you at the next one.",
+        };
+        return { ...e, status: "absent", subtitle: undefined, session: nextSession };
+      }),
+    );
+    setSelected(null);
+    toast(
+      compliant
+        ? `Cancelled — ${Math.round(hoursUntil)}h notice is within the ${POLICY_NOTICE_HOURS}h policy, so it's marked Cancelled with no penalty.`
+        : `Marked Absent — less than ${POLICY_NOTICE_HOURS}h notice, so per policy this counts as an unexcused absence.`,
+    );
+  }
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: "#f4f6f8" }}>
@@ -216,14 +478,14 @@ function DemoOnboardingPage() {
           <Logo />
         </div>
 
-        <Card className="mb-6 flex flex-wrap items-center gap-4 p-5">
+        <Card className="mb-6 flex flex-wrap items-start gap-4 p-5">
           <div
             className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full text-lg font-semibold text-white"
             style={{ background: "linear-gradient(135deg, #01304a 0%, #02466b 100%)" }}
           >
             {DEMO_STUDENT.initials}
           </div>
-          <div>
+          <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
               <h1 className="text-lg font-semibold text-foreground">{DEMO_STUDENT.name}</h1>
               <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-800">Demo</span>
@@ -231,6 +493,17 @@ function DemoOnboardingPage() {
             <p className="text-sm text-muted-foreground">
               {DEMO_STUDENT.plan} plan · {DEMO_STUDENT.level} · Teacher: {DEMO_STUDENT.teacher}
             </p>
+            <p className="mt-2 text-sm italic text-foreground/80">"{DEMO_STUDENT.headline}"</p>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {DEMO_STUDENT.personalityTags.map((tag) => (
+                <span
+                  key={tag}
+                  className="rounded-full bg-secondary px-2.5 py-1 text-[11px] font-medium text-foreground/80"
+                >
+                  {tag}
+                </span>
+              ))}
+            </div>
           </div>
         </Card>
 
@@ -244,7 +517,13 @@ function DemoOnboardingPage() {
         </Card>
       </div>
 
-      {selected && <DemoSessionModal event={selected} onClose={() => setSelected(null)} />}
+      {selected && (
+        <DemoSessionModal
+          event={selected}
+          onClose={() => setSelected(null)}
+          onCancelAttempt={handleCancelAttempt}
+        />
+      )}
     </div>
   );
 }
