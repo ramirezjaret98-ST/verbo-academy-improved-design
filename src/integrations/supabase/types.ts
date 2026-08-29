@@ -3819,6 +3819,13 @@ export type Database = {
         }[]
       }
       is_login_locked: { Args: { p_email: string }; Returns: boolean }
+      leaderboard_challenge_completion_counts: {
+        Args: never
+        Returns: {
+          completed_count: number
+          legacy_id: string
+        }[]
+      }
       legacy_id_lookup: {
         Args: never
         Returns: {
