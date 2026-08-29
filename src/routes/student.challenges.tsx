@@ -72,6 +72,7 @@ import {
   submitChallenge,
   resubmitChallenge,
   subscribeStudents,
+  getLeaderboardCompletedCount,
   openMysteryBox,
   mysteryBoxCooldownRemaining,
   activeMysteryBoxPick,
@@ -2561,12 +2562,21 @@ function useLeaderboardRows(): LeaderboardRow[] {
         const useReal = id.mode === "real" || !id.nickname.trim();
         const displayName = useReal ? u.name : id.nickname.trim();
         sortKey.set(u.id, u.name || u.id);
+        // `challenge_submissions_select` RLS only lets a student read their
+        // OWN submissions, so `u.completed_challenges` (built from that RLS-
+        // scoped table) is only ever accurate for the viewer's own row — every
+        // OTHER student would render 0 no matter how much they've actually
+        // completed. `getLeaderboardCompletedCount()` reads a durable,
+        // cross-student count from a SECURITY DEFINER RPC instead; fall back
+        // to the local value only for the split-second before that RPC's
+        // first fetch resolves, so the board doesn't flash everyone at 0.
+        const rpcCount = getLeaderboardCompletedCount(u.id);
         return {
           userId: u.id,
           displayName,
           useRealAvatar: useReal,
           avatarSeed: useReal ? u.name : id.nickname.trim(),
-          completed: totalCompletedChallenges(u),
+          completed: rpcCount ?? totalCompletedChallenges(u),
         };
       })
       .sort((a, b) =>

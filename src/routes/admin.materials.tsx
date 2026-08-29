@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useRef, useState } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { type MaterialType } from "@/lib/mock-data";
 import {
   useMaterials,
@@ -17,13 +17,133 @@ import {
   type StoredMaterial,
 } from "@/lib/materials-store";
 import { Card, GhostButton, Pill, PrimaryButton, SectionTitle } from "@/components/verbo/ui";
-import { Pencil, Trash2, X, Upload, Image as ImageIcon } from "lucide-react";
+import {
+  Pencil,
+  Trash2,
+  X,
+  Upload,
+  Plus,
+  Check,
+  Book,
+  FileText,
+  ListChecks,
+  Video,
+  Image as ImageIcon,
+  type LucideIcon,
+} from "lucide-react";
 
 export const Route = createFileRoute("/admin/materials")({ component: Page });
 
-const TYPES: MaterialType[] = ["book", "pdf", "verb-list", "video", "image"];
-const fieldCls =
-  "w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring";
+const ACCENT = "#5fca16"; // brand lime — every primary/selected action in this form
+const ACTIVE = "#01304a"; // navy — active/selected chip background
+
+// Friendly, non-technical labels — Jaret asked for these to replace the raw
+// enum values (e.g. "verb-list") that used to show up straight in the Type
+// dropdown and in the listing below.
+const TYPE_META: Record<MaterialType, { label: string; icon: LucideIcon }> = {
+  book: { label: "Book", icon: Book },
+  pdf: { label: "PDF", icon: FileText },
+  "verb-list": { label: "Verb List", icon: ListChecks },
+  video: { label: "Video", icon: Video },
+  image: { label: "Image", icon: ImageIcon },
+};
+const TYPES = Object.keys(TYPE_META) as MaterialType[];
+
+/** One big tappable choice — used for Type, Category, product/level and the
+ *  Premium toggle. Replaces every dropdown that used to be in this form. */
+function ChoiceButton({
+  active,
+  onClick,
+  icon: Icon,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  icon?: LucideIcon;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="inline-flex items-center gap-2 rounded-full border px-4 py-2.5 text-sm font-medium transition-colors"
+      style={
+        active
+          ? { background: ACTIVE, borderColor: ACTIVE, color: "#fff" }
+          : { background: "transparent", borderColor: "var(--border)", color: "var(--foreground)" }
+      }
+    >
+      {Icon && <Icon className="h-4 w-4" />}
+      {children}
+    </button>
+  );
+}
+
+/** Shared drag & drop + big-button upload zone for the resource file and the
+ *  cover image — one visual pattern instead of two different-looking ones. */
+function UploadZone({
+  accept,
+  uploading,
+  fileName,
+  preview,
+  placeholder,
+  hint,
+  onFile,
+  onRemove,
+}: {
+  accept: string;
+  uploading: boolean;
+  fileName?: string;
+  preview?: string;
+  placeholder: ReactNode;
+  hint?: string;
+  onFile: (file?: File | null) => void;
+  onRemove?: () => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const hasFile = !!fileName || !!preview;
+  return (
+    <div
+      onDragOver={(e) => e.preventDefault()}
+      onDrop={(e) => {
+        e.preventDefault();
+        onFile(e.dataTransfer.files?.[0]);
+      }}
+      className="flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-border bg-secondary/30 p-6 text-center"
+    >
+      <input
+        ref={inputRef}
+        type="file"
+        accept={accept}
+        className="hidden"
+        onChange={(e) => onFile(e.target.files?.[0])}
+      />
+      {preview ? (
+        <img src={preview} alt="preview" className="h-28 w-44 rounded-lg object-cover" />
+      ) : (
+        placeholder
+      )}
+      {fileName && <div className="text-sm font-medium text-foreground">{fileName}</div>}
+      {hint && !hasFile && <div className="text-xs text-muted-foreground">{hint}</div>}
+      <div className="flex gap-2">
+        <PrimaryButton
+          type="button"
+          accentColor={ACCENT}
+          onClick={() => inputRef.current?.click()}
+          disabled={uploading}
+        >
+          <Upload className="h-4 w-4" />
+          {uploading ? "Uploading…" : hasFile ? "Replace file" : "Choose or drop a file"}
+        </PrimaryButton>
+        {hasFile && onRemove && (
+          <GhostButton type="button" onClick={onRemove}>
+            <X className="h-3.5 w-3.5" /> Remove
+          </GhostButton>
+        )}
+      </div>
+    </div>
+  );
+}
 
 function Page() {
   const items = useMaterials();
@@ -34,7 +154,7 @@ function Page() {
   const [type, setType] = useState<MaterialType>("pdf");
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState(categories[0] ?? "Grammar");
-  const [creatingCat, setCreatingCat] = useState(false);
+  const [addingCat, setAddingCat] = useState(false);
   const [newCat, setNewCat] = useState("");
   const [cover, setCover] = useState<string | undefined>(undefined);
   const [restrictProduct, setRestrictProduct] = useState<RestrictProduct | "">("");
@@ -47,15 +167,13 @@ function Page() {
   const [coverError, setCoverError] = useState<string | null>(null);
   const [resourceUploading, setResourceUploading] = useState(false);
   const [coverUploading, setCoverUploading] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
-  const resourceRef = useRef<HTMLInputElement>(null);
 
   const resetForm = () => {
     setEditingId(null);
     setType("pdf");
     setTitle("");
     setCategory(categories[0] ?? "Grammar");
-    setCreatingCat(false);
+    setAddingCat(false);
     setNewCat("");
     setCover(undefined);
     setRestrictProduct("");
@@ -65,7 +183,6 @@ function Page() {
     setResourceName("");
     setResourceError(null);
     setCoverError(null);
-    if (resourceRef.current) resourceRef.current.value = "";
   };
 
   const onResourceFile = async (file?: File | null) => {
@@ -74,7 +191,6 @@ function Page() {
       setResourceError(MAX_MATERIAL_FILE_ERROR);
       setResourceFile(undefined);
       setResourceName("");
-      if (resourceRef.current) resourceRef.current.value = "";
       return;
     }
     setResourceError(null);
@@ -85,28 +201,20 @@ function Page() {
     if (!res.ok) {
       setResourceError(res.error);
       setResourceName("");
-      if (resourceRef.current) resourceRef.current.value = "";
       return;
     }
     setResourceFile(res.url);
   };
 
-
-
-  const onPickCategory = (v: string) => {
-    if (v === "__new__") {
-      setCreatingCat(true);
-    } else {
-      setCategory(v);
-    }
-  };
-
   const commitNewCategory = () => {
     const trimmed = newCat.trim();
-    if (!trimmed) return;
+    if (!trimmed) {
+      setAddingCat(false);
+      return;
+    }
     addCategory(trimmed);
     setCategory(trimmed);
-    setCreatingCat(false);
+    setAddingCat(false);
     setNewCat("");
   };
 
@@ -114,7 +222,6 @@ function Page() {
     if (!file) return;
     if (isFileTooLarge(file)) {
       setCoverError(MAX_MATERIAL_FILE_ERROR);
-      if (fileRef.current) fileRef.current.value = "";
       return;
     }
     setCoverError(null);
@@ -123,14 +230,13 @@ function Page() {
     setCoverUploading(false);
     if (!res.ok) {
       setCoverError(res.error);
-      if (fileRef.current) fileRef.current.value = "";
       return;
     }
     setCover(res.url);
   };
 
-  const onProductChange = (v: string) => {
-    setRestrictProduct(v as RestrictProduct | "");
+  const onProductChange = (v: RestrictProduct | "") => {
+    setRestrictProduct(v);
     setRestrictLevel(""); // reset dependent level
   };
 
@@ -151,13 +257,12 @@ function Page() {
     resetForm();
   };
 
-
   const startEdit = (m: StoredMaterial) => {
     setEditingId(m.id);
     setType(m.material_type);
     setTitle(m.title);
     setCategory(m.category);
-    setCreatingCat(false);
+    setAddingCat(false);
     setNewCat("");
     setCover(m.cover_image);
     setRestrictProduct(m.restrict_product ?? "");
@@ -166,11 +271,9 @@ function Page() {
     setResourceFile(undefined);
     setResourceName("");
     setResourceError(null);
-    if (resourceRef.current) resourceRef.current.value = "";
 
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
-
 
   const restrictLabel = (m: StoredMaterial) => {
     if (!m.restrict_product && !m.restrict_level) return null;
@@ -183,7 +286,7 @@ function Page() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight text-foreground">Material Complementario</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Upload supplemental resources — auto-categorized into the Student & Teacher Resources pages.
+          Upload supplemental resources — they show up automatically on the Student & Teacher Resources pages.
         </p>
       </div>
 
@@ -200,244 +303,201 @@ function Page() {
           {editingId ? "Edit material" : "Upload material"}
         </SectionTitle>
 
-        <div className="grid gap-4 md:grid-cols-3">
-          <div>
-            <label className="text-xs font-medium text-foreground">Type</label>
-            <select value={type} onChange={(e) => setType(e.target.value as MaterialType)} className={`mt-1.5 ${fieldCls}`}>
-              {TYPES.map((t) => (
-                <option key={t} value={t}>
-                  {t}
-                </option>
-              ))}
-            </select>
+        {/* Type — big icon buttons instead of a dropdown */}
+        <div>
+          <label className="text-xs font-medium text-foreground">What kind of material is this?</label>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {TYPES.map((t) => (
+              <ChoiceButton key={t} active={type === t} onClick={() => setType(t)} icon={TYPE_META[t].icon}>
+                {TYPE_META[t].label}
+              </ChoiceButton>
+            ))}
           </div>
-          <div>
-            <label className="text-xs font-medium text-foreground">Title</label>
-            <input
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              className={`mt-1.5 ${fieldCls}`}
-              placeholder="Resource title"
-            />
-          </div>
-          <div>
-            <label className="text-xs font-medium text-foreground">Category</label>
-            {creatingCat ? (
-              <div className="mt-1.5 flex gap-2">
+        </div>
+
+        {/* Title */}
+        <div className="mt-5">
+          <label className="text-xs font-medium text-foreground">Title</label>
+          <input
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            className="mt-1.5 w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+            placeholder="Resource title"
+          />
+        </div>
+
+        {/* Category — pill buttons instead of a dropdown */}
+        <div className="mt-5">
+          <label className="text-xs font-medium text-foreground">Category</label>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            {categories.map((c) => (
+              <ChoiceButton key={c} active={category === c} onClick={() => setCategory(c)}>
+                {c}
+              </ChoiceButton>
+            ))}
+            {addingCat ? (
+              <div className="flex items-center gap-1.5">
                 <input
                   value={newCat}
                   onChange={(e) => setNewCat(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && commitNewCategory()}
                   autoFocus
-                  className={fieldCls}
+                  className="rounded-full border border-input bg-background px-3.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                   placeholder="New category name"
                 />
-                <PrimaryButton onClick={commitNewCategory}>Add</PrimaryButton>
-                <GhostButton onClick={() => { setCreatingCat(false); setNewCat(""); }}>
+                <button
+                  type="button"
+                  onClick={commitNewCategory}
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-white"
+                  style={{ background: ACCENT }}
+                >
+                  <Check className="h-4 w-4" />
+                </button>
+                <GhostButton type="button" onClick={() => { setAddingCat(false); setNewCat(""); }} className="!px-2.5">
                   <X className="h-3.5 w-3.5" />
                 </GhostButton>
               </div>
             ) : (
-              <select value={category} onChange={(e) => onPickCategory(e.target.value)} className={`mt-1.5 ${fieldCls}`}>
-                {categories.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-                <option value="__new__">+ Create new category</option>
-              </select>
+              <button
+                type="button"
+                onClick={() => setAddingCat(true)}
+                className="inline-flex items-center gap-1.5 rounded-full border border-dashed border-border px-4 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-secondary"
+              >
+                <Plus className="h-4 w-4" /> New category
+              </button>
             )}
           </div>
         </div>
 
         {/* Restrict to */}
-        <div className="mt-4">
-          <label className="text-xs font-medium text-foreground">Restrict to (optional)</label>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            Leave both on “Any” to show this resource to every student. Set a product/level to limit visibility.
-          </p>
-          <div className="mt-1.5 grid gap-3 md:grid-cols-2">
-            <select value={restrictProduct} onChange={(e) => onProductChange(e.target.value)} className={fieldCls}>
-              <option value="">Product — Any —</option>
-              {RESTRICT_PRODUCTS.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.label}
-                </option>
-              ))}
-            </select>
-            <select
-              value={restrictLevel}
-              onChange={(e) => setRestrictLevel(e.target.value)}
-              disabled={!restrictProduct}
-              className={`${fieldCls} disabled:cursor-not-allowed disabled:opacity-50`}
-            >
-              <option value="">Level — Any —</option>
-              {levelsForProduct(restrictProduct).map((l) => (
-                <option key={l} value={l}>
-                  {l}
-                </option>
-              ))}
-            </select>
+        <div className="mt-5">
+          <label className="text-xs font-medium text-foreground">Who can see this?</label>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <ChoiceButton active={!restrictProduct} onClick={() => onProductChange("")}>
+              Everyone
+            </ChoiceButton>
+            {RESTRICT_PRODUCTS.map((p) => (
+              <ChoiceButton key={p.id} active={restrictProduct === p.id} onClick={() => onProductChange(p.id)}>
+                {p.label} only
+              </ChoiceButton>
+            ))}
           </div>
-          <label className="mt-3 inline-flex cursor-pointer items-center gap-2 text-sm text-foreground">
-            <input
-              type="checkbox"
-              checked={premium}
-              onChange={(e) => setPremium(e.target.checked)}
-              className="h-4 w-4 rounded border-input"
-            />
-            Premium (Advance/Elite only)
-          </label>
+          {restrictProduct && (
+            <div className="mt-2 flex flex-wrap gap-2 pl-1">
+              <ChoiceButton active={!restrictLevel} onClick={() => setRestrictLevel("")}>
+                Any level
+              </ChoiceButton>
+              {levelsForProduct(restrictProduct).map((l) => (
+                <ChoiceButton key={l} active={restrictLevel === l} onClick={() => setRestrictLevel(l)}>
+                  {l}
+                </ChoiceButton>
+              ))}
+            </div>
+          )}
+          <div className="mt-3">
+            <ChoiceButton active={premium} onClick={() => setPremium((v) => !v)}>
+              {premium ? "✓ Premium only (Advance/Elite)" : "Mark as Premium (Advance/Elite)"}
+            </ChoiceButton>
+          </div>
         </div>
 
         {/* Resource file */}
-        <div className="mt-4">
-          <label className="text-xs font-medium text-foreground">Resource file</label>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            Upload the actual document ({acceptForType(type)}), max 8MB.
-            {editingId ? " Leave empty to keep the current file." : ""}
+        <div className="mt-6">
+          <label className="text-xs font-medium text-foreground">Upload the file</label>
+          <p className="mt-0.5 mb-2 text-xs text-muted-foreground">
+            {editingId ? "Leave empty to keep the current file." : "Max 8MB."}
           </p>
-          <input
-            ref={resourceRef}
-            type="file"
+          <UploadZone
             accept={acceptForType(type)}
-            className="hidden"
-            onChange={(e) => onResourceFile(e.target.files?.[0])}
+            uploading={resourceUploading}
+            fileName={resourceName}
+            placeholder={<Upload className="h-8 w-8 text-muted-foreground" />}
+            onFile={onResourceFile}
+            onRemove={() => {
+              setResourceFile(undefined);
+              setResourceName("");
+              setResourceError(null);
+            }}
           />
-          <div className="mt-1.5 flex flex-wrap items-center gap-3">
-            <GhostButton onClick={() => resourceRef.current?.click()} disabled={resourceUploading}>
-              <Upload className="h-3.5 w-3.5" /> {resourceUploading ? "Uploading…" : resourceFile ? "Replace file" : "Choose file"}
-            </GhostButton>
-            {resourceName && <span className="text-xs text-foreground">{resourceName}</span>}
-            {resourceFile && (
-              <GhostButton
-                onClick={() => {
-                  setResourceFile(undefined);
-                  setResourceName("");
-                  setResourceError(null);
-                  if (resourceRef.current) resourceRef.current.value = "";
-                }}
-              >
-                <X className="h-3.5 w-3.5" /> Remove
-              </GhostButton>
-            )}
-          </div>
           {resourceError && <p className="mt-2 text-xs font-medium text-destructive">{resourceError}</p>}
         </div>
 
-
         {/* Cover image */}
-        <div className="mt-4">
+        <div className="mt-6">
           <label className="text-xs font-medium text-foreground">Cover image (optional)</label>
-          <input
-            ref={fileRef}
-            type="file"
+          <p className="mt-0.5 mb-2 text-xs text-muted-foreground">
+            If you skip this, a generic icon is used instead.
+          </p>
+          <UploadZone
             accept="image/*"
-            className="hidden"
-            onChange={(e) => onCoverFile(e.target.files?.[0])}
+            uploading={coverUploading}
+            preview={cover}
+            placeholder={<ImageIcon className="h-8 w-8 text-muted-foreground" />}
+            onFile={onCoverFile}
+            onRemove={() => setCover(undefined)}
           />
-          <div
-            onDragOver={(e) => e.preventDefault()}
-            onDrop={(e) => {
-              e.preventDefault();
-              onCoverFile(e.dataTransfer.files?.[0]);
-            }}
-            className="mt-1.5 flex flex-col items-center justify-center rounded-xl border border-dashed border-border bg-secondary/30 p-6 text-center"
-          >
-            {cover ? (
-              <img src={cover} alt="cover preview" className="h-28 w-44 rounded-lg object-cover" />
-            ) : (
-              <>
-                <ImageIcon className="h-7 w-7 text-muted-foreground" />
-                <div className="mt-2 text-sm font-medium text-foreground">Drag & drop a cover image</div>
-                <div className="mt-1 text-xs text-muted-foreground">
-                  If empty, a generic icon based on the resource type is used.
-                </div>
-              </>
-            )}
-            <div className="mt-3 flex gap-2">
-              <GhostButton onClick={() => fileRef.current?.click()} disabled={coverUploading}>
-                {coverUploading ? "Uploading…" : cover ? "Replace image" : "Choose file"}
-              </GhostButton>
-              {cover && (
-                <GhostButton onClick={() => setCover(undefined)}>
-                  <X className="h-3.5 w-3.5" /> Remove
-                </GhostButton>
-              )}
-            </div>
-          </div>
           {coverError && <p className="mt-2 text-xs font-medium text-destructive">{coverError}</p>}
         </div>
 
-
-        <div className="mt-5 flex justify-end">
-          <PrimaryButton onClick={save} disabled={resourceUploading || coverUploading}>
+        <div className="mt-6 flex justify-end">
+          <PrimaryButton accentColor={ACCENT} onClick={save} disabled={resourceUploading || coverUploading}>
             {editingId ? "Save changes" : "Save material"}
           </PrimaryButton>
         </div>
       </Card>
 
-      <Card className="!p-0">
-        <table className="w-full text-sm">
-          <thead className="text-left text-xs uppercase tracking-wider text-muted-foreground">
-            <tr className="border-b border-border">
-              <th className="px-6 py-3 font-medium">Title</th>
-              <th className="px-6 py-3 font-medium">Type</th>
-              <th className="px-6 py-3 font-medium">Category</th>
-              <th className="px-6 py-3 font-medium">Restricted to</th>
-              <th className="px-6 py-3 text-right font-medium">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((m) => (
-              <tr key={m.id} className="border-b border-border last:border-0">
-                <td className="px-6 py-4">
-                  <div className="flex items-center gap-3">
-                    <div className="h-9 w-9 shrink-0 overflow-hidden rounded-md border border-border bg-secondary">
-                      {m.cover_image ? (
-                        <img src={m.cover_image} alt="" className="h-full w-full object-cover" />
+      {/* Listing — cards instead of a dense table */}
+      <div>
+        <SectionTitle>All materials ({items.length})</SectionTitle>
+        {items.length === 0 ? (
+          <Card>
+            <p className="text-center text-sm text-muted-foreground">No materials yet — upload one above.</p>
+          </Card>
+        ) : (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {items.map((m) => {
+              const TypeIcon = TYPE_META[m.material_type].icon;
+              return (
+                <Card key={m.id} className="!p-0 overflow-hidden">
+                  <div className="relative aspect-video w-full overflow-hidden border-b border-border bg-secondary/40">
+                    {m.cover_image ? (
+                      <img src={m.cover_image} alt="" className="h-full w-full object-cover" />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center">
+                        <TypeIcon className="h-10 w-10 text-muted-foreground" style={{ opacity: 0.5 }} />
+                      </div>
+                    )}
+                  </div>
+                  <div className="space-y-3 p-4">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="text-sm font-semibold text-foreground">{m.title}</div>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <Pill tone="muted">
+                        <TypeIcon className="mr-1 h-3 w-3" /> {TYPE_META[m.material_type].label}
+                      </Pill>
+                      <Pill tone="default">{m.category}</Pill>
+                      {restrictLabel(m) ? (
+                        <Pill tone="warning">{restrictLabel(m)}</Pill>
                       ) : (
-                        <div className="flex h-full w-full items-center justify-center text-[10px] uppercase text-muted-foreground">
-                          {m.material_type.slice(0, 3)}
-                        </div>
+                        <Pill tone="muted">Everyone</Pill>
                       )}
                     </div>
-                    <span className="text-foreground">{m.title}</span>
+                    <div className="flex justify-end gap-2 pt-1">
+                      <GhostButton onClick={() => startEdit(m)}>
+                        <Pencil className="h-3.5 w-3.5" /> Edit
+                      </GhostButton>
+                      <GhostButton onClick={() => setConfirmDelete(m)}>
+                        <Trash2 className="h-3.5 w-3.5" /> Delete
+                      </GhostButton>
+                    </div>
                   </div>
-                </td>
-                <td className="px-6 py-4">
-                  <Pill tone="muted">{m.material_type}</Pill>
-                </td>
-                <td className="px-6 py-4 text-muted-foreground">{m.category}</td>
-                <td className="px-6 py-4">
-                  {restrictLabel(m) ? (
-                    <Pill tone="warning">{restrictLabel(m)}</Pill>
-                  ) : (
-                    <span className="text-xs text-muted-foreground">Everyone</span>
-                  )}
-                </td>
-                <td className="px-6 py-4">
-                  <div className="flex justify-end gap-2">
-                    <GhostButton onClick={() => startEdit(m)}>
-                      <Pencil className="h-3.5 w-3.5" /> Edit
-                    </GhostButton>
-                    <GhostButton onClick={() => setConfirmDelete(m)}>
-                      <Trash2 className="h-3.5 w-3.5" /> Delete
-                    </GhostButton>
-                  </div>
-                </td>
-              </tr>
-            ))}
-            {items.length === 0 && (
-              <tr>
-                <td colSpan={5} className="px-6 py-10 text-center text-sm text-muted-foreground">
-                  No materials yet — upload one above.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </Card>
+                </Card>
+              );
+            })}
+          </div>
+        )}
+      </div>
 
       {confirmDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center verbo-backdrop p-4">
@@ -463,6 +523,5 @@ function Page() {
         </div>
       )}
     </div>
-
   );
 }
