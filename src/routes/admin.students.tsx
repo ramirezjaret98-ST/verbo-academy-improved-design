@@ -26,7 +26,7 @@ import {
   Plus, X, Eye, EyeOff, KeyRound, Mail, Phone, Building2, CalendarDays, GraduationCap,
   Users, Briefcase, Compass, Globe, Crown, Copy, Check, Snowflake, Ban, Play, Unlock,
   Sparkles, Wand2, Pencil, Video, Repeat, Clock, CreditCard, ShieldAlert, CircleDollarSign,
-  Search, ArrowUpDown, Filter, Gauge, Lightbulb, Layers, Trash2, FileSignature,
+  Search, ArrowUpDown, Filter, Gauge, Lightbulb, Layers, Trash2, FileSignature, Loader2,
 } from "lucide-react";
 import {
   type WorkshopCohort, type WorkshopTemplate,
@@ -252,7 +252,39 @@ function Page() {
     forceTick((n) => n + 1);
   };
 
-  const handleRegister = (u: User, teacherId?: string, sendWelcomeEmail?: boolean) => {
+  // 2026-08-29: rewritten to create the REAL Supabase Auth account FIRST and
+  // only write the optimistic USERS/localStorage bookkeeping (and close the
+  // modal) once that's confirmed. This used to be the other way around —
+  // write local state immediately, then fire the real account creation in
+  // the background — which is exactly how "cascarón" accounts happened
+  // (Claudia Escamilla 2026-08-22, Tilin Hermanz 2026-08-21): if the
+  // background call failed, or the admin never even managed to trigger it
+  // (e.g. the Save button silently staying disabled with a required field
+  // empty — see the Video Call Link fix in this same lote), the student was
+  // left looking fully registered in the admin panel while having no real
+  // login at all, invisible until someone happened to notice later. Now a
+  // failure here leaves NOTHING behind — no local entry, nothing in the
+  // Students list — and the modal stays open with the error shown so the
+  // admin can fix and retry immediately instead of the ghost slipping past.
+  const handleRegister = async (u: User, teacherId?: string, sendWelcomeEmail?: boolean) => {
+    const { data, error } = await supabase.functions.invoke("admin-create-user", {
+      body: {
+        legacyId: u.id, email: u.email, password: u.password, name: u.name, role: "student",
+        // Opt-in per the "Welcome email" checkbox on the form — the
+        // function only sends when this is explicitly true.
+        sendWelcomeEmail: !!sendWelcomeEmail,
+      },
+    });
+    const invokeError = (data as { error?: string } | null)?.error;
+    if (error || invokeError) {
+      console.error("[admin.students] failed to create real auth account", error ?? invokeError);
+      notifyError(invokeError ?? error, { context: `Creating account for ${u.name}` });
+      // Re-throw so the modal's handleSave knows the save failed and keeps
+      // itself open (instead of the parent closing it as if this succeeded).
+      throw error ?? new Error(invokeError ?? "Failed to create account");
+    }
+    invalidateUserIdBridge();
+
     USERS.push(u);
     const registered = readRegisteredStudents();
     registered.push(u);
@@ -261,41 +293,12 @@ function Page() {
     forceTick((n) => n + 1);
     setDetail(null);
 
-    // Create a REAL Supabase Auth account in the background so this student
-    // can actually log in (beta users need a working account, not just a
-    // localStorage-only entry). The localStorage/USERS bookkeeping above
-    // already happened, so a failure here just leaves the student without a
-    // real login yet — same net effect as before this lote, logged for
-    // follow-up rather than blocking the admin's flow.
-    void (async () => {
-      const { data, error } = await supabase.functions.invoke("admin-create-user", {
-        body: {
-          legacyId: u.id, email: u.email, password: u.password, name: u.name, role: "student",
-          // Opt-in per the "Welcome email" checkbox on the form — the
-          // function only sends when this is explicitly true.
-          sendWelcomeEmail: !!sendWelcomeEmail,
-        },
-      });
-      const invokeError = (data as { error?: string } | null)?.error;
-      if (error || invokeError) {
-        console.error("[admin.students] failed to create real auth account", error ?? invokeError);
-        // This is the exact "cascarón" bug class (see Claudia Escamilla,
-        // 2026-08-22 memory): without this, the modal had already closed
-        // looking successful, and the student was left with no real login —
-        // invisible until someone happened to notice later. Now the admin
-        // sees it immediately, with the real error.
-        notifyError(invokeError ?? error, { context: `Creating account for ${u.name}` });
-        return;
-      }
-      invalidateUserIdBridge();
-      const { id, name, role, ...rest } = u;
-      patchStudentProfile(u.id, rest as Partial<StudentProfileFields>);
-      // The assignments table FKs into app_users, so the real row (created
-      // just above) has to exist before this can resolve — that's why this
-      // waits until here instead of firing at the top of handleRegister.
-      if (teacherId) setAssignment(u.id, teacherId);
-      notifySuccess(`${u.name} created successfully.`);
-    })();
+    const { id, name, role, ...rest } = u;
+    patchStudentProfile(u.id, rest as Partial<StudentProfileFields>);
+    // The assignments table FKs into app_users, so the real row (created
+    // just above) has to exist before this can resolve.
+    if (teacherId) setAssignment(u.id, teacherId);
+    notifySuccess(`${u.name} created successfully.`);
   };
 
   const handleUpdate = (u: User, teacherId?: string) => {
@@ -728,7 +731,7 @@ function StudentFormModal({
   initial: User | null;
   teachers: User[];
   onClose: () => void;
-  onSave: (u: User, teacherId?: string, sendWelcomeEmail?: boolean) => void;
+  onSave: (u: User, teacherId?: string, sendWelcomeEmail?: boolean) => void | Promise<void>;
 }) {
   const editing = !!initial;
   const existingTeacher = initial ? assignedTeacherIdFor(initial.id) ?? "" : "";
@@ -773,8 +776,16 @@ function StudentFormModal({
   const [showPassword, setShowPassword] = useState(false);
   const [emailTouched, setEmailTouched] = useState(false);
   const [attemptedSave, setAttemptedSave] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [tab, setTab] = useState<"academic" | "financial" | "info">("academic");
   const prevPerWeek = useRef(f.sessions_per_week);
+  // Guards the setSaving(false) in handleSave's finally block: on success
+  // onSave() causes the parent to unmount this modal before the await
+  // resolves, and setting state on an unmounted component is a no-op we'd
+  // rather not attempt.
+  const mountedRef = useRef(true);
+  useEffect(() => () => { mountedRef.current = false; }, []);
 
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) => setF((p) => ({ ...p, [k]: v }));
 
@@ -914,9 +925,23 @@ function StudentFormModal({
     });
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     setAttemptedSave(true);
-    if (!isValid) return;
+    if (!isValid) {
+      // Jump the admin straight to whichever tab is actually missing
+      // something instead of leaving them staring at a Save button that
+      // (before this fix) just silently did nothing — see the Academic/
+      // Student Info tab dots below, which only ever activate once
+      // attemptedSave is true.
+      const isPerfNow = f.product_type === "performance";
+      const missingAcademic = isPerfNow
+        && (!f.product || !f.video_call_link.trim() || (isEnterprise && !f.company.trim()));
+      const missingInfo = !f.name.trim() || !isValidEmail(f.email) || !f.password.trim();
+      if (missingAcademic) setTab("academic");
+      else if (missingInfo) setTab("info");
+      return;
+    }
+    setSaving(true);
     const accessPlan = (f.access_plan || undefined) as AccessPlanId | undefined;
     const id = initial?.id ?? `u${Date.now()}`;
     const isPerf = f.product_type === "performance";
@@ -968,7 +993,20 @@ function StudentFormModal({
     for (const cid of currentIds) if (!targetIds.has(cid)) removeParticipantFromCohort(cid, id);
     for (const cid of targetIds) if (!currentIds.has(cid)) addStudentToCohort(cid, id, u.name);
 
-    onSave(u, isPerf ? (f.teacher_id || undefined) : undefined, !editing ? f.send_welcome_email : undefined);
+    try {
+      // Awaited so a failure (e.g. admin-create-user rejecting a duplicate
+      // email) keeps this modal open with the data intact instead of the
+      // parent closing it optimistically — see handleRegister's comment for
+      // why this matters. onSave() itself already surfaces the error via a
+      // toast (notifyError), so there's nothing further to show here beyond
+      // re-enabling the form.
+      await onSave(u, isPerf ? (f.teacher_id || undefined) : undefined, !editing ? f.send_welcome_email : undefined);
+    } catch {
+      // Swallow — the toast already told the admin what went wrong. Falls
+      // through to the finally below so the button un-freezes.
+    } finally {
+      if (mountedRef.current) setSaving(false);
+    }
   };
 
   const isPerf = f.product_type === "performance";
@@ -1095,11 +1133,21 @@ function StudentFormModal({
                       );
                     })}
                   </div>
+                  {attemptedSave && !f.product && (
+                    <p className="mt-2 text-xs text-destructive">Pick a product to continue.</p>
+                  )}
 
                   {isEnterprise && (
                     <div className="verbo-fade-up mt-4">
                       <Field label="Company" icon={<Building2 className="h-3.5 w-3.5" />}>
-                        <input value={f.company} onChange={(e) => set("company", e.target.value)} placeholder="Organization (required)" className={inputCls} />
+                        <input
+                          value={f.company}
+                          onChange={(e) => set("company", e.target.value)}
+                          placeholder="Organization (required)"
+                          className={`${inputCls} ${attemptedSave && !f.company.trim() ? "!border-destructive focus:!border-destructive focus:!ring-destructive" : ""}`}
+                          aria-invalid={attemptedSave && !f.company.trim() ? "true" : "false"}
+                        />
+                        {attemptedSave && !f.company.trim() && <p className="mt-1 text-xs text-destructive">Company is required for Enterprise students.</p>}
                       </Field>
                     </div>
                   )}
@@ -1196,9 +1244,20 @@ function StudentFormModal({
                     </>
                   )}
 
-                  <Field label="Video Call Link" icon={<Video className="h-3.5 w-3.5" />} className="md:col-span-2">
-                    <input type="url" value={f.video_call_link} onChange={(e) => set("video_call_link", e.target.value)} placeholder="https://teams.microsoft.com/..." className={inputCls} />
-                    <p className="mt-1 text-[10.5px] text-muted-foreground">This link will be used for all of the student's sessions until an admin changes it.</p>
+                  <Field label={<>Video Call Link <span className="text-destructive">*</span></>} icon={<Video className="h-3.5 w-3.5" />} className="md:col-span-2">
+                    <input
+                      type="url"
+                      value={f.video_call_link}
+                      onChange={(e) => set("video_call_link", e.target.value)}
+                      placeholder="https://teams.microsoft.com/..."
+                      className={`${inputCls} ${attemptedSave && !f.video_call_link.trim() ? "!border-destructive focus:!border-destructive focus:!ring-destructive" : ""}`}
+                      aria-invalid={attemptedSave && !f.video_call_link.trim() ? "true" : "false"}
+                    />
+                    {attemptedSave && !f.video_call_link.trim() ? (
+                      <p className="mt-1 text-xs text-destructive">Required — Save stays disabled without it.</p>
+                    ) : (
+                      <p className="mt-1 text-[10.5px] text-muted-foreground">This link will be used for all of the student's sessions until an admin changes it.</p>
+                    )}
                   </Field>
 
                   <Field label="Assign Initial Teacher" icon={<Users className="h-3.5 w-3.5" />} className="md:col-span-2">
@@ -1324,7 +1383,14 @@ function StudentFormModal({
             <div className="mb-3"><SectionTitleTab>Student Info</SectionTitleTab></div>
             <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
               <Field label="Student Name">
-                <input value={f.name} onChange={(e) => set("name", e.target.value)} placeholder="Full name" className={inputCls} />
+                <input
+                  value={f.name}
+                  onChange={(e) => set("name", e.target.value)}
+                  placeholder="Full name"
+                  className={`${inputCls} ${attemptedSave && !f.name.trim() ? "!border-destructive focus:!border-destructive focus:!ring-destructive" : ""}`}
+                  aria-invalid={attemptedSave && !f.name.trim() ? "true" : "false"}
+                />
+                {attemptedSave && !f.name.trim() && <p className="mt-1 text-xs text-destructive">Name is required.</p>}
               </Field>
               <Field label="Email" icon={<Mail className="h-3.5 w-3.5" />}>
                 <input
@@ -1349,11 +1415,19 @@ function StudentFormModal({
               </Field>
               <Field label="Initial Password" icon={<KeyRound className="h-3.5 w-3.5" />}>
                 <div className="relative">
-                  <input type={showPassword ? "text" : "password"} value={f.password} onChange={(e) => set("password", e.target.value)} placeholder="Set a password" className={`${inputCls} pr-9`} />
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    value={f.password}
+                    onChange={(e) => set("password", e.target.value)}
+                    placeholder="Set a password"
+                    className={`${inputCls} pr-9 ${attemptedSave && !f.password.trim() ? "!border-destructive focus:!border-destructive focus:!ring-destructive" : ""}`}
+                    aria-invalid={attemptedSave && !f.password.trim() ? "true" : "false"}
+                  />
                   <button type="button" onClick={() => setShowPassword((v) => !v)} className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground hover:text-foreground" aria-label="Toggle password">
                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
                 </div>
+                {attemptedSave && !f.password.trim() && <p className="mt-1 text-xs text-destructive">Password is required.</p>}
               </Field>
               {!editing && (
                 <Field label="Welcome email" icon={<Mail className="h-3.5 w-3.5" />} className="md:col-span-2">
@@ -1386,14 +1460,22 @@ function StudentFormModal({
       </div>
 
       <AccentModalFooter>
-        <GhostButton onClick={onClose}>Cancel</GhostButton>
+        <GhostButton onClick={onClose} disabled={saving}>Cancel</GhostButton>
         <PrimaryButton
           onClick={handleSave}
-          disabled={!isValid}
+          // Deliberately NOT disabled={!isValid} — a disabled button never
+          // fires onClick, so handleSave (which sets attemptedSave and
+          // reveals exactly which field is missing) could never run. That
+          // silent dead-end was the actual bug: the button just sat there
+          // doing nothing with zero feedback. Only "already saving" blocks
+          // it now, to prevent a double-submit while the real account
+          // creation is in flight.
+          disabled={saving}
           accentColor="#5fca16"
           className="hover:!bg-[#4fb010]"
         >
-          {editing ? "Save changes" : "Save"}
+          {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+          {saving ? "Saving…" : editing ? "Save changes" : "Save"}
         </PrimaryButton>
       </AccentModalFooter>
     </AccentModal>

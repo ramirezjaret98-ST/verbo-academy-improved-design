@@ -17,6 +17,9 @@ import {
   Link2,
   Info,
   Upload,
+  CheckCircle2,
+  Video,
+  FileDown,
 } from "lucide-react";
 import {
   loadActivities,
@@ -234,10 +237,28 @@ function Page() {
             <div key={u.id} className={`flex items-center justify-between gap-4 px-6 py-4 ${i ? "border-t border-border" : ""}`}>
               <div className="min-w-0">
                 <div className="text-sm font-medium text-foreground truncate">{u.title}</div>
-                <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
+                <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                   <span>{u.id}</span>
                   <span>•</span>
                   <Pill tone={count ? "success" : "muted"}>{count} {count === 1 ? "activity" : "activities"}</Pill>
+                  {u.video_url && (
+                    <span className="inline-flex items-center gap-1 text-foreground">
+                      <Video className="h-3 w-3" /> Video attached
+                    </span>
+                  )}
+                  {u.pdf_url ? (
+                    <a
+                      href={u.pdf_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className="inline-flex items-center gap-1 text-accent hover:underline"
+                    >
+                      <FileDown className="h-3 w-3" /> PDF attached
+                    </a>
+                  ) : (
+                    <span className="italic">No PDF attached</span>
+                  )}
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -323,7 +344,19 @@ function UnitModal({ level, editingUnit, onClose, onCreate, onUpdate }: {
     if (!res.ok) { setVideoUploadError(res.error); return; }
     setVideoUrl(res.url);
   };
+  const [pdfSource, setPdfSource] = useState<"url" | "upload">("url");
   const [pdfUrl, setPdfUrl] = useState(isEdit ? editingUnit!.pdf_url : "");
+  const [pdfUploading, setPdfUploading] = useState(false);
+  const [pdfUploadError, setPdfUploadError] = useState("");
+  const handlePdfFile = async (file?: File) => {
+    if (!file) return;
+    setPdfUploading(true);
+    setPdfUploadError("");
+    const res = await uploadContentFile(file, "course-pdf");
+    setPdfUploading(false);
+    if (!res.ok) { setPdfUploadError(res.error); return; }
+    setPdfUrl(res.url);
+  };
   const [teaser, setTeaser] = useState(isEdit ? editingUnit!.teaser ?? "" : "");
 
   const handleSave = () => {
@@ -417,13 +450,45 @@ function UnitModal({ level, editingUnit, onClose, onCreate, onUpdate }: {
           )}
         </Field>
 
-        <Field label="Study Guide PDF URL" hint="Paste a public document or cloud storage link.">
-          <input value={pdfUrl} onChange={(e) => setPdfUrl(e.target.value)} className={inputCls} placeholder="e.g., https://example.com/study-guide.pdf or public document link" />
+        <Field label="Study Guide PDF" hint={pdfUrl ? "A file is attached to this unit." : "Optional — the unit works fine without one."}>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => setPdfSource("url")}
+              className={`flex items-center justify-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${pdfSource === "url" ? "border-accent bg-accent/10 text-foreground" : "border-border bg-background text-muted-foreground hover:bg-secondary"}`}
+            >
+              <Link2 className="h-4 w-4" /> PDF URL
+            </button>
+            <button
+              type="button"
+              onClick={() => setPdfSource("upload")}
+              className={`flex items-center justify-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${pdfSource === "upload" ? "border-accent bg-accent/10 text-foreground" : "border-border bg-background text-muted-foreground hover:bg-secondary"}`}
+            >
+              <Upload className="h-4 w-4" /> Upload PDF
+            </button>
+          </div>
+          {pdfSource === "url" ? (
+            <input value={pdfUrl} onChange={(e) => setPdfUrl(e.target.value)} className={`${inputCls} mt-2`} placeholder="e.g., https://example.com/study-guide.pdf or public document link" />
+          ) : (
+            <div className="mt-2 space-y-1.5">
+              <label className="flex h-16 w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-secondary/40 text-sm text-muted-foreground transition-colors hover:bg-secondary">
+                <Upload className="h-4 w-4" />
+                {pdfUploading ? "Uploading…" : pdfUrl || "Click to upload a PDF"}
+                <input type="file" accept="application/pdf" className="sr-only" disabled={pdfUploading} onChange={(e) => handlePdfFile(e.target.files?.[0])} />
+              </label>
+              {pdfUploadError && <p className="text-xs text-destructive">{pdfUploadError}</p>}
+            </div>
+          )}
+          {pdfUrl && (
+            <p className="mt-1.5 flex items-center gap-1 text-xs text-success">
+              <CheckCircle2 className="h-3.5 w-3.5" /> PDF attached — will be confirmed on the unit list after saving.
+            </p>
+          )}
         </Field>
       </div>
       <ModalFooter>
         <GhostButton onClick={onClose}>Cancel</GhostButton>
-        <PrimaryButton disabled={!title.trim() || videoUploading} onClick={handleSave}>{isEdit ? "Save Changes" : "Create unit"}</PrimaryButton>
+        <PrimaryButton disabled={!title.trim() || videoUploading || pdfUploading} onClick={handleSave}>{isEdit ? "Save Changes" : "Create unit"}</PrimaryButton>
       </ModalFooter>
     </ModalShell>
   );

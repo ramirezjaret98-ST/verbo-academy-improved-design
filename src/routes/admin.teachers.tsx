@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { USERS, SESSIONS, userById, type User, type Session } from "@/lib/mock-data";
 import { hydrateAssignments, removeAssignment, setAssignment, subscribeAssignments, allAssignments } from "@/lib/assignments-store";
 import { getProduct } from "@/lib/student-model";
@@ -30,7 +30,7 @@ import {
   Plus, X, Eye, EyeOff, Star, Users, Clock, KeyRound, Snowflake, Ban, Play,
   Pencil, Search, Filter, ArrowUpDown, Check, AlertTriangle, Mail, Phone, ShieldAlert,
   CheckCircle2, CalendarClock, ChevronRight, UserX, Wallet, FileDown, CircleDollarSign, Trophy,
-  ShieldCheck, Zap, Briefcase, Undo2, Trash2, Unlock,
+  ShieldCheck, Zap, Briefcase, Undo2, Trash2, Unlock, Loader2,
 } from "lucide-react";
 import { waLink } from "@/lib/phone-utils";
 import type { LucideIcon } from "lucide-react";
@@ -197,37 +197,35 @@ function Page() {
     forceTick((n) => n + 1);
   };
 
-  const registerTeacher = (u: User, studentIds: string[]) => {
+  // 2026-08-29: rewritten to create the REAL Supabase Auth account FIRST
+  // (awaited) and only write the optimistic USERS/localStorage bookkeeping
+  // once that's confirmed — same fix, and same reasoning, as
+  // admin.students.tsx's handleRegister. A failure now leaves no ghost
+  // teacher entry behind; the modal stays open with the error shown instead.
+  const registerTeacher = async (u: User, studentIds: string[]) => {
+    const { data, error } = await supabase.functions.invoke("admin-create-user", {
+      body: { legacyId: u.id, email: u.email, password: u.password, name: u.name, role: "teacher" },
+    });
+    const invokeError = (data as { error?: string } | null)?.error;
+    if (error || invokeError) {
+      console.error("[admin.teachers] failed to create real auth account", error ?? invokeError);
+      notifyError(invokeError ?? error, { context: `Creating account for ${u.name}` });
+      throw error ?? new Error(invokeError ?? "Failed to create account");
+    }
+    invalidateUserIdBridge();
+
     USERS.push(u);
     const reg = read<User[]>(REGISTERED_KEY, []);
     reg.push(u); write(REGISTERED_KEY, reg);
     setFormFor(null);
     forceTick((n) => n + 1);
 
-    // Create a REAL Supabase Auth account in the background so this teacher
-    // can actually log in — same reasoning as admin.students.tsx's
-    // handleRegister. A failure here leaves the teacher without a real login
-    // yet (same as before this lote) rather than blocking the admin's flow.
-    void (async () => {
-      const { data, error } = await supabase.functions.invoke("admin-create-user", {
-        body: { legacyId: u.id, email: u.email, password: u.password, name: u.name, role: "teacher" },
-      });
-      const invokeError = (data as { error?: string } | null)?.error;
-      if (error || invokeError) {
-        console.error("[admin.teachers] failed to create real auth account", error ?? invokeError);
-        notifyError(invokeError ?? error, { context: `Creating account for ${u.name}` });
-        return;
-      }
-      invalidateUserIdBridge();
-      const { id, role, ...rest } = u;
-      patchTeacherProfile(u.id, rest as Partial<User>);
-      // The assignments table FKs into app_users, so the real teacher row
-      // (created just above) has to exist before this can resolve — that's
-      // why this waits until here instead of firing at the top of
-      // registerTeacher.
-      studentIds.forEach((sid) => reassignStudent(sid, u.id));
-      notifySuccess(`${u.name} created successfully.`);
-    })();
+    const { id, role, ...rest } = u;
+    patchTeacherProfile(u.id, rest as Partial<User>);
+    // The assignments table FKs into app_users, so the real teacher row
+    // (created just above) has to exist before this can resolve.
+    studentIds.forEach((sid) => reassignStudent(sid, u.id));
+    notifySuccess(`${u.name} created successfully.`);
   };
 
   const updateTeacher = (u: User) => {
@@ -1321,7 +1319,7 @@ function TeacherFormModal({
 }: {
   initial: User | null;
   onClose: () => void;
-  onSave: (u: User, studentIds: string[]) => void;
+  onSave: (u: User, studentIds: string[]) => void | Promise<void>;
 }) {
   const editing = !!initial;
   const [name, setName] = useState(initial?.name ?? "");
@@ -1335,6 +1333,10 @@ function TeacherFormModal({
     initial?.hire_date ?? new Date().toISOString().slice(0, 10),
   );
   const [studentIds, setStudentIds] = useState<string[]>([]);
+  const [attemptedSave, setAttemptedSave] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const mountedRef = useRef(true);
+  useEffect(() => () => { mountedRef.current = false; }, []);
 
   // Students with no teacher assigned (available for initial assignment)
   const assignedStudentIds = useMemo(() => new Set(allAssignments().map((a) => a.student_id)), []);
@@ -1345,8 +1347,10 @@ function TeacherFormModal({
 
   const valid = name.trim() && email.trim() && password.trim() && products.length > 0 && !!hireDate;
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    setAttemptedSave(true);
     if (!valid) return;
+    setSaving(true);
     const u: User = {
       ...(initial ?? {}),
       id: initial?.id ?? `t${Date.now()}`,
@@ -1365,7 +1369,17 @@ function TeacherFormModal({
       availability: initial?.availability ?? [],
       availability_request: initial?.availability_request ?? null,
     };
-    onSave(u, editing ? [] : studentIds);
+    try {
+      // Awaited so a failure keeps this modal open with the data intact —
+      // see registerTeacher's comment for why (same "ghost account" class
+      // of bug as admin.students.tsx, same fix).
+      await onSave(u, editing ? [] : studentIds);
+    } catch {
+      // notifyError already told the admin what went wrong — just fall
+      // through to re-enable the form.
+    } finally {
+      if (mountedRef.current) setSaving(false);
+    }
   };
 
   return (
@@ -1382,22 +1396,49 @@ function TeacherFormModal({
       <div className="max-h-[70vh] space-y-4 overflow-y-auto px-6 py-5 report-modal-scroll">
         <SectionBanner color="#01304a" icon={Users} title="Teacher Info" />
         <Field label="Full name" icon={<Users className="h-3.5 w-3.5" />}>
-          <input type="text" value={name} onChange={(e) => setName(e.target.value)} className={inputCls} placeholder="Jane Doe" />
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className={`${inputCls} ${attemptedSave && !name.trim() ? "!border-destructive focus:!border-destructive focus:!ring-destructive" : ""}`}
+            placeholder="Jane Doe"
+            aria-invalid={attemptedSave && !name.trim() ? "true" : "false"}
+          />
+          {attemptedSave && !name.trim() && <p className="mt-1 text-xs text-destructive">Name is required.</p>}
         </Field>
         <Field label="Email" icon={<Mail className="h-3.5 w-3.5" />}>
-          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className={inputCls} placeholder="jane@verbo.com" />
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className={`${inputCls} ${attemptedSave && !email.trim() ? "!border-destructive focus:!border-destructive focus:!ring-destructive" : ""}`}
+            placeholder="jane@verbo.com"
+            aria-invalid={attemptedSave && !email.trim() ? "true" : "false"}
+          />
+          {attemptedSave && !email.trim() && <p className="mt-1 text-xs text-destructive">Email is required.</p>}
         </Field>
         <Field label="Phone" icon={<Phone className="h-3.5 w-3.5" />}>
           <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} className={inputCls} placeholder="+52 55 1234 5678" />
         </Field>
         <Field label="Initial password" icon={<KeyRound className="h-3.5 w-3.5" />}>
           <div className="relative">
-            <input type={showPw ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} className={inputCls} placeholder="••••••••" />
+            <input
+              type={showPw ? "text" : "password"}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className={`${inputCls} ${attemptedSave && !password.trim() ? "!border-destructive focus:!border-destructive focus:!ring-destructive" : ""}`}
+              placeholder="••••••••"
+              aria-invalid={attemptedSave && !password.trim() ? "true" : "false"}
+            />
             <button type="button" onClick={() => setShowPw((v) => !v)} className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground hover:text-foreground">
               {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </button>
           </div>
-          <p className="mt-1 text-[10.5px] text-muted-foreground">The teacher will be required to change it on their first sign-in.</p>
+          {attemptedSave && !password.trim() ? (
+            <p className="mt-1 text-xs text-destructive">Password is required.</p>
+          ) : (
+            <p className="mt-1 text-[10.5px] text-muted-foreground">The teacher will be required to change it on their first sign-in.</p>
+          )}
         </Field>
 
         <SectionBanner color="#d97706" icon={Briefcase} title="Contract & Products" />
@@ -1413,11 +1454,16 @@ function TeacherFormModal({
             type="date"
             value={hireDate}
             onChange={(e) => setHireDate(e.target.value)}
-            className={inputCls}
+            className={`${inputCls} ${attemptedSave && !hireDate ? "!border-destructive focus:!border-destructive focus:!ring-destructive" : ""}`}
+            aria-invalid={attemptedSave && !hireDate ? "true" : "false"}
           />
-          <p className="mt-1 text-[10.5px] text-muted-foreground">
-            KPI tracking activates in week 2 of the hire month. The 6-month bonus streak counts from the first full calendar month after the hire month.
-          </p>
+          {attemptedSave && !hireDate ? (
+            <p className="mt-1 text-xs text-destructive">Required — Save stays disabled without it.</p>
+          ) : (
+            <p className="mt-1 text-[10.5px] text-muted-foreground">
+              KPI tracking activates in week 2 of the hire month. The 6-month bonus streak counts from the first full calendar month after the hire month.
+            </p>
+          )}
         </Field>
         <Field label="Qualified products (at least one)">
           <div className="flex flex-wrap gap-2">
@@ -1436,6 +1482,9 @@ function TeacherFormModal({
               );
             })}
           </div>
+          {attemptedSave && products.length === 0 && (
+            <p className="mt-1 text-xs text-destructive">Select at least one qualified product.</p>
+          )}
         </Field>
 
         {!editing && (
@@ -1468,9 +1517,10 @@ function TeacherFormModal({
       </div>
 
       <AccentModalFooter>
-        <GhostButton onClick={onClose}>Cancel</GhostButton>
-        <PrimaryButton accentColor="#5fca16" className="hover:!bg-[#4fb010]" onClick={handleSave} disabled={!valid}>
-          {editing ? "Save changes" : "Save"}
+        <GhostButton onClick={onClose} disabled={saving}>Cancel</GhostButton>
+        <PrimaryButton accentColor="#5fca16" className="hover:!bg-[#4fb010]" onClick={handleSave} disabled={saving}>
+          {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+          {saving ? "Saving…" : editing ? "Save changes" : "Save"}
         </PrimaryButton>
       </AccentModalFooter>
     </AccentModal>
