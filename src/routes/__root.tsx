@@ -77,7 +77,9 @@ function PasswordChangeGate({ children }: { children: React.ReactNode }) {
   const { user } = useAuthCtx();
   const router = useRouter();
   const path = router.state.location.pathname;
-  const allowed = path === "/change-password" || path === "/login" || path === "/";
+  const allowed =
+    path === "/change-password" || path === "/login" || path === "/" ||
+    path === "/forgot-password" || path === "/reset-password";
   if (user?.must_change_password && !allowed) {
     return <RedirectToChangePassword />;
   }

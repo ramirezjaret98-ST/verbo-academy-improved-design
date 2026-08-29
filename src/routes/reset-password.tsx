@@ -1,148 +1,104 @@
-// Landing page for the link Supabase's password-recovery email sends
-// (see login.tsx's "Forgot your password?" modal, which triggers
-// supabase.auth.resetPasswordForEmail with redirectTo pointing here).
-//
-// Unlike change-password.tsx (the forced first-login flow), this page must
-// work WITHOUT an existing app session/useAuth().user — the visitor is
-// arriving fresh from an email link. Supabase's client auto-detects the
-// recovery token in the URL (detectSessionInUrl defaults to true) and fires
-// a PASSWORD_RECOVERY auth event once it's established a temporary session
-// from it; we listen for that (and also check for an already-active session
-// in case the event fired before this component mounted) before allowing
-// the form to submit.
-import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import { validatePasswordComplexity } from "@/lib/auth";
-import { notifyAccountEvent } from "@/lib/account-notify";
 import { Logo } from "@/components/verbo/Logo";
-import { Loader2, Check, X, AlertTriangle } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { Check, Loader2, X } from "lucide-react";
 
 export const Route = createFileRoute("/reset-password")({
   head: () => ({ meta: [{ title: "Reset your password — Verbo Language Solutions" }] }),
   component: ResetPasswordPage,
 });
 
-type LinkState = "checking" | "ready" | "invalid";
+/** Same complexity rule enforced server-side in confirm-password-reset /
+ *  admin-set-password (this sets a real Supabase Auth password — stricter
+ *  than the legacy ≥4-char mock-login rule in src/lib/auth.tsx). */
+function passwordError(pwd: string): string | null {
+  if (!pwd || pwd.length < 6) return "Password must be at least 6 characters.";
+  if (!/[A-Z]/.test(pwd)) return "Password must include at least one uppercase letter.";
+  if (!/[0-9]/.test(pwd)) return "Password must include at least one number.";
+  return null;
+}
 
 function ResetPasswordPage() {
   const navigate = useNavigate();
-  const [linkState, setLinkState] = useState<LinkState>("checking");
+  const [token, setToken] = useState<string | null>(null);
   const [next, setNext] = useState("");
   const [confirm, setConfirm] = useState("");
   const [touched, setTouched] = useState(false);
   const [attempted, setAttempted] = useState(false);
-  const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [done, setDone] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState(false);
 
   useEffect(() => {
-    let cancelled = false;
-
-    supabase.auth.getSession().then(({ data }) => {
-      if (!cancelled && data.session) setLinkState("ready");
-    });
-
-    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
-      if (cancelled) return;
-      if (event === "PASSWORD_RECOVERY" || (event === "SIGNED_IN" && session)) {
-        setLinkState("ready");
-      }
-    });
-
-    // Give the recovery-token exchange a few seconds to complete before
-    // concluding the link is invalid/expired.
-    const timeout = setTimeout(() => {
-      if (!cancelled) setLinkState((s) => (s === "checking" ? "invalid" : s));
-    }, 4000);
-
-    return () => {
-      cancelled = true;
-      sub.subscription.unsubscribe();
-      clearTimeout(timeout);
-    };
+    setToken(new URLSearchParams(window.location.search).get("token"));
   }, []);
 
-  const complexityError = validatePasswordComplexity(next);
+  const complexityError = passwordError(next);
   const hasUpper = /[A-Z]/.test(next);
   const hasDigit = /[0-9]/.test(next);
-  const hasMinLen = next.length >= 4;
+  const hasMinLen = next.length >= 6;
   const matches = next.length > 0 && next === confirm;
-  const canSubmit = !complexityError && matches && !submitting;
+  const canSubmit = !complexityError && matches && !submitting && !!token;
+  const showErrors = touched || attempted;
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setAttempted(true);
     setError("");
+    if (!token) return setError("This link is invalid or has expired. Please request a new one.");
     if (complexityError) return setError(complexityError);
     if (!matches) return setError("Passwords do not match.");
+
     setSubmitting(true);
-
-    const { error: updateErr } = await supabase.auth.updateUser({ password: next });
-    if (updateErr) {
-      setError(updateErr.message);
+    try {
+      const { data, error: fnError } = await supabase.functions.invoke("confirm-password-reset", {
+        body: { token, newPassword: next },
+      });
+      if (fnError || (data && (data as { error?: string }).error)) {
+        const msg = (data as { error?: string } | null)?.error ?? "This link is invalid or has expired. Please request a new one.";
+        setError(msg);
+        setSubmitting(false);
+        return;
+      }
+      setSuccess(true);
+      setTimeout(() => navigate({ to: "/login" }), 2200);
+    } catch {
+      setError("Something went wrong. Please try again in a moment.");
       setSubmitting(false);
-      return;
     }
-
-    // Clear the forced-change flag now that a real password has been set —
-    // best-effort: the password change itself already succeeded above, so a
-    // failure here just means they'll also see the "first sign-in" prompt
-    // once, which is harmless.
-    const { data: userData } = await supabase.auth.getUser();
-    if (userData?.user) {
-      await supabase.from("app_users").update({ must_change_password: false }).eq("id", userData.user.id);
-      // 2026-08-20: security confirmation email — "tu contraseña fue
-      // actualizada" — same as when Admin resets it on someone's behalf
-      // (see adminSetPassword in admin-password.ts). Fire-and-forget, never
-      // blocks the sign-out/redirect below.
-      notifyAccountEvent(userData.user.id, "password_changed");
-    }
-
-    // Sign out of the temporary recovery session and send them to a normal
-    // login — simpler and safer than trying to splice this session into the
-    // app's existing AuthContext.
-    await supabase.auth.signOut();
-    setDone(true);
-    setSubmitting(false);
-    setTimeout(() => navigate({ to: "/login" }), 1800);
   };
-
-  const showErrors = touched || attempted;
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-white px-6 py-10">
       <div className="w-full max-w-sm">
         <Logo className="mb-8 [&_span]:text-[#01304a] [&_span.text-muted-foreground]:text-[#01304a]/70" />
 
-        {linkState === "checking" && (
-          <div className="flex items-center gap-2 text-sm text-[#01304a]/70">
-            <Loader2 className="h-4 w-4 animate-spin" /> Verifying your reset link…
-          </div>
-        )}
-
-        {linkState === "invalid" && (
-          <div className="space-y-4">
-            <div className="flex items-start gap-2 rounded-lg border border-destructive/20 bg-destructive/5 px-3 py-2.5 text-sm text-destructive">
-              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-              <span>This reset link is invalid or has expired. Request a new one from the sign-in page.</span>
-            </div>
-            <Link to="/login" className="inline-block rounded-lg bg-[#f38934] px-4 py-2.5 text-sm font-semibold text-white shadow-soft">
-              Back to sign in
-            </Link>
-          </div>
-        )}
-
-        {linkState === "ready" && done && (
-          <div className="flex items-start gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-sm text-emerald-800">
-            <Check className="mt-0.5 h-4 w-4 shrink-0" />
-            <span>Password updated. Taking you to sign in…</span>
-          </div>
-        )}
-
-        {linkState === "ready" && !done && (
+        {success ? (
           <>
-            <h1 className="mt-3 text-3xl font-semibold tracking-tight text-[#01304a]">Set a new password</h1>
+            <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-full bg-emerald-50">
+              <Check className="h-5 w-5 text-emerald-600" />
+            </div>
+            <h1 className="text-3xl font-semibold tracking-tight text-[#01304a]">Password updated</h1>
+            <p className="mt-2 text-sm text-[#01304a]/70">Taking you to sign in…</p>
+          </>
+        ) : token === null ? null : !token ? (
+          <>
+            <h1 className="text-3xl font-semibold tracking-tight text-[#01304a]">Link invalid or expired</h1>
+            <p className="mt-2 text-sm leading-relaxed text-[#01304a]/70">
+              This password reset link is no longer valid. Reset links expire after 30 minutes and can only be used
+              once.
+            </p>
+            <Link
+              to="/forgot-password"
+              className="mt-6 inline-flex items-center justify-center rounded-lg bg-[#f38934] px-4 py-3 text-sm font-semibold text-white shadow-soft"
+            >
+              Request a new link
+            </Link>
+          </>
+        ) : (
+          <>
+            <h1 className="text-3xl font-semibold tracking-tight text-[#01304a]">Set a new password</h1>
             <p className="mt-1.5 text-sm text-[#01304a]/70">Choose a new password for your account.</p>
 
             <form onSubmit={onSubmit} className="mt-8 space-y-4">
@@ -163,7 +119,7 @@ function ResetPasswordPage() {
               </div>
 
               <ul className="space-y-1 text-xs text-[#01304a]/70">
-                <RuleRow ok={hasMinLen} label="At least 4 characters" />
+                <RuleRow ok={hasMinLen} label="At least 6 characters" />
                 <RuleRow ok={hasUpper} label="At least one uppercase letter" />
                 <RuleRow ok={hasDigit} label="At least one number" />
               </ul>
@@ -188,7 +144,10 @@ function ResetPasswordPage() {
               </div>
 
               {error && (
-                <div className="rounded-lg border border-destructive/20 bg-destructive/5 px-3 py-2 text-xs text-destructive">{error}</div>
+                <div className="flex items-start gap-2 rounded-lg border border-destructive/20 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+                  <X className="mt-px h-3.5 w-3.5 shrink-0" />
+                  {error}
+                </div>
               )}
 
               <button
