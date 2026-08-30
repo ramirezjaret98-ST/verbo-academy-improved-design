@@ -1,7 +1,6 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useAuth } from "@/lib/auth";
-import { USERS } from "@/lib/mock-data";
 import { Logo } from "@/components/verbo/Logo";
 import { PhotoPlaceholder } from "@/components/verbo/ui";
 import logoSrc from "@/assets/verbo-logo.png";
@@ -105,40 +104,50 @@ function LoginPage() {
     setError("");
     setBtnState("loading");
     later(() => {
-      const res = login(email.trim(), password, remember);
-      if (!res.ok) {
-        setError(res.error);
-        setBtnState("error");
-        later(() => setBtnState("idle"), 900);
-        return;
-      }
-      const match = USERS.find((u) => u.email.toLowerCase() === email.trim().toLowerCase());
-      const dest = match?.must_change_password
-        ? "/change-password"
-        : res.role === "admin"
-          ? "/admin"
-          : res.role === "teacher"
-            ? "/teacher"
-            : "/student";
+      // `login()` moved to real Supabase Auth (async: it awaits
+      // signInWithPassword + the lockout RPCs) — this call MUST be awaited.
+      // Left un-awaited, `res` is the Promise object itself: `res.ok` is
+      // always undefined, so every login attempt — right credentials or
+      // wrong — fell into the error branch below. That was today's "login
+      // is broken" bug, not anything related to the forgot-password change.
+      void (async () => {
+        const res = await login(email.trim(), password, remember);
+        if (!res.ok) {
+          setError(res.error);
+          setBtnState("error");
+          later(() => setBtnState("idle"), 900);
+          return;
+        }
+        // `must_change_password` now comes straight off the login result
+        // (real `app_users` row) instead of a stale lookup in the mock
+        // `USERS` array, which real accounts aren't guaranteed to be in.
+        const dest = res.must_change_password
+          ? "/change-password"
+          : res.role === "admin"
+            ? "/admin"
+            : res.role === "teacher"
+              ? "/teacher"
+              : "/student";
 
-      setBtnState("success");
+        setBtnState("success");
 
-      if (prefersReducedMotion()) {
-        navigate({ to: dest });
-        return;
-      }
+        if (prefersReducedMotion()) {
+          navigate({ to: dest });
+          return;
+        }
 
-      setPop(true);
-      later(() => setPop(false), 200);
-      later(() => {
-        const rect = btnRef.current?.getBoundingClientRect();
-        setOverlay({
-          x: rect ? rect.left + rect.width / 2 : window.innerWidth / 2,
-          y: rect ? rect.top + rect.height / 2 : window.innerHeight / 2,
-        });
-        requestAnimationFrame(() => requestAnimationFrame(() => setOverlayOpen(true)));
-        later(() => navigate({ to: dest }), 520);
-      }, 200);
+        setPop(true);
+        later(() => setPop(false), 200);
+        later(() => {
+          const rect = btnRef.current?.getBoundingClientRect();
+          setOverlay({
+            x: rect ? rect.left + rect.width / 2 : window.innerWidth / 2,
+            y: rect ? rect.top + rect.height / 2 : window.innerHeight / 2,
+          });
+          requestAnimationFrame(() => requestAnimationFrame(() => setOverlayOpen(true)));
+          later(() => navigate({ to: dest }), 520);
+        }, 200);
+      })();
     }, 900);
   };
 
