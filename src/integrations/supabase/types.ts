@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.17"
+    PostgrestVersion: "14.5"
   }
   public: {
     Tables: {
@@ -216,6 +216,7 @@ export type Database = {
           availability_request_note: string | null
           avatar_url: string | null
           bookclub_strikes: number | null
+          can_manage_unit_pdfs: boolean
           company: string | null
           contracted_levels: string[] | null
           created_at: string
@@ -286,6 +287,7 @@ export type Database = {
           availability_request_note?: string | null
           avatar_url?: string | null
           bookclub_strikes?: number | null
+          can_manage_unit_pdfs?: boolean
           company?: string | null
           contracted_levels?: string[] | null
           created_at?: string
@@ -358,6 +360,7 @@ export type Database = {
           availability_request_note?: string | null
           avatar_url?: string | null
           bookclub_strikes?: number | null
+          can_manage_unit_pdfs?: boolean
           company?: string | null
           contracted_levels?: string[] | null
           created_at?: string
@@ -2213,6 +2216,33 @@ export type Database = {
           },
         ]
       }
+      password_reset_tokens: {
+        Row: {
+          created_at: string
+          expires_at: string
+          id: string
+          token_hash: string
+          used_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at: string
+          id?: string
+          token_hash: string
+          used_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          id?: string
+          token_hash?: string
+          used_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       payment_installments: {
         Row: {
           amount: number
@@ -3713,6 +3743,7 @@ export type Database = {
           availability_request_note: string | null
           avatar_url: string | null
           bookclub_strikes: number | null
+          can_manage_unit_pdfs: boolean
           company: string | null
           contracted_levels: string[] | null
           created_at: string
@@ -3902,6 +3933,14 @@ export type Database = {
           tier_frozen_since: string
           tier_reset_at: string
         }[]
+      }
+      teacher_set_course_unit_pdf: {
+        Args: { p_pdf_url: string; p_unit_code: string }
+        Returns: undefined
+      }
+      teacher_set_custom_unit_pdf: {
+        Args: { p_file_name?: string; p_file_url: string; p_unit_id: number }
+        Returns: undefined
       }
       upsert_session_member_statuses: {
         Args: {
