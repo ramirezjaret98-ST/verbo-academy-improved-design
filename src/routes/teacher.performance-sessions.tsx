@@ -1,8 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { ArrowLeft, ChevronRight, Compass, Briefcase, Globe } from "lucide-react";
+import { ArrowLeft, ChevronRight, Compass, Briefcase, Globe, FileDown, Pencil } from "lucide-react";
 import { Pill, GhostButton } from "@/components/verbo/ui";
 import { CurriculumBreadcrumb } from "@/components/verbo/CurriculumBreadcrumb";
+import { useAuth } from "@/lib/auth";
 import {
   type ProductId,
   type ProductCourse,
@@ -12,8 +13,10 @@ import {
   PRODUCT_ORDER,
   loadCourses,
   subscribeCourses,
+  teacherSetCourseUnitPdf,
 } from "@/lib/product-courses-store";
 import { UnitDetail } from "./student.courses";
+import { UnitPdfModal } from "@/components/verbo/UnitPdfManager";
 
 export const Route = createFileRoute("/teacher/performance-sessions")({
   head: () => ({
@@ -40,10 +43,13 @@ const PRODUCT_ICON_GRADIENT: Record<ProductId, string> = {
 const PREVIEW_STUDENT_ID = "teacher-preview";
 
 function Page() {
+  const { user } = useAuth();
+  const canManagePdfs = !!user?.can_manage_unit_pdfs;
   const [courses, setCourses] = useState<ProductCourse[]>(loadCourses);
   const [productId, setProductId] = useState<ProductId | null>(null);
   const [levelId, setLevelId] = useState<string | null>(null);
   const [unitId, setUnitId] = useState<string | null>(null);
+  const [pdfModalUnit, setPdfModalUnit] = useState<CourseUnit | null>(null);
 
   useEffect(() => {
     setCourses(loadCourses());
@@ -110,10 +116,13 @@ function Page() {
         </div>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {level.units.map((u) => (
-            <button
+            <div
               key={u.id}
+              role="button"
+              tabIndex={0}
               onClick={() => setUnitId(u.id)}
-              className="group flex flex-col gap-2 rounded-2xl border border-border bg-card p-5 text-left shadow-sm verbo-lift hover:border-accent hover:shadow-elevated"
+              onKeyDown={(e) => { if (e.key === "Enter") setUnitId(u.id); }}
+              className="group flex cursor-pointer flex-col gap-2 rounded-2xl border border-border bg-card p-5 text-left shadow-sm verbo-lift hover:border-accent hover:shadow-elevated"
             >
               <div className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">{u.id}</div>
               <div className="text-base font-semibold tracking-tight text-foreground">{u.title}</div>
@@ -122,9 +131,28 @@ function Page() {
                 <Pill tone="muted">Preview</Pill>
                 <ChevronRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
               </div>
-            </button>
+              {canManagePdfs && (
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); setPdfModalUnit(u); }}
+                  className="mt-1 inline-flex items-center justify-center gap-1.5 self-start rounded-full border border-border bg-background px-2.5 py-1 text-[11px] font-medium text-muted-foreground transition-colors hover:border-accent hover:text-foreground"
+                >
+                  {u.pdf_url ? <FileDown className="h-3 w-3" /> : <Pencil className="h-3 w-3" />}
+                  {u.pdf_url ? "Manage PDF" : "Add PDF"}
+                </button>
+              )}
+            </div>
           ))}
         </div>
+        {pdfModalUnit && (
+          <UnitPdfModal
+            unitTitle={pdfModalUnit.title}
+            target={{ kind: "course", unitCode: pdfModalUnit.id, currentUrl: pdfModalUnit.pdf_url || "" }}
+            onClose={() => setPdfModalUnit(null)}
+            onSave={(url) => teacherSetCourseUnitPdf(pdfModalUnit.id, url)}
+            onRemove={() => teacherSetCourseUnitPdf(pdfModalUnit.id, "")}
+          />
+        )}
       </div>
     );
   }

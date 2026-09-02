@@ -18,9 +18,10 @@ import { loadSessions, subscribeSessions } from "@/lib/sessions-store";
 import { ActivityViewModal, type ModalAccent } from "@/components/verbo/course-modals";
 import { Card, GhostButton, Pill } from "@/components/verbo/ui";
 import { loadActivities, subscribeActivities } from "@/lib/activities-store";
-import { customUnitAccessOverride, resolveCustomUnitUnlock } from "@/lib/custom-units-store";
+import { customUnitAccessOverride, resolveCustomUnitUnlock, teacherSetCustomUnitFile } from "@/lib/custom-units-store";
+import { UnitPdfModal } from "@/components/verbo/UnitPdfManager";
 import {
-  Sparkles, ArrowLeft, Lock, Unlock, FileDown, CheckCircle2, Video, ImageIcon, LayoutGrid,
+  Sparkles, ArrowLeft, Lock, Unlock, FileDown, CheckCircle2, Video, ImageIcon, LayoutGrid, Pencil,
 } from "lucide-react";
 
 export const Route = createFileRoute("/teacher/tailored-content")({
@@ -149,7 +150,10 @@ const TAILORED_ACCENT: ModalAccent = {
 function StudentView({ studentId, studentName, onBack }: {
   studentId: string; studentName: string; onBack: () => void;
 }) {
+  const { user } = useAuth();
+  const canManagePdfs = !!user?.can_manage_unit_pdfs;
   const [actModalUnit, setActModalUnit] = useState<{ unitId: string; unitTitle: string } | null>(null);
+  const [pdfModalUnit, setPdfModalUnit] = useState<{ id: string; title: string; file_url: string; file_name?: string } | null>(null);
   const [rev, setRev] = useState(0);
 
   const units = useMemo(() => tailoredUnitsForStudent(studentId), [studentId, rev]);
@@ -255,6 +259,11 @@ function StudentView({ studentId, studentName, onBack }: {
                 </div>
               </div>
               <div className="flex items-center gap-2">
+                {canManagePdfs && (
+                  <GhostButton onClick={() => setPdfModalUnit({ id: u.id, title: u.title, file_url: u.file_url, file_name: u.file_name })}>
+                    <Pencil className="h-3.5 w-3.5" /> PDF
+                  </GhostButton>
+                )}
                 <GhostButton onClick={() => setActModalUnit({ unitId: u.id, unitTitle: u.title })}>
                   <Sparkles className="h-3.5 w-3.5" /> Activities
                 </GhostButton>
@@ -270,6 +279,14 @@ function StudentView({ studentId, studentName, onBack }: {
           unitTitle={actModalUnit.unitTitle}
           accent={TAILORED_ACCENT}
           onClose={() => { setActModalUnit(null); setRev((r) => r + 1); }}
+        />
+      )}
+      {pdfModalUnit && (
+        <UnitPdfModal
+          unitTitle={pdfModalUnit.title}
+          target={{ kind: "custom", customKind: "tailored", unitId: pdfModalUnit.id, currentUrl: pdfModalUnit.file_url, currentFileName: pdfModalUnit.file_name }}
+          onClose={() => { setPdfModalUnit(null); setRev((r) => r + 1); }}
+          onSave={(url, fileName) => teacherSetCustomUnitFile("tailored", pdfModalUnit.id, url, fileName)}
         />
       )}
     </div>
