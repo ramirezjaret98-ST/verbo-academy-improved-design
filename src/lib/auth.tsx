@@ -115,6 +115,7 @@ function buildTeacherProfilePatch(row: AppUserRow): Partial<User> {
     hours_cycle: row.hours_cycle ?? undefined,
     payment_frequency: row.payment_frequency ?? undefined,
     admin_notes: row.admin_notes ?? undefined,
+    can_manage_unit_pdfs: row.can_manage_unit_pdfs ?? false,
   };
   for (const k of Object.keys(patch) as (keyof User)[]) {
     if (patch[k] === undefined) delete patch[k];

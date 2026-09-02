@@ -290,6 +290,49 @@ export function deleteUnit(levelId: string, unitId: string): void {
   })();
 }
 
+/**
+ * Scoped write for teachers with `can_manage_unit_pdfs` (2026-09-02) — see
+ * `UnitPdfModal`. Unlike `saveUnit`, this ONLY ever touches `pdf_url` via the
+ * `teacher_set_course_unit_pdf` RPC, which is the only path a flagged
+ * teacher (not admin) can write through — direct table writes to
+ * `course_units` stay admin/coordinator-only. Pass `""` to remove the PDF —
+ * the RPC normalizes a blank string to a real SQL NULL (the generated
+ * Supabase types don't allow a literal `null` for a required `text` arg, so
+ * this stays a plain `string` on the TS side too). Awaited by the caller so
+ * it can show a real error instead of the optimistic/rollback pattern the
+ * rest of this file uses.
+ */
+export async function teacherSetCourseUnitPdf(
+  unitCode: string,
+  pdfUrl: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const prevMap = unitsByLevelCode;
+  let levelCode: string | null = null;
+  for (const [lc, units] of unitsByLevelCode) {
+    if (units.some((u) => u.id === unitCode)) { levelCode = lc; break; }
+  }
+  if (levelCode) {
+    const list = unitsByLevelCode.get(levelCode) ?? [];
+    unitsByLevelCode = new Map(unitsByLevelCode).set(
+      levelCode,
+      list.map((u) => (u.id === unitCode ? { ...u, pdf_url: pdfUrl } : u)),
+    );
+    notify();
+  }
+
+  const { error } = await supabase.rpc("teacher_set_course_unit_pdf", {
+    p_unit_code: unitCode,
+    p_pdf_url: pdfUrl,
+  });
+  if (error) {
+    console.error("[product-courses-store] teacherSetCourseUnitPdf failed", error);
+    unitsByLevelCode = prevMap;
+    notify();
+    return { ok: false, error: "Couldn't save the PDF — try again." };
+  }
+  return { ok: true };
+}
+
 /** Bulk-adds skeleton (or bulk-uploaded) units in a single optimistic update
  *  + a single background upsert, keyed by (level, code) so it's safe to
  *  re-run against units that already exist. */

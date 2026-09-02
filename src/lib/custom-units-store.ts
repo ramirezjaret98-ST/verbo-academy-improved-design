@@ -383,6 +383,43 @@ export function updateCustomUnit(
   })();
 }
 
+/**
+ * Scoped write for teachers with `can_manage_unit_pdfs` (2026-09-02) — see
+ * `UnitPdfModal`. Unlike `updateCustomUnit`, this ONLY ever replaces the
+ * file (`file_url`/`file_name`) via the `teacher_set_custom_unit_pdf` RPC —
+ * the only path a flagged teacher (not admin) can write through. `file_url`
+ * is required at the DB level (VIP/Tailored units can't go file-less), so
+ * there's no "remove" here, only replace. Direct table writes to
+ * `custom_units` stay admin/coordinator-only. Awaited by the caller so it
+ * can show a real error instead of the optimistic/rollback pattern the rest
+ * of this file uses.
+ */
+export async function teacherSetCustomUnitFile(
+  kind: CustomUnitKind,
+  id: string,
+  fileUrl: string,
+  fileName?: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const prev = unitsCache;
+  unitsCache = unitsCache.map((u) =>
+    u.id === id && u.kind === kind ? { ...u, file_url: fileUrl, file_name: fileName } : u,
+  );
+  notify();
+
+  const { error } = await supabase.rpc("teacher_set_custom_unit_pdf", {
+    p_unit_id: Number(id),
+    p_file_url: fileUrl,
+    p_file_name: fileName,
+  });
+  if (error) {
+    console.error("[custom-units-store] teacherSetCustomUnitFile failed", error);
+    unitsCache = prev;
+    notify();
+    return { ok: false, error: "Couldn't save the PDF — try again." };
+  }
+  return { ok: true };
+}
+
 export function removeCustomUnit(kind: CustomUnitKind, id: string): void {
   const prev = unitsCache;
   unitsCache = unitsCache.filter((u) => !(u.id === id && u.kind === kind));

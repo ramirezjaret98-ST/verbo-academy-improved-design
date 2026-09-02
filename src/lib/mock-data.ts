@@ -156,6 +156,11 @@ export interface User {
   teacher_status?: "active" | "frozen" | "removed";
   /** ISO date (YYYY-MM-DD). Drives the 6-month bonus-streak tracking window. */
   hire_date?: string;
+  /** Scoped permission (2026-09-02): can attach/replace/remove ONLY the PDF
+   *  of a unit (normal catalog, VIP, Tailored) — never create/edit/delete
+   *  units. Off by default; granted per-teacher from `app_users` in Supabase
+   *  (currently on for Jonathan Aguilar only). See UnitPdfModal. */
+  can_manage_unit_pdfs?: boolean;
   // ----- Tier clock (see src/lib/teacher-tiers.ts) -----
   /** ISO timestamp when the current "frozen" period started (null if active). */
   tier_frozen_since?: string | null;
