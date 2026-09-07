@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { CalendarDays, X, Video, FileText, CalendarClock, RefreshCcw, ClipboardList, NotebookPen } from "lucide-react";
+import { CalendarDays, X, Video, FileText, CalendarClock, RefreshCcw, ClipboardList, NotebookPen, Pencil, UserCheck } from "lucide-react";
 import { USERS, userById } from "@/lib/mock-data";
 import { subscribeStudents } from "@/lib/students-store";
 import { subscribeTeachers } from "@/lib/teacher-model";
@@ -21,6 +21,7 @@ import {
 import { SessionReportModal, hasSessionReport } from "@/components/verbo/SessionReportModal";
 import { RescheduleModal } from "@/components/verbo/RescheduleModal";
 import { PlanModal } from "@/components/verbo/PlanModal";
+import { CandidatesModal } from "@/components/verbo/CandidatesModal";
 import { getLessonPlan, saveLessonPlan } from "@/lib/lesson-plans-store";
 
 // A session hasn't happened yet in any of these statuses — safe to bump to
@@ -241,6 +242,27 @@ export function EventDetailsModal({
   // renders) — no parallel editor built.
   const [planningOpen, setPlanningOpen] = useState(false);
 
+  // 2026-09-07: Jaret's ask — from this exact modal, he needs to (1) swap in
+  // his own (or a substitute's) video call link when he ends up covering a
+  // session last-minute, and (2) hand the session off to another teacher
+  // when one is available. Both reuse existing engines rather than building
+  // new ones: `updateSession()` already accepts a `teams_link` patch (same
+  // field `CandidatesModal` writes), and `CandidatesModal` itself is the
+  // exact "assign a substitute" flow already used from Admin > Sessions —
+  // just gated there behind `needs_substitute`, which doesn't apply here
+  // since Jaret is stepping in ad hoc, not via a teacher's own cancellation.
+  const [linkEditing, setLinkEditing] = useState(false);
+  const [pendingLink, setPendingLink] = useState(s?.teams_link ?? "");
+  const [reassignOpen, setReassignOpen] = useState(false);
+
+  const saveLink = () => {
+    if (!s) return;
+    updateSession(s.id, { teams_link: pendingLink.trim() });
+    setLinkEditing(false);
+    notifySuccess("Video call link updated.");
+    onClose();
+  };
+
   // Suppress unused-var warning for teacherIdFilter (kept for symmetry / future).
   void teacherIdFilter;
 
@@ -377,20 +399,58 @@ export function EventDetailsModal({
               </div>
             </div>
           ) : (
-            videoLink && (
+            (videoLink || s) && (
               <div className="flex items-start gap-3">
                 <div className="w-24 shrink-0 text-xs font-medium uppercase tracking-wider text-muted-foreground">
                   Video call
                 </div>
-                <a
-                  href={videoLink}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-1.5 text-sm font-medium underline"
-                  style={{ color: BRAND }}
-                >
-                  <Video className="h-3.5 w-3.5" /> Open link
-                </a>
+                {s && linkEditing ? (
+                  <div className="flex flex-1 flex-wrap items-center gap-2">
+                    <input
+                      autoFocus
+                      value={pendingLink}
+                      onChange={(e) => setPendingLink(e.target.value)}
+                      placeholder="https://teams.microsoft.com/..."
+                      className="min-w-[200px] flex-1 rounded-md border border-input bg-background px-2 py-1.5 text-xs outline-none focus:ring-2 focus:ring-ring"
+                    />
+                    <PrimaryButton onClick={saveLink} className="!px-2.5 !py-1 !text-xs">Save</PrimaryButton>
+                    <GhostButton
+                      onClick={() => { setPendingLink(s.teams_link ?? ""); setLinkEditing(false); }}
+                      className="!px-2.5 !py-1 !text-xs"
+                    >
+                      Cancel
+                    </GhostButton>
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap items-center gap-2">
+                    {videoLink ? (
+                      <a
+                        href={videoLink}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1.5 text-sm font-medium underline"
+                        style={{ color: BRAND }}
+                      >
+                        <Video className="h-3.5 w-3.5" /> Open link
+                      </a>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">No link set</span>
+                    )}
+                    {/* Lets Admin swap in their own meeting link when covering a
+                       *  session themselves (or paste a substitute's), without
+                       *  needing to go through the substitute-assignment flow
+                       *  below. Only offered for real sessions — clubs keep
+                       *  their read-only link, managed from Admin > Clubs. */}
+                    {s && (
+                      <button
+                        onClick={() => { setPendingLink(s.teams_link ?? ""); setLinkEditing(true); }}
+                        className="inline-flex items-center gap-1 text-xs text-muted-foreground underline decoration-dotted hover:text-foreground"
+                      >
+                        <Pencil className="h-3 w-3" /> {videoLink ? "Change link" : "Add link"}
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             )
           )}
@@ -452,6 +512,12 @@ export function EventDetailsModal({
                 >
                   <NotebookPen className="h-3.5 w-3.5" /> {plan ? "Edit lesson plan" : "Plan session"}
                 </button>
+                <button
+                  onClick={() => setReassignOpen(true)}
+                  className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-2.5 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-secondary"
+                >
+                  <UserCheck className="h-3.5 w-3.5" /> Reassign teacher
+                </button>
                 {!showReport && (
                   <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
                     <ClipboardList className="h-3 w-3" /> No report yet
@@ -491,6 +557,13 @@ export function EventDetailsModal({
             notifySuccess("Lesson plan saved.");
             onClose();
           }}
+        />
+      )}
+      {reassignOpen && s && (
+        <CandidatesModal
+          sessionId={s.id}
+          onClose={() => setReassignOpen(false)}
+          onAssigned={() => { setReassignOpen(false); onClose(); }}
         />
       )}
       {/* Reschedule's own Cancel button also routes through this same
