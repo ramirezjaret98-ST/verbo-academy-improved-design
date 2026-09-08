@@ -32,6 +32,7 @@ import {
   PartyPopper,
   Medal,
   ShieldAlert,
+  Lightbulb,
 } from "lucide-react";
 import { AnimatedNumber, Card, Pill, StatRing } from "@/components/verbo/ui";
 import { Confetti } from "@/components/verbo/Confetti";
@@ -1619,7 +1620,11 @@ export function ActivityRunner({
             const active = c === activeCat;
             const mandatory = isMandatoryCategory(c);
             const catActivities = activities.filter((a) => (a.category ?? "uncategorized") === c);
-            const best = catActivities.reduce((m, a) => Math.max(m, bestScoreFor(studentId, a.id)), 0);
+            // Average across every activity in the category (unanswered = 0) —
+            // getting one exercise right must not paint the whole category 100/100.
+            const best = catActivities.length
+              ? Math.round(catActivities.reduce((s, a) => s + bestScoreFor(studentId, a.id), 0) / catActivities.length)
+              : 0;
             const catAttempted = catActivities.some((a) => wasAttempted(studentId, a.id));
             const ok = mandatory && best >= 60;
             return (
@@ -1684,6 +1689,12 @@ export function ActivityRunner({
                   <span className="font-semibold text-foreground">{bestScoreFor(studentId, current.id)}/100</span>. Restart the unit to try again.
                 </div>
               ) : null}
+              {current.hint?.trim() && (
+                <div className="mt-4 flex items-start gap-2.5 rounded-lg border border-amber-400/40 bg-amber-50/70 px-3.5 py-3 text-xs leading-relaxed text-amber-900 dark:border-amber-400/25 dark:bg-amber-500/10 dark:text-amber-200">
+                  <Lightbulb className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                  <div><span className="font-semibold">Hint:</span> {current.hint}</div>
+                </div>
+              )}
               <div key={`${current.id}-${feedback ? (feedback.ok ? "ok" : "ko") : "idle"}`} className={`mt-6 ${feedback && !feedback.ok ? "verbo-shake" : ""}`}>
                 <ExerciseBody activity={current} value={draft[current.id] ?? ""} onChange={(v) => setDraft((d) => ({ ...d, [current.id]: v }))} disabled={readOnly || alreadyAttempted} />
               </div>
@@ -1810,12 +1821,38 @@ function ExerciseBody({ activity, value, onChange, disabled }: { activity: Activ
   return null;
 }
 
+/** Deterministic shuffle keyed by a string seed — so the same activity always
+ *  renders the same shuffled order within a session/render pass (no reshuffle
+ *  on every keystroke), but different activities/loads don't share one fixed
+ *  order the student can memorize. */
+function seededShuffle<T>(arr: T[], seed: string): T[] {
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
+  const rand = () => {
+    h = (h * 1664525 + 1013904223) >>> 0;
+    return h / 4294967296;
+  };
+  const out = [...arr];
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
+
 function MatchExercise({ items, value, onChange, disabled }: { items: { text: string; key: string }[]; value: string; onChange: (v: string) => void; disabled?: boolean }) {
   const map: Record<string, string> = useMemo(() => {
     try { return value ? JSON.parse(value) : {}; } catch { return {}; }
   }, [value]);
   const update = (text: string, dest: string) => onChange(JSON.stringify({ ...map, [text]: dest }));
-  const destinations = Array.from(new Set(items.map((i) => i.key)));
+  // Shuffled once per activity (re-runs only when the item set itself changes,
+  // not on every answer) so the destination list isn't always in the same
+  // top-to-bottom order as the items — that let students match by position
+  // instead of by reading.
+  const destinations = useMemo(
+    () => seededShuffle(Array.from(new Set(items.map((i) => i.key))), items.map((i) => i.text).join("|")),
+    [items],
+  );
   return (
     <div className="space-y-3">
       <div className="text-xs text-muted-foreground">Pick the correct destination for each item.</div>
