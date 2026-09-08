@@ -18,6 +18,7 @@ import {
   computeTeacherKpis, ratingBand, getBonusThreshold,
 } from "@/lib/teacher-kpis";
 import { addFinancialIssue } from "@/lib/financial-issues-store";
+import { notifySuccess, notifyError } from "@/lib/notify";
 import { SectionTitle, Pill, AccentModal, AccentModalFooter } from "@/components/verbo/ui";
 import { BonusBadge } from "@/components/verbo/BonusBadge";
 import { overridesForMonth } from "@/lib/teacher-kpi-overrides-store";
@@ -598,12 +599,21 @@ function MyBalancePage() {
         <FinancialIssueModal
           onClose={() => setReportOpen(false)}
           onSubmit={(text) => {
-            addFinancialIssue({ teacherId: teacher.id, text }).catch((err) => {
-              console.error("[teacher.financial] failed to report issue", err);
-              window.alert("Couldn't send the report. Please try again.");
-            });
+            // 2026-09-08: this used to set `reportSent` (and close the modal)
+            // optimistically no matter what — a failed send showed BOTH a
+            // native window.alert() AND the "Issue reported to Admin." success
+            // line at the same time. Now the success state only flips on an
+            // actual round-trip, and failure gets the same notifyError()
+            // treatment as the rest of the app instead of a browser alert().
+            addFinancialIssue({ teacherId: teacher.id, text })
+              .then(() => {
+                notifySuccess("Issue reported to Admin.");
+                setReportSent(true);
+              })
+              .catch((err) => {
+                notifyError(err, { context: "Reporting financial issue" });
+              });
             setReportOpen(false);
-            setReportSent(true);
           }}
         />
       )}

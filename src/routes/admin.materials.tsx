@@ -17,6 +17,7 @@ import {
   type StoredMaterial,
 } from "@/lib/materials-store";
 import { Card, GhostButton, Pill, PrimaryButton, SectionTitle } from "@/components/verbo/ui";
+import { notifySuccess, notifyError } from "@/lib/notify";
 import {
   Pencil,
   Trash2,
@@ -201,6 +202,7 @@ function Page() {
     if (!res.ok) {
       setResourceError(res.error);
       setResourceName("");
+      notifyError(res.error, { context: "Uploading material file" });
       return;
     }
     setResourceFile(res.url);
@@ -230,6 +232,7 @@ function Page() {
     setCoverUploading(false);
     if (!res.ok) {
       setCoverError(res.error);
+      notifyError(res.error, { context: "Uploading cover image" });
       return;
     }
     setCover(res.url);
@@ -254,6 +257,7 @@ function Page() {
       restrict_level: restrictLevel || undefined,
       premium: premium || undefined,
     });
+    notifySuccess(editingId ? "Material updated." : "Material saved.");
     resetForm();
   };
 
@@ -514,6 +518,7 @@ function Page() {
                   deleteMaterial(confirmDelete.id);
                   if (editingId === confirmDelete.id) resetForm();
                   setConfirmDelete(null);
+                  notifySuccess("Material deleted.");
                 }}
               >
                 <Trash2 className="h-3.5 w-3.5" /> Delete

@@ -10,6 +10,7 @@ import {
   loadClubs, createClub, updateClub, deleteClub, subscribeClubs, releaseClub,
   loadReleaseRequests, subscribeReleaseRequests, removeReleaseRequest,
 } from "@/lib/clubs-store";
+import { notifySuccess, notifyError } from "@/lib/notify";
 import {
   Sparkles,
   BookOpen,
@@ -107,14 +108,23 @@ function Page() {
   const onCreate = () => { setEditing(null); setOpen(true); };
   const onEdit = (c: Club) => { setEditing(c); setOpen(true); };
   const onDelete = (id: string) => {
-    void deleteClub(id);
+    void deleteClub(id).then((ok) => {
+      if (ok) notifySuccess("Club deleted.");
+      else notifyError("Couldn't delete the club — try again.", { context: "Deleting club" });
+    });
   };
 
   const onSave = (data: Omit<Club, "id" | "spots_taken" | "status">) => {
     if (editing) {
-      void updateClub(editing.id, data);
+      void updateClub(editing.id, data).then((res) => {
+        if (res) notifySuccess("Club updated.");
+        else notifyError("Couldn't save the club — try again.", { context: "Saving club" });
+      });
     } else {
-      void createClub(data);
+      void createClub(data).then((res) => {
+        if (res) notifySuccess("Club created.");
+        else notifyError("Couldn't create the club — try again.", { context: "Creating club" });
+      });
     }
     setOpen(false);
   };
@@ -775,7 +785,10 @@ function ReleaseRequestsPanel({ requests, clubs }: { requests: ClubReleaseReques
                 -Math.abs(amount),
                 `Club release penalty — ${label}: ${club.title} on ${dateStr}`,
               );
-              releaseClub(club.id);
+              void releaseClub(club.id).then((res) => {
+                if (res) notifySuccess("Release approved.");
+                else notifyError("Couldn't release the club — try again.", { context: "Approving club release" });
+              });
             }
             removeReleaseRequest(approving.id);
             setApproving(null);

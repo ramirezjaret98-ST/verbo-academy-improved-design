@@ -24,6 +24,7 @@ import { computeUrgencySignals, type UrgencyItem } from "@/lib/urgent-items";
 import { UrgencyList } from "@/components/verbo/UrgencyList";
 import { getAdminType } from "@/lib/admin-roles";
 import { useAuth } from "@/lib/auth";
+import { notifySuccess } from "@/lib/notify";
 import {
   UserPlus, CalendarPlus, Sparkles, BarChart3, X, CreditCard, Lock,
   Star, TrendingDown, Users2, Megaphone, ChevronRight,
@@ -510,6 +511,7 @@ function AnnouncementsSection() {
     setMessage("");
     setAudience("all");
     setExpires("");
+    notifySuccess("Announcement published.");
   };
 
   const audienceLabel: Record<Audience, string> = { all: "All", students: "Students only", teachers: "Teachers only" };
@@ -594,7 +596,7 @@ function AnnouncementsSection() {
                       <span>{a.expires_at ? `Expires ${new Date(a.expires_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}` : "No expiration"}</span>
                     </div>
                   </div>
-                  <GhostButton className="!px-3 !py-1.5 text-xs" onClick={() => endAnnouncement(a.id)}>
+                  <GhostButton className="!px-3 !py-1.5 text-xs" onClick={() => { endAnnouncement(a.id); notifySuccess("Announcement ended."); }}>
                     <X className="h-3.5 w-3.5" /> End
                   </GhostButton>
                 </div>

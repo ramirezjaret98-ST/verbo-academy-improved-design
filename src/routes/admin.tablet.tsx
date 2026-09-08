@@ -50,6 +50,7 @@ import { ResetPasswordModal } from "@/components/verbo/ResetPasswordModal";
 import { waLink } from "@/lib/phone-utils";
 import { computeUrgencySignals } from "@/lib/urgent-items";
 import { UrgencyList } from "@/components/verbo/UrgencyList";
+import { notifySuccess, notifyError } from "@/lib/notify";
 
 export const Route = createFileRoute("/admin/tablet")({ component: TabletPage });
 
@@ -379,7 +380,13 @@ function TabletPage() {
           initial={editingClub}
           clubs={allClubsList}
           onClose={() => setEditingClub(null)}
-          onSave={(data) => { void updateClub(editingClub.id, data); setEditingClub(null); }}
+          onSave={(data) => {
+            void updateClub(editingClub.id, data).then((res) => {
+              if (res) notifySuccess("Club updated.");
+              else notifyError("Couldn't save the club — try again.", { context: "Saving club" });
+            });
+            setEditingClub(null);
+          }}
         />
       )}
     </div>

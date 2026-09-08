@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { toast } from "sonner";
+import { notifySuccess, notifyError } from "@/lib/notify";
 import { Sparkles, BookOpen, MessageCircle, Undo2, CalendarClock, User, Users, Clock, ArrowUpRight } from "lucide-react";
 import { LogOut } from "lucide-react";
 import { Card, GhostButton, PrimaryButton, AccentModal, AccentModalFooter } from "@/components/verbo/ui";
@@ -114,26 +114,28 @@ function Page() {
   const onClaim = async (c: Club) => {
     const updated = await claimClub(c.id, user.id);
     if (!updated) {
-      toast.error("This club was just claimed by another teacher");
+      notifyError("This club was just claimed by another teacher", { context: "Claiming club" });
       setClubs(loadClubs());
       return;
     }
     setBanner({ clubId: c.id, claimedAt: +new Date(updated.claimed_at ?? new Date().toISOString()) });
     setNow(Date.now());
-    toast.success("Club claimed!");
+    notifySuccess("Club claimed!");
   };
 
   const onFreeRelease = () => {
     if (!banner) return;
-    void releaseClub(banner.clubId);
+    void releaseClub(banner.clubId).then((res) => {
+      if (res) notifySuccess("Club released");
+      else notifyError("Couldn't release the club — try again.", { context: "Releasing club" });
+    });
     setBanner(null);
-    toast("Club released");
   };
 
   const onSubmitRelease = (club: Club, reason: string) => {
     addReleaseRequest({ club_id: club.id, teacher_id: user.id, reason });
     setReleaseFor(null);
-    toast.success("Release request submitted for admin approval");
+    notifySuccess("Release request submitted for admin approval");
   };
 
   const remaining = banner ? banner.claimedAt + FREE_RELEASE_WINDOW_MS - now : 0;
