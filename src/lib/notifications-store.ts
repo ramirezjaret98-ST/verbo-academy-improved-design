@@ -199,6 +199,7 @@ function teacherNotifications(teacherId: string): Notification[] {
       body: `${fmtDate(s.date_time)} · ${s.duration_minutes} min`,
       createdAt: s.date_time, // no created_at in mock — use scheduled time
       to: "/teacher/calendar",
+      data: { sessionId: s.id },
       read: false,
     });
   }
@@ -215,6 +216,7 @@ function teacherNotifications(teacherId: string): Notification[] {
       body: s.cancellation_note || "The student cancelled this Spotlight Session.",
       createdAt: s.date_time,
       to: "/teacher/calendar",
+      data: { sessionId: s.id },
       read: false,
     });
   }
@@ -240,6 +242,7 @@ function teacherNotifications(teacherId: string): Notification[] {
       body: `${fmtDate(s.date_time)}${s.cancellation_note ? ` — "${s.cancellation_note}"` : ""}`,
       createdAt: s.date_time,
       to: "/teacher/calendar",
+      data: { sessionId: s.id },
       read: false,
     });
   }
@@ -494,7 +497,13 @@ function adminNotifications(): Notification[] {
       title: s.status === "absent" ? "Student marked Absent (late cancellation)" : "Student cancelled a session",
       body: `${st?.name ?? "Student"} → ${t?.name ?? "Teacher"} · ${fmtDate(s.date_time)}`,
       createdAt: s.date_time,
-      to: "/admin/sessions",
+      // 2026-09-08: used to route to the generic /admin/sessions table —
+      // Jaret wants a click on this notification to land on the Calendar
+      // Overview with that student's calendar already selected and the
+      // cancelled session glowing (see NotificationsBell.tsx's onClickItem +
+      // admin.calendar.tsx's highlight/studentId search params).
+      to: "/admin/calendar",
+      data: { sessionId: s.id, studentId: s.student_id },
       read: false,
     });
   }
@@ -793,6 +802,7 @@ function studentNotifications(studentId: string): Notification[] {
       body: fmtDate(s.date_time),
       createdAt: s.date_time,
       to: "/student/sessions",
+      data: { sessionId: s.id },
       read: false,
     });
   }
