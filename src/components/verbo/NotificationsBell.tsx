@@ -15,6 +15,9 @@ import { Pill } from "@/components/verbo/ui";
 import { BadgeUnlockModal } from "@/components/verbo/BadgeUnlockCelebration";
 import { computeAllEarnedBadges, type UnlockBadge } from "@/lib/badge-unlock";
 import { markBadgeUnlockSeen } from "@/lib/badge-unlock-seen-store";
+import { loadSessions } from "@/lib/sessions-store";
+import { getLessonPlan } from "@/lib/lesson-plans-store";
+import { SessionPrepModal } from "@/components/verbo/SessionPrepModal";
 
 const MAX_VISIBLE = 15;
 
@@ -110,6 +113,7 @@ export function NotificationsBell({ variant = "light" }: { variant?: "light" | "
   const [open, setOpen] = useState(false);
   const [sharedModal, setSharedModal] = useState<{ studentId: string; challengeId: string } | null>(null);
   const [badgeModal, setBadgeModal] = useState<UnlockBadge | null>(null);
+  const [prepModalSessionId, setPrepModalSessionId] = useState<string | null>(null);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -147,6 +151,13 @@ export function NotificationsBell({ variant = "light" }: { variant?: "light" | "
       n.data?.studentId && n.data?.challengeId
     ) {
       setSharedModal({ studentId: n.data.studentId, challengeId: n.data.challengeId });
+      return;
+    }
+    // 2026-09-08: opens the new SessionPrepModal in place instead of
+    // navigating to the generic sessions list — same pattern as the
+    // shared-result / badge-unlock branches below.
+    if (n.kind === "session_ready_to_prepare" && n.data?.sessionId) {
+      setPrepModalSessionId(n.data.sessionId);
       return;
     }
     if (n.kind === "badge_unlocked" && n.data?.badgeStorageId) {
@@ -279,6 +290,19 @@ export function NotificationsBell({ variant = "light" }: { variant?: "light" | "
           }}
         />
       )}
+
+      {prepModalSessionId && (() => {
+        const session = loadSessions().find((s) => s.id === prepModalSessionId);
+        const plan = getLessonPlan(prepModalSessionId);
+        if (!session || !plan) return null;
+        return (
+          <SessionPrepModal
+            session={session}
+            plan={plan}
+            onClose={() => setPrepModalSessionId(null)}
+          />
+        );
+      })()}
     </div>
 
   );
