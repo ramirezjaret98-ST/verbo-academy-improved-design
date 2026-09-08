@@ -122,7 +122,7 @@ export interface Notification {
   read: boolean;
   /** Optional payload used by handlers that open a modal instead of routing
    *  (e.g. student_shared_challenge_result). */
-  data?: { studentId?: string; challengeId?: string; badgeStorageId?: string };
+  data?: { studentId?: string; challengeId?: string; badgeStorageId?: string; sessionId?: string };
 }
 
 // ---------------------------------------------------------------------------
@@ -741,7 +741,14 @@ function studentNotifications(studentId: string): Notification[] {
       title: "Your session is ready — review the content",
       body: `${plan.title} · ${fmtDate(s.date_time)}`,
       createdAt: plan.saved_at,
+      // 2026-09-08: used to route to the generic "/student/sessions" list —
+      // the student had to hunt for the right session. The bell now opens
+      // SessionPrepModal directly instead of navigating (see
+      // NotificationsBell.tsx), so `to` is only a fallback for anything
+      // that still reads it. `data.sessionId` is what the modal actually
+      // keys off of to load the matching session + lesson plan.
       to: "/student/sessions",
+      data: { sessionId: s.id },
       read: false,
     });
   }
