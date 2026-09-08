@@ -121,6 +121,7 @@ export function ActivityModal({ unitId, unitTitle, onClose, accent }: { unitId: 
   const [options, setOptions] = useState(["", "", "", ""]);
   const [correctIndex, setCorrectIndex] = useState(0);
   const [feedback, setFeedback] = useState("");
+  const [hint, setHint] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [rev, setRev] = useState(0);
 
@@ -135,7 +136,7 @@ export function ActivityModal({ unitId, unitTitle, onClose, accent }: { unitId: 
     setName(""); setParagraph(""); setAnswer("");
     setItems([{ text: "", key: "" }, { text: "", key: "" }]);
     setPrompt(""); setAudioName(""); setAudioDurationSec(undefined); setAudioUrl(""); setAudioUploadError(""); setQuestion("");
-    setOptions(["", "", "", ""]); setCorrectIndex(0); setFeedback("");
+    setOptions(["", "", "", ""]); setCorrectIndex(0); setFeedback(""); setHint("");
     setEditingId(null);
   };
 
@@ -165,6 +166,7 @@ export function ActivityModal({ unitId, unitTitle, onClose, accent }: { unitId: 
     setOptions([0, 1, 2, 3].map((i) => opts[i] ?? ""));
     setCorrectIndex(a.correctIndex ?? 0);
     setFeedback(a.feedback ?? "");
+    setHint(a.hint ?? "");
   };
 
   /** Reads the audio duration straight from the file (admins never type it)
@@ -193,7 +195,7 @@ export function ActivityModal({ unitId, unitTitle, onClose, accent }: { unitId: 
   const save = () => {
     if (!name.trim()) { alert("Please give the activity a name."); return; }
     const finalCategory = (useCustomCategory ? customCategory.trim().toLowerCase() : category) || "vocabulary";
-    const base: Activity = { id: editingId ?? `act-${Date.now()}`, unit_id: unitId, name: name.trim(), type, category: finalCategory, session_phase: phase, feedback: feedback.trim() || undefined };
+    const base: Activity = { id: editingId ?? `act-${Date.now()}`, unit_id: unitId, name: name.trim(), type, category: finalCategory, session_phase: phase, feedback: feedback.trim() || undefined, hint: hint.trim() || undefined };
     let payload: Activity = base;
     if (type === "fill_gaps" || type === "read_complete") {
       if (!paragraph.trim() || !answer.trim()) { alert("Provide a paragraph and the correct answer."); return; }
@@ -293,9 +295,16 @@ export function ActivityModal({ unitId, unitTitle, onClose, accent }: { unitId: 
           {missingMandatory.length > 0 && (
             <div className="flex items-start gap-2 rounded-lg border border-dashed border-amber-400/60 bg-amber-50/60 px-3 py-2.5 text-[11px] leading-relaxed text-amber-900 dark:bg-amber-500/10 dark:text-amber-200">
               <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-              This unit is missing mandatory {missingMandatory.map(categoryLabel).join(" · ")} activities. Students cannot pass the unit until each mandatory category has at least one activity with a score ≥ 60.
+              This unit is missing mandatory {missingMandatory.map(categoryLabel).join(" · ")} activities. Students cannot pass the unit until their average score across each mandatory category's activities is ≥ 60.
             </div>
           )}
+
+          <Field
+            label="Hint for the student (optional)"
+            hint={`Shown to the student in its own labeled box, separate from the ${type === "fill_gaps" || type === "read_complete" ? "sentence/paragraph" : type === "match" || type === "drag_drop" ? "items" : "prompt"} text below — e.g. "Use the base form of enjoy." Keep instructions here instead of mixing them into the exercise content itself.`}
+          >
+            <textarea value={hint} onChange={(e) => setHint(e.target.value)} className={textareaCls} placeholder="e.g. Use the base form of enjoy." />
+          </Field>
 
           {(type === "fill_gaps" || type === "read_complete") && (
             <div className="space-y-4">
