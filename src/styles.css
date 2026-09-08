@@ -347,6 +347,13 @@
     animation: verbo-focus-pulse 1.9s ease-in-out infinite;
   }
 
+  /* Static "you are here" ring left behind once a deep-link spotlight's
+     pulse (verbo-focus-pulse above) settles down — keeps the target event
+     visibly marked without animating forever. Color set inline per event. */
+  .verbo-target-ring {
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--verbo-focus-pulse-color, var(--violet-500)) 75%, transparent);
+  }
+
 
 
   @keyframes verbo-live-breath {
