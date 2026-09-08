@@ -113,6 +113,7 @@ import { USERS } from "@/lib/mock-data";
 import { hydrateTeachers } from "@/lib/teacher-model";
 import { groupsByStudentId } from "@/lib/groups-store";
 import { setAvatar, useAvatar } from "@/lib/avatar-store";
+import { AvatarCropper } from "@/components/verbo/AvatarCropper";
 import {
   getLeaderboardIdentity,
   setLeaderboardIdentity,
@@ -3018,6 +3019,7 @@ function PlayerProfileCard({ student }: { student: (typeof USERS)[number] }) {
   const [editingName, setEditingName] = useState(false);
   const [picker, setPicker] = useState(false);
   const [challengeBadges, setChallengeBadges] = useState(false);
+  const [cropSrc, setCropSrc] = useState<string | null>(null);
 
   const [mode, setMode] = useState<LeaderboardIdentityMode>("real");
   const [nickname, setNickname] = useState("");
@@ -3067,7 +3069,7 @@ function PlayerProfileCard({ student }: { student: (typeof USERS)[number] }) {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = () => setAvatar(student.id, String(reader.result));
+    reader.onload = () => setCropSrc(String(reader.result));
     reader.readAsDataURL(file);
     e.target.value = "";
   };
@@ -3237,6 +3239,17 @@ function PlayerProfileCard({ student }: { student: (typeof USERS)[number] }) {
         onOpenChange={setChallengeBadges}
         student={student}
       />
+
+      {cropSrc && (
+        <AvatarCropper
+          imageSrc={cropSrc}
+          onCancel={() => setCropSrc(null)}
+          onSave={(dataUrl) => {
+            setAvatar(student.id, dataUrl);
+            setCropSrc(null);
+          }}
+        />
+      )}
     </section>
   );
 }
