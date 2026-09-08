@@ -88,6 +88,10 @@ export const Route = createFileRoute("/student/sessions")({
     // (see SessionPrepModal.tsx) — opens that session's prep modal directly
     // on load instead of leaving the student to hunt for it in the list.
     prep: typeof search.prep === "string" ? search.prep : undefined,
+    // Deep link from a "session_changed" bell notification (rescheduled /
+    // cancelled / delayed / etc) — spotlights that session on the calendar
+    // instead of leaving the student to find it themselves.
+    highlight: typeof search.highlight === "string" ? search.highlight : undefined,
   }),
   component: Page,
 });
@@ -142,7 +146,7 @@ function buildSessionsTourSteps(closeEventModal: () => void): TourStep[] {
 function Page() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const { focus: focusParam, prep: prepParam } = Route.useSearch();
+  const { focus: focusParam, prep: prepParam, highlight: highlightParam } = Route.useSearch();
   const [prepModalSessionId, setPrepModalSessionId] = useState<string | null>(prepParam ?? null);
 
   const [, tick] = useState(0);
@@ -190,6 +194,12 @@ function Page() {
     return upcoming[0] ? new Date(upcoming[0].date) : undefined;
   }, [events, focusParam]);
 
+  // Deep link from a "session_changed" bell notification — see
+  // Route.validateSearch above. Its own date wins over nearestClubDate.
+  const highlightEvent = useMemo(
+    () => (highlightParam ? events.find((e) => e.id === highlightParam) : undefined),
+    [events, highlightParam],
+  );
 
   if (!user) return null;
 
@@ -312,8 +322,9 @@ function Page() {
           availableKinds={studentKinds}
           initialEnabledKinds={focusParam === "clubs" ? CLUB_KINDS : undefined}
           pulseKinds={pulseActive ? CLUB_KINDS : undefined}
-          initialDate={nearestClubDate}
-
+          initialDate={highlightEvent ? new Date(highlightEvent.date) : nearestClubDate}
+          initialMode={highlightEvent ? "day" : undefined}
+          highlightEventId={highlightParam}
         />
 
       </Card>

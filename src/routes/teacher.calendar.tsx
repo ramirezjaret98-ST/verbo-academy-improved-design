@@ -27,7 +27,15 @@ import { ClubReportModal, type ClubReportEventInput } from "@/components/verbo/C
 import { getClubReport, subscribeClubReports } from "@/lib/club-reports-store";
 import { getCoverageNoteForStudent } from "@/lib/coverage-notes-store";
 
-export const Route = createFileRoute("/teacher/calendar")({ component: Page });
+export const Route = createFileRoute("/teacher/calendar")({
+  // Deep link from the notification bell (session_assigned, spotlight_cancelled,
+  // student_cancelled_session — see notifications-store.ts / NotificationsBell.tsx).
+  // `highlight` is the session id to spotlight on arrival.
+  validateSearch: (search: Record<string, unknown>) => ({
+    highlight: typeof search.highlight === "string" ? search.highlight : undefined,
+  }),
+  component: Page,
+});
 
 function fmtDateTime(iso: string) {
   return new Date(iso).toLocaleString([], { weekday: "short", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
@@ -36,6 +44,7 @@ function fmtDateTime(iso: string) {
 function Page() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { highlight: highlightParam } = Route.useSearch();
 
   const [sessions, setSessions] = useState<ExtSession[]>([]);
   const [plans, setPlans] = useState<Record<string, LessonPlan>>({});
@@ -77,6 +86,13 @@ function Page() {
       cohortNameOf: cohortName,
     });
   }, [user, sessions, plans]);
+
+  // Deep-link target from the notification bell — see Route.validateSearch
+  // above. Its own date decides which day CalendarView opens on.
+  const highlightEvent = useMemo(
+    () => (highlightParam ? events.find((e) => e.id === highlightParam) : undefined),
+    [events, highlightParam],
+  );
 
   // Active list: upcoming Scheduled/Ready class or workshop sessions only
   // (Session Report submission removes them; the calendar dot remains.).
@@ -171,7 +187,14 @@ function Page() {
       </div>
 
       <Card>
-        <CalendarView events={events} onEventClick={handleEventClick} substitutionAware />
+        <CalendarView
+          events={events}
+          onEventClick={handleEventClick}
+          substitutionAware
+          highlightEventId={highlightParam}
+          initialMode={highlightEvent ? "day" : undefined}
+          initialDate={highlightEvent ? new Date(highlightEvent.date) : undefined}
+        />
       </Card>
 
       <div>

@@ -39,11 +39,24 @@ const STATUS_OPTIONS: ExtSessionStatus[] = [
 
 const BRAND = "#01304a";
 
-export const Route = createFileRoute("/admin/calendar")({ component: Page });
+export const Route = createFileRoute("/admin/calendar")({
+  // Deep link from the notification bell (e.g. "student cancelled a
+  // session" — see notifications-store.ts's admin student_cancelled_session
+  // + NotificationsBell.tsx's onClickItem). `highlight` is the session id to
+  // spotlight, `studentId`/`teacherId` pre-select the same filters this page
+  // already offers so the highlighted session is actually visible.
+  validateSearch: (search: Record<string, unknown>) => ({
+    studentId: typeof search.studentId === "string" ? search.studentId : undefined,
+    teacherId: typeof search.teacherId === "string" ? search.teacherId : undefined,
+    highlight: typeof search.highlight === "string" ? search.highlight : undefined,
+  }),
+  component: Page,
+});
 
 function Page() {
-  const [teacherId, setTeacherId] = useState("");
-  const [studentId, setStudentId] = useState("");
+  const { studentId: studentIdParam, teacherId: teacherIdParam, highlight: highlightParam } = Route.useSearch();
+  const [teacherId, setTeacherId] = useState(teacherIdParam ?? "");
+  const [studentId, setStudentId] = useState(studentIdParam ?? "");
   const [openEvent, setOpenEvent] = useState<CalendarEvent | null>(null);
   const [tick, setTick] = useState(0);
 
@@ -67,6 +80,15 @@ function Page() {
     () => adminCalendarEvents({ teacherId: teacherId || undefined, studentId: studentId || undefined }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [teacherId, studentId, tick],
+  );
+
+  // The highlighted event's own date decides which month/day CalendarView
+  // opens on — otherwise it'd land on "today" and the target could be
+  // several weeks away. Day view is used so a busy day's "+N more" collapse
+  // (month view only shows the first 3 pills) can never hide the target.
+  const highlightEvent = useMemo(
+    () => (highlightParam ? events.find((e) => e.id === highlightParam) : undefined),
+    [events, highlightParam],
   );
 
   return (
@@ -110,7 +132,14 @@ function Page() {
       </Card>
 
       {hasFilter ? (
-        <CalendarView events={events} onEventClick={(ev) => setOpenEvent(ev)} substitutionAware />
+        <CalendarView
+          events={events}
+          onEventClick={(ev) => setOpenEvent(ev)}
+          substitutionAware
+          highlightEventId={highlightParam}
+          initialMode={highlightEvent ? "day" : undefined}
+          initialDate={highlightEvent ? new Date(highlightEvent.date) : undefined}
+        />
       ) : (
         <Card className="!p-12">
           <div className="flex flex-col items-center justify-center gap-3 text-center">
