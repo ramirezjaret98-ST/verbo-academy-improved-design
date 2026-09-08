@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { useAuth, validatePasswordComplexity } from "@/lib/auth";
 import { setAvatar, useAvatar } from "@/lib/avatar-store";
+import { AvatarCropper } from "@/components/verbo/AvatarCropper";
 import { initialsOf } from "@/lib/utils";
 import {
   MAX_HEADLINE_CHARS,
@@ -86,6 +87,7 @@ export function StaffProfileModal({ open, onOpenChange, promptCompleteProfile = 
   // Student-only extras
   const [gallery, setGallery] = useState(false);
   const [pickerSlot, setPickerSlot] = useState<number | null>(null);
+  const [cropSrc, setCropSrc] = useState<string | null>(null);
   const [lbMode, setLbMode] = useState<LeaderboardIdentityMode>("real");
   const [lbNickname, setLbNickname] = useState("");
   const [tick, setTick] = useState(0);
@@ -140,7 +142,7 @@ export function StaffProfileModal({ open, onOpenChange, promptCompleteProfile = 
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = () => setAvatar(user.id, String(reader.result));
+    reader.onload = () => setCropSrc(String(reader.result));
     reader.readAsDataURL(file);
     e.target.value = "";
   };
@@ -629,6 +631,17 @@ export function StaffProfileModal({ open, onOpenChange, promptCompleteProfile = 
           onPick={(id) => { if (pickerSlot !== null) equip(pickerSlot, id); }}
         />
       </>
+    )}
+
+    {cropSrc && (
+      <AvatarCropper
+        imageSrc={cropSrc}
+        onCancel={() => setCropSrc(null)}
+        onSave={(dataUrl) => {
+          setAvatar(user.id, dataUrl);
+          setCropSrc(null);
+        }}
+      />
     )}
     </>
   );

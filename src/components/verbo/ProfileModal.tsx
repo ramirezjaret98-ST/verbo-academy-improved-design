@@ -3,6 +3,7 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { useAuth } from "@/lib/auth";
 import { Award, Lock, Camera, Plus, X } from "lucide-react";
 import { setAvatar, useAvatar } from "@/lib/avatar-store";
+import { AvatarCropper } from "@/components/verbo/AvatarCropper";
 import { initialsOf } from "@/lib/utils";
 import {
   getLeaderboardIdentity,
@@ -84,6 +85,7 @@ export function ProfileModal({ open, onOpenChange }: Props) {
   const { user } = useAuth();
   const [gallery, setGallery] = useState(false);
   const [pickerSlot, setPickerSlot] = useState<number | null>(null);
+  const [cropSrc, setCropSrc] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const avatar = useAvatar(user?.id);
 
@@ -111,7 +113,7 @@ export function ProfileModal({ open, onOpenChange }: Props) {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = () => setAvatar(user.id, String(reader.result));
+    reader.onload = () => setCropSrc(String(reader.result));
     reader.readAsDataURL(file);
     e.target.value = "";
   };
@@ -341,6 +343,17 @@ export function ProfileModal({ open, onOpenChange }: Props) {
         earnedCount={earned.length}
         onPick={(id) => { if (pickerSlot !== null) equip(pickerSlot, id); }}
       />
+
+      {cropSrc && (
+        <AvatarCropper
+          imageSrc={cropSrc}
+          onCancel={() => setCropSrc(null)}
+          onSave={(dataUrl) => {
+            setAvatar(user.id, dataUrl);
+            setCropSrc(null);
+          }}
+        />
+      )}
     </>
   );
 }
