@@ -55,6 +55,7 @@ import {
 } from "@/components/verbo/course-modals";
 import { Card, GhostButton, PrimaryButton, Pill } from "@/components/verbo/ui";
 import { loadActivities, subscribeActivities } from "@/lib/activities-store";
+import { notifySuccess, notifyError } from "@/lib/notify";
 
 export interface CustomUnitAdminConfig {
   kind: CustomUnitKind;
@@ -362,6 +363,7 @@ function StudentBuilder({ config, studentId, studentName, onBack }: {
                     if (confirm(`Delete unit "${u.title}"? This does not delete its activities.`)) {
                       removeCustomUnit(config.kind, u.id);
                       setRev((r) => r + 1);
+                      notifySuccess("Unit deleted.");
                     }
                   }}
                   className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-destructive"
@@ -392,12 +394,14 @@ function StudentBuilder({ config, studentId, studentName, onBack }: {
           onCreate={(title, fileUrl, fileName, videoUrl, block) => {
             addCustomUnit(config.kind, studentId, title, fileUrl, fileName, videoUrl, block);
             setUnitModal(null);
+            notifySuccess("Unit created.");
           }}
           onUpdate={(id, title, fileUrl, fileName, videoUrl, block) => {
             updateCustomUnit(config.kind, id, {
               title, file_url: fileUrl, file_name: fileName, video_url: videoUrl, block,
             });
             setUnitModal(null);
+            notifySuccess("Unit updated.");
           }}
         />
       )}
@@ -444,7 +448,7 @@ function CourseCardModal({ config, studentId, meta, onClose, onSaved }: {
     setError("");
     const res = await uploadContentFile(file, config.coverUploadFolder);
     setUploading(false);
-    if (!res.ok) { setError(res.error); return; }
+    if (!res.ok) { setError(res.error); notifyError(res.error, { context: "Uploading cover image" }); return; }
     setCover(res.url);
   };
 
@@ -453,7 +457,8 @@ function CourseCardModal({ config, studentId, meta, onClose, onSaved }: {
     setSaving(true);
     const result = await saveCourseMeta(config.kind, studentId, { title: title.trim(), cover_image: cover || null });
     setSaving(false);
-    if (!result.ok) { setError(result.error); return; }
+    if (!result.ok) { setError(result.error); notifyError(result.error, { context: "Saving course card" }); return; }
+    notifySuccess("Course card saved.");
     onSaved();
   };
 
@@ -523,7 +528,7 @@ function CustomUnitModal({ config, editingUnit, onClose, onCreate, onUpdate }: {
     setFileError("");
     const res = await uploadContentFile(file, config.uploadFolder);
     setUploadingFile(false);
-    if (!res.ok) { setFileError(res.error); return; }
+    if (!res.ok) { setFileError(res.error); notifyError(res.error, { context: "Uploading file" }); return; }
     setFileUrl(res.url);
     setFileName(res.fileName);
   };
@@ -534,7 +539,7 @@ function CustomUnitModal({ config, editingUnit, onClose, onCreate, onUpdate }: {
     setVideoError("");
     const res = await uploadContentFile(file, `${config.uploadFolder}-video`);
     setUploadingVideo(false);
-    if (!res.ok) { setVideoError(res.error); return; }
+    if (!res.ok) { setVideoError(res.error); notifyError(res.error, { context: "Uploading video" }); return; }
     setVideoUrl(res.url);
   };
 

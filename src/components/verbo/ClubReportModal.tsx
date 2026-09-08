@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Download, BookOpen, Lightbulb, Sparkles } from "lucide-react";
-import { toast } from "sonner";
 import { GhostButton, PrimaryButton, AccentModalHeader } from "@/components/verbo/ui";
+import { notifySuccess, notifyError } from "@/lib/notify";
 import {
   saveClubReport, type ClubAttendance, type ClubReportEventType,
 } from "@/lib/club-reports-store";
@@ -68,11 +68,13 @@ export function ClubReportModal({
     // Calendar and Manage Clubs reflect immediately. Spotlight events don't
     // yet have a cross-app store; the club-reports entry alone tracks them.
     if (event.type === "book" || event.type === "insight") {
-      void updateClub(event.id, { status: "completed" });
+      void updateClub(event.id, { status: "completed" }).then((res) => {
+        if (!res) notifyError("Couldn't mark the club as completed — try again.", { context: "Submitting club report" });
+      });
     } else if (event.type === "spotlight") {
       updateSession(event.id, { status: "completed" });
     }
-    toast.success("Club Report submitted. It will be saved to the club history and visible to attendees.");
+    notifySuccess("Club Report submitted. It will be saved to the club history and visible to attendees.");
     onSubmitted?.();
     onClose();
   };
