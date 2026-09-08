@@ -19,6 +19,7 @@ import { registerRehydrate } from "@/lib/auth-rehydrate";
 import type { Database } from "@/integrations/supabase/types";
 import { sanitizeText, getUnitAccessOverride, setUnitAccess, type UnitAccessAction } from "./activities-store";
 import { hydrateUserIdBridge, legacyToUuid, uuidToLegacySync } from "@/lib/user-id-bridge";
+import { notifyError } from "@/lib/notify";
 
 export type CustomUnitKind = "vip" | "tailored";
 
@@ -228,6 +229,7 @@ export function addCustomUnit(
       console.error("[custom-units-store] no app_users row for legacy id", studentId);
       unitsCache = unitsCache.filter((u) => u.id !== tempId);
       notify();
+      notifyError("Couldn't identify the student", { context: "Adding unit" });
       return;
     }
     const { data, error } = await supabase
@@ -248,6 +250,7 @@ export function addCustomUnit(
       console.error("[custom-units-store] failed to add unit", error);
       unitsCache = unitsCache.filter((u) => u.id !== tempId);
       notify();
+      notifyError(error, { context: "Adding unit" });
       return;
     }
     const saved = fromUnitRow(data);
@@ -379,6 +382,7 @@ export function updateCustomUnit(
       console.error("[custom-units-store] failed to update unit", error);
       unitsCache = prev;
       notify();
+      notifyError(error, { context: "Updating unit" });
     }
   })();
 }
@@ -432,6 +436,7 @@ export function removeCustomUnit(kind: CustomUnitKind, id: string): void {
       console.error("[custom-units-store] failed to delete unit", error);
       unitsCache = prev;
       notify();
+      notifyError(error, { context: "Deleting unit" });
     }
   })();
 }

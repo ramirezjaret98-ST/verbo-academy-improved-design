@@ -27,6 +27,7 @@ import { MATERIALS, type MaterialType } from "./mock-data";
 import { supabase } from "@/integrations/supabase/client";
 import { registerRehydrate } from "@/lib/auth-rehydrate";
 import type { Database } from "@/integrations/supabase/types";
+import { notifyError } from "@/lib/notify";
 
 export type RestrictProduct = "go" | "enterprise" | "international";
 
@@ -315,6 +316,7 @@ export function upsertMaterial(mat: StoredMaterial) {
         console.error("[materials-store] failed to update material", error);
         cache = prevCache;
         notify();
+        notifyError(error, { context: "Saving material" });
       }
       return;
     }
@@ -323,6 +325,7 @@ export function upsertMaterial(mat: StoredMaterial) {
       console.error("[materials-store] failed to insert material", error);
       cache = prevCache;
       notify();
+      notifyError(error, { context: "Saving material" });
       return;
     }
     const saved = mapRow(data);
@@ -343,6 +346,7 @@ export function deleteMaterial(id: string) {
       console.error("[materials-store] failed to delete material", error);
       cache = prevCache;
       notify();
+      notifyError(error, { context: "Deleting material" });
     }
   })();
 }

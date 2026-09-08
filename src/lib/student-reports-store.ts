@@ -13,6 +13,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { registerRehydrate } from "@/lib/auth-rehydrate";
 import type { Database } from "@/integrations/supabase/types";
 import { hydrateUserIdBridge, legacyToUuid, uuidToLegacySync } from "@/lib/user-id-bridge";
+import { notifyError } from "@/lib/notify";
 
 export interface StudentReport {
   id: string;
@@ -102,6 +103,7 @@ export function addStudentReport(input: { studentId: string; teacherId: string; 
     if (!studentUuid || !teacherUuid) {
       cache = cache.filter((r) => r.id !== tempId);
       notify();
+      notifyError("Couldn't identify the student or teacher", { context: "Saving student report" });
       return;
     }
     const { data, error } = await supabase
@@ -113,6 +115,7 @@ export function addStudentReport(input: { studentId: string; teacherId: string; 
       console.error("[student-reports-store] failed to save report", error);
       cache = cache.filter((r) => r.id !== tempId);
       notify();
+      notifyError(error, { context: "Saving student report" });
       return;
     }
     cache = cache.map((r) => (r.id === tempId ? mapRow(data) : r));

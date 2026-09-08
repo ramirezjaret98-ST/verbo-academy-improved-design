@@ -22,6 +22,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { registerRehydrate } from "@/lib/auth-rehydrate";
 import { legacyToUuid, uuidToLegacySync, hydrateUserIdBridge } from "./user-id-bridge";
+import { notifyError } from "@/lib/notify";
 
 export const COVERAGE_NOTES_EVENT = "verbo:coverage-notes-updated";
 
@@ -125,6 +126,9 @@ export function setCoverageNote(teacherId: string, studentId: string, note: stri
         teacherUuid,
         studentUuid,
       });
+      // 2026-09-08: was silent — the note editor closes optimistically, so
+      // without this the author had no way to know the note never saved.
+      notifyError("Couldn't identify the teacher or student", { context: "Saving coverage note" });
       return;
     }
     if (note.trim()) {
@@ -136,6 +140,7 @@ export function setCoverageNote(teacherId: string, studentId: string, note: stri
         );
       if (error) {
         console.error("[coverage-notes-store] failed to save coverage note", error);
+        notifyError(error, { context: "Saving coverage note" });
       }
     } else {
       const { error } = await supabase
@@ -145,6 +150,7 @@ export function setCoverageNote(teacherId: string, studentId: string, note: stri
         .eq("student_id", studentUuid);
       if (error) {
         console.error("[coverage-notes-store] failed to delete coverage note", error);
+        notifyError(error, { context: "Deleting coverage note" });
       }
     }
   })();

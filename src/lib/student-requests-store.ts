@@ -33,6 +33,7 @@ import {
   type ExtSessionStatus,
 } from "./sessions-store";
 import { getStudentVideoLink } from "./students-store";
+import { notifyError } from "@/lib/notify";
 
 export type StudentRequestKind = "reschedule" | "spotlight";
 
@@ -223,6 +224,7 @@ export function addStudentRequest(
       });
       cache = cache.filter((r) => r.id !== tempId);
       notify();
+      notifyError("Couldn't identify the student", { context: "Submitting request" });
       return;
     }
     const { data, error } = await supabase
@@ -247,6 +249,7 @@ export function addStudentRequest(
       // the local UI as if it worked.
       cache = cache.filter((r) => r.id !== tempId);
       notify();
+      notifyError(error, { context: "Submitting request" });
       return;
     }
     const saved = mapRow(data);
@@ -300,6 +303,7 @@ export function recordSpotlightConversion(input: {
       );
       cache = cache.filter((r) => r.id !== tempId);
       notify();
+      notifyError("Couldn't identify the student or teacher", { context: "Recording spotlight conversion" });
       return;
     }
     const { data, error } = await supabase
@@ -324,6 +328,7 @@ export function recordSpotlightConversion(input: {
       console.error("[student-requests-store] failed to save spotlight conversion", error);
       cache = cache.filter((r) => r.id !== tempId);
       notify();
+      notifyError(error, { context: "Recording spotlight conversion" });
       return;
     }
     const saved = mapRow(data);
@@ -366,6 +371,7 @@ function transitionRequest(
         teacherId,
         requestId: id,
       });
+      notifyError("Couldn't identify the teacher", { context: "Claiming request" });
       return;
     }
     const { error } = await supabase
@@ -374,6 +380,7 @@ function transitionRequest(
       .eq("id", Number(id));
     if (error) {
       console.error("[student-requests-store] failed to persist claim", error);
+      notifyError(error, { context: "Claiming request" });
     }
   })();
 

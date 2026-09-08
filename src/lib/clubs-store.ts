@@ -14,6 +14,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 import { hydrateUserIdBridge, legacyToUuid, uuidToLegacySync } from "@/lib/user-id-bridge";
 import { USERS } from "./mock-data";
+import { notifyError } from "@/lib/notify";
 
 export type ClubType = "insight" | "book";
 export type TimeStatus = "upcoming" | "live" | "completed" | "cancelled";
@@ -339,6 +340,7 @@ export function addReleaseRequest(input: { club_id: string; teacher_id: string; 
     if (!teacherUuid || !Number.isFinite(numericClubId)) {
       requestsCache = requestsCache.filter((r) => r.id !== tempId);
       notifyRequests();
+      notifyError("Couldn't identify the teacher or club", { context: "Requesting club release" });
       return;
     }
     const { data, error } = await supabase
@@ -350,6 +352,7 @@ export function addReleaseRequest(input: { club_id: string; teacher_id: string; 
       console.error("[clubs-store] failed to submit release request", error);
       requestsCache = requestsCache.filter((r) => r.id !== tempId);
       notifyRequests();
+      notifyError(error, { context: "Requesting club release" });
       return;
     }
     requestsCache = requestsCache.map((r) => (r.id === tempId ? mapReleaseRow(data) : r));
@@ -371,6 +374,7 @@ export function removeReleaseRequest(id: string) {
       console.error("[clubs-store] failed to remove release request", error);
       requestsCache = prev;
       notifyRequests();
+      notifyError(error, { context: "Removing release request" });
     }
   })();
 }

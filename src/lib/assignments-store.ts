@@ -27,6 +27,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { registerRehydrate } from "@/lib/auth-rehydrate";
 import { legacyToUuid, uuidToLegacySync, hydrateUserIdBridge } from "./user-id-bridge";
+import { notifyError } from "@/lib/notify";
 
 export const ASSIGNMENTS_EVENT = "verbo:assignments-updated";
 
@@ -135,6 +136,7 @@ export function setAssignment(studentId: string, teacherId: string) {
     ]);
     if (!studentUuid || !teacherUuid) {
       console.error("[assignments-store] cannot persist assignment — unresolved ids", { studentId, teacherId, studentUuid, teacherUuid });
+      notifyError("Couldn't identify the student or teacher", { context: "Assigning teacher" });
       return;
     }
     // Remove any other row for this student first (enforces one-teacher-
@@ -142,12 +144,14 @@ export function setAssignment(studentId: string, teacherId: string) {
     const { error: deleteError } = await supabase.from("assignments").delete().eq("student_id", studentUuid);
     if (deleteError) {
       console.error("[assignments-store] failed to clear previous assignment", deleteError);
+      notifyError(deleteError, { context: "Assigning teacher" });
     }
     const { error: insertError } = await supabase
       .from("assignments")
       .insert({ teacher_id: teacherUuid, student_id: studentUuid });
     if (insertError) {
       console.error("[assignments-store] failed to save assignment", insertError);
+      notifyError(insertError, { context: "Assigning teacher" });
     }
   })();
 }
@@ -162,11 +166,13 @@ export function removeAssignment(studentId: string) {
     const studentUuid = await legacyToUuid(studentId);
     if (!studentUuid) {
       console.error("[assignments-store] cannot remove assignment — unresolved student id", studentId);
+      notifyError("Couldn't identify the student", { context: "Removing assignment" });
       return;
     }
     const { error } = await supabase.from("assignments").delete().eq("student_id", studentUuid);
     if (error) {
       console.error("[assignments-store] failed to remove assignment", error);
+      notifyError(error, { context: "Removing assignment" });
     }
   })();
 }

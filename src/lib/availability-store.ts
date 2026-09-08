@@ -16,6 +16,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 import { hydrateUserIdBridge, legacyToUuid, uuidToLegacySync } from "@/lib/user-id-bridge";
 import { loadSessions } from "./sessions-store";
+import { notifyError } from "@/lib/notify";
 
 export type DayKey = "mon" | "tue" | "wed" | "thu" | "fri" | "sat";
 export const DAY_KEYS: DayKey[] = ["mon", "tue", "wed", "thu", "fri", "sat"];
@@ -206,6 +207,7 @@ export function saveAvailability(teacherId: string, weekly: Weekly): void {
       console.error("[availability-store] unknown teacher id", teacherId);
       setAvailabilityEntry(teacherId, prev);
       notifyAvailability();
+      notifyError("Couldn't identify the teacher", { context: "Saving availability" });
       return;
     }
     const blocks = DAY_KEYS.flatMap((day) =>
@@ -220,6 +222,7 @@ export function saveAvailability(teacherId: string, weekly: Weekly): void {
       console.error("[availability-store] failed to save availability", error);
       setAvailabilityEntry(teacherId, prev);
       notifyAvailability();
+      notifyError(error, { context: "Saving availability" });
     }
   })();
 }
@@ -263,6 +266,7 @@ export function submitChangeRequest(teacherId: string, proposed: Weekly, reason?
     if (!teacherUuid) {
       changeRequestsCache = changeRequestsCache.filter((r) => r.id !== tempId);
       notifyChangeRequests();
+      notifyError("Couldn't identify the teacher", { context: "Submitting availability change" });
       return;
     }
     const { data, error } = await supabase
@@ -274,6 +278,7 @@ export function submitChangeRequest(teacherId: string, proposed: Weekly, reason?
       console.error("[availability-store] failed to submit change request", error);
       changeRequestsCache = changeRequestsCache.filter((r) => r.id !== tempId);
       notifyChangeRequests();
+      notifyError(error, { context: "Submitting availability change" });
       return;
     }
     changeRequestsCache = changeRequestsCache.map((r) => (r.id === tempId ? mapChangeRequestRow(data) : r));
@@ -306,6 +311,7 @@ export function approveChangeRequest(id: string) {
       console.error("[availability-store] failed to approve change request", error);
       changeRequestsCache = prev;
       notifyChangeRequests();
+      notifyError(error, { context: "Approving availability change" });
     }
   })();
 }
@@ -329,6 +335,7 @@ export function rejectChangeRequest(id: string) {
       console.error("[availability-store] failed to reject change request", error);
       changeRequestsCache = prev;
       notifyChangeRequests();
+      notifyError(error, { context: "Rejecting availability change" });
     }
   })();
 }

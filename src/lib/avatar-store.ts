@@ -14,6 +14,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { registerRehydrate } from "@/lib/auth-rehydrate";
 import { legacyToUuid } from "./user-id-bridge";
+import { notifyError } from "@/lib/notify";
 
 const EVT = "verbo:avatars-updated";
 
@@ -93,6 +94,7 @@ export function setAvatar(userId: string, dataUrl: string) {
       .eq("id", uuid);
     if (error) {
       console.error("[avatar-store] failed to persist avatar", error);
+      notifyError(error, { context: "Saving profile photo" });
     }
   })();
 }

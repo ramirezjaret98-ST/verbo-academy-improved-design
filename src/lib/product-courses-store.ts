@@ -23,6 +23,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { registerRehydrate } from "@/lib/auth-rehydrate";
 import type { Database } from "@/integrations/supabase/types";
+import { notifyError } from "@/lib/notify";
 
 export type ProductId = "go" | "enterprise" | "international";
 
@@ -235,6 +236,7 @@ export function saveUnit(levelId: string, originalId: string | null, unit: Cours
   const levelDbId = levelDbIdByCode.get(levelId);
   if (levelDbId === undefined) {
     console.error("[product-courses-store] unknown level id", levelId);
+    notifyError("Unknown course level", { context: "Saving unit" });
     return;
   }
   const prevMap = unitsByLevelCode;
@@ -254,6 +256,7 @@ export function saveUnit(levelId: string, originalId: string | null, unit: Cours
         console.error("[product-courses-store] failed to rename unit", error);
         unitsByLevelCode = prevMap;
         notify();
+        notifyError(error, { context: "Saving unit" });
       }
       return;
     }
@@ -264,6 +267,7 @@ export function saveUnit(levelId: string, originalId: string | null, unit: Cours
       console.error("[product-courses-store] failed to save unit", error);
       unitsByLevelCode = prevMap;
       notify();
+      notifyError(error, { context: "Saving unit" });
     }
   })();
 }
@@ -286,6 +290,7 @@ export function deleteUnit(levelId: string, unitId: string): void {
       console.error("[product-courses-store] failed to delete unit", error);
       unitsByLevelCode = prevMap;
       notify();
+      notifyError(error, { context: "Deleting unit" });
     }
   })();
 }
@@ -341,6 +346,7 @@ export function addUnitsBulk(levelId: string, units: CourseUnit[]): void {
   const levelDbId = levelDbIdByCode.get(levelId);
   if (levelDbId === undefined) {
     console.error("[product-courses-store] unknown level id", levelId);
+    notifyError("Unknown course level", { context: "Bulk-adding units" });
     return;
   }
   const prevMap = unitsByLevelCode;
@@ -356,6 +362,7 @@ export function addUnitsBulk(levelId: string, units: CourseUnit[]): void {
       console.error("[product-courses-store] failed to bulk-add units", error);
       unitsByLevelCode = prevMap;
       notify();
+      notifyError(error, { context: "Bulk-adding units" });
     }
   })();
 }

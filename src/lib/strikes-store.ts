@@ -23,6 +23,7 @@ import { legacyToUuid, uuidToLegacySync, hydrateUserIdBridge } from "./user-id-b
 import { USERS } from "./mock-data";
 import { loadSessions, updateSession, type ExtSession } from "./sessions-store";
 import { patchTeacherProfile } from "./teacher-model";
+import { notifyError } from "@/lib/notify";
 
 export type CancelReason = "illness" | "personal" | "major_issue" | "other";
 export type JustificationCause = "evidence_provided" | "force_majeure" | "illness";
@@ -228,6 +229,7 @@ export function cancelSessionByTeacher(input: {
         teacherId: input.teacherId,
         strikeId: strike.id,
       });
+      notifyError("Couldn't identify the teacher", { context: "Recording cancellation strike" });
       return;
     }
     const { error } = await supabase.from("teacher_strikes").insert({
@@ -242,6 +244,7 @@ export function cancelSessionByTeacher(input: {
     });
     if (error) {
       console.error("[strikes-store] failed to persist strike", error);
+      notifyError(error, { context: "Recording cancellation strike" });
     }
   })();
 
@@ -263,6 +266,7 @@ export function justifyStrike(strikeId: string, cause: JustificationCause) {
       .eq("id", strikeId);
     if (error) {
       console.error("[strikes-store] failed to persist strike justification", error);
+      notifyError(error, { context: "Justifying strike" });
     }
   })();
 }
@@ -277,6 +281,7 @@ export function markSubstituteFound(strikeId: string, found: boolean) {
       .eq("id", strikeId);
     if (error) {
       console.error("[strikes-store] failed to persist substitute flag", error);
+      notifyError(error, { context: "Updating substitute status" });
     }
   })();
 }

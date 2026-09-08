@@ -16,6 +16,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { registerRehydrate } from "@/lib/auth-rehydrate";
 import type { Database } from "@/integrations/supabase/types";
 import { hydrateUserIdBridge, legacyToUuid, uuidToLegacySync } from "@/lib/user-id-bridge";
+import { notifyError } from "@/lib/notify";
 
 export const UNIT_ISSUE_TYPES = [
   "PDF won't download",
@@ -152,6 +153,7 @@ export function addContentIssueReport(input: {
     if (!uuid) {
       cache = cache.filter((r) => r.id !== tempId);
       notify();
+      notifyError("Couldn't identify the reporting student", { context: "Sending technical issue report" });
       return;
     }
     const { data, error } = await supabase
@@ -170,6 +172,10 @@ export function addContentIssueReport(input: {
       console.error("[content-issue-reports-store] failed to save report", error);
       cache = cache.filter((r) => r.id !== tempId);
       notify();
+      // 2026-09-08: previously silent — the reporting UI closes/confirms
+      // optimistically, so without this the student had no way to know a
+      // "PDF won't download" report (etc.) never actually reached Admin.
+      notifyError(error, { context: "Sending technical issue report" });
       return;
     }
     cache = sortDesc(cache.map((r) => (r.id === tempId ? mapRow(data) : r)));
@@ -209,6 +215,7 @@ export function updateContentIssueReport(
         console.error("[content-issue-reports-store] failed to update report", error);
         cache = cache.map((r) => (r.id === id ? prev : r));
         notify();
+        notifyError(error, { context: "Updating technical issue status" });
       }
     })();
   }

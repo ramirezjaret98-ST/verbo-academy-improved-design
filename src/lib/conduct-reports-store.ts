@@ -13,6 +13,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { registerRehydrate } from "@/lib/auth-rehydrate";
 import type { Database } from "@/integrations/supabase/types";
 import { hydrateUserIdBridge, legacyToUuid, uuidToLegacySync } from "@/lib/user-id-bridge";
+import { notifyError } from "@/lib/notify";
 
 export type ConductTargetType = "teacher" | "student";
 export type ConductCategory =
@@ -135,6 +136,7 @@ export function addConductReport(input: {
     if (!reporterUuid || !targetUuid) {
       cache = cache.filter((r) => r.id !== tempId);
       notify();
+      notifyError("Couldn't identify the reporter or the person being reported", { context: "Sending conduct report" });
       return;
     }
     const { data, error } = await supabase
@@ -152,6 +154,11 @@ export function addConductReport(input: {
       console.error("[conduct-reports-store] failed to save report", error);
       cache = cache.filter((r) => r.id !== tempId);
       notify();
+      // 2026-09-08: this used to fail completely silently — the modal already
+      // showed "submitted" (see ReportConductModal.tsx's optimistic
+      // setSubmitted(true)) and the report just vanished from the cache with
+      // nothing telling the student it never actually reached Admin.
+      notifyError(error, { context: "Sending conduct report" });
       return;
     }
     cache = cache.map((r) => (r.id === tempId ? mapRow(data) : r));
@@ -191,6 +198,7 @@ export function updateConductReport(
         console.error("[conduct-reports-store] failed to update report", error);
         cache = cache.map((r) => (r.id === id ? prev : r));
         notify();
+        notifyError(error, { context: "Updating conduct report status" });
       }
     })();
   }

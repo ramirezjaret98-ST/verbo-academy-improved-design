@@ -19,6 +19,7 @@ import { registerRehydrate } from "@/lib/auth-rehydrate";
 import type { Database } from "@/integrations/supabase/types";
 import { hydrateUserIdBridge, legacyToUuid, uuidToLegacySync } from "@/lib/user-id-bridge";
 import type { Role } from "./mock-data";
+import { notifyError } from "@/lib/notify";
 
 export type Audience = "all" | "students" | "teachers";
 
@@ -176,6 +177,7 @@ export function publishAnnouncement(message: string, audience: Audience, expires
       console.error("[announcements-store] failed to publish", error);
       cache = cache.filter((a) => a.id !== tempId);
       notify();
+      notifyError(error, { context: "Publishing announcement" });
       return;
     }
     cache = cache.map((a) => (a.id === tempId ? mapRow(data) : a));
@@ -195,6 +197,7 @@ export function endAnnouncement(id: string) {
       console.error("[announcements-store] failed to end announcement", error);
       cache = prev;
       notify();
+      notifyError(error, { context: "Ending announcement" });
     }
   })();
 }
