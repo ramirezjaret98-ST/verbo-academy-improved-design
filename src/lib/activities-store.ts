@@ -101,6 +101,9 @@ export interface Activity {
   correctIndex?: number;
   /** Free text shown to the student when the answer is incorrect — explains WHY. */
   feedback?: string;
+  /** Optional hint shown to the student in its own clearly-labeled box, separate
+   *  from the paragraph/prompt/chat text — e.g. "Use the base form of enjoy." */
+  hint?: string;
 }
 
 const EXERCISE_TYPES: ExerciseType[] = [
@@ -136,6 +139,7 @@ export function sanitizeActivity(a: Activity): Activity {
   if (a.prompt !== undefined) out.prompt = sanitizeText(a.prompt);
   if (a.question !== undefined) out.question = sanitizeText(a.question);
   if (a.feedback !== undefined) out.feedback = sanitizeText(a.feedback);
+  if (a.hint !== undefined) out.hint = sanitizeText(a.hint);
   if (a.items) out.items = a.items.map((i) => ({ text: sanitizeText(i.text), key: sanitizeText(i.key) }));
   if (a.options) out.options = a.options.map((o) => sanitizeText(o));
   return out;
@@ -178,6 +182,8 @@ export function validateBulkActivities(raw: unknown[], unitId: string): { valid:
     if (o.session_phase !== undefined) base.session_phase = o.session_phase === "post" ? "post" : "pre";
     const feedback = str(o.feedback);
     if (feedback) base.feedback = feedback;
+    const hint = str(o.hint);
+    if (hint) base.hint = hint;
 
     if (type === "fill_gaps" || type === "read_complete") {
       const paragraph = str(o.paragraph);
@@ -924,9 +930,11 @@ export function attemptsFor(studentId: string, activityId: string): number {
 
 /* ---- Unit pass rule ----
  * A unit is "passed" when every mandatory category present in that unit
- * has at least one activity with best score ≥ 60 for THAT student. Units
- * without any mandatory activity fall back to the legacy completion flag
- * (admin override / seed), also scoped per student.
+ * has an AVERAGE best score (across all of that category's activities,
+ * unanswered = 0) of at least 60 for THAT student — not just one activity
+ * answered correctly, which used to let a single lucky answer pass the
+ * whole category. Units without any mandatory activity fall back to the
+ * legacy completion flag (admin override / seed), also scoped per student.
  */
 export function unitPassed(studentId: string, unitId: string): boolean {
   const list = activitiesForUnit(unitId);
@@ -941,8 +949,8 @@ export function unitPassed(studentId: string, unitId: string): boolean {
     return !!completionsCache[scopedKey(studentId, unitId)];
   }
   for (const [, arr] of byCat) {
-    const ok = arr.some((a) => (scoresCache[scopedKey(studentId, a.id)]?.best ?? 0) >= 60);
-    if (!ok) return false;
+    const avg = arr.reduce((s, a) => s + (scoresCache[scopedKey(studentId, a.id)]?.best ?? 0), 0) / arr.length;
+    if (avg < 60) return false;
   }
   return true;
 }
@@ -961,8 +969,8 @@ export function unitPassedByActivities(studentId: string, unitId: string): boole
   }
   if (byCat.size === 0) return false;
   for (const [, arr] of byCat) {
-    const ok = arr.some((a) => (scoresCache[scopedKey(studentId, a.id)]?.best ?? 0) >= 60);
-    if (!ok) return false;
+    const avg = arr.reduce((s, a) => s + (scoresCache[scopedKey(studentId, a.id)]?.best ?? 0), 0) / arr.length;
+    if (avg < 60) return false;
   }
   return true;
 }
@@ -979,7 +987,10 @@ export function unitCategoryProgress(studentId: string, unitId: string): {
     byCat.set(cat, arr);
   }
   return Array.from(byCat.entries()).map(([category, arr]) => {
-    const best = arr.reduce((m, a) => Math.max(m, scoresCache[scopedKey(studentId, a.id)]?.best ?? 0), 0);
+    // Average across every activity in the category (unanswered = 0), not the
+    // max of any single one — otherwise one lucky answer paints the whole
+    // category (and the unit's overall score) as 100/100.
+    const best = Math.round(arr.reduce((s, a) => s + (scoresCache[scopedKey(studentId, a.id)]?.best ?? 0), 0) / arr.length);
     const mandatory = isMandatoryCategory(category);
     return { category, best, mandatory, passed: mandatory ? best >= 60 : true };
   });
