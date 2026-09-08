@@ -46,6 +46,7 @@ import { X, Video, AlertTriangle, Sparkles, CalendarClock, Clock, RefreshCcw, Ar
 import spotlightArt from "@/assets/spotlight1.png";
 import nextUpArt from "@/assets/Verbot_up_next.svg";
 import { getLessonPlan } from "@/lib/lesson-plans-store";
+import { SessionPrepModal } from "@/components/verbo/SessionPrepModal";
 import { NextEventCard } from "@/components/verbo/NextEventCard";
 import { VerbotHelpBubble } from "@/components/verbo/VerbotHelpBubble";
 import type { TourStep } from "@/components/verbo/GuidedTour";
@@ -83,6 +84,10 @@ import { useAvatar } from "@/lib/avatar-store";
 export const Route = createFileRoute("/student/sessions")({
   validateSearch: (search: Record<string, unknown>) => ({
     focus: search.focus === "clubs" ? ("clubs" as const) : undefined,
+    // Deep link from the "lesson_plan_ready" email + the notification bell
+    // (see SessionPrepModal.tsx) — opens that session's prep modal directly
+    // on load instead of leaving the student to hunt for it in the list.
+    prep: typeof search.prep === "string" ? search.prep : undefined,
   }),
   component: Page,
 });
@@ -136,7 +141,9 @@ function buildSessionsTourSteps(closeEventModal: () => void): TourStep[] {
 
 function Page() {
   const { user } = useAuth();
-  const { focus: focusParam } = Route.useSearch();
+  const navigate = useNavigate();
+  const { focus: focusParam, prep: prepParam } = Route.useSearch();
+  const [prepModalSessionId, setPrepModalSessionId] = useState<string | null>(prepParam ?? null);
 
   const [, tick] = useState(0);
   const [selected, setSelected] = useState<CalendarEvent | null>(null);
@@ -348,6 +355,23 @@ function Page() {
           onCancelSpotlight={(s) => { setSelected(null); setCancelSpotlightFor(s); }}
         />
       )}
+
+      {prepModalSessionId && (() => {
+        const prepSession = loadSessions().find((s) => s.id === prepModalSessionId);
+        const prepPlan = getLessonPlan(prepModalSessionId);
+        if (!prepSession || !prepPlan) return null;
+        return (
+          <SessionPrepModal
+            session={prepSession}
+            plan={prepPlan}
+            onClose={() => {
+              setPrepModalSessionId(null);
+              // Drop ?prep= from the URL so a refresh/back doesn't reopen it.
+              if (prepParam) navigate({ to: "/student/sessions", search: { focus: focusParam }, replace: true });
+            }}
+          />
+        );
+      })()}
 
       {cantAttendFor && (
         <CantAttendRouter
