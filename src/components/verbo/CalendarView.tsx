@@ -11,7 +11,7 @@
 // It is presentation-only: it does not read from any store directly, so
 // the Student panel can wire it later with its own event source.
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type MutableRefObject } from "react";
 import { ChevronLeft, ChevronRight, Check } from "lucide-react";
 
 import { GhostButton } from "@/components/verbo/ui";
@@ -44,6 +44,11 @@ export interface CalendarViewProps {
   initialDate?: Date;
   /** Staff-only: paint covered pending sessions with the Substitution color. */
   substitutionAware?: boolean;
+  /** Session/event id to spotlight — the matching pill pulses (in its own
+   *  status color) for a few seconds, keeps a static ring afterwards, and
+   *  scrolls into view once on mount. Deep link target for the notification
+   *  bell (e.g. "student cancelled a session" → jump straight to it). */
+  highlightEventId?: string;
 }
 
 
@@ -70,6 +75,7 @@ export function CalendarView({
   pulseKinds,
   initialDate,
   substitutionAware = false,
+  highlightEventId,
 }: CalendarViewProps) {
   const [mode, setMode] = useState<CalendarViewMode>(initialMode);
   const [cursor, setCursor] = useState(() => { const d = initialDate ? new Date(initialDate) : new Date(); d.setDate(1); return d; });
@@ -78,6 +84,21 @@ export function CalendarView({
   const [enabledKinds, setEnabledKinds] = useState<Set<CalendarEventKind>>(
     () => new Set(initialEnabledKinds ?? availableKinds ?? (Object.keys(EVENT_KIND_META) as CalendarEventKind[])),
   );
+
+  // Deep-link spotlight: pulse for a few seconds after arriving so it draws
+  // the eye, then settle into a static ring (verbo-target-ring below) so the
+  // target stays visually marked without animating forever. Re-arms if the
+  // caller navigates to a different highlightEventId while mounted.
+  const [highlightPulsing, setHighlightPulsing] = useState(!!highlightEventId);
+  const highlightScrolledRef = useRef(false);
+  useEffect(() => {
+    if (!highlightEventId) return;
+    highlightScrolledRef.current = false;
+    setHighlightPulsing(true);
+    const t = setTimeout(() => setHighlightPulsing(false), 6000);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [highlightEventId]);
 
   const kindsToShow = availableKinds ?? (Object.keys(EVENT_KIND_META) as CalendarEventKind[]);
 
@@ -177,9 +198,27 @@ export function CalendarView({
 
       {/* Grid */}
       {mode === "month" ? (
-        <MonthGrid cursor={cursor} eventsByDay={eventsByDay} onEventClick={onEventClick} pulseKinds={pulseKinds} substitutionAware={substitutionAware} />
+        <MonthGrid
+          cursor={cursor}
+          eventsByDay={eventsByDay}
+          onEventClick={onEventClick}
+          pulseKinds={pulseKinds}
+          substitutionAware={substitutionAware}
+          highlightEventId={highlightEventId}
+          highlightPulsing={highlightPulsing}
+          highlightScrolledRef={highlightScrolledRef}
+        />
       ) : (
-        <DayList day={dayCursor} events={eventsByDay.get(dayKey(dayCursor)) ?? []} onEventClick={onEventClick} pulseKinds={pulseKinds} substitutionAware={substitutionAware} />
+        <DayList
+          day={dayCursor}
+          events={eventsByDay.get(dayKey(dayCursor)) ?? []}
+          onEventClick={onEventClick}
+          pulseKinds={pulseKinds}
+          substitutionAware={substitutionAware}
+          highlightEventId={highlightEventId}
+          highlightPulsing={highlightPulsing}
+          highlightScrolledRef={highlightScrolledRef}
+        />
 
       )}
 
@@ -220,12 +259,16 @@ export function CalendarView({
 
 function MonthGrid({
   cursor, eventsByDay, onEventClick, pulseKinds, substitutionAware,
+  highlightEventId, highlightPulsing, highlightScrolledRef,
 }: {
   cursor: Date;
   eventsByDay: Map<string, CalendarEvent[]>;
   onEventClick?: (ev: CalendarEvent) => void;
   pulseKinds?: CalendarEventKind[];
   substitutionAware?: boolean;
+  highlightEventId?: string;
+  highlightPulsing?: boolean;
+  highlightScrolledRef?: MutableRefObject<boolean>;
 }) {
 
   const grid = buildMonthGrid(cursor);
@@ -260,9 +303,21 @@ function MonthGrid({
               </span>
             </div>
             <div className="space-y-1">
-              {dayEvents.slice(0, 3).map((e, idx) => (
-                <EventPill key={e.id} index={idx} ev={e} onClick={() => onEventClick?.(e)} pulse={(!!pulseKinds?.includes(e.kind) || e.status === "pending_reschedule") && !isClubFull(e)} substitutionAware={substitutionAware} />
-              ))}
+              {dayEvents.slice(0, 3).map((e, idx) => {
+                const highlighted = !!highlightEventId && e.id === highlightEventId;
+                return (
+                  <EventPill
+                    key={e.id}
+                    index={idx}
+                    ev={e}
+                    onClick={() => onEventClick?.(e)}
+                    pulse={(!!pulseKinds?.includes(e.kind) || e.status === "pending_reschedule" || (highlighted && !!highlightPulsing)) && !isClubFull(e)}
+                    substitutionAware={substitutionAware}
+                    highlighted={highlighted}
+                    scrolledRef={highlightScrolledRef}
+                  />
+                );
+              })}
               {dayEvents.length > 3 && (
                 <div className="px-1.5 text-[10px] text-muted-foreground">+{dayEvents.length - 3} more</div>
               )}
@@ -277,12 +332,16 @@ function MonthGrid({
 
 function DayList({
   day, events, onEventClick, pulseKinds, substitutionAware,
+  highlightEventId, highlightPulsing, highlightScrolledRef,
 }: {
   day: Date;
   events: CalendarEvent[];
   onEventClick?: (ev: CalendarEvent) => void;
   pulseKinds?: CalendarEventKind[];
   substitutionAware?: boolean;
+  highlightEventId?: string;
+  highlightPulsing?: boolean;
+  highlightScrolledRef?: MutableRefObject<boolean>;
 }) {
   if (events.length === 0) {
     return (
@@ -294,15 +353,22 @@ function DayList({
   return (
     <div key={dayKey(day)} className="verbo-cal-in overflow-hidden rounded-xl border border-border bg-card shadow-elevated">
       {events.map((e, idx) => {
-        const pulse = (!!pulseKinds?.includes(e.kind) || e.status === "pending_reschedule") && !isClubFull(e);
+        const highlighted = !!highlightEventId && e.id === highlightEventId;
+        const pulse = (!!pulseKinds?.includes(e.kind) || e.status === "pending_reschedule" || (highlighted && !!highlightPulsing)) && !isClubFull(e);
         const display = eventPillDisplay(e, { substitutionAware });
         return (
         <button
           key={e.id}
+          ref={(el) => {
+            if (highlighted && el && highlightScrolledRef && !highlightScrolledRef.current) {
+              highlightScrolledRef.current = true;
+              el.scrollIntoView({ behavior: "smooth", block: "center" });
+            }
+          }}
           onClick={() => onEventClick?.(e)}
-          style={{ animationDelay: `${idx * 35}ms`, ...(pulse ? { ["--verbo-focus-pulse-color" as string]: display.color } : {}) }}
+          style={{ animationDelay: `${idx * 35}ms`, ...(pulse || highlighted ? { ["--verbo-focus-pulse-color" as string]: display.color } : {}) }}
           className={`verbo-cal-pill flex w-full items-center gap-4 border-b border-border p-3 text-left transition-[background-color,transform] duration-200 ease-out last:border-0 hover:bg-secondary/60 hover:translate-x-0.5 active:scale-[0.995] ${
-            pulse ? "verbo-focus-pulse" : ""
+            pulse ? "verbo-focus-pulse" : highlighted ? "verbo-target-ring" : ""
           }`}
         >
 
@@ -368,7 +434,17 @@ function DayList({
   );
 }
 
-function EventPill({ ev, onClick, pulse = false, substitutionAware = false, index = 0 }: { ev: CalendarEvent; onClick: () => void; pulse?: boolean; substitutionAware?: boolean; index?: number }) {
+function EventPill({
+  ev, onClick, pulse = false, substitutionAware = false, index = 0, highlighted = false, scrolledRef,
+}: {
+  ev: CalendarEvent;
+  onClick: () => void;
+  pulse?: boolean;
+  substitutionAware?: boolean;
+  index?: number;
+  highlighted?: boolean;
+  scrolledRef?: MutableRefObject<boolean>;
+}) {
   const display = eventPillDisplay(ev, { substitutionAware });
   const kindMeta = EVENT_KIND_META[ev.kind];
   const isClub = ev.kind === "insight" || ev.kind === "book_club";
@@ -384,16 +460,22 @@ function EventPill({ ev, onClick, pulse = false, substitutionAware = false, inde
   return (
     <div className="group relative">
       <button
+        ref={(el) => {
+          if (highlighted && el && scrolledRef && !scrolledRef.current) {
+            scrolledRef.current = true;
+            el.scrollIntoView({ behavior: "smooth", block: "center" });
+          }
+        }}
         onClick={onClick}
         className={`flex w-full items-center gap-1 truncate rounded-lg border px-1.5 py-1 text-left text-[10.5px] font-medium shadow-sm verbo-cal-pill transition-[transform,box-shadow,opacity] duration-200 ease-out hover:-translate-y-px hover:shadow-md active:scale-[0.97] cursor-pointer ${
           showBooked ? "ring-2 ring-[#f38934] ring-offset-1 ring-offset-card" : ""
-        } ${pulse ? "verbo-focus-pulse" : ""} ${full ? "opacity-55 grayscale-[0.4]" : ""}`}
+        } ${pulse ? "verbo-focus-pulse" : highlighted ? "verbo-target-ring" : ""} ${full ? "opacity-55 grayscale-[0.4]" : ""}`}
         style={{
           background: display.color,
           color: display.borderColor ? "#01304a" : "#ffffff",
           borderColor: display.borderColor ?? "transparent",
           animationDelay: `${index * 40}ms`,
-          ...(pulse ? { ["--verbo-focus-pulse-color" as string]: display.color } : {}),
+          ...(pulse || highlighted ? { ["--verbo-focus-pulse-color" as string]: display.color } : {}),
         }}
 
         title={

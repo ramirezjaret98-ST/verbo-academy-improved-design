@@ -2,12 +2,19 @@
 // derived from existing stores. Click an item to navigate to its route and
 // mark it read. See src/lib/notifications-store.ts for source of truth.
 import { useEffect, useRef, useState } from "react";
-import { Bell, X, ExternalLink } from "lucide-react";
+import {
+  Bell, X, ExternalLink, type LucideIcon,
+  CalendarPlus, Users, CheckCircle2, XCircle, CalendarX, Snowflake, TrendingDown,
+  Gift, TrendingUp, Megaphone, Trophy, Share2, ClipboardList, UserSearch, LogOut,
+  CalendarClock, AlertTriangle, FileText, ShieldAlert, FileWarning, DollarSign,
+  Flag, RefreshCcw, Sparkles, ShieldCheck, NotebookPen, FileCheck, AlertCircle,
+  CreditCard, Award, RotateCcw,
+} from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
 import { useAuth } from "@/lib/auth";
 import {
   useNotifications, markNotificationRead, markAllNotificationsRead,
-  type Notification,
+  type Notification, type NotificationKind,
 } from "@/lib/notifications-store";
 import { USERS } from "@/lib/mock-data";
 import { loadChallenges } from "@/lib/challenges-store";
@@ -32,6 +39,68 @@ function timeAgo(iso: string): string {
   if (d < 7) return `${d}d ago`;
   return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
+
+/* -------------------------------------------------------------------------- */
+/* Per-kind visual differentiation — 2026-09-08. Before this every           */
+/* notification in the dropdown looked identical (same grey row, same dot).  */
+/* Each kind now gets its own icon + brand-consistent color chip so a        */
+/* cancellation reads as urgent at a glance and a badge unlock reads as a    */
+/* celebration, without having to read the title first.                     */
+/* -------------------------------------------------------------------------- */
+const TONE = {
+  danger: "#dc0000",   // matches STATUS_PALETTE.absent — same red used on the calendar
+  warning: "#f38934",  // brand orange
+  success: "#16a34a",
+  info: "#01304a",     // brand navy
+  violet: "#8b5cf6",   // matches STATUS_PALETTE.ready
+  neutral: "#64748b",
+} as const;
+
+const NOTIF_KIND_META: Record<NotificationKind, { icon: LucideIcon; color: string }> = {
+  // teacher-facing
+  session_assigned: { icon: CalendarPlus, color: TONE.info },
+  club_substitute_match: { icon: Users, color: TONE.violet },
+  avail_request_approved: { icon: CheckCircle2, color: TONE.success },
+  avail_request_rejected: { icon: XCircle, color: TONE.danger },
+  club_claim_confirmed: { icon: CheckCircle2, color: TONE.success },
+  club_released: { icon: CalendarX, color: TONE.neutral },
+  freeze_applied: { icon: Snowflake, color: TONE.danger },
+  kpi_below_threshold: { icon: TrendingDown, color: TONE.warning },
+  bonus_eligible: { icon: Gift, color: TONE.success },
+  tier_upgraded: { icon: TrendingUp, color: TONE.success },
+  announcement: { icon: Megaphone, color: TONE.info },
+  student_challenge_selected: { icon: Trophy, color: TONE.violet },
+  student_shared_challenge_result: { icon: Share2, color: TONE.violet },
+  spotlight_cancelled: { icon: CalendarX, color: TONE.danger },
+  challenge_pending_review: { icon: ClipboardList, color: TONE.warning },
+  student_cancelled_session: { icon: CalendarX, color: TONE.danger },
+  // admin-facing
+  needs_substitute: { icon: UserSearch, color: TONE.warning },
+  release_request: { icon: LogOut, color: TONE.info },
+  avail_change_request: { icon: CalendarClock, color: TONE.info },
+  teacher_three_strikes: { icon: AlertTriangle, color: TONE.danger },
+  student_report_filed: { icon: FileText, color: TONE.info },
+  conduct_report_filed: { icon: ShieldAlert, color: TONE.warning },
+  content_issue_reported: { icon: FileWarning, color: TONE.warning },
+  financial_issue_reported: { icon: DollarSign, color: TONE.danger },
+  challenge_flagged: { icon: Flag, color: TONE.danger },
+  // student-facing
+  reschedule_request_updated: { icon: RefreshCcw, color: TONE.info },
+  personalized_content_added: { icon: Sparkles, color: TONE.violet },
+  conduct_report_reviewed: { icon: ShieldCheck, color: TONE.success },
+  learning_path_milestone: { icon: Trophy, color: TONE.success },
+  session_ready_to_prepare: { icon: NotebookPen, color: TONE.info },
+  report_ready: { icon: FileCheck, color: TONE.success },
+  session_changed: { icon: CalendarClock, color: TONE.warning },
+  club_opened: { icon: Sparkles, color: TONE.violet },
+  payment_or_sessions_ending_soon: { icon: AlertCircle, color: TONE.warning },
+  installment_payment_due: { icon: CreditCard, color: TONE.warning },
+  new_challenge_available: { icon: Trophy, color: TONE.violet },
+  badge_unlocked: { icon: Award, color: TONE.success },
+  challenge_needs_resubmission: { icon: RotateCcw, color: TONE.warning },
+  challenge_submission_approved: { icon: CheckCircle2, color: TONE.success },
+  challenge_submission_rejected: { icon: XCircle, color: TONE.danger },
+};
 
 /* -------------------------------------------------------------------------- */
 /* Shared-result preview modal — reuses MaterialLibrary's read-only preview   */
@@ -168,6 +237,24 @@ export function NotificationsBell({ variant = "light" }: { variant?: "light" | "
       if (badge) setBadgeModal(badge);
       return;
     }
+    // 2026-09-08: kinds tied to one specific session get a deep link instead
+    // of just landing on the generic calendar — `highlight` makes
+    // CalendarView pulse + scroll to that exact session (color of its
+    // status), `studentId` pre-selects the Admin Calendar's student filter
+    // so it's actually visible. See admin.calendar.tsx / teacher.calendar.tsx
+    // / student.sessions.tsx's Route.validateSearch + highlightEventId prop.
+    if (
+      n.data?.sessionId &&
+      (n.kind === "session_assigned" ||
+        n.kind === "spotlight_cancelled" ||
+        n.kind === "student_cancelled_session" ||
+        n.kind === "session_changed")
+    ) {
+      const search: Record<string, string> = { highlight: n.data.sessionId };
+      if (n.data.studentId) search.studentId = n.data.studentId;
+      navigate({ to: n.to, search: search as never });
+      return;
+    }
     navigate({ to: n.to });
   };
 
@@ -239,15 +326,30 @@ export function NotificationsBell({ variant = "light" }: { variant?: "light" | "
                       n.read ? "" : "bg-accent/5"
                     }`}
                   >
-                    <span
-                      aria-hidden="true"
-                      className={`verbo-notif-dot mt-1.5 h-2 w-2 flex-shrink-0 rounded-full bg-accent ${
-                        n.read ? "scale-50 opacity-0" : "scale-100 opacity-100"
-                      }`}
-                    />
+                    {(() => {
+                      const meta = NOTIF_KIND_META[n.kind] ?? { icon: Bell, color: TONE.neutral };
+                      const Icon = meta.icon;
+                      return (
+                        <span
+                          aria-hidden="true"
+                          className="mt-0.5 grid h-8 w-8 flex-shrink-0 place-items-center rounded-full text-white"
+                          style={{ backgroundColor: meta.color }}
+                        >
+                          <Icon className="h-4 w-4" />
+                        </span>
+                      );
+                    })()}
                     <div className="min-w-0 flex-1">
-                      <div className={`text-sm ${n.read ? "text-muted-foreground" : "font-semibold text-foreground"}`}>
-                        {n.title}
+                      <div className="flex items-center gap-1.5">
+                        <span
+                          aria-hidden="true"
+                          className={`verbo-notif-dot h-1.5 w-1.5 flex-shrink-0 rounded-full bg-accent ${
+                            n.read ? "scale-50 opacity-0" : "scale-100 opacity-100"
+                          }`}
+                        />
+                        <div className={`text-sm ${n.read ? "text-muted-foreground" : "font-semibold text-foreground"}`}>
+                          {n.title}
+                        </div>
                       </div>
                       {n.body && (
                         <div className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
