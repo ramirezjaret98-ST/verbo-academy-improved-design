@@ -103,7 +103,13 @@ export async function uploadMaterialFile(
   const dot = file.name.lastIndexOf(".");
   const ext = dot >= 0 ? file.name.slice(dot) : "";
   const path = `${kind}/${crypto.randomUUID()}${ext}`;
-  const { error } = await supabase.storage.from(MATERIALS_BUCKET).upload(path, file);
+  // Immutable path (fresh UUID every upload) — safe to cache for a year at
+  // the CDN edge and in the browser instead of Supabase's 1-hour default.
+  // Same fix as content-uploads.ts; see that file for the egress context.
+  const { error } = await supabase.storage.from(MATERIALS_BUCKET).upload(path, file, {
+    cacheControl: "31536000",
+    upsert: false,
+  });
   if (error) {
     console.error("[materials-store] failed to upload file", error);
     return { ok: false, error: "Upload failed — please try again." };

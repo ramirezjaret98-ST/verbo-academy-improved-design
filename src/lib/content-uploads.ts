@@ -27,7 +27,17 @@ export async function uploadContentFile(
   const dot = file.name.lastIndexOf(".");
   const ext = dot >= 0 ? file.name.slice(dot) : "";
   const path = `${folder}/${crypto.randomUUID()}${ext}`;
-  const { error } = await supabase.storage.from(BUCKET).upload(path, file);
+  // Every path is a fresh random UUID (never reused/overwritten), so the
+  // file at this path is immutable — safe to cache for a full year both at
+  // the CDN edge and in the browser. Without this, Supabase's default
+  // (cacheControl: "3600" = 1 hour) meant every unit PDF was re-fetched in
+  // full from origin on almost every open, which is what blew up Storage
+  // egress (see egress investigation, 2026-09-09: a handful of 2-4.5MB unit
+  // PDFs being re-downloaded repeatedly accounted for several GB/day).
+  const { error } = await supabase.storage.from(BUCKET).upload(path, file, {
+    cacheControl: "31536000",
+    upsert: false,
+  });
   if (error) {
     console.error("[content-uploads] failed to upload file", error);
     return { ok: false, error: "Upload failed — please try again." };
