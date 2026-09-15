@@ -18,6 +18,7 @@ import { Link2, Upload, CheckCircle2, Trash2 } from "lucide-react";
 import { ModalShell, ModalFooter, Field, inputCls } from "./course-modals";
 import { GhostButton, PrimaryButton } from "./ui";
 import { uploadContentFile } from "@/lib/content-uploads";
+import { legacyToUuid } from "@/lib/user-id-bridge";
 
 export type UnitPdfTarget =
   | { kind: "course"; unitCode: string; currentUrl: string }
@@ -31,12 +32,17 @@ function folderFor(target: UnitPdfTarget): string {
 export function UnitPdfModal({
   unitTitle,
   target,
+  studentId,
   onClose,
   onSave,
   onRemove,
 }: {
   unitTitle: string;
   target: UnitPdfTarget;
+  /** Legacy id of the owning student — required when target.kind === "custom" so the
+   *  uploaded file lands in that student's own subfolder (content_bucket_select RLS
+   *  only lets a student read their own subfolder of vip-units/tailored-units). */
+  studentId?: string;
   onClose: () => void;
   /** Persists a new/replacement PDF. `fileName` is only meaningful for VIP/Tailored. */
   onSave: (url: string, fileName?: string) => Promise<{ ok: true } | { ok: false; error: string }>;
@@ -58,7 +64,12 @@ export function UnitPdfModal({
     if (!file) return;
     setUploading(true);
     setUploadError("");
-    const res = await uploadContentFile(file, folderFor(target));
+    let folder = folderFor(target);
+    if (target.kind === "custom" && studentId) {
+      const uuid = await legacyToUuid(studentId);
+      if (uuid) folder = `${folder}/${uuid}`;
+    }
+    const res = await uploadContentFile(file, folder);
     setUploading(false);
     if (!res.ok) {
       setUploadError(res.error);

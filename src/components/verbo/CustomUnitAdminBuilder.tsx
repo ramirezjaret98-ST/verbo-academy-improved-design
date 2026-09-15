@@ -28,6 +28,7 @@ import { USERS, type User } from "@/lib/mock-data";
 import { hydrateStudents, subscribeStudents } from "@/lib/students-store";
 import { loadSessions, subscribeSessions } from "@/lib/sessions-store";
 import { uploadContentFile } from "@/lib/content-uploads";
+import { legacyToUuid } from "@/lib/user-id-bridge";
 import { subscribeLessonPlans } from "@/lib/lesson-plans-store";
 import {
   type CustomUnit,
@@ -388,6 +389,7 @@ function StudentBuilder({ config, studentId, studentName, onBack }: {
       {unitModal && (
         <CustomUnitModal
           config={config}
+          studentId={studentId}
           editingUnit={unitModal.mode === "edit" ? unitModal.unit : undefined}
           onClose={() => setUnitModal(null)}
           onCreate={(title, fileUrl, fileName, videoUrl, block) => {
@@ -445,7 +447,9 @@ function CourseCardModal({ config, studentId, meta, onClose, onSaved }: {
     if (!file) return;
     setUploading(true);
     setError("");
-    const res = await uploadContentFile(file, config.coverUploadFolder);
+    const uuid = await legacyToUuid(studentId);
+    const folder = uuid ? `${config.coverUploadFolder}/${uuid}` : config.coverUploadFolder;
+    const res = await uploadContentFile(file, folder);
     setUploading(false);
     if (!res.ok) { setError(res.error); notifyError(res.error, { context: "Uploading cover image" }); return; }
     setCover(res.url);
@@ -501,8 +505,11 @@ function CourseCardModal({ config, studentId, meta, onClose, onSaved }: {
 /* ---------------------------------------------------------------------- */
 /* Unit modal — title, optional block/section, optional video, file       */
 /* ---------------------------------------------------------------------- */
-function CustomUnitModal({ config, editingUnit, onClose, onCreate, onUpdate }: {
+function CustomUnitModal({ config, studentId, editingUnit, onClose, onCreate, onUpdate }: {
   config: CustomUnitAdminConfig;
+  /** Legacy id of the owning student — the uploaded file/video lands in this
+   *  student's own subfolder of the shared "content" bucket (see content_bucket_select RLS). */
+  studentId: string;
   editingUnit?: CustomUnit;
   onClose: () => void;
   onCreate: (title: string, fileUrl: string, fileName: string | undefined, videoUrl: string | undefined, block: string | undefined) => void;
@@ -525,7 +532,9 @@ function CustomUnitModal({ config, editingUnit, onClose, onCreate, onUpdate }: {
     if (!file) return;
     setUploadingFile(true);
     setFileError("");
-    const res = await uploadContentFile(file, config.uploadFolder);
+    const uuid = await legacyToUuid(studentId);
+    const folder = uuid ? `${config.uploadFolder}/${uuid}` : config.uploadFolder;
+    const res = await uploadContentFile(file, folder);
     setUploadingFile(false);
     if (!res.ok) { setFileError(res.error); notifyError(res.error, { context: "Uploading file" }); return; }
     setFileUrl(res.url);
@@ -536,7 +545,9 @@ function CustomUnitModal({ config, editingUnit, onClose, onCreate, onUpdate }: {
     if (!file) return;
     setUploadingVideo(true);
     setVideoError("");
-    const res = await uploadContentFile(file, `${config.uploadFolder}-video`);
+    const uuid = await legacyToUuid(studentId);
+    const folder = uuid ? `${config.uploadFolder}-video/${uuid}` : `${config.uploadFolder}-video`;
+    const res = await uploadContentFile(file, folder);
     setUploadingVideo(false);
     if (!res.ok) { setVideoError(res.error); notifyError(res.error, { context: "Uploading video" }); return; }
     setVideoUrl(res.url);
