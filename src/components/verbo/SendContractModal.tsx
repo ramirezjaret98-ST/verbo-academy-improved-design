@@ -3,7 +3,7 @@
 // correo al alumno. Ver src/lib/contracts.ts (lógica) y
 // src/routes/firmar-contrato.$token.tsx (lo que ve el alumno).
 import { useState } from "react";
-import { FileSignature, Loader2, Check, Eye } from "lucide-react";
+import { FileSignature, Loader2, Check, Eye, X } from "lucide-react";
 import { GhostButton, PrimaryButton } from "@/components/verbo/ui";
 import { useAuth } from "@/lib/auth";
 import { contractFieldsFromStudent, createContractAndNotify } from "@/lib/contracts";
@@ -16,7 +16,7 @@ export function SendContractModal({ student, onClose }: { student: User; onClose
   const [fields, setFields] = useState<ContractFields>(() => contractFieldsFromStudent(student));
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
-  const [previewing, setPreviewing] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
 
   const set = <K extends keyof ContractFields>(key: K, value: ContractFields[K]) =>
     setFields((f) => ({ ...f, [key]: value }));
@@ -34,16 +34,9 @@ export function SendContractModal({ student, onClose }: { student: User; onClose
     setSent(true);
   };
 
-  const preview = () => {
-    setPreviewing(true);
-    try {
-      const blob = new Blob([renderContractHtml(fields)], { type: "text/html" });
-      const url = URL.createObjectURL(blob);
-      window.open(url, "_blank", "noopener");
-      setTimeout(() => URL.revokeObjectURL(url), 30000);
-    } finally {
-      setPreviewing(false);
-    }
+  const sendFromPreview = async () => {
+    await submit();
+    setShowPreview(false);
   };
 
   return (
@@ -122,7 +115,7 @@ export function SendContractModal({ student, onClose }: { student: User; onClose
               </div>
             </div>
             <div className="flex items-center justify-between gap-2 border-t border-border bg-secondary/30 px-5 py-4">
-              <GhostButton onClick={preview} disabled={previewing}><Eye className="h-3.5 w-3.5" /> Vista previa</GhostButton>
+              <GhostButton onClick={() => setShowPreview(true)}><Eye className="h-3.5 w-3.5" /> Vista previa</GhostButton>
               <div className="flex items-center gap-2">
                 <GhostButton onClick={onClose} disabled={sending}>Cancelar</GhostButton>
                 <PrimaryButton onClick={submit} disabled={sending}>
@@ -132,6 +125,70 @@ export function SendContractModal({ student, onClose }: { student: User; onClose
             </div>
           </>
         )}
+      </div>
+
+      {showPreview && (
+        <ContractPreviewModal
+          fields={fields}
+          studentName={student.name}
+          sending={sending}
+          onClose={() => setShowPreview(false)}
+          onSend={sendFromPreview}
+        />
+      )}
+    </div>
+  );
+}
+
+/** Full-size, read-only look at exactly what `firmar-contrato.$token.tsx`
+ *  will render for the student — same `renderContractHtml` + `srcDoc`
+ *  pattern, so "preview" and "what actually gets sent" can never drift
+ *  apart. Sits on top of SendContractModal (higher z-index) so admins can
+ *  review the current field values, then send right from here. */
+function ContractPreviewModal({
+  fields,
+  studentName,
+  sending,
+  onClose,
+  onSend,
+}: {
+  fields: ContractFields;
+  studentName: string;
+  sending: boolean;
+  onClose: () => void;
+  onSend: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center verbo-backdrop p-4" onClick={onClose}>
+      <div
+        className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between border-b border-border px-5 py-4">
+          <div className="flex items-center gap-2">
+            <Eye className="h-4 w-4 text-[#01304a]" />
+            <h3 className="text-sm font-semibold text-foreground">Vista previa — contrato de {studentName}</h3>
+          </div>
+          <button onClick={onClose} className="rounded-lg p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-auto bg-secondary/30 p-5">
+          <div className="mx-auto overflow-hidden rounded-xl border border-border bg-white shadow-sm">
+            <iframe title="Vista previa del contrato" srcDoc={renderContractHtml(fields)} className="h-[65vh] w-full" />
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between gap-2 border-t border-border bg-secondary/30 px-5 py-4">
+          <p className="text-[11px] text-muted-foreground">Así lo verá {studentName} al abrir el link de firma.</p>
+          <div className="flex items-center gap-2">
+            <GhostButton onClick={onClose} disabled={sending}>Cerrar</GhostButton>
+            <PrimaryButton onClick={onSend} disabled={sending}>
+              {sending ? (<><Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> Enviando…</>) : "Enviar contrato"}
+            </PrimaryButton>
+          </div>
+        </div>
       </div>
     </div>
   );

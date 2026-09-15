@@ -10,7 +10,7 @@
 // See storage-signed-url.ts for why this exists (Hallazgo 2, auditoría de
 // seguridad 2026-09-15) and what it deliberately does NOT close.
 import { useEffect, useState } from "react";
-import type { ButtonHTMLAttributes, ReactNode } from "react";
+import type { ButtonHTMLAttributes, ReactNode, VideoHTMLAttributes } from "react";
 import { openSignedContentUrl, resolveContentUrl } from "@/lib/storage-signed-url";
 
 /**
@@ -50,7 +50,14 @@ export function SignedImg({ src, alt, className }: { src: string; alt: string; c
 
 export function SignedIframe({ src, title, className }: { src: string; title: string; className?: string }) {
   const { url } = useSignedContentUrl(src);
-  return <iframe src={url} title={title} className={className} />;
+  // Hide the browser's own PDF-viewer chrome (toolbar, side "navpanes" with
+  // thumbnails/bookmarks) so a PDF preview shows just the document instead of
+  // a second, generic browser-within-our-browser UI sitting on top of ours.
+  // Widely-supported "open parameters" for Chromium/Firefox's built-in
+  // viewers — a plain '#' fragment, so it never touches the signed query
+  // string or gets sent to the server.
+  const viewerUrl = url ? `${url}#toolbar=0&navpanes=0` : url;
+  return <iframe src={viewerUrl} title={title} className={className} />;
 }
 
 export function SignedVideo({
@@ -58,15 +65,16 @@ export function SignedVideo({
   className,
   controls = true,
   children,
+  ...rest
 }: {
   src: string;
   className?: string;
   controls?: boolean;
   children?: ReactNode;
-}) {
+} & Omit<VideoHTMLAttributes<HTMLVideoElement>, "src" | "className" | "controls" | "children">) {
   const { url } = useSignedContentUrl(src);
   return (
-    <video src={url} controls={controls} className={className}>
+    <video src={url} controls={controls} className={className} {...rest}>
       {children}
     </video>
   );

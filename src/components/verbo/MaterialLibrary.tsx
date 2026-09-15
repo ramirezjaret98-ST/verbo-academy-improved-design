@@ -97,6 +97,13 @@ function CoverArt({ m, className = "" }: { m: StoredMaterial; className?: string
 function PreviewModal({ m, onClose }: { m: StoredMaterial; onClose: () => void }) {
   const isPdf = m.material_type === "pdf";
   const isVideo = m.material_type === "video";
+  // The card already hides "Preview" when there's no uploaded file, but a
+  // video can still fail to load in practice (deleted/moved Storage object,
+  // bad signed URL, etc.) — without this, that showed an empty native
+  // <video> player with controls and nothing to play, which looked broken.
+  // Track that and fall back to a plain "not available" state instead.
+  const [videoFailed, setVideoFailed] = useState(false);
+  const videoAvailable = isVideo && hasUploadedFile(m) && !videoFailed;
   return (
     <div className="verbo-overlay-in fixed inset-0 z-50 flex items-center justify-center verbo-backdrop p-4">
       <div
@@ -116,10 +123,21 @@ function PreviewModal({ m, onClose }: { m: StoredMaterial; onClose: () => void }
         <div className="min-h-0 flex-1 overflow-auto bg-secondary/30 p-5">
           {isPdf ? (
             <SignedIframe title={m.title} src={m.upload_url} className="h-[60vh] w-full rounded-lg border border-border bg-background" />
-          ) : isVideo ? (
-            <SignedVideo src={m.upload_url} className="h-[60vh] w-full rounded-lg bg-black">
+          ) : videoAvailable ? (
+            <SignedVideo
+              src={m.upload_url}
+              className="h-[60vh] w-full rounded-lg bg-black"
+              onError={() => setVideoFailed(true)}
+            >
               Your browser does not support embedded video.
             </SignedVideo>
+          ) : isVideo ? (
+            <div className="mx-auto flex max-w-sm flex-col items-center py-10">
+              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-secondary text-muted-foreground">
+                <Video className="h-6 w-6" />
+              </div>
+              <p className="mt-4 text-center text-sm text-muted-foreground">This video isn't available right now. Try again later or download it instead.</p>
+            </div>
           ) : (
             <div className="mx-auto flex max-w-sm flex-col items-center">
               <div className="aspect-[3/4] w-full overflow-hidden rounded-xl border border-border">
@@ -654,7 +672,7 @@ export function MaterialLibrary({
         </div>
       )}
 
-      {preview && <PreviewModal m={preview} onClose={() => setPreview(null)} />}
+      {preview && <PreviewModal key={preview.id} m={preview} onClose={() => setPreview(null)} />}
       {upsell && <PremiumUpsellModal onClose={() => setUpsell(false)} />}
     </div>
   );
