@@ -19,6 +19,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 import { getKnownLegacyIds, hydrateUserIdBridge, legacyToUuid, uuidToLegacySync } from "@/lib/user-id-bridge";
 import { notifyError } from "@/lib/notify";
+import { withTimeout } from "@/lib/net-utils";
 
 export type { ChallengeSubmission, ChallengeSubmissionFormat };
 
@@ -217,88 +218,108 @@ export function hydrateStudents() {
     // roster with its narrower column set. For a student or admin caller the
     // RPC's own WHERE clause just returns 0 rows / a harmless redundant
     // superset, respectively — no need to branch on the caller's role here.
-    const [selectRes, rpcRes] = await Promise.all([
-      supabase.from("app_users").select("*"),
-      supabase.rpc("student_profile_for_teacher"),
-    ]);
-    if (selectRes.error) {
-      console.error("[students-store] failed to load app_users profiles", selectRes.error);
-    }
-    if (rpcRes.error) {
-      console.error("[students-store] failed to load teacher roster profiles", rpcRes.error);
-    }
-    const applyRow = (row: Record<string, unknown>) => {
-      const legacyId = row.legacy_id;
-      if (typeof legacyId !== "string" || !legacyId) return;
-      // `selectRes.data` (select("*")) returns every role admin can see, not
-      // just students — skip non-students here so this store only ever
-      // creates student entries (a real admin/teacher row reaching this
-      // point is handled by hydrateAdminRoles()/hydrateTeachers() instead).
-      // `rpcRes.data` (student_profile_for_teacher) has no `role` column at
-      // all — it's already student-only by the RPC's own WHERE clause.
-      if (typeof row.role === "string" && row.role !== "student") return;
-      let u = USERS.find((x) => x.id === legacyId);
-      if (!u) {
-        // A real student registered (or assigned) from a DIFFERENT
-        // browser/session never reached THIS session's in-memory USERS
-        // array — that bookkeeping (USERS.push + localStorage) only ever
-        // happens in the browser tab that ran the registration form. Build
-        // a fresh entry straight from this DB/RPC row instead of silently
-        // dropping it, so the student is visible here too (this was the
-        // root cause of a real bug: a newly-registered/assigned student
-        // never showed up in their assigned teacher's own roster, even
-        // after the assignments-store fix, because the teacher's session
-        // had no USERS entry for them to attach the profile fields to).
-        u = {
-          id: legacyId,
-          name: typeof row.name === "string" ? row.name : "",
-          email: typeof row.email === "string" ? row.email : "",
-          password: "",
-          role: "student",
-        };
-        USERS.push(u);
+    //
+    // Everything below used to have no timeout and no try/catch: if either
+    // call hung or threw (a flaky connection, a momentary backend hiccup),
+    // this whole async function died silently mid-flight — nothing logged,
+    // STUDENTS_EVENT never fired — so the page stayed on whatever USERS
+    // already had (often the seeded mock/demo students), with no error
+    // anywhere. That's the "sometimes real students never show up / mock
+    // students come back" bug reported 2026-09-15. Bounding the fetch and
+    // catching any failure means it's now visible (a toast) and temporary
+    // (the next mount/retry tries again) instead of a silent, permanent
+    // freeze.
+    try {
+      const [selectRes, rpcRes] = await withTimeout(
+        Promise.all([
+          supabase.from("app_users").select("*"),
+          supabase.rpc("student_profile_for_teacher"),
+        ]),
+        15000,
+        "hydrateStudents",
+      );
+      if (selectRes.error) {
+        console.error("[students-store] failed to load app_users profiles", selectRes.error);
       }
-      for (const key of STUDENT_PROFILE_FIELD_KEYS) {
-        const value = row[key];
-        // Only assign non-null/known DB values so a column this row's source
-        // doesn't return (RPC) or hasn't been backfilled yet doesn't clobber
-        // a mock demo default.
-        if (value !== null && value !== undefined) {
-          (u as unknown as Record<string, unknown>)[key] = value;
+      if (rpcRes.error) {
+        console.error("[students-store] failed to load teacher roster profiles", rpcRes.error);
+      }
+      const applyRow = (row: Record<string, unknown>) => {
+        const legacyId = row.legacy_id;
+        if (typeof legacyId !== "string" || !legacyId) return;
+        // `selectRes.data` (select("*")) returns every role admin can see, not
+        // just students — skip non-students here so this store only ever
+        // creates student entries (a real admin/teacher row reaching this
+        // point is handled by hydrateAdminRoles()/hydrateTeachers() instead).
+        // `rpcRes.data` (student_profile_for_teacher) has no `role` column at
+        // all — it's already student-only by the RPC's own WHERE clause.
+        if (typeof row.role === "string" && row.role !== "student") return;
+        let u = USERS.find((x) => x.id === legacyId);
+        if (!u) {
+          // A real student registered (or assigned) from a DIFFERENT
+          // browser/session never reached THIS session's in-memory USERS
+          // array — that bookkeeping (USERS.push + localStorage) only ever
+          // happens in the browser tab that ran the registration form. Build
+          // a fresh entry straight from this DB/RPC row instead of silently
+          // dropping it, so the student is visible here too (this was the
+          // root cause of a real bug: a newly-registered/assigned student
+          // never showed up in their assigned teacher's own roster, even
+          // after the assignments-store fix, because the teacher's session
+          // had no USERS entry for them to attach the profile fields to).
+          u = {
+            id: legacyId,
+            name: typeof row.name === "string" ? row.name : "",
+            email: typeof row.email === "string" ? row.email : "",
+            password: "",
+            role: "student",
+          };
+          USERS.push(u);
+        }
+        for (const key of STUDENT_PROFILE_FIELD_KEYS) {
+          const value = row[key];
+          // Only assign non-null/known DB values so a column this row's source
+          // doesn't return (RPC) or hasn't been backfilled yet doesn't clobber
+          // a mock demo default.
+          if (value !== null && value !== undefined) {
+            (u as unknown as Record<string, unknown>)[key] = value;
+          }
+        }
+        if (row.access_plan) u.hired_plan = row.access_plan as typeof u.hired_plan;
+      };
+      for (const row of selectRes.data ?? []) applyRow(row as unknown as Record<string, unknown>);
+      for (const row of rpcRes.data ?? []) applyRow(row as unknown as Record<string, unknown>);
+
+      // 2026-08-29 fix: drop any `USERS` entry for a real student account that
+      // was deleted elsewhere (e.g. by Admin, in a different tab/device). Until
+      // now this loop only ever added/updated rows from `selectRes`/`rpcRes` —
+      // never removed one that stopped coming back — so a deleted student stuck
+      // around as a "ghost" (visible e.g. on the Leaderboard) in any tab that
+      // was already open, until a full page reload rebuilt `USERS` from
+      // scratch. `getKnownLegacyIds()` comes from `legacy_id_lookup()`, a
+      // SECURITY DEFINER RPC with no row filter — reliable for every caller
+      // role, unlike `selectRes`/`rpcRes` above (RLS-limited to admin / the
+      // caller's own row / their own roster), so it's safe to use here even in
+      // a plain student's own session.
+      await hydrateUserIdBridge();
+      const knownIds = getKnownLegacyIds();
+      if (knownIds.size > 0) {
+        const localOnlyIds = new Set(readRegisteredStudents().map((r) => r.id));
+        for (let i = USERS.length - 1; i >= 0; i--) {
+          const u = USERS[i];
+          if (u.role !== "student") continue;
+          if (knownIds.has(u.id)) continue; // still a real account
+          if (SEED_STUDENT_IDS.has(u.id)) continue; // mock/demo — pruneHiddenMockUsers() owns these
+          if (localOnlyIds.has(u.id)) continue; // registered locally, no backend row yet — not deleted
+          USERS.splice(i, 1);
         }
       }
-      if (row.access_plan) u.hired_plan = row.access_plan as typeof u.hired_plan;
-    };
-    for (const row of selectRes.data ?? []) applyRow(row as unknown as Record<string, unknown>);
-    for (const row of rpcRes.data ?? []) applyRow(row as unknown as Record<string, unknown>);
 
-    // 2026-08-29 fix: drop any `USERS` entry for a real student account that
-    // was deleted elsewhere (e.g. by Admin, in a different tab/device). Until
-    // now this loop only ever added/updated rows from `selectRes`/`rpcRes` —
-    // never removed one that stopped coming back — so a deleted student stuck
-    // around as a "ghost" (visible e.g. on the Leaderboard) in any tab that
-    // was already open, until a full page reload rebuilt `USERS` from
-    // scratch. `getKnownLegacyIds()` comes from `legacy_id_lookup()`, a
-    // SECURITY DEFINER RPC with no row filter — reliable for every caller
-    // role, unlike `selectRes`/`rpcRes` above (RLS-limited to admin / the
-    // caller's own row / their own roster), so it's safe to use here even in
-    // a plain student's own session.
-    await hydrateUserIdBridge();
-    const knownIds = getKnownLegacyIds();
-    if (knownIds.size > 0) {
-      const localOnlyIds = new Set(readRegisteredStudents().map((r) => r.id));
-      for (let i = USERS.length - 1; i >= 0; i--) {
-        const u = USERS[i];
-        if (u.role !== "student") continue;
-        if (knownIds.has(u.id)) continue; // still a real account
-        if (SEED_STUDENT_IDS.has(u.id)) continue; // mock/demo — pruneHiddenMockUsers() owns these
-        if (localOnlyIds.has(u.id)) continue; // registered locally, no backend row yet — not deleted
-        USERS.splice(i, 1);
+      if (!selectRes.error || !rpcRes.error) {
+        window.dispatchEvent(new CustomEvent(STUDENTS_EVENT));
       }
-    }
-
-    if (!selectRes.error || !rpcRes.error) {
-      window.dispatchEvent(new CustomEvent(STUDENTS_EVENT));
+    } catch (err) {
+      console.error("[students-store] failed to load student profiles (timed out or network error)", err);
+      notifyError(err, { context: "Loading students — showing cached data, try refreshing" });
     }
   })();
 }

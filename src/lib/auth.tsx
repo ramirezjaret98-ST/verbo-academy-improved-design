@@ -4,6 +4,7 @@ import { isMemberBlocked } from "./groups-store";
 import { hydrateAdminRoles, isUserDeactivated } from "./admin-roles";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
+import { withTimeout } from "@/lib/net-utils";
 
 interface AuthCtx {
   user: User | null;
@@ -38,23 +39,6 @@ export function validatePasswordComplexity(pwd: string): string | null {
   if (!/[A-Z]/.test(pwd)) return "Password must include at least one uppercase letter.";
   if (!/[0-9]/.test(pwd)) return "Password must include at least one number.";
   return null;
-}
-
-/** Rejects with an error if `promise` doesn't settle within `ms`.
- *  supabase-js has no built-in timeout, so a hung/very slow request (a flaky
- *  mobile connection, a momentary backend hiccup) used to leave `login()`
- *  awaiting forever with nothing to catch it - the sign-in button stuck in
- *  its loading state permanently, with no error and no way to retry short of
- *  reloading the page. This bounds every network call in login() so it
- *  always settles one way or another (2026-09-15 login-hang fix). */
-function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
-    promise.then(
-      (value) => { clearTimeout(timer); resolve(value); },
-      (err) => { clearTimeout(timer); reject(err); },
-    );
-  });
 }
 
 const Ctx = createContext<AuthCtx | null>(null);
@@ -256,9 +240,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
 
     (async () => {
-      const { data } = await supabase.auth.getSession();
-      await applySession(data.session?.user ?? null);
-      if (!cancelled) setReady(true);
+      try {
+        const { data } = await withTimeout(supabase.auth.getSession(), 10000, "auth.getSession");
+        await applySession(data.session?.user ?? null);
+      } catch (err) {
+        // Treat a hung/failed session restore as "no session" instead of
+        // leaving the UI stuck on the loading skeleton forever (2026-09-15
+        // stuck-skeleton fix) — the user just lands on the normal
+        // session-expired screen and can log in again.
+        console.error("[auth] session restore failed or timed out", err);
+        authIdRef.current = null;
+        if (!cancelled) setUser(null);
+      } finally {
+        if (!cancelled) setReady(true);
+      }
     })();
 
     const { data: subscription } = supabase.auth.onAuthStateChange((event) => {

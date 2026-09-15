@@ -10,6 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 import { legacyToUuid } from "@/lib/user-id-bridge";
 import { notifyError } from "@/lib/notify";
+import { withTimeout } from "@/lib/net-utils";
 
 export const DEFAULT_HOURLY_RATE = 120; // MXN / hour
 export const AVAILABILITY_CHANGE_DAYS = 30; // teacher may request a change once per N days
@@ -306,56 +307,69 @@ export function hydrateTeachers(): void {
   const overrides = readTeacherOverrides();
   USERS.forEach((u) => { if (u.role === "teacher" && overrides[u.id]) Object.assign(u, overrides[u.id]); });
   void (async () => {
-    const [selectRes, rpcRes] = await Promise.all([
-      supabase.from("app_users").select("*"),
-      supabase.rpc("teacher_profile_for_peek"),
-    ]);
-    if (selectRes.error) console.error("[teacher-model] failed to load app_users profiles", selectRes.error);
-    if (rpcRes.error) console.error("[teacher-model] failed to load teacher peek profiles", rpcRes.error);
-    // A real teacher registered from a DIFFERENT browser/session never
-    // reached THIS session's in-memory USERS array (that bookkeeping is
-    // per-browser, localStorage-only) — build a fresh entry straight from
-    // the DB/RPC row instead of silently dropping it (same root-cause fix as
-    // students-store.ts's hydrateStudents(), applied here for teachers: e.g.
-    // a student peeking a teacher card, or the reschedule-teacher picker,
-    // for a teacher only assigned/registered in another session).
-    const ensureTeacher = (legacyId: string, name: string): User => {
-      let u = USERS.find((x) => x.id === legacyId && x.role === "teacher");
-      if (!u) {
-        u = { id: legacyId, name, email: "", password: "", role: "teacher" };
-        USERS.push(u);
-      }
-      return u;
-    };
-    const applyFullRow = (row: Record<string, unknown>) => {
-      const legacyId = row.legacy_id;
-      if (typeof legacyId !== "string" || !legacyId) return;
-      // select("*") returns every role admin can see — only build teacher
-      // entries here.
-      if (typeof row.role === "string" && row.role !== "teacher") return;
-      const u = ensureTeacher(legacyId, typeof row.name === "string" ? row.name : "");
-      if (typeof row.email === "string" && row.email) u.email = row.email;
-      for (const key of TEACHER_PROFILE_FIELD_KEYS) {
-        const value = row[key];
-        if (value !== null && value !== undefined) { (u as unknown as Record<string, unknown>)[key] = value; }
-      }
-      const note = row.availability_request_note as string | null | undefined;
-      const at = row.availability_request_at as string | null | undefined;
-      u.availability_request = note || at ? { note: note ?? "", requested_on: at ?? "" } : null;
-    };
-    const applyPeekRow = (row: Record<string, unknown>) => {
-      const legacyId = row.legacy_id;
-      if (typeof legacyId !== "string" || !legacyId) return;
-      const u = ensureTeacher(legacyId, typeof row.name === "string" ? row.name : "");
-      const peekKeys: (keyof TeacherProfileFields)[] = ["qualified_products", "teacher_status", "hire_date", "tier_frozen_since", "tier_frozen_days", "tier_reset_at", "rating", "hours_month"];
-      for (const key of peekKeys) {
-        const value = (row as Record<string, unknown>)[key];
-        if (value !== null && value !== undefined) { (u as unknown as Record<string, unknown>)[key] = value; }
-      }
-    };
-    for (const row of selectRes.data ?? []) applyFullRow(row as unknown as Record<string, unknown>);
-    for (const row of rpcRes.data ?? []) applyPeekRow(row as unknown as Record<string, unknown>);
-    if (!selectRes.error || !rpcRes.error) window.dispatchEvent(new CustomEvent(TEACHERS_EVENT));
+    // Same fix as students-store.ts's hydrateStudents() (2026-09-15): this
+    // used to have no timeout and no try/catch, so a hung/failed request
+    // died silently mid-flight — TEACHERS_EVENT never fired, and the page
+    // stayed on stale/mock teacher data with no error shown anywhere.
+    try {
+      const [selectRes, rpcRes] = await withTimeout(
+        Promise.all([
+          supabase.from("app_users").select("*"),
+          supabase.rpc("teacher_profile_for_peek"),
+        ]),
+        15000,
+        "hydrateTeachers",
+      );
+      if (selectRes.error) console.error("[teacher-model] failed to load app_users profiles", selectRes.error);
+      if (rpcRes.error) console.error("[teacher-model] failed to load teacher peek profiles", rpcRes.error);
+      // A real teacher registered from a DIFFERENT browser/session never
+      // reached THIS session's in-memory USERS array (that bookkeeping is
+      // per-browser, localStorage-only) — build a fresh entry straight from
+      // the DB/RPC row instead of silently dropping it (same root-cause fix as
+      // students-store.ts's hydrateStudents(), applied here for teachers: e.g.
+      // a student peeking a teacher card, or the reschedule-teacher picker,
+      // for a teacher only assigned/registered in another session).
+      const ensureTeacher = (legacyId: string, name: string): User => {
+        let u = USERS.find((x) => x.id === legacyId && x.role === "teacher");
+        if (!u) {
+          u = { id: legacyId, name, email: "", password: "", role: "teacher" };
+          USERS.push(u);
+        }
+        return u;
+      };
+      const applyFullRow = (row: Record<string, unknown>) => {
+        const legacyId = row.legacy_id;
+        if (typeof legacyId !== "string" || !legacyId) return;
+        // select("*") returns every role admin can see — only build teacher
+        // entries here.
+        if (typeof row.role === "string" && row.role !== "teacher") return;
+        const u = ensureTeacher(legacyId, typeof row.name === "string" ? row.name : "");
+        if (typeof row.email === "string" && row.email) u.email = row.email;
+        for (const key of TEACHER_PROFILE_FIELD_KEYS) {
+          const value = row[key];
+          if (value !== null && value !== undefined) { (u as unknown as Record<string, unknown>)[key] = value; }
+        }
+        const note = row.availability_request_note as string | null | undefined;
+        const at = row.availability_request_at as string | null | undefined;
+        u.availability_request = note || at ? { note: note ?? "", requested_on: at ?? "" } : null;
+      };
+      const applyPeekRow = (row: Record<string, unknown>) => {
+        const legacyId = row.legacy_id;
+        if (typeof legacyId !== "string" || !legacyId) return;
+        const u = ensureTeacher(legacyId, typeof row.name === "string" ? row.name : "");
+        const peekKeys: (keyof TeacherProfileFields)[] = ["qualified_products", "teacher_status", "hire_date", "tier_frozen_since", "tier_frozen_days", "tier_reset_at", "rating", "hours_month"];
+        for (const key of peekKeys) {
+          const value = (row as Record<string, unknown>)[key];
+          if (value !== null && value !== undefined) { (u as unknown as Record<string, unknown>)[key] = value; }
+        }
+      };
+      for (const row of selectRes.data ?? []) applyFullRow(row as unknown as Record<string, unknown>);
+      for (const row of rpcRes.data ?? []) applyPeekRow(row as unknown as Record<string, unknown>);
+      if (!selectRes.error || !rpcRes.error) window.dispatchEvent(new CustomEvent(TEACHERS_EVENT));
+    } catch (err) {
+      console.error("[teacher-model] failed to load teacher profiles (timed out or network error)", err);
+      notifyError(err, { context: "Loading teachers — showing cached data, try refreshing" });
+    }
   })();
 }
 
