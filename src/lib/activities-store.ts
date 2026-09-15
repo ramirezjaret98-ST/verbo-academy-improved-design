@@ -263,6 +263,7 @@ function fromActivityRow(row: ActivityRow): Activity {
   if (row.audio_duration_sec != null) a.audioDurationSec = row.audio_duration_sec;
   if ("audio_url" in row && row.audio_url != null && row.audio_url !== "") a.audioUrl = row.audio_url;
   if (row.feedback != null) a.feedback = row.feedback;
+  if ("hint" in row && row.hint != null && row.hint !== "") a.hint = row.hint;
   // Same citation cleanup the old store applied to persisted rows on load.
   return sanitizeActivity(a);
 }
@@ -287,6 +288,7 @@ function toDbColumns(a: Activity): Database["public"]["Tables"]["activities"]["I
     audio_duration_sec: a.audioDurationSec ?? null,
     audio_url: a.audioUrl ? a.audioUrl : null,
     feedback: a.feedback ?? null,
+    hint: a.hint ?? null,
   };
 }
 
