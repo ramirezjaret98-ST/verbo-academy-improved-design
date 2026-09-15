@@ -21,7 +21,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
   Plus, ArrowLeft, Pencil, Trash2, Lock, Unlock, FileDown, Link2, Upload,
-  CheckCircle2, Sparkles, ImageIcon, Video, LayoutGrid,
+  CheckCircle2, Sparkles, ImageIcon, Video, LayoutGrid, Eye,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { USERS, type User } from "@/lib/mock-data";
@@ -56,6 +56,8 @@ import {
 } from "@/components/verbo/course-modals";
 import { Card, GhostButton, PrimaryButton, Pill } from "@/components/verbo/ui";
 import { loadActivities, subscribeActivities } from "@/lib/activities-store";
+import { ActivityRunner } from "@/routes/student.courses";
+import type { CourseUnit } from "@/lib/product-courses-store";
 import { notifySuccess, notifyError } from "@/lib/notify";
 import { SignedDownloadTrigger, SignedImg } from "@/components/verbo/SignedMedia";
 
@@ -194,6 +196,7 @@ function StudentBuilder({ config, studentId, studentName, onBack }: {
   const { user: actor } = useAuth();
   const [unitModal, setUnitModal] = useState<{ mode: "create" | "edit"; unit?: CustomUnit } | null>(null);
   const [actModalUnit, setActModalUnit] = useState<{ unitId: string; unitTitle: string } | null>(null);
+  const [previewUnit, setPreviewUnit] = useState<CustomUnit | null>(null);
   const [cardModalOpen, setCardModalOpen] = useState(false);
   const [rev, setRev] = useState(0);
   const [bulkOpen, setBulkOpen] = useState(false);
@@ -352,6 +355,15 @@ function StudentBuilder({ config, studentId, studentName, onBack }: {
                   <Sparkles className="h-3.5 w-3.5" /> Activities
                 </PrimaryButton>
                 <button
+                  onClick={() => setPreviewUnit(u)}
+                  disabled={!count}
+                  title={count ? "Preview this unit's activities — nothing is saved" : "No activities to preview yet"}
+                  aria-label="Preview activities"
+                  className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-accent disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-muted-foreground"
+                >
+                  <Eye className="h-4 w-4" />
+                </button>
+                <button
                   onClick={() => setUnitModal({ mode: "edit", unit: u })}
                   className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-[#f38934]"
                   aria-label="Edit unit"
@@ -421,6 +433,16 @@ function StudentBuilder({ config, studentId, studentName, onBack }: {
           meta={courseMeta}
           onClose={() => setCardModalOpen(false)}
           onSaved={() => { setCardModalOpen(false); setRev((r) => r + 1); }}
+        />
+      )}
+      {previewUnit && (
+        <ActivityRunner
+          unit={{ id: previewUnit.id, title: previewUnit.title, video_url: previewUnit.video_url ?? "", pdf_url: "" } as CourseUnit}
+          activities={allActivities.filter((a) => a.unit_id === previewUnit.id)}
+          studentId="admin-preview"
+          readOnly={false}
+          previewMode
+          onClose={() => setPreviewUnit(null)}
         />
       )}
     </div>
