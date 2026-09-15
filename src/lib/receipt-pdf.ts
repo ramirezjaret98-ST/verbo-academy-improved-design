@@ -1,5 +1,5 @@
 import { jsPDF } from "jspdf";
-import html2canvas from "html2canvas";
+import { renderHtmlToCanvas } from "@/lib/pdf-capture";
 import logoUrl from "@/assets/verbo-logo.png";
 import { supabase } from "@/integrations/supabase/client";
 import { productDisplayName } from "@/lib/certificate";
@@ -249,41 +249,25 @@ export async function downloadReceiptPdf(input: Omit<ReceiptInput, "invoiceUrl">
   const invoiceUrl = await resolveInvoiceUrl(input.entry.id);
   const full: ReceiptInput = { ...input, invoiceUrl };
 
-  const container = document.createElement("div");
-  container.style.position = "fixed";
-  container.style.left = "-10000px";
-  container.style.top = "0";
-  container.innerHTML = buildHtml(full);
-  document.body.appendChild(container);
-  const pageEl = container.querySelector(".page") as HTMLElement;
+  const canvas = await renderHtmlToCanvas(buildHtml(full));
+  const imgData = canvas.toDataURL("image/png");
 
-  try {
-    const canvas = await html2canvas(pageEl, {
-      scale: 2,
-      useCORS: true,
-      backgroundColor: "#ffffff",
-    });
-    const imgData = canvas.toDataURL("image/png");
+  const doc = new jsPDF({ unit: "pt", format: "letter" });
+  const pdfWidth = doc.internal.pageSize.getWidth();
+  const pdfHeight = doc.internal.pageSize.getHeight();
+  const ratio = pdfWidth / canvas.width;
+  const imgHeightPt = canvas.height * ratio;
 
-    const doc = new jsPDF({ unit: "pt", format: "letter" });
-    const pdfWidth = doc.internal.pageSize.getWidth();
-    const pdfHeight = doc.internal.pageSize.getHeight();
-    const ratio = pdfWidth / canvas.width;
-    const imgHeightPt = canvas.height * ratio;
-
-    // Slice across pages in case a future edit ever pushes content past one
-    // Letter page again — normal case (verified 2026-08-20) is a single page.
-    let renderedHeight = 0;
-    let page = 0;
-    while (renderedHeight < imgHeightPt) {
-      if (page > 0) doc.addPage();
-      doc.addImage(imgData, "PNG", 0, -renderedHeight, pdfWidth, imgHeightPt);
-      renderedHeight += pdfHeight;
-      page++;
-    }
-
-    doc.save(receiptFileName(input.entry));
-  } finally {
-    document.body.removeChild(container);
+  // Slice across pages in case a future edit ever pushes content past one
+  // Letter page again — normal case (verified 2026-08-20) is a single page.
+  let renderedHeight = 0;
+  let page = 0;
+  while (renderedHeight < imgHeightPt) {
+    if (page > 0) doc.addPage();
+    doc.addImage(imgData, "PNG", 0, -renderedHeight, pdfWidth, imgHeightPt);
+    renderedHeight += pdfHeight;
+    page++;
   }
+
+  doc.save(receiptFileName(input.entry));
 }

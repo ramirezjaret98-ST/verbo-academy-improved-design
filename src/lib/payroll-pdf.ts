@@ -1,5 +1,5 @@
 import { jsPDF } from "jspdf";
-import html2canvas from "html2canvas";
+import { renderHtmlToCanvas } from "@/lib/pdf-capture";
 import logoUrl from "@/assets/verbo-logo.png";
 import type { PaymentFrequency } from "@/lib/teacher-model";
 
@@ -247,39 +247,23 @@ export function payrollFileName(input: PayrollInput): string {
 
 /** Renders the payroll report off-screen and triggers a download. */
 export async function downloadPayrollPdf(input: PayrollInput): Promise<void> {
-  const container = document.createElement("div");
-  container.style.position = "fixed";
-  container.style.left = "-10000px";
-  container.style.top = "0";
-  container.innerHTML = buildHtml(input);
-  document.body.appendChild(container);
-  const pageEl = container.querySelector(".page") as HTMLElement;
+  const canvas = await renderHtmlToCanvas(buildHtml(input));
+  const imgData = canvas.toDataURL("image/png");
 
-  try {
-    const canvas = await html2canvas(pageEl, {
-      scale: 2,
-      useCORS: true,
-      backgroundColor: "#ffffff",
-    });
-    const imgData = canvas.toDataURL("image/png");
+  const doc = new jsPDF({ unit: "pt", format: "letter" });
+  const pdfWidth = doc.internal.pageSize.getWidth();
+  const pdfHeight = doc.internal.pageSize.getHeight();
+  const ratio = pdfWidth / canvas.width;
+  const imgHeightPt = canvas.height * ratio;
 
-    const doc = new jsPDF({ unit: "pt", format: "letter" });
-    const pdfWidth = doc.internal.pageSize.getWidth();
-    const pdfHeight = doc.internal.pageSize.getHeight();
-    const ratio = pdfWidth / canvas.width;
-    const imgHeightPt = canvas.height * ratio;
-
-    let renderedHeight = 0;
-    let page = 0;
-    while (renderedHeight < imgHeightPt) {
-      if (page > 0) doc.addPage();
-      doc.addImage(imgData, "PNG", 0, -renderedHeight, pdfWidth, imgHeightPt);
-      renderedHeight += pdfHeight;
-      page++;
-    }
-
-    doc.save(payrollFileName(input));
-  } finally {
-    document.body.removeChild(container);
+  let renderedHeight = 0;
+  let page = 0;
+  while (renderedHeight < imgHeightPt) {
+    if (page > 0) doc.addPage();
+    doc.addImage(imgData, "PNG", 0, -renderedHeight, pdfWidth, imgHeightPt);
+    renderedHeight += pdfHeight;
+    page++;
   }
+
+  doc.save(payrollFileName(input));
 }

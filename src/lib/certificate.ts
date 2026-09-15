@@ -1,5 +1,5 @@
 import { jsPDF } from "jspdf";
-import html2canvas from "html2canvas";
+import { renderHtmlToCanvas } from "@/lib/pdf-capture";
 import logoUrl from "@/assets/verbo-logo.png";
 import medalUrl from "@/assets/certificate-medal.png";
 import signatureUrl from "@/assets/jaret-signature.png";
@@ -287,32 +287,16 @@ function buildHtml(input: CertificateInput): string {
 
 /** Renders the certificate off-screen and triggers a download. */
 export async function generateLevelCertificate(input: CertificateInput): Promise<void> {
-  const container = document.createElement("div");
-  container.style.position = "fixed";
-  container.style.left = "-10000px";
-  container.style.top = "0";
-  container.innerHTML = buildHtml(input);
-  document.body.appendChild(container);
-  const pageEl = container.querySelector(".cert") as HTMLElement;
+  const canvas = await renderHtmlToCanvas(buildHtml(input), { selector: ".cert", backgroundColor: "#01304a", width: 1200, height: 849 });
+  const imgData = canvas.toDataURL("image/png");
 
-  try {
-    const canvas = await html2canvas(pageEl, {
-      scale: 2,
-      useCORS: true,
-      backgroundColor: "#01304a",
-    });
-    const imgData = canvas.toDataURL("image/png");
+  // Unlike receipt/payroll/simple-docs (variable-height content sliced
+  // across Letter pages), this artwork is a fixed 1200x849 layout — so the
+  // PDF page is sized to match the canvas exactly (unit "px", format =
+  // canvas dimensions) instead of forcing it into a4's slightly different
+  // aspect ratio, which left a near-blank sliver second page in testing.
+  const doc = new jsPDF({ orientation: "landscape", unit: "px", format: [canvas.width, canvas.height] });
+  doc.addImage(imgData, "PNG", 0, 0, canvas.width, canvas.height);
 
-    // Unlike receipt/payroll/simple-docs (variable-height content sliced
-    // across Letter pages), this artwork is a fixed 1200x849 layout — so the
-    // PDF page is sized to match the canvas exactly (unit "px", format =
-    // canvas dimensions) instead of forcing it into a4's slightly different
-    // aspect ratio, which left a near-blank sliver second page in testing.
-    const doc = new jsPDF({ orientation: "landscape", unit: "px", format: [canvas.width, canvas.height] });
-    doc.addImage(imgData, "PNG", 0, 0, canvas.width, canvas.height);
-
-    doc.save(certificateFileName(input));
-  } finally {
-    document.body.removeChild(container);
-  }
+  doc.save(certificateFileName(input));
 }

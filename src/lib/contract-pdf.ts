@@ -53,7 +53,7 @@
 //      el resto del documento. Avísame si en realidad debía ser alguien más.
 // ---------------------------------------------------------------------------
 import { jsPDF } from "jspdf";
-import html2canvas from "html2canvas";
+import { renderHtmlToCanvas } from "@/lib/pdf-capture";
 import logoUrl from "@/assets/verbo-logo.png";
 // Reuses the SAME asset certificate.ts already uses for student
 // certificates — found while building this feature: the file exists in the
@@ -456,36 +456,24 @@ export function renderContractHtml(fields: ContractFields, opts: { signedAt?: st
  *  to be hashed, stored, and emailed, it never gets saved locally here. */
 export async function renderContractPdfBase64(fields: ContractFields, opts: { signedAt?: string; studentSignatureDataUrl?: string } = {}): Promise<string> {
   const html = renderContractHtml(fields, opts);
-  const container = document.createElement("div");
-  container.style.position = "fixed";
-  container.style.left = "-10000px";
-  container.style.top = "0";
-  container.innerHTML = html;
-  document.body.appendChild(container);
-  const pageEl = container.querySelector(".page") as HTMLElement;
+  const canvas = await renderHtmlToCanvas(html);
+  const imgData = canvas.toDataURL("image/png");
 
-  try {
-    const canvas = await html2canvas(pageEl, { scale: 2, useCORS: true, backgroundColor: "#ffffff" });
-    const imgData = canvas.toDataURL("image/png");
+  const doc = new jsPDF({ unit: "pt", format: "letter" });
+  const pdfWidth = doc.internal.pageSize.getWidth();
+  const pdfHeight = doc.internal.pageSize.getHeight();
+  const ratio = pdfWidth / canvas.width;
+  const imgHeightPt = canvas.height * ratio;
 
-    const doc = new jsPDF({ unit: "pt", format: "letter" });
-    const pdfWidth = doc.internal.pageSize.getWidth();
-    const pdfHeight = doc.internal.pageSize.getHeight();
-    const ratio = pdfWidth / canvas.width;
-    const imgHeightPt = canvas.height * ratio;
-
-    let renderedHeight = 0;
-    let page = 0;
-    while (renderedHeight < imgHeightPt) {
-      if (page > 0) doc.addPage();
-      doc.addImage(imgData, "PNG", 0, -renderedHeight, pdfWidth, imgHeightPt);
-      renderedHeight += pdfHeight;
-      page++;
-    }
-    return doc.output("datauristring");
-  } finally {
-    document.body.removeChild(container);
+  let renderedHeight = 0;
+  let page = 0;
+  while (renderedHeight < imgHeightPt) {
+    if (page > 0) doc.addPage();
+    doc.addImage(imgData, "PNG", 0, -renderedHeight, pdfWidth, imgHeightPt);
+    renderedHeight += pdfHeight;
+    page++;
   }
+  return doc.output("datauristring");
 }
 
 /** Convierte "Estefanía Martínez" -> "estefania-martinez", para nombres de
@@ -513,34 +501,22 @@ function slugify(name: string): string {
  *  usa el flujo normal de "Enviar contrato" para el documento real. */
 export async function downloadDraftContractPdf(fields: ContractFields): Promise<void> {
   const html = pageHtml(contractBodyHtml(fields) + signatureBlockHtml(fields, {}), fields.issuedDate, "Borrador · Sin validez legal");
-  const container = document.createElement("div");
-  container.style.position = "fixed";
-  container.style.left = "-10000px";
-  container.style.top = "0";
-  container.innerHTML = html;
-  document.body.appendChild(container);
-  const pageEl = container.querySelector(".page") as HTMLElement;
+  const canvas = await renderHtmlToCanvas(html);
+  const imgData = canvas.toDataURL("image/png");
 
-  try {
-    const canvas = await html2canvas(pageEl, { scale: 2, useCORS: true, backgroundColor: "#ffffff" });
-    const imgData = canvas.toDataURL("image/png");
+  const doc = new jsPDF({ unit: "pt", format: "letter" });
+  const pdfWidth = doc.internal.pageSize.getWidth();
+  const pdfHeight = doc.internal.pageSize.getHeight();
+  const ratio = pdfWidth / canvas.width;
+  const imgHeightPt = canvas.height * ratio;
 
-    const doc = new jsPDF({ unit: "pt", format: "letter" });
-    const pdfWidth = doc.internal.pageSize.getWidth();
-    const pdfHeight = doc.internal.pageSize.getHeight();
-    const ratio = pdfWidth / canvas.width;
-    const imgHeightPt = canvas.height * ratio;
-
-    let renderedHeight = 0;
-    let page = 0;
-    while (renderedHeight < imgHeightPt) {
-      if (page > 0) doc.addPage();
-      doc.addImage(imgData, "PNG", 0, -renderedHeight, pdfWidth, imgHeightPt);
-      renderedHeight += pdfHeight;
-      page++;
-    }
-    doc.save(`borrador-contrato-${slugify(fields.studentName)}.pdf`);
-  } finally {
-    document.body.removeChild(container);
+  let renderedHeight = 0;
+  let page = 0;
+  while (renderedHeight < imgHeightPt) {
+    if (page > 0) doc.addPage();
+    doc.addImage(imgData, "PNG", 0, -renderedHeight, pdfWidth, imgHeightPt);
+    renderedHeight += pdfHeight;
+    page++;
   }
+  doc.save(`borrador-contrato-${slugify(fields.studentName)}.pdf`);
 }

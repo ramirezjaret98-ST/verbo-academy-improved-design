@@ -1,5 +1,5 @@
 import { jsPDF } from "jspdf";
-import html2canvas from "html2canvas";
+import { renderHtmlToCanvas } from "@/lib/pdf-capture";
 import logoUrl from "@/assets/verbo-logo.png";
 import { supabase } from "@/integrations/supabase/client";
 import { productDisplayName } from "@/lib/certificate";
@@ -111,37 +111,25 @@ function pageShell(opts: { docLabel: string; folio: string; bodyHtml: string }):
 
 /** Shared render pipeline — same as receipt-pdf.ts / payroll-pdf.ts. */
 async function renderPdf(html: string, fileName: string): Promise<void> {
-  const container = document.createElement("div");
-  container.style.position = "fixed";
-  container.style.left = "-10000px";
-  container.style.top = "0";
-  container.innerHTML = html;
-  document.body.appendChild(container);
-  const pageEl = container.querySelector(".page") as HTMLElement;
+  const canvas = await renderHtmlToCanvas(html);
+  const imgData = canvas.toDataURL("image/png");
 
-  try {
-    const canvas = await html2canvas(pageEl, { scale: 2, useCORS: true, backgroundColor: "#ffffff" });
-    const imgData = canvas.toDataURL("image/png");
+  const doc = new jsPDF({ unit: "pt", format: "letter" });
+  const pdfWidth = doc.internal.pageSize.getWidth();
+  const pdfHeight = doc.internal.pageSize.getHeight();
+  const ratio = pdfWidth / canvas.width;
+  const imgHeightPt = canvas.height * ratio;
 
-    const doc = new jsPDF({ unit: "pt", format: "letter" });
-    const pdfWidth = doc.internal.pageSize.getWidth();
-    const pdfHeight = doc.internal.pageSize.getHeight();
-    const ratio = pdfWidth / canvas.width;
-    const imgHeightPt = canvas.height * ratio;
-
-    let renderedHeight = 0;
-    let page = 0;
-    while (renderedHeight < imgHeightPt) {
-      if (page > 0) doc.addPage();
-      doc.addImage(imgData, "PNG", 0, -renderedHeight, pdfWidth, imgHeightPt);
-      renderedHeight += pdfHeight;
-      page++;
-    }
-
-    doc.save(fileName);
-  } finally {
-    document.body.removeChild(container);
+  let renderedHeight = 0;
+  let page = 0;
+  while (renderedHeight < imgHeightPt) {
+    if (page > 0) doc.addPage();
+    doc.addImage(imgData, "PNG", 0, -renderedHeight, pdfWidth, imgHeightPt);
+    renderedHeight += pdfHeight;
+    page++;
   }
+
+  doc.save(fileName);
 }
 
 /* ========================================================================== */
