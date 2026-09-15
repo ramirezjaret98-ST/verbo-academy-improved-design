@@ -105,19 +105,29 @@ function LoginPage() {
     setBtnState("loading");
 
     // Safety net: login() (src/lib/auth.tsx) is now guaranteed to resolve —
-    // every Supabase call inside it has a timeout as of the 2026-09-15
-    // login-hang fix — but this is a second, independent guard. If the
-    // button is somehow still "loading" 20s later, force it back to an
-    // error state so the user is never stuck without feedback or a way to
-    // retry (previously: any hung/failed network call left the button
-    // spinning forever, with the only fix being a full page reload).
+    // every Supabase call inside it has a timeout — but this is a second,
+    // independent guard. If the button is somehow still "loading" long
+    // after login() should have settled, force it back to an error state
+    // so the user is never stuck without feedback or a way to retry
+    // (previously: any hung/failed network call left the button spinning
+    // forever, with the only fix being a full page reload).
+    //
+    // This MUST stay comfortably above login()'s own worst-case duration,
+    // or it fires and shows "taking too long" while a perfectly legitimate
+    // (just slow) login is still in flight underneath it — that's exactly
+    // what happened on 2026-09-15: the login-lock check, password check,
+    // and profile lookup (with its one retry) can each take up to their own
+    // timeout under real backend load, and those add up sequentially to
+    // ~56s in the worst case. 60s leaves a safety margin above that so this
+    // watchdog only ever fires when something is genuinely, unusually stuck
+    // — not on an ordinary slow-backend day.
     const watchdog = setTimeout(() => {
       setBtnState((s) => {
         if (s !== "loading") return s;
         setError("This is taking too long. Check your connection and try again.");
         return "error";
       });
-    }, 20000);
+    }, 60000);
     timers.current.push(watchdog);
 
     // `login()` moved to real Supabase Auth (async: it awaits
