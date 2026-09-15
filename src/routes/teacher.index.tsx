@@ -1394,7 +1394,12 @@ function makeEntry(): Entry {
 }
 
 type Attendance = "present" | "delayed" | "absent";
-function ReportModal({ session, perf, subskills, onClose, onSubmit }: {
+// Exported (2026-09-15) so Admin > Calendar can reuse this exact same
+// two-step report flow when a super admin has to fill a Session Report
+// themselves (e.g. covering a class ad hoc, with no teacher account of
+// their own) — see EventDetailsModal in admin.calendar.tsx. Nothing about
+// this component's own behavior changed.
+export function ReportModal({ session, perf, subskills, onClose, onSubmit }: {
   session: Session;
   perf: PerformanceRating;
   subskills: Record<string, number>;
@@ -1868,7 +1873,8 @@ function ScoreBadge({ value }: { value: number | null }) {
   );
 }
 
-function PerformanceEvaluationModal({
+// Exported alongside ReportModal above, same reason (Admin > Calendar reuse).
+export function PerformanceEvaluationModal({
   session,
   onClose,
   onContinue,

@@ -1,9 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { CalendarDays, X, Video, FileText, CalendarClock, RefreshCcw, ClipboardList, NotebookPen, Pencil, UserCheck } from "lucide-react";
-import { USERS, userById } from "@/lib/mock-data";
+import { USERS, userById, type Session } from "@/lib/mock-data";
 import { subscribeStudents } from "@/lib/students-store";
-import { subscribeTeachers } from "@/lib/teacher-model";
+import { subscribeTeachers, setSessionExcludedFromPay } from "@/lib/teacher-model";
 import { notifySuccess } from "@/lib/notify";
 import { Card, GhostButton, PrimaryButton } from "@/components/verbo/ui";
 import { CalendarView } from "@/components/verbo/CalendarView";
@@ -15,7 +15,7 @@ import {
 } from "@/lib/calendar-events";
 import { groupsByStudentId } from "@/lib/groups-store";
 import {
-  updateSession, subscribeSessions, WORKSHOP_STATUS_META,
+  updateSession, subscribeSessions, submitSessionReport, WORKSHOP_STATUS_META,
   type ExtSessionStatus,
 } from "@/lib/sessions-store";
 import { SessionReportModal, hasSessionReport } from "@/components/verbo/SessionReportModal";
@@ -23,6 +23,15 @@ import { RescheduleModal } from "@/components/verbo/RescheduleModal";
 import { PlanModal } from "@/components/verbo/PlanModal";
 import { CandidatesModal } from "@/components/verbo/CandidatesModal";
 import { getLessonPlan, saveLessonPlan } from "@/lib/lesson-plans-store";
+import { savePerformance, type PerformanceRating } from "@/lib/performance-store";
+import { markVipUnitDone, clearVipUnitDoneForSession } from "@/lib/vip-courses-store";
+import { markTailoredUnitDone, clearTailoredUnitDoneForSession } from "@/lib/tailored-content-store";
+// Reusing the teacher's own two-step report flow (skill evaluation + the
+// report form itself) rather than building a parallel one — same pattern
+// already used for `UnitVideoPlayer`/`ActivityRunner` being shared from
+// student.courses.tsx into student.my-course.tsx. See the "Fill Session
+// Report" button below for why Admin needs this at all.
+import { ReportModal, PerformanceEvaluationModal } from "./teacher.index";
 
 // A session hasn't happened yet in any of these statuses — safe to bump to
 // "ready" after (re)saving its lesson plan, mirroring what the teacher's own
@@ -240,6 +249,64 @@ export function EventDetailsModal({
   const videoLink = s?.teams_link || (c as { meeting_link?: string } | undefined)?.meeting_link;
   const showReport = s ? hasSessionReport(s) : false;
   const [reportOpen, setReportOpen] = useState(false);
+
+  // 2026-09-15: Jaret's ask — he has no teacher account of his own, so when
+  // he covers a class ad hoc (like changing the video link above already
+  // lets him do), he still has no way to actually fill that session's
+  // report. Reuses the teacher's own PerformanceEvaluationModal → ReportModal
+  // flow so the report looks and behaves exactly the same either way. Scoped
+  // to plain 1:1 sessions only — group/workshop reports go through a
+  // different data shape (submitGroupSessionReport) this flow doesn't cover.
+  const isOneOnOneSession = !!s && !s.origin && !s.group_id && !s.workshop_cohort_id && !s.workshop_template_id;
+  const [adminEvaluating, setAdminEvaluating] = useState(false);
+  const [adminReportDraft, setAdminReportDraft] = useState<{ perf: PerformanceRating; subskills: Record<string, number> } | null>(null);
+
+  // Filling a report from here always means "someone other than the
+  // assigned teacher actually gave this class" — so it should never count
+  // toward that teacher's pay. Simplest, least error-prone version of what
+  // Jaret asked for (a switch, or "whichever is easier"): automatic, no
+  // extra toggle to forget. Reuses the existing excluded_from_pay mechanism
+  // built 2026-08-19 for Admin > Teachers' manual pay review, unchanged.
+  const handleAdminReportSubmit = (
+    sessionId: string,
+    attendance: "present" | "delayed" | "absent",
+    perf: PerformanceRating,
+    subskills: Record<string, number>,
+    absentCause?: "student" | "teacher",
+    subStatus?: import("@/lib/sessions-store").AttendanceSubStatus | null,
+    reportComments?: string,
+    notes?: string,
+  ) => {
+    if (!s) return;
+    submitSessionReport({
+      sessionId,
+      teacherId: s.teacher_id,
+      studentId: s.student_id,
+      attendance,
+      absentCause,
+      subStatus: subStatus ?? null,
+      subskills,
+      reportComments,
+      notes,
+    });
+    // Named distinctly from the outer `plan` (this modal's own lesson-plan
+    // lookup for the "Edit lesson plan" button) — same session, same lookup,
+    // just re-fetched here so this handler doesn't depend on outer scope.
+    const sessionPlan = getLessonPlan(sessionId);
+    if (sessionPlan?.vip_unit_id) {
+      if (attendance !== "absent") markVipUnitDone(sessionPlan.vip_unit_id, sessionId);
+      else clearVipUnitDoneForSession(sessionId);
+    }
+    if (sessionPlan?.tailored_unit_id) {
+      if (attendance !== "absent") markTailoredUnitDone(sessionPlan.tailored_unit_id, sessionId);
+      else clearTailoredUnitDoneForSession(sessionId);
+    }
+    if (attendance !== "absent") savePerformance(sessionId, s.student_id, s.teacher_id, perf);
+    void setSessionExcludedFromPay(Number(sessionId), true);
+    setAdminReportDraft(null);
+    notifySuccess(`Session report submitted — won't count toward ${teacherName ?? "the teacher"}'s pay.`);
+    onClose();
+  };
 
   // 2026-08-19: "command center" shortcuts — Jaret wants to reschedule /
   // change status right from this modal instead of hopping to Admin >
@@ -547,7 +614,16 @@ export function EventDetailsModal({
                 >
                   <UserCheck className="h-3.5 w-3.5" /> Reassign teacher
                 </button>
-                {!showReport && (
+                {!showReport && isOneOnOneSession && (
+                  <button
+                    onClick={() => setAdminEvaluating(true)}
+                    title={`Fill the Session Report yourself — won't count toward ${teacherName ?? "the teacher"}'s pay`}
+                    className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-2.5 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-secondary"
+                  >
+                    <ClipboardList className="h-3.5 w-3.5" /> Fill Session Report
+                  </button>
+                )}
+                {!showReport && !isOneOnOneSession && (
                   <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
                     <ClipboardList className="h-3 w-3" /> No report yet
                   </span>
@@ -564,6 +640,25 @@ export function EventDetailsModal({
 
       {reportOpen && s && (
         <SessionReportModal session={s} onClose={() => setReportOpen(false)} />
+      )}
+      {adminEvaluating && s && (
+        <PerformanceEvaluationModal
+          session={s as unknown as Session}
+          onClose={() => setAdminEvaluating(false)}
+          onContinue={(perf, subskills) => {
+            setAdminReportDraft({ perf, subskills });
+            setAdminEvaluating(false);
+          }}
+        />
+      )}
+      {adminReportDraft && s && (
+        <ReportModal
+          session={s as unknown as Session}
+          perf={adminReportDraft.perf}
+          subskills={adminReportDraft.subskills}
+          onClose={() => setAdminReportDraft(null)}
+          onSubmit={handleAdminReportSubmit}
+        />
       )}
       {rescheduleOpen && s && (
         <RescheduleModal
