@@ -24,6 +24,7 @@ import {
 } from "@/lib/sessions-store";
 import { hydrateStudents, subscribeStudents } from "@/lib/students-store";
 import { hydrateTeachers, subscribeTeachers } from "@/lib/teacher-model";
+import { SignedImg } from "@/components/verbo/SignedMedia";
 
 export const Route = createFileRoute("/admin/workshops")({ component: Page });
 
@@ -96,7 +97,7 @@ function Page() {
                 <button className="text-left" onClick={() => setOpenId(t.id)}>
                   <div className="relative h-32 w-full bg-gradient-to-br from-[#01304a] to-[#024366]">
                     {t.cover_url ? (
-                      <img src={t.cover_url} alt={t.name} className="h-full w-full object-cover" />
+                      <SignedImg src={t.cover_url} alt={t.name} className="h-full w-full object-cover" />
                     ) : (
                       <div className="flex h-full w-full items-center justify-center text-white/70">
                         <ImageIcon className="h-8 w-8" />

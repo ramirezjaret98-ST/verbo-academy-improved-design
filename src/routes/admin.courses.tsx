@@ -26,6 +26,7 @@ import {
   renameUnitReferences,
 } from "@/lib/activities-store";
 import { uploadContentFile } from "@/lib/content-uploads";
+import { SignedDownloadTrigger } from "@/components/verbo/SignedMedia";
 import {
   ActivityModal,
   Field,
@@ -247,15 +248,13 @@ function Page() {
                     </span>
                   )}
                   {u.pdf_url ? (
-                    <a
+                    <SignedDownloadTrigger
                       href={u.pdf_url}
-                      target="_blank"
-                      rel="noreferrer"
                       onClick={(e) => e.stopPropagation()}
                       className="inline-flex items-center gap-1 text-accent hover:underline"
                     >
                       <FileDown className="h-3 w-3" /> PDF attached
-                    </a>
+                    </SignedDownloadTrigger>
                   ) : (
                     <span className="italic">No PDF attached</span>
                   )}

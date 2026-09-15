@@ -19,6 +19,7 @@ import { Card, GhostButton, Pill } from "@/components/verbo/ui";
 import { loadActivities, subscribeActivities } from "@/lib/activities-store";
 import { customUnitAccessOverride, resolveCustomUnitUnlock, teacherSetCustomUnitFile } from "@/lib/custom-units-store";
 import { UnitPdfModal } from "@/components/verbo/UnitPdfManager";
+import { SignedDownloadTrigger, SignedImg } from "@/components/verbo/SignedMedia";
 import {
   Crown, ArrowLeft, Sparkles, Lock, Unlock, FileDown, CheckCircle2, Video, ImageIcon, LayoutGrid, Pencil,
 } from "lucide-react";
@@ -167,7 +168,7 @@ function StudentView({ studentId, studentName, onBack }: {
 
       <div className="flex items-center gap-4">
         {courseMeta.cover_image ? (
-          <img src={courseMeta.cover_image} alt="" className="h-14 w-24 shrink-0 rounded-lg object-cover" />
+          <SignedImg src={courseMeta.cover_image} alt="" className="h-14 w-24 shrink-0 rounded-lg object-cover" />
         ) : (
           <div className="flex h-14 w-24 shrink-0 items-center justify-center rounded-lg bg-secondary text-muted-foreground">
             <ImageIcon className="h-5 w-5" />
@@ -228,14 +229,12 @@ function StudentView({ studentId, studentName, onBack }: {
                     </span>
                   )}
                   {u.file_url ? (
-                    <a
+                    <SignedDownloadTrigger
                       href={u.file_url}
-                      target="_blank"
-                      rel="noreferrer"
                       className="inline-flex items-center gap-1 text-accent hover:underline"
                     >
                       <FileDown className="h-3 w-3" /> {u.file_name || "Download file"}
-                    </a>
+                    </SignedDownloadTrigger>
                   ) : (
                     <span className="italic">No file attached</span>
                   )}

@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ExternalLink, FileText, Video } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { Card, Pill, SectionTitle } from "@/components/verbo/ui";
+import { SignedDownloadTrigger, SignedImg } from "@/components/verbo/SignedMedia";
 import {
   loadWorkshops,
   subscribeWorkshops,
@@ -60,7 +61,7 @@ function CohortCard({ template, cohort }: { template: WorkshopTemplate; cohort: 
     <Card className="!p-0 overflow-hidden">
       {template.cover_url ? (
         <div className="aspect-[5/1] w-full overflow-hidden border-b border-border bg-secondary">
-          <img src={template.cover_url} alt={template.name} className="h-full w-full object-cover" />
+          <SignedImg src={template.cover_url} alt={template.name} className="h-full w-full object-cover" />
         </div>
       ) : null}
 
@@ -143,15 +144,13 @@ function CohortCard({ template, cohort }: { template: WorkshopTemplate; cohort: 
                         </a>
                       ) : null}
                       {u.pdf_url ? (
-                        <a
+                        <SignedDownloadTrigger
                           href={u.pdf_url}
-                          target="_blank"
-                          rel="noreferrer"
                           className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-secondary px-3 py-1.5 text-xs font-medium text-foreground hover:bg-secondary/70"
                         >
                           <FileText className="h-3.5 w-3.5" /> PDF
                           <ExternalLink className="h-3 w-3 text-muted-foreground" />
-                        </a>
+                        </SignedDownloadTrigger>
                       ) : null}
                       {!u.video_url && !u.pdf_url ? (
                         <span className="text-xs text-muted-foreground">No content attached.</span>

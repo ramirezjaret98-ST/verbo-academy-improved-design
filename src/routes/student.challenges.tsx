@@ -210,6 +210,7 @@ const DIFFICULTY_MOTIF: Record<DifficultyId, typeof Trophy> = {
 export { categoryTheme } from "@/lib/challenge-theme";
 import { categoryTheme } from "@/lib/challenge-theme";
 import { ProfilePeekCard } from "@/components/verbo/ProfilePeekCard";
+import { SignedDownloadTrigger } from "@/components/verbo/SignedMedia";
 
 function ChallengeSurface({
   difficulty,
@@ -1787,14 +1788,12 @@ function MysteryRevealModal({
                 </p>
                 <SubmissionInstructions text={challenge.submission_instructions} delay="0.4s" accent={accent} />
                 {challenge.video_url && (
-                  <a
+                  <SignedDownloadTrigger
                     href={challenge.video_url}
-                    target="_blank"
-                    rel="noreferrer"
                     className="mt-4 inline-flex items-center gap-2 rounded-lg border border-border bg-secondary/50 px-3 py-2 text-xs font-medium text-foreground hover:bg-secondary"
                   >
                     <Play className="h-3.5 w-3.5" /> Watch reference video
-                  </a>
+                  </SignedDownloadTrigger>
                 )}
                 {onCooldown && (
                   <div className="mt-4 rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-xs font-medium text-foreground">
@@ -1988,15 +1987,13 @@ function ChallengeDetail({
             <SubmissionInstructions text={challenge.submission_instructions} delay="0.36s" accent={theme.solid} />
 
             {challenge.video_url && (
-              <a
+              <SignedDownloadTrigger
                 href={challenge.video_url}
-                target="_blank"
-                rel="noreferrer"
                 className="vc-rise mt-4 inline-flex items-center gap-2 rounded-lg border border-border bg-secondary/50 px-3 py-2 text-xs font-medium text-foreground hover:bg-secondary"
                 style={{ animationDelay: "0.4s" }}
               >
                 <Play className="h-3.5 w-3.5" /> Watch reference video
-              </a>
+              </SignedDownloadTrigger>
             )}
             {onCooldown && (
               <div className="vc-rise mt-4 rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-xs font-medium text-foreground" style={{ animationDelay: "0.45s" }}>
@@ -2274,14 +2271,12 @@ function LightningRevealModal({
             </p>
             <SubmissionInstructions text={challenge.submission_instructions} delay="0.4s" accent={accent} />
             {challenge.video_url && (
-              <a
+              <SignedDownloadTrigger
                 href={challenge.video_url}
-                target="_blank"
-                rel="noreferrer"
                 className="mt-4 inline-flex items-center gap-2 rounded-lg border border-border bg-secondary/50 px-3 py-2 text-xs font-medium text-foreground hover:bg-secondary"
               >
                 <Play className="h-3.5 w-3.5" /> Watch reference video
-              </a>
+              </SignedDownloadTrigger>
             )}
             {!isLive && !completed && (
               <div className="mt-4 rounded-lg border border-border bg-secondary/60 px-3 py-2 text-xs font-medium text-muted-foreground">
@@ -2476,14 +2471,12 @@ function SeasonRevealModal({
                 </p>
                 <SubmissionInstructions text={challenge.submission_instructions} delay="0.4s" accent={accent} />
                 {challenge.video_url && (
-                  <a
+                  <SignedDownloadTrigger
                     href={challenge.video_url}
-                    target="_blank"
-                    rel="noreferrer"
                     className="mt-4 inline-flex items-center gap-2 rounded-lg border border-border bg-secondary/50 px-3 py-2 text-xs font-medium text-foreground hover:bg-secondary"
                   >
                     <Play className="h-3.5 w-3.5" /> Watch reference video
-                  </a>
+                  </SignedDownloadTrigger>
                 )}
               </div>
               {locked && (

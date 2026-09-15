@@ -35,6 +35,7 @@ import {
 } from "@/lib/activities-store";
 import { ActivityRunner, UnitVideoPlayer } from "./student.courses";
 import type { CourseUnit } from "@/lib/product-courses-store";
+import { SignedDownloadTrigger, useSignedContentUrl } from "@/components/verbo/SignedMedia";
 
 export const Route = createFileRoute("/student/my-course")({ component: Page });
 
@@ -133,6 +134,10 @@ export function CourseCardHero({
   onOpen: () => void;
 }) {
   const pct = unitsCount === 0 ? 0 : Math.round((doneCount / unitsCount) * 100);
+  // Course cover images live in the `content` bucket (uploaded via
+  // CustomUnitAdminBuilder) — resolve to a signed URL, same as everywhere
+  // else in this file. Passing undefined through is a harmless no-op.
+  const { url: resolvedCover } = useSignedContentUrl(coverImage);
   return (
     <div className="mx-auto max-w-md">
       <button
@@ -144,7 +149,7 @@ export function CourseCardHero({
           {coverImage ? (
             <div
               className="verbo-ease-out-expo absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-[1.04]"
-              style={{ backgroundImage: `url(${coverImage})` }}
+              style={{ backgroundImage: `url(${resolvedCover})` }}
             />
           ) : (
             <div className="absolute inset-0 flex items-center justify-center text-white/30">
@@ -395,9 +400,9 @@ export function CustomUnitDetail({
               </div>
             </div>
             {unit.file_url && (
-              <a href={unit.file_url} target="_blank" rel="noopener noreferrer" className="verbo-ease-out-expo mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-border bg-background px-4 py-2.5 text-sm font-medium text-foreground shadow-sm transition-all duration-300 hover:scale-[1.02] hover:border-accent/50 hover:bg-accent/10 hover:text-accent">
+              <SignedDownloadTrigger href={unit.file_url} className="verbo-ease-out-expo mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-border bg-background px-4 py-2.5 text-sm font-medium text-foreground shadow-sm transition-all duration-300 hover:scale-[1.02] hover:border-accent/50 hover:bg-accent/10 hover:text-accent">
                 <FileDown className="h-4 w-4" /> {unit.file_name || "Download material"}
-              </a>
+              </SignedDownloadTrigger>
             )}
           </Card>
 

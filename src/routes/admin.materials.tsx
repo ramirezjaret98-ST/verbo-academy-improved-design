@@ -18,6 +18,7 @@ import {
 } from "@/lib/materials-store";
 import { Card, GhostButton, Pill, PrimaryButton, SectionTitle } from "@/components/verbo/ui";
 import { notifySuccess, notifyError } from "@/lib/notify";
+import { SignedImg } from "@/components/verbo/SignedMedia";
 import {
   Pencil,
   Trash2,
@@ -120,7 +121,7 @@ function UploadZone({
         onChange={(e) => onFile(e.target.files?.[0])}
       />
       {preview ? (
-        <img src={preview} alt="preview" className="h-28 w-44 rounded-lg object-cover" />
+        <SignedImg src={preview} alt="preview" className="h-28 w-44 rounded-lg object-cover" />
       ) : (
         placeholder
       )}
@@ -465,7 +466,7 @@ function Page() {
                 <Card key={m.id} className="!p-0 overflow-hidden">
                   <div className="relative aspect-video w-full overflow-hidden border-b border-border bg-secondary/40">
                     {m.cover_image ? (
-                      <img src={m.cover_image} alt="" className="h-full w-full object-cover" />
+                      <SignedImg src={m.cover_image} alt="" className="h-full w-full object-cover" />
                     ) : (
                       <div className="flex h-full w-full items-center justify-center">
                         <TypeIcon className="h-10 w-10 text-muted-foreground" style={{ opacity: 0.5 }} />

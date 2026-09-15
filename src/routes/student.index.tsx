@@ -99,6 +99,7 @@ import soundWavesIconAsset from "@/assets/sound-waves.svg";
 import bookIconAsset from "@/assets/book-icon.svg";
 import { useAvatar } from "@/lib/avatar-store";
 import { ProfilePeekCard } from "@/components/verbo/ProfilePeekCard";
+import { openSignedContentUrl } from "@/lib/storage-signed-url";
 // DashboardWelcomeTour no longer auto-fires here: the first-login moment now
 // opens the profile-completion prompt instead (see TopNav.tsx).
 
@@ -1687,7 +1688,7 @@ function StudentDashboard() {
                   <GhostButton
                     disabled={!hasRealPdf}
                     title={!hasRealPdf ? "Coming soon" : undefined}
-                    onClick={() => hasRealPdf && window.open(s.report_pdf_url!, "_blank")}
+                    onClick={() => { if (hasRealPdf) void openSignedContentUrl(s.report_pdf_url); }}
                   >
                     <Download className="h-3.5 w-3.5" /> Download report
                   </GhostButton>

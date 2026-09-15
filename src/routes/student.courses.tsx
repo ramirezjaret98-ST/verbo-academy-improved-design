@@ -37,6 +37,7 @@ import {
 import { AnimatedNumber, Card, Pill, StatRing } from "@/components/verbo/ui";
 import { Confetti } from "@/components/verbo/Confetti";
 import { VerboAudioPlayer } from "@/components/verbo/VerboAudioPlayer";
+import { SignedDownloadTrigger, SignedIframe, useSignedContentUrl } from "@/components/verbo/SignedMedia";
 import airportSunsetAsset from "@/assets/airport-sunset.png";
 import mountainsSunsetAsset from "@/assets/mountains-sunset.png";
 import coreFoundationsAsset from "@/assets/corefoundations.png";
@@ -1200,9 +1201,15 @@ function isVimeo(url: string): boolean {
 }
 export function UnitVideoPlayer({ url }: { url: string }) {
   const yt = getYouTubeEmbed(url);
+  const vimeo = isVimeo(url);
+  // Institutional/VIP/Tailored unit videos can be an uploaded file in the
+  // `content` bucket (not just an external YouTube/Vimeo link) — those need
+  // a signed URL. The hook is called unconditionally (rules-of-hooks) but
+  // only does real work when neither embed branch below applies.
+  const { url: signedUrl } = useSignedContentUrl(!yt && !vimeo ? url : undefined);
   if (yt) return <iframe src={yt} title="Lesson video" allowFullScreen className="absolute inset-0 h-full w-full border-0" />;
-  if (isVimeo(url)) return <iframe src={url.replace("vimeo.com", "player.vimeo.com/video")} title="Lesson video" allowFullScreen className="absolute inset-0 h-full w-full border-0" />;
-  return <video src={url} controls className="absolute inset-0 h-full w-full object-cover" />;
+  if (vimeo) return <iframe src={url.replace("vimeo.com", "player.vimeo.com/video")} title="Lesson video" allowFullScreen className="absolute inset-0 h-full w-full border-0" />;
+  return <video src={signedUrl} controls className="absolute inset-0 h-full w-full object-cover" />;
 }
 
 export function UnitDetail({
@@ -1365,9 +1372,9 @@ export function UnitDetail({
                   <BookOpen className="h-4 w-4" /> View PDF Guide
                 </button>
               ) : (
-                <a href={unit.pdf_url} target="_blank" rel="noopener noreferrer" className="verbo-ease-out-expo mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-border bg-background px-4 py-2.5 text-sm font-medium text-foreground shadow-sm transition-all duration-300 hover:scale-[1.02] hover:border-accent/50 hover:bg-accent/10 hover:text-accent">
+                <SignedDownloadTrigger href={unit.pdf_url} className="verbo-ease-out-expo mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-border bg-background px-4 py-2.5 text-sm font-medium text-foreground shadow-sm transition-all duration-300 hover:scale-[1.02] hover:border-accent/50 hover:bg-accent/10 hover:text-accent">
                   <Download className="h-4 w-4" /> Download PDF Guide
-                </a>
+                </SignedDownloadTrigger>
               )
             ) : (
               <div className="mt-4 flex flex-col items-center gap-2 rounded-xl border border-dashed border-border bg-secondary/40 px-4 py-5 text-center">
@@ -1488,7 +1495,7 @@ export function UnitDetail({
               <div className="text-sm font-semibold text-foreground">{unit.title} — PDF Guide</div>
               <button onClick={() => setPdfOpen(false)} className="rounded-md p-1 text-muted-foreground hover:bg-secondary hover:text-foreground"><X className="h-4 w-4" /></button>
             </div>
-            <iframe src={unit.pdf_url} title={`${unit.title} PDF`} className="flex-1 w-full bg-background" />
+            <SignedIframe src={unit.pdf_url} title={`${unit.title} PDF`} className="flex-1 w-full bg-background" />
           </div>
         </div>
       )}
