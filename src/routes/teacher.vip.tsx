@@ -277,6 +277,7 @@ function StudentView({ studentId, studentName, onBack }: {
         <UnitPdfModal
           unitTitle={pdfModalUnit.title}
           target={{ kind: "custom", customKind: "vip", unitId: pdfModalUnit.id, currentUrl: pdfModalUnit.file_url, currentFileName: pdfModalUnit.file_name }}
+          studentId={studentId}
           onClose={() => { setPdfModalUnit(null); setRev((r) => r + 1); }}
           onSave={(url, fileName) => teacherSetCustomUnitFile("vip", pdfModalUnit.id, url, fileName)}
         />

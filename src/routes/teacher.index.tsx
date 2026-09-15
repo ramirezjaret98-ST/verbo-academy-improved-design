@@ -22,6 +22,7 @@ import { PlanModal } from "@/components/verbo/PlanModal";
 import { downloadSessionReportPdf, sessionReportPdfBlob, sessionReportFileName } from "@/lib/session-report-pdf";
 import { downloadCollaborationPdf, downloadKpiSummaryPdf } from "@/lib/simple-docs-pdf";
 import { uploadContentFile } from "@/lib/content-uploads";
+import { legacyToUuid } from "@/lib/user-id-bridge";
 import { supabase } from "@/integrations/supabase/client";
 
 import { subscribeCourses, computeCurrentProgress } from "@/lib/product-courses-store";
@@ -1448,7 +1449,9 @@ function ReportModal({ session, perf, subskills, onClose, onSubmit }: {
       try {
         const blob = await sessionReportPdfBlob(reportInput);
         const file = new File([blob], sessionReportFileName(reportInput), { type: "application/pdf" });
-        const result = await uploadContentFile(file, "session-reports");
+        const studentUuid = await legacyToUuid(session.student_id);
+        const reportFolder = studentUuid ? `session-reports/${studentUuid}` : "session-reports";
+        const result = await uploadContentFile(file, reportFolder);
         if (result.ok) {
           // Awaited (not the fire-and-forget updateSession() path) so the
           // notify-session-event call right below is guaranteed to see
