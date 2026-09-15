@@ -141,24 +141,35 @@ function buildTeacherProfilePatch(row: AppUserRow): Partial<User> {
  *  Once a given store is migrated to Supabase for real, it should look the
  *  user up by email or by a dedicated `auth_id` field rather than assuming
  *  `user.id` is a UUID. */
-async function buildUser(authId: string, email: string): Promise<User | null> {
+/** Result of {@link buildUser}: either the built profile, or a failure with
+ *  `transient` telling the caller whether it is worth retrying (a timeout or
+ *  network hiccup) versus a real "no profile for this account" case (retrying
+ *  won't help that) — see the 2026-09-15 false "Invalid credentials" fix in
+ *  `login()` below. */
+type BuildUserResult = { user: User; transient?: never } | { user: null; transient: boolean };
+
+async function buildUser(authId: string, email: string, timeoutMs = 12000): Promise<BuildUserResult> {
   let row: AppUserRow | null;
   let error: { message?: string } | null;
   try {
     const result = await withTimeout(
       supabase.from("app_users").select("*").eq("id", authId).maybeSingle(),
-      10000,
+      timeoutMs,
       "app_users lookup",
     );
     row = result.data as AppUserRow | null;
     error = result.error;
   } catch (err) {
     console.error("[auth] app_users lookup failed or timed out", err);
-    return null;
+    return { user: null, transient: true };
   }
-  if (error || !row) {
+  if (error) {
     console.error("[auth] failed to load app_users profile for session", error);
-    return null;
+    return { user: null, transient: true };
+  }
+  if (!row) {
+    console.error("[auth] no app_users profile found for this account", authId);
+    return { user: null, transient: false };
   }
   const typedRow = row as AppUserRow;
   const canonical = typedRow.legacy_id ? userById(typedRow.legacy_id) : undefined;
@@ -170,15 +181,17 @@ async function buildUser(authId: string, email: string): Promise<User | null> {
     role: typedRow.role,
   };
   return {
-    ...base,
-    id: typedRow.legacy_id ?? typedRow.id,
-    name: typedRow.name,
-    email: typedRow.email,
-    role: typedRow.role,
-    admin_type: typedRow.admin_type ?? undefined,
-    must_change_password: typedRow.must_change_password,
-    ...(typedRow.role === "student" ? buildStudentProfilePatch(typedRow) : {}),
-    ...(typedRow.role === "teacher" ? buildTeacherProfilePatch(typedRow) : {}),
+    user: {
+      ...base,
+      id: typedRow.legacy_id ?? typedRow.id,
+      name: typedRow.name,
+      email: typedRow.email,
+      role: typedRow.role,
+      admin_type: typedRow.admin_type ?? undefined,
+      must_change_password: typedRow.must_change_password,
+      ...(typedRow.role === "student" ? buildStudentProfilePatch(typedRow) : {}),
+      ...(typedRow.role === "teacher" ? buildTeacherProfilePatch(typedRow) : {}),
+    },
   };
 }
 
@@ -219,7 +232,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!cancelled) setUser(null);
         return;
       }
-      const built = await buildUser(sessionUser.id, sessionUser.email ?? "");
+      const { user: built } = await buildUser(sessionUser.id, sessionUser.email ?? "");
       if (cancelled) return;
       if (!built) {
         authIdRef.current = null;
@@ -344,10 +357,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             : "Invalid credentials. Contact your administrator.",
         };
       }
-      const built = await buildUser(data.user.id, data.user.email ?? email);
+      let { user: built, transient } = await buildUser(data.user.id, data.user.email ?? email, 15000);
+      if (!built && transient) {
+        // The password check above already succeeded — this failure is the
+        // profile lookup timing out or hitting a transient error (backend
+        // latency / connection-pool contention under load), not a real
+        // credentials problem. Retrying once, after a short pause, avoids
+        // rejecting a perfectly correct login as "Invalid credentials" and
+        // forcing an unwanted global sign-out (2026-09-15 fix).
+        await new Promise((resolve) => setTimeout(resolve, 1200));
+        ({ user: built, transient } = await buildUser(data.user.id, data.user.email ?? email, 15000));
+      }
       if (!built) {
         await supabase.auth.signOut();
-        return { ok: false, error: "Invalid credentials. Contact your administrator." };
+        return {
+          ok: false,
+          error: transient
+            ? "Couldn't load your profile right now. Check your connection and try again."
+            : "Invalid credentials. Contact your administrator.",
+        };
       }
       // Group members in Pending Removal or Archived status lose platform access.
       if (built.role === "student" && isMemberBlocked(built.id)) {
