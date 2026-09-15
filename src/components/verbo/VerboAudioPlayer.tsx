@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Pause, Play } from "lucide-react";
+import { useSignedContentUrl } from "@/components/verbo/SignedMedia";
 
 function formatDuration(sec?: number): string {
   if (sec === undefined || !Number.isFinite(sec) || sec < 0) return "--:--";
@@ -29,6 +30,10 @@ export function VerboAudioPlayer({
 }) {
   const [isPlaying, setIsPlaying] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  // The `content` Storage bucket went from public to signed-URL-only
+  // (auditoría de seguridad 2026-09-15, Hallazgo 2) — resolve the stored URL
+  // before handing it to the <audio> element.
+  const { url: signedAudioUrl, resolving } = useSignedContentUrl(audioUrl);
 
   useEffect(() => {
     // Stop playback if the underlying activity changes out from under us.
@@ -37,6 +42,7 @@ export function VerboAudioPlayer({
 
   const toggle = () => {
     if (!audioUrl) { setIsPlaying((p) => !p); return; } // legacy fallback: no real file to play
+    if (resolving) return;
     const el = audioRef.current;
     if (!el) return;
     if (isPlaying) el.pause();
@@ -48,7 +54,7 @@ export function VerboAudioPlayer({
       {audioUrl && (
         <audio
           ref={audioRef}
-          src={audioUrl}
+          src={signedAudioUrl}
           onPlay={() => setIsPlaying(true)}
           onPause={() => setIsPlaying(false)}
           onEnded={() => setIsPlaying(false)}
@@ -57,7 +63,7 @@ export function VerboAudioPlayer({
       <button
         type="button"
         onClick={toggle}
-        disabled={disabled}
+        disabled={disabled || (!!audioUrl && resolving)}
         aria-label={isPlaying ? "Pause audio clip" : "Play audio clip"}
         className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-accent text-accent-foreground shadow-lg transition-transform duration-150 ease-out hover:scale-105 active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-60"
       >

@@ -9,6 +9,7 @@ import { userById } from "@/lib/mock-data";
 import { unitsForStudent } from "@/lib/vip-courses-store";
 import { tailoredUnitsForStudent } from "@/lib/tailored-content-store";
 import { loadCourses, PRODUCT_TO_COURSE } from "@/lib/product-courses-store";
+import { SignedDownloadTrigger } from "@/components/verbo/SignedMedia";
 
 /** Lime accent used across the app for "join a live session" actions. */
 const LIME = "#5fca16";
@@ -132,14 +133,12 @@ export function SessionDetailsModal({
            *  already-completed session) never surfaced `report_pdf_url` at
            *  all, even though Admin's session detail view always has. */}
           {mode === "completed" && session.report_pdf_url && (
-            <a
+            <SignedDownloadTrigger
               href={session.report_pdf_url}
-              target="_blank"
-              rel="noopener noreferrer"
               className="inline-flex items-center gap-1.5 text-xs font-semibold text-accent underline-offset-4 hover:underline"
             >
               <FileText className="h-3.5 w-3.5" /> Open full PDF report
-            </a>
+            </SignedDownloadTrigger>
           )}
           {mode === "ready" && onEditPlan && (
             <button

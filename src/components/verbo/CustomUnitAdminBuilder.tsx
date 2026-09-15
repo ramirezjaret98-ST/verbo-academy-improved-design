@@ -56,6 +56,7 @@ import {
 import { Card, GhostButton, PrimaryButton, Pill } from "@/components/verbo/ui";
 import { loadActivities, subscribeActivities } from "@/lib/activities-store";
 import { notifySuccess, notifyError } from "@/lib/notify";
+import { SignedDownloadTrigger, SignedImg } from "@/components/verbo/SignedMedia";
 
 export interface CustomUnitAdminConfig {
   kind: CustomUnitKind;
@@ -230,7 +231,7 @@ function StudentBuilder({ config, studentId, studentName, onBack }: {
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-center gap-4">
           {courseMeta.cover_image ? (
-            <img src={courseMeta.cover_image} alt="" className="h-14 w-24 shrink-0 rounded-lg object-cover" />
+            <SignedImg src={courseMeta.cover_image} alt="" className="h-14 w-24 shrink-0 rounded-lg object-cover" />
           ) : (
             <div className="flex h-14 w-24 shrink-0 items-center justify-center rounded-lg bg-secondary text-muted-foreground">
               <ImageIcon className="h-5 w-5" />
@@ -302,14 +303,12 @@ function StudentBuilder({ config, studentId, studentName, onBack }: {
                     </span>
                   )}
                   {u.file_url ? (
-                    <a
+                    <SignedDownloadTrigger
                       href={u.file_url}
-                      target="_blank"
-                      rel="noreferrer"
                       className="inline-flex items-center gap-1 text-accent hover:underline"
                     >
                       <FileDown className="h-3 w-3" /> {u.file_name || "Download file"}
-                    </a>
+                    </SignedDownloadTrigger>
                   ) : (
                     <span className="italic">No file attached</span>
                   )}
@@ -476,7 +475,7 @@ function CourseCardModal({ config, studentId, meta, onClose, onSaved }: {
         <Field label="Cover Image" hint="Optional. Shown behind the title on the student's course card.">
           <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border bg-secondary/30 p-6 text-center">
             {cover ? (
-              <img src={cover} alt="Cover preview" className="mb-2 h-28 w-full max-w-xs rounded-lg object-cover" />
+              <SignedImg src={cover} alt="Cover preview" className="mb-2 h-28 w-full max-w-xs rounded-lg object-cover" />
             ) : (
               <ImageIcon className="mb-2 h-7 w-7 text-muted-foreground" />
             )}

@@ -14,6 +14,7 @@ import { userById } from "@/lib/mock-data";
 import type { ExtSession } from "@/lib/sessions-store";
 import { AccentModal } from "@/components/verbo/ui";
 import { getPerformanceSnapshot, performanceKey } from "@/lib/performance-store";
+import { SignedDownloadTrigger } from "@/components/verbo/SignedMedia";
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -110,14 +111,12 @@ export function SessionReportModal({ session, onClose }: { session: ExtSession; 
         )}
 
         {session.report_pdf_url && (
-          <a
+          <SignedDownloadTrigger
             href={session.report_pdf_url}
-            target="_blank"
-            rel="noopener noreferrer"
             className="inline-flex items-center gap-1.5 rounded-lg bg-[#01304a] px-3.5 py-2 text-xs font-semibold text-white transition-opacity hover:opacity-90"
           >
             <FileText className="h-3.5 w-3.5" /> Open full PDF report
-          </a>
+          </SignedDownloadTrigger>
         )}
 
         {typeof session.student_rating === "number" && (

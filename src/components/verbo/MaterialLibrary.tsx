@@ -6,6 +6,8 @@ import type { MaterialType } from "@/lib/mock-data";
 import { PremiumBadge } from "@/components/verbo/PremiumGate";
 import { useAuth } from "@/lib/auth";
 import { groupsByStudentId } from "@/lib/groups-store";
+import { SignedIframe, SignedImg, SignedVideo } from "@/components/verbo/SignedMedia";
+import { openSignedContentUrl } from "@/lib/storage-signed-url";
 import listeningArt from "@/assets/Listiening.svg";
 import grammarArt from "@/assets/Grammar.svg";
 import vocabularyArt from "@/assets/Vocabulary_2.svg";
@@ -79,7 +81,7 @@ function letterOf(title: string): string {
 function CoverArt({ m, className = "" }: { m: StoredMaterial; className?: string }) {
   const Icon = TYPE_ICON[m.material_type];
   if (m.cover_image) {
-    return <img src={m.cover_image} alt={m.title} className={`h-full w-full object-cover ${className}`} />;
+    return <SignedImg src={m.cover_image} alt={m.title} className={`h-full w-full object-cover ${className}`} />;
   }
   return (
     <div className={`relative h-full w-full bg-gradient-to-br from-secondary/60 to-secondary/20 ${className}`}>
@@ -113,11 +115,11 @@ function PreviewModal({ m, onClose }: { m: StoredMaterial; onClose: () => void }
 
         <div className="min-h-0 flex-1 overflow-auto bg-secondary/30 p-5">
           {isPdf ? (
-            <iframe title={m.title} src={m.upload_url} className="h-[60vh] w-full rounded-lg border border-border bg-background" />
+            <SignedIframe title={m.title} src={m.upload_url} className="h-[60vh] w-full rounded-lg border border-border bg-background" />
           ) : isVideo ? (
-            <video src={m.upload_url} controls className="h-[60vh] w-full rounded-lg bg-black">
+            <SignedVideo src={m.upload_url} className="h-[60vh] w-full rounded-lg bg-black">
               Your browser does not support embedded video.
-            </video>
+            </SignedVideo>
           ) : (
             <div className="mx-auto flex max-w-sm flex-col items-center">
               <div className="aspect-[3/4] w-full overflow-hidden rounded-xl border border-border">
@@ -130,11 +132,9 @@ function PreviewModal({ m, onClose }: { m: StoredMaterial; onClose: () => void }
 
         <div className="flex justify-end gap-2 border-t border-border px-5 py-4">
           <GhostButton onClick={onClose}>Close</GhostButton>
-          <a href={m.upload_url} target="_blank" rel="noreferrer">
-            <PrimaryButton>
-              <Download className="h-3.5 w-3.5" /> Download
-            </PrimaryButton>
-          </a>
+          <PrimaryButton onClick={() => void openSignedContentUrl(m.upload_url)}>
+            <Download className="h-3.5 w-3.5" /> Download
+          </PrimaryButton>
         </div>
       </div>
     </div>
@@ -323,11 +323,9 @@ function MaterialCard({ m, onPreview }: { m: StoredMaterial; onPreview: (m: Stor
             <GhostButton className="flex-1 justify-center" onClick={() => onPreview(m)}>
               <Eye className="h-3.5 w-3.5" /> Preview
             </GhostButton>
-            <a href={m.upload_url} target="_blank" rel="noreferrer" className="flex-1">
-              <PrimaryButton className="w-full justify-center">
-                <Download className="h-3.5 w-3.5" /> Download
-              </PrimaryButton>
-            </a>
+            <PrimaryButton className="flex-1 w-full justify-center" onClick={() => void openSignedContentUrl(m.upload_url)}>
+              <Download className="h-3.5 w-3.5" /> Download
+            </PrimaryButton>
           </div>
         ) : (
           <div className="space-y-2">
