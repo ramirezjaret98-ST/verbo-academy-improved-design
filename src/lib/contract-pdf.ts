@@ -24,12 +24,23 @@
 // "NOTA A JARET" — decisiones tomadas para que la plantilla sirva para
 // cualquier alumno, no solo para copiar el caso de Ericka:
 //   1. El contrato de Ericka es de PAGO ÚNICO (un total fijo por el paquete
-//      completo). Así quedó modelado aquí. Si otros productos (Enterprise/
-//      GO/International, que en la app ya manejan precio MENSUAL recurrente
-//      vía payment_day/cycle_start) necesitan una cláusula de pago distinta
-//      (mensualidades en vez de pago único), avísame y agrego esa variante
-//      — no la inventé por mi cuenta para no comprometerte a redactar algo
-//      que no revisaste.
+//      completo). Así quedó modelado originalmente aquí, dejando pendiente
+//      a propósito la variante de mensualidades para no redactarla sin que
+//      Jaret la revisara. ✅ 2026-09-15: Jaret confirmó agregarla — ver
+//      `ContractFields.paymentType`. La cláusula SEGUNDA ahora se arma con
+//      `paymentClauseHtml()` según `paymentType` ("single" reproduce el
+//      párrafo original tal cual; "installments" divide `totalPrice` entre
+//      `installmentsCount` parcialidades con la MISMA matemática que
+//      `computeInstallmentSchedule()` de payment-plans.ts — duplicada aquí a
+//      propósito como función pura, en vez de importar ese módulo, porque
+//      esta plantilla también la usa la página pública de firma
+//      (firmar-contrato.$token.tsx, sin sesión) y payment-plans.ts trae
+//      efectos secundarios de Supabase/Realtime al importarse que no deben
+//      correr ahí — mantener ambas en sync si el cálculo cambia). El resto
+//      de la cláusula (mora, suspensión al 3er día, rescisión al 10mo) NO
+//      cambió: ya estaba redactada de forma genérica ("cualquiera de los
+//      pagos pactados"), así que aplica igual a cada parcialidad vencida,
+//      tal como confirmó Jaret.
 //   2. La frase "4 accesos mensuales acumulables" del original es específica
 //      del plan Elite (según la tabla de verbo-legal). Como este documento
 //      se reutiliza para CUALQUIER plan, esa cifra se dejó genérica
@@ -66,15 +77,25 @@ export interface ContractFields {
   sessionDuration?: number; // minutos
   modality?: string; // "Virtual" | "Presencial" | etc.
   reschedulePolicy?: string; // texto libre opcional, además de la tabla oficial de abajo
-  totalPrice?: number; // MXN, precio total del paquete (modelo de pago único — ver NOTA A JARET #1)
-  paymentDueDate?: string; // ISO date — fecha límite del pago único
+  totalPrice?: number; // MXN, precio total del paquete (el mismo total se reparte entre parcialidades si paymentType es "installments")
+  // "single" (default si no viene definido, para no romper contratos ya
+  // guardados antes de este campo) = un solo pago por `totalPrice`, vence en
+  // `paymentDueDate`. "installments" = `totalPrice` dividido entre
+  // `installmentsCount` parcialidades de `frequencyDays` en `frequencyDays`
+  // días, empezando en `paymentDueDate` (aquí actúa como "fecha del primer
+  // pago" en vez de "fecha límite" — mismo campo, distinto rol según el tipo,
+  // para no duplicar el campo de fecha en el formulario).
+  paymentType?: "single" | "installments";
+  installmentsCount?: number; // solo si paymentType es "installments"
+  frequencyDays?: number; // días entre parcialidades, solo si paymentType es "installments"
+  paymentDueDate?: string; // ISO date — fecha límite (pago único) o fecha del primer pago (mensualidades)
   startDate?: string; // ISO date — fecha de inicio de sesiones
   estimatedEndDate?: string; // ISO date — fecha de término estimada (tentativa)
   folio?: string; // p.ej. "VFP-34-26" — se arma en contracts.ts a partir del id del contrato
   // Campos heredados del modelo de cobro mensual recurrente (Enterprise/GO/
-  // International) — no usados por la cláusula de pago único de abajo, pero
-  // se conservan por si se agrega esa variante más adelante (ver NOTA A
-  // JARET #1).
+  // International) — no usados por ninguna cláusula de abajo (la variante de
+  // mensualidades usa paymentType/installmentsCount/frequencyDays arriba, no
+  // estos), se conservan solo por compatibilidad con contratos ya guardados.
   monthlyPrice?: number;
   paymentDay?: number;
   cycleStart?: string;
@@ -137,6 +158,68 @@ function numberToWordsEsMXN(amount?: number): string {
 
   const centsStr = String(cents).padStart(2, "0");
   return `${words(whole)} pesos ${centsStr}/100 moneda nacional`;
+}
+
+function addDaysToIsoDate(iso: string, days: number): string {
+  const d = new Date(iso + "T00:00:00");
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+/** Copia intencional, en forma pura, de `computeInstallmentSchedule()` de
+ *  payment-plans.ts (ver NOTA A JARET #1 arriba sobre por qué no se importa
+ *  ese módulo aquí). Misma matemática exacta: reparte `totalAmount` entre
+ *  `count` parcialidades iguales, la última absorbe el redondeo, fechas
+ *  espaciadas por `frequencyDays` desde `firstDueDate` — así el calendario
+ *  que ve y firma el alumno en el contrato es idéntico al que arma
+ *  `createPaymentPlan()` cuando SendContractModal crea el Payment Plan
+ *  interno del alumno al enviar un contrato de mensualidades. */
+function computeContractInstallments(
+  totalAmount: number,
+  count: number,
+  firstDueDate: string,
+  frequencyDays: number,
+): { installmentNumber: number; amount: number; dueDate: string }[] {
+  const base = Math.round((totalAmount / count) * 100) / 100;
+  const out: { installmentNumber: number; amount: number; dueDate: string }[] = [];
+  let allocated = 0;
+  for (let i = 0; i < count; i++) {
+    const isLast = i === count - 1;
+    const amount = isLast ? Math.round((totalAmount - allocated) * 100) / 100 : base;
+    allocated += amount;
+    out.push({
+      installmentNumber: i + 1,
+      amount,
+      dueDate: i === 0 ? firstDueDate : addDaysToIsoDate(firstDueDate, frequencyDays * i),
+    });
+  }
+  return out;
+}
+
+function installmentsTableHtml(f: ContractFields): string {
+  const count = Math.max(1, f.installmentsCount ?? 1);
+  const schedule = f.totalPrice && f.paymentDueDate
+    ? computeContractInstallments(f.totalPrice, count, f.paymentDueDate, f.frequencyDays ?? 30)
+    : [];
+  const rows = schedule
+    .map((s) => `<tr><td>Parcialidad ${s.installmentNumber} de ${count}</td><td>${fmtMoney(s.amount)}</td><td>${fmtDate(s.dueDate)}</td></tr>`)
+    .join("");
+  return `<table class="concept"><thead><tr><th>Parcialidad</th><th>Monto</th><th>Fecha de vencimiento</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+/** Cláusula de forma de pago propiamente dicha (el "pago único de..." o su
+ *  variante de mensualidades) — todo lo que viene antes (precio total) y
+ *  después (medios de pago, mora, facturación) de la Cláusula SEGUNDA es
+ *  igual para ambos tipos y no se duplica aquí. */
+function paymentClauseHtml(f: ContractFields): string {
+  if (f.paymentType === "installments") {
+    const count = Math.max(1, f.installmentsCount ?? 1);
+    return `
+    <p>Dicho monto se cubrirá en ${count} (${count === 1 ? "una" : count}) parcialidades conforme al siguiente calendario de pagos, IVA incluido en cada una:</p>
+    ${installmentsTableHtml(f)}
+    <p>Las fechas anteriores son las pactadas al momento de la firma; cualquier ajuste posterior a una fecha de vencimiento individual deberá gestionarse por los canales oficiales de administración señalados en la Cláusula Cuarta.</p>`;
+  }
+  return `<p>Pago único de ${fmtMoney(f.totalPrice)} M.N. (IVA incluido), a más tardar el ${fmtDate(f.paymentDueDate)}.</p>`;
 }
 
 /** Tabla oficial de política de reagendamiento por plan de acceso (idéntica
@@ -227,7 +310,7 @@ function contractBodyHtml(f: ContractFields): string {
 
     <p><strong>SEGUNDA. COSTO, FORMA DE PAGO Y PENALIZACIONES.</strong></p>
     <p>El precio total de los servicios objeto del presente contrato es de ${fmtMoney(f.totalPrice)} M.N. (${totalPriceWords}), IVA incluido.</p>
-    <p>Pago único de ${fmtMoney(f.totalPrice)} M.N. (IVA incluido), a más tardar el ${fmtDate(f.paymentDueDate)}.</p>
+    ${paymentClauseHtml(f)}
     <p>Los pagos deberán efectuarse exclusivamente a través de los medios de pago vigentes publicados por Verbo Language Solutions en sus canales oficiales al momento de la contratación o durante la vigencia del presente contrato. No se aceptarán pagos a terceros, maestros o colaboradores de Verbo Language Solutions bajo ninguna circunstancia.</p>
     <p>En caso de mora en cualquiera de los pagos pactados, "EL CLIENTE" se obliga a cubrir una penalización de $50.00 M.N. (cincuenta pesos 00/100 moneda nacional) por cada día natural de atraso. A partir del tercer día de mora, Verbo Language Solutions podrá suspender temporalmente la calendarización de sesiones; a partir del décimo día de mora, Verbo Language Solutions podrá dar por rescindido el presente contrato de pleno derecho, sin responsabilidad para Verbo Language Solutions y sin obligación de reembolso alguno. No se reservarán horarios sin el pago correspondiente previamente confirmado. "EL CLIENTE" se obliga a proporcionar el comprobante de pago que le sea requerido por los canales oficiales.</p>
     <p>La obligación de pago de "EL CLIENTE" es independiente de sus circunstancias personales, económicas o laborales. Las penalizaciones por mora, la suspensión del servicio y las demás consecuencias previstas en esta cláusula aplican con independencia del motivo que "EL CLIENTE" invoque para justificar el atraso. Verbo Language Solutions podrá, a su entera discreción y como cortesía excepcional, evaluar una prórroga o facilidad de pago en casos particulares, sin que ello constituya obligación, precedente, ni renuncia a exigir el cumplimiento en casos futuros.</p>

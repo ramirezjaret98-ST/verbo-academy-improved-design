@@ -59,6 +59,7 @@ export function contractFieldsFromStudent(student: User): ContractFields {
     reschedulePolicy: student.reschedule_policy,
     startDate: student.cycle_start,
     totalPrice: student.custom_price ?? undefined,
+    paymentType: "single",
     monthlyPrice: student.custom_price ?? undefined,
     paymentDay: student.payment_day,
     cycleStart: student.cycle_start,
