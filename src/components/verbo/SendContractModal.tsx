@@ -2,34 +2,103 @@
 // Reemplaza DocuSign/OpenSign: genera el link único de firma y dispara el
 // correo al alumno. Ver src/lib/contracts.ts (lógica) y
 // src/routes/firmar-contrato.$token.tsx (lo que ve el alumno).
+//
+// 2026-09-15: agregado el selector "Pago único / Mensualidades" (antes solo
+// existía pago único — ver NOTA A JARET #1 en contract-pdf.ts). Cuando se
+// envía un contrato de mensualidades, además de crear el contrato también se
+// crea el Payment Plan interno del alumno (mismo mecanismo de
+// admin.students.tsx → PaymentPlanModal, con las alertas 3/2/1/0 días en la
+// campanita) con el mismo total/parcialidades/frecuencia/fecha, para no
+// tener que configurarlo dos veces — decisión explícita de Jaret. Para pago
+// único NO se toca el Payment Plan: createPaymentPlan() lo marcaría como ya
+// pagado de inmediato, lo cual sería incorrecto aquí (el contrato apenas se
+// está enviando a firmar, todavía no se ha cobrado).
 import { useState } from "react";
 import { FileSignature, Loader2, Check, Eye, X } from "lucide-react";
 import { GhostButton, PrimaryButton } from "@/components/verbo/ui";
 import { useAuth } from "@/lib/auth";
 import { contractFieldsFromStudent, createContractAndNotify } from "@/lib/contracts";
 import { renderContractHtml, type ContractFields } from "@/lib/contract-pdf";
+import { computeInstallmentSchedule, createPaymentPlan } from "@/lib/payment-plans";
 import type { User } from "@/lib/mock-data";
 import { notifyError, notifySuccess } from "@/lib/notify";
 
+const ACTIVE = "#01304a"; // navy — convención de la app para el estado seleccionado de un chip/pill
+
+function PaymentTypeButton({ active, onClick, title, subtitle }: { active: boolean; onClick: () => void; title: string; subtitle: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="rounded-xl border px-3 py-2.5 text-left text-sm font-semibold transition-colors"
+      style={active ? { background: ACTIVE, borderColor: ACTIVE, color: "#fff" } : { background: "transparent", borderColor: "var(--border)", color: "var(--foreground)" }}
+    >
+      {title}
+      <p className={`mt-0.5 text-[11px] font-normal ${active ? "text-white/80" : "text-muted-foreground"}`}>{subtitle}</p>
+    </button>
+  );
+}
+
 export function SendContractModal({ student, onClose }: { student: User; onClose: () => void }) {
   const { user } = useAuth();
-  const [fields, setFields] = useState<ContractFields>(() => contractFieldsFromStudent(student));
+  const [fields, setFields] = useState<ContractFields>(() => ({
+    installmentsCount: 3,
+    frequencyDays: 30,
+    ...contractFieldsFromStudent(student),
+  }));
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const set = <K extends keyof ContractFields>(key: K, value: ContractFields[K]) =>
     setFields((f) => ({ ...f, [key]: value }));
 
+  const isInstallments = fields.paymentType === "installments";
+  const schedulePreview =
+    isInstallments && fields.totalPrice && fields.paymentDueDate && fields.installmentsCount && fields.frequencyDays
+      ? computeInstallmentSchedule(fields.totalPrice, fields.installmentsCount, fields.paymentDueDate, fields.frequencyDays)
+      : [];
+
   const submit = async () => {
     if (!user) return;
+    setError(null);
+    if (isInstallments && !(fields.totalPrice && fields.totalPrice > 0 && fields.installmentsCount && fields.installmentsCount >= 1 && fields.frequencyDays && fields.frequencyDays >= 1 && fields.paymentDueDate)) {
+      setError("Para mensualidades, completa precio total, número de parcialidades, frecuencia y fecha del primer pago.");
+      return;
+    }
     setSending(true);
     const res = await createContractAndNotify({ studentId: student.id, createdBy: user.id, fields });
-    setSending(false);
     if (!res.ok) {
+      setSending(false);
       notifyError(res.error, { context: `Enviando contrato a ${student.name}` });
       return;
     }
+
+    // El contrato ya se envió con éxito en este punto — lo que sigue es una
+    // conveniencia adicional (crear el Payment Plan interno), nunca debe
+    // hacer parecer que el envío del contrato falló si esto falla.
+    if (isInstallments && fields.totalPrice && fields.installmentsCount && fields.frequencyDays && fields.paymentDueDate) {
+      const planRes = await createPaymentPlan({
+        studentId: student.id,
+        studentName: student.name,
+        planType: "installments",
+        totalAmount: fields.totalPrice,
+        installmentsCount: fields.installmentsCount,
+        frequencyDays: fields.frequencyDays,
+        firstDueDate: fields.paymentDueDate,
+        createdBy: user.id,
+        notes: `Creado automáticamente al enviar el contrato${fields.folio ? ` ${fields.folio}` : ""}.`,
+      });
+      if (!planRes.ok) {
+        notifyError(
+          `El contrato se envió correctamente, pero no se pudo crear el Payment Plan interno (${planRes.error}). Configúralo manualmente en el perfil del alumno para que aparezcan las alertas de pago.`,
+          { context: `Payment Plan de ${student.name}` },
+        );
+      }
+    }
+
+    setSending(false);
     notifySuccess(`Contrato enviado a ${student.name} (${student.email}).`);
     setSent(true);
   };
@@ -103,15 +172,79 @@ export function SendContractModal({ student, onClose }: { student: User; onClose
                 <Field label="Fecha de término estimada">
                   <input type="date" value={fields.estimatedEndDate?.slice(0, 10) ?? ""} onChange={(e) => set("estimatedEndDate", e.target.value)} className={inputCls} />
                 </Field>
-                <Field label="Precio total del paquete (MXN, pago único)">
+                <Field label="Precio total del paquete (MXN)">
                   <input type="number" value={fields.totalPrice ?? ""} onChange={(e) => set("totalPrice", e.target.value ? Number(e.target.value) : undefined)} className={inputCls} />
                 </Field>
-                <Field label="Fecha límite de pago">
-                  <input type="date" value={fields.paymentDueDate?.slice(0, 10) ?? ""} onChange={(e) => set("paymentDueDate", e.target.value)} className={inputCls} />
-                </Field>
               </div>
+
+              <div className="space-y-3 rounded-xl border border-border bg-secondary/20 p-3.5">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Forma de pago</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <PaymentTypeButton
+                    active={!isInstallments}
+                    onClick={() => set("paymentType", "single")}
+                    title="Pago único"
+                    subtitle="Un solo pago por el total del paquete."
+                  />
+                  <PaymentTypeButton
+                    active={isInstallments}
+                    onClick={() => set("paymentType", "installments")}
+                    title="Mensualidades"
+                    subtitle="Se divide el total en varias parcialidades."
+                  />
+                </div>
+
+                {isInstallments ? (
+                  <>
+                    <div className="grid grid-cols-2 gap-3">
+                      <Field label="Número de parcialidades">
+                        <input
+                          type="number"
+                          min={1}
+                          value={fields.installmentsCount ?? ""}
+                          onChange={(e) => set("installmentsCount", e.target.value ? Math.max(1, Number(e.target.value)) : undefined)}
+                          className={inputCls}
+                        />
+                      </Field>
+                      <Field label="Frecuencia (días entre pagos)">
+                        <input
+                          type="number"
+                          min={1}
+                          value={fields.frequencyDays ?? ""}
+                          onChange={(e) => set("frequencyDays", e.target.value ? Math.max(1, Number(e.target.value)) : undefined)}
+                          className={inputCls}
+                        />
+                      </Field>
+                    </div>
+                    <Field label="Fecha del primer pago">
+                      <input type="date" value={fields.paymentDueDate?.slice(0, 10) ?? ""} onChange={(e) => set("paymentDueDate", e.target.value)} className={inputCls} />
+                    </Field>
+                    {schedulePreview.length > 0 && (
+                      <div className="rounded-lg border border-border bg-card p-2.5 text-[12px]">
+                        <p className="mb-1 font-semibold text-foreground">Calendario de parcialidades</p>
+                        {schedulePreview.map((s) => (
+                          <div key={s.installmentNumber} className="flex justify-between py-0.5 text-muted-foreground">
+                            <span>#{s.installmentNumber} · {new Date(s.dueDate + "T00:00:00").toLocaleDateString("es-MX")}</span>
+                            <span className="font-medium text-foreground">${s.amount.toLocaleString("es-MX")} MXN</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <p className="text-[10.5px] text-muted-foreground">
+                      Al enviar, esto también crea el Payment Plan interno del alumno (mismas alertas de la campanita que ya usas para pagos diferidos).
+                    </p>
+                  </>
+                ) : (
+                  <Field label="Fecha límite de pago">
+                    <input type="date" value={fields.paymentDueDate?.slice(0, 10) ?? ""} onChange={(e) => set("paymentDueDate", e.target.value)} className={inputCls} />
+                  </Field>
+                )}
+              </div>
+
+              {error && <p className="text-xs font-medium text-destructive">{error}</p>}
+
               <div className="rounded-lg border border-sky-200 bg-sky-50 px-3 py-2.5 text-xs text-sky-800">
-                El texto legal es el contrato real que confirmaste (Ericka Escamilla, 2026-08-27), con solo estos datos como variables. Está modelado como pago único por el paquete completo — si necesitas mensualidades para otro alumno, avísame antes de enviarlo.
+                El texto legal (cláusulas de objeto, mora, cancelaciones, conducta, etc.) es el contrato real que confirmaste (Ericka Escamilla, 2026-08-27), con solo estos datos como variables. La cláusula de forma de pago cambia según lo que elijas arriba; el resto no depende de eso.
               </div>
             </div>
             <div className="flex items-center justify-between gap-2 border-t border-border bg-secondary/30 px-5 py-4">
