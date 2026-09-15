@@ -40,6 +40,23 @@ export function validatePasswordComplexity(pwd: string): string | null {
   return null;
 }
 
+/** Rejects with an error if `promise` doesn't settle within `ms`.
+ *  supabase-js has no built-in timeout, so a hung/very slow request (a flaky
+ *  mobile connection, a momentary backend hiccup) used to leave `login()`
+ *  awaiting forever with nothing to catch it - the sign-in button stuck in
+ *  its loading state permanently, with no error and no way to retry short of
+ *  reloading the page. This bounds every network call in login() so it
+ *  always settles one way or another (2026-09-15 login-hang fix). */
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
+    promise.then(
+      (value) => { clearTimeout(timer); resolve(value); },
+      (err) => { clearTimeout(timer); reject(err); },
+    );
+  });
+}
+
 const Ctx = createContext<AuthCtx | null>(null);
 
 type AppUserRow = Database["public"]["Tables"]["app_users"]["Row"];
@@ -141,11 +158,20 @@ function buildTeacherProfilePatch(row: AppUserRow): Partial<User> {
  *  user up by email or by a dedicated `auth_id` field rather than assuming
  *  `user.id` is a UUID. */
 async function buildUser(authId: string, email: string): Promise<User | null> {
-  const { data: row, error } = await supabase
-    .from("app_users")
-    .select("*")
-    .eq("id", authId)
-    .maybeSingle();
+  let row: AppUserRow | null;
+  let error: { message?: string } | null;
+  try {
+    const result = await withTimeout(
+      supabase.from("app_users").select("*").eq("id", authId).maybeSingle(),
+      10000,
+      "app_users lookup",
+    );
+    row = result.data as AppUserRow | null;
+    error = result.error;
+  } catch (err) {
+    console.error("[auth] app_users lookup failed or timed out", err);
+    return null;
+  }
   if (error || !row) {
     console.error("[auth] failed to load app_users profile for session", error);
     return null;
@@ -266,64 +292,96 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // are `SECURITY DEFINER` and callable by the `anon` role on purpose —
     // there is no session yet at this point in the flow.
     const normalizedEmail = email.trim().toLowerCase();
-    const { data: lockedData, error: lockedError } = await supabase.rpc("is_login_locked", {
-      p_email: normalizedEmail,
-    });
-    if (lockedError) {
-      console.error("[auth] is_login_locked check failed", lockedError);
-    }
-    if (lockedData === true) {
-      return {
-        ok: false,
-        error: "This account is locked after too many failed attempts. Contact your administrator to unlock it.",
-      };
-    }
 
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-      options: captchaToken ? { captchaToken } : undefined,
-    });
-    if (error || !data.user) {
-      const { data: attemptData, error: attemptError } = await supabase.rpc("record_failed_login", {
-        p_email: normalizedEmail,
-      });
-      if (attemptError) {
-        console.error("[auth] record_failed_login failed", attemptError);
+    // Everything below used to be able to throw (a dropped connection, a
+    // hung fetch, a Supabase hiccup) with nothing to catch it - the promise
+    // this function returns would never settle, and the caller in
+    // login.tsx has no timeout of its own either. That left the sign-in
+    // button stuck in its loading state forever, with no error shown and no
+    // way to retry without a full page reload. This try/catch, plus a
+    // timeout on every network call, guarantees `login()` always resolves
+    // to a real result (2026-09-15 login-hang fix).
+    try {
+      const { data: lockedData, error: lockedError } = await withTimeout(
+        supabase.rpc("is_login_locked", { p_email: normalizedEmail }),
+        10000,
+        "is_login_locked",
+      );
+      if (lockedError) {
+        console.error("[auth] is_login_locked check failed", lockedError);
       }
-      const nowLocked =
-        !!attemptData && typeof attemptData === "object" && (attemptData as { locked?: boolean }).locked === true;
+      if (lockedData === true) {
+        return {
+          ok: false,
+          error: "This account is locked after too many failed attempts. Contact your administrator to unlock it.",
+        };
+      }
+
+      const { data, error } = await withTimeout(
+        supabase.auth.signInWithPassword({
+          email,
+          password,
+          options: captchaToken ? { captchaToken } : undefined,
+        }),
+        15000,
+        "signInWithPassword",
+      );
+      if (error || !data.user) {
+        let nowLocked = false;
+        try {
+          const { data: attemptData, error: attemptError } = await withTimeout(
+            supabase.rpc("record_failed_login", { p_email: normalizedEmail }),
+            8000,
+            "record_failed_login",
+          );
+          if (attemptError) {
+            console.error("[auth] record_failed_login failed", attemptError);
+          }
+          nowLocked =
+            !!attemptData && typeof attemptData === "object" && (attemptData as { locked?: boolean }).locked === true;
+        } catch (attemptErr) {
+          console.error("[auth] record_failed_login timed out", attemptErr);
+        }
+        return {
+          ok: false,
+          error: nowLocked
+            ? "This account is now locked after too many failed attempts. Contact your administrator to unlock it."
+            : "Invalid credentials. Contact your administrator.",
+        };
+      }
+      const built = await buildUser(data.user.id, data.user.email ?? email);
+      if (!built) {
+        await supabase.auth.signOut();
+        return { ok: false, error: "Invalid credentials. Contact your administrator." };
+      }
+      // Group members in Pending Removal or Archived status lose platform access.
+      if (built.role === "student" && isMemberBlocked(built.id)) {
+        await supabase.auth.signOut();
+        return { ok: false, error: "Access revoked. Contact your administrator." };
+      }
+      if (isUserDeactivated(built.id)) {
+        await supabase.auth.signOut();
+        return { ok: false, error: "Account deactivated. Contact your administrator." };
+      }
+      // Successful login — clear any failed-attempt counter for next time.
+      // Fired in the background instead of awaited: it's bookkeeping the
+      // user doesn't need to wait on to get into the app, and it no longer
+      // has any chance of stalling a successful login.
+      void supabase.rpc("record_successful_login", { p_email: normalizedEmail }).then(({ error: resetError }) => {
+        if (resetError) console.error("[auth] record_successful_login failed", resetError);
+      });
+      if (logoutTimer.current) clearTimeout(logoutTimer.current);
+      setIsLoggingOut(false);
+      authIdRef.current = data.user.id;
+      setUser(built);
+      return { ok: true, role: built.role, must_change_password: !!built.must_change_password };
+    } catch (err) {
+      console.error("[auth] login failed unexpectedly", err);
       return {
         ok: false,
-        error: nowLocked
-          ? "This account is now locked after too many failed attempts. Contact your administrator to unlock it."
-          : "Invalid credentials. Contact your administrator.",
+        error: "Couldn't connect right now. Check your connection and try again.",
       };
     }
-    const built = await buildUser(data.user.id, data.user.email ?? email);
-    if (!built) {
-      await supabase.auth.signOut();
-      return { ok: false, error: "Invalid credentials. Contact your administrator." };
-    }
-    // Group members in Pending Removal or Archived status lose platform access.
-    if (built.role === "student" && isMemberBlocked(built.id)) {
-      await supabase.auth.signOut();
-      return { ok: false, error: "Access revoked. Contact your administrator." };
-    }
-    if (isUserDeactivated(built.id)) {
-      await supabase.auth.signOut();
-      return { ok: false, error: "Account deactivated. Contact your administrator." };
-    }
-    // Successful login — clear any failed-attempt counter for next time.
-    const { error: resetError } = await supabase.rpc("record_successful_login", { p_email: normalizedEmail });
-    if (resetError) {
-      console.error("[auth] record_successful_login failed", resetError);
-    }
-    if (logoutTimer.current) clearTimeout(logoutTimer.current);
-    setIsLoggingOut(false);
-    authIdRef.current = data.user.id;
-    setUser(built);
-    return { ok: true, role: built.role, must_change_password: !!built.must_change_password };
   };
 
   /** Clears the session. Raises `isLoggingOut` synchronously (before `user`
