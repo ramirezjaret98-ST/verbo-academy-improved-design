@@ -14,7 +14,6 @@ import {
   ChevronRight,
   Download,
   Lock,
-  Play,
   Sparkles,
   MessageSquareQuote,
   FileQuestion,
@@ -1313,7 +1312,7 @@ export function UnitDetail({
               </div>
               <h1 className="mt-1 font-display text-2xl font-bold tracking-tight text-foreground">{unit.title}</h1>
               <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
-                Watch the video, review the PDF guide, then complete Vocabulary, Grammar and Practice with a score of at least 60 in each to pass this unit.
+                {unit.video_url ? "Watch the video, review" : "Review"} the PDF guide, then complete Vocabulary, Grammar and Practice with a score of at least 60 in each to pass this unit.
               </p>
             </div>
             <div className="flex shrink-0 flex-col items-end gap-2">
@@ -1339,25 +1338,10 @@ export function UnitDetail({
       </div>
 
 
-      <div className="grid gap-6 lg:grid-cols-[1.6fr_1fr]">
-        <Card className="overflow-hidden !p-0">
-          <div className="relative aspect-video w-full bg-primary">
-            {unit.video_url ? (
-              <UnitVideoPlayer url={unit.video_url} />
-            ) : (
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-gradient-to-br from-primary via-primary to-black/40 text-white/60">
-                <Play className="h-8 w-8" />
-                <span className="text-xs">No video assigned yet</span>
-              </div>
-            )}
-          </div>
-          <div className="p-5">
-            <div className="text-sm font-semibold text-foreground">Introduction · {unit.title}</div>
-            <div className="mt-0.5 text-xs text-muted-foreground">{unit.video_url ? "HD · English subtitles available" : "Video not available yet"}</div>
-          </div>
-        </Card>
+      {(() => {
+        const hasVideo = !!unit.video_url;
 
-        <div className="space-y-4">
+        const pdfGuideCard = (
           <Card>
             <div className="flex items-start gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-secondary text-foreground"><BookOpen className="h-4 w-4" /></div>
@@ -1383,25 +1367,29 @@ export function UnitDetail({
                 </span>
                 <div className="text-xs font-semibold text-foreground">Guide on the way</div>
                 <p className="text-[11px] leading-relaxed text-muted-foreground">
-                  Your teacher is still preparing this unit's PDF. The video and activities are ready to go.
+                  {hasVideo
+                    ? "Your teacher is still preparing this unit's PDF. The video and activities are ready to go."
+                    : "Your teacher is still preparing this unit's PDF. The activities are ready to go."}
                 </p>
               </div>
             )}
           </Card>
+        );
 
-          {unit.teaser?.trim() && (
-            <Card>
-              <div className="flex items-start gap-3">
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent/15 text-accent">
-                  <MessageSquareQuote className="h-5 w-5" />
-                </span>
-                <p className="font-display text-[15px] font-semibold leading-relaxed text-foreground">
-                  {unit.teaser}
-                </p>
-              </div>
-            </Card>
-          )}
+        const teaserCard = unit.teaser?.trim() ? (
+          <Card>
+            <div className="flex items-start gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent/15 text-accent">
+                <MessageSquareQuote className="h-5 w-5" />
+              </span>
+              <p className="font-display text-[15px] font-semibold leading-relaxed text-foreground">
+                {unit.teaser}
+              </p>
+            </div>
+          </Card>
+        ) : null;
 
+        const mandatoryCategoriesCard = (
           <Card>
             <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Mandatory Categories</div>
             <div className="mt-4 flex items-start justify-between gap-2">
@@ -1430,7 +1418,9 @@ export function UnitDetail({
               </div>
             )}
           </Card>
+        );
 
+        const startButton = (
           <button
             disabled={activities.length === 0}
             onClick={() => setOpen(true)}
@@ -1439,8 +1429,48 @@ export function UnitDetail({
           >
             {activities.length === 0 ? "No activities yet" : <>{actionLabel} <ArrowRight className="h-4 w-4" /></>}
           </button>
-        </div>
-      </div>
+        );
+
+        // Units without an assigned video never render a video slot at all —
+        // not even an empty/placeholder player — so the layout reads as
+        // intentionally video-less rather than "something is missing". The
+        // supporting cards reflow into a wider, self-contained layout instead
+        // of being squeezed into the narrow column that used to sit next to
+        // the player.
+        if (!hasVideo) {
+          return (
+            <div className="space-y-4">
+              {teaserCard}
+              <div className="grid gap-4 sm:grid-cols-2">
+                {pdfGuideCard}
+                {mandatoryCategoriesCard}
+              </div>
+              {startButton}
+            </div>
+          );
+        }
+
+        return (
+          <div className="grid gap-6 lg:grid-cols-[1.6fr_1fr]">
+            <Card className="overflow-hidden !p-0">
+              <div className="relative aspect-video w-full bg-primary">
+                <UnitVideoPlayer url={unit.video_url} />
+              </div>
+              <div className="p-5">
+                <div className="text-sm font-semibold text-foreground">Introduction · {unit.title}</div>
+                <div className="mt-0.5 text-xs text-muted-foreground">HD · English subtitles available</div>
+              </div>
+            </Card>
+
+            <div className="space-y-4">
+              {pdfGuideCard}
+              {teaserCard}
+              {mandatoryCategoriesCard}
+              {startButton}
+            </div>
+          </div>
+        );
+      })()}
 
       {passed && (
         nextUnit && onOpenUnit ? (

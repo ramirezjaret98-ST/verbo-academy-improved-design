@@ -372,25 +372,10 @@ export function CustomUnitDetail({
         {done && <Pill tone="success">Marked done</Pill>}
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[1.6fr_1fr]">
-        <Card className="overflow-hidden !p-0">
-          <div className="relative aspect-video w-full bg-primary">
-            {unit.video_url ? (
-              <UnitVideoPlayer url={unit.video_url} />
-            ) : (
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-gradient-to-br from-primary via-primary to-black/40 text-white/60">
-                <Play className="h-8 w-8" />
-                <span className="text-xs">No video for this unit</span>
-              </div>
-            )}
-          </div>
-          <div className="p-5">
-            <div className="text-sm font-semibold text-foreground">{unit.title}</div>
-            <div className="mt-0.5 text-xs text-muted-foreground">{unit.video_url ? "Intro video" : "This unit doesn't have a video — that's OK, check the material and activities below."}</div>
-          </div>
-        </Card>
+      {(() => {
+        const videoUrl = unit.video_url;
 
-        <div className="space-y-4">
+        const materialCard = (
           <Card>
             <div className="flex items-start gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-secondary text-foreground"><FileDown className="h-4 w-4" /></div>
@@ -405,35 +390,37 @@ export function CustomUnitDetail({
               </SignedDownloadTrigger>
             )}
           </Card>
+        );
 
-          {activities.length > 0 && (
-            <Card>
-              <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Progress</div>
-              <div className="mt-4 flex items-start justify-between gap-2">
-                {MANDATORY_CATEGORIES.filter((c) => catProgress.some((r) => r.category === c)).map((c, i) => {
-                  const row = catProgress.find((r) => r.category === c);
-                  const best = row?.best ?? 0;
-                  const color = CATEGORY_RING_COLORS[i % CATEGORY_RING_COLORS.length];
-                  return (
-                    <div key={c} className="flex flex-1 flex-col items-center gap-1.5 text-center">
-                      <StatRing value={best} size={56} stroke={6} label={row ? String(best) : "—"} progressColor={color} textColor={color} />
-                      <span className="text-[11px] font-medium leading-tight text-muted-foreground">{categoryLabel(c)}</span>
-                    </div>
-                  );
-                })}
-                {overallScore !== null && (
-                  <div className="flex flex-1 flex-col items-center gap-1.5 text-center">
-                    <StatRing value={overallScore} size={56} stroke={6} label={String(overallScore)} progressColor="#f38934" textColor="#f38934" />
-                    <span className="text-[11px] font-medium leading-tight text-muted-foreground">Overall</span>
+        const progressCard = activities.length > 0 ? (
+          <Card>
+            <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Progress</div>
+            <div className="mt-4 flex items-start justify-between gap-2">
+              {MANDATORY_CATEGORIES.filter((c) => catProgress.some((r) => r.category === c)).map((c, i) => {
+                const row = catProgress.find((r) => r.category === c);
+                const best = row?.best ?? 0;
+                const color = CATEGORY_RING_COLORS[i % CATEGORY_RING_COLORS.length];
+                return (
+                  <div key={c} className="flex flex-1 flex-col items-center gap-1.5 text-center">
+                    <StatRing value={best} size={56} stroke={6} label={row ? String(best) : "—"} progressColor={color} textColor={color} />
+                    <span className="text-[11px] font-medium leading-tight text-muted-foreground">{categoryLabel(c)}</span>
                   </div>
-                )}
-              </div>
-              {activitiesPassed && (
-                <div className="mt-3 border-t border-border pt-3 text-[11px] text-muted-foreground">All mandatory categories passed.</div>
+                );
+              })}
+              {overallScore !== null && (
+                <div className="flex flex-1 flex-col items-center gap-1.5 text-center">
+                  <StatRing value={overallScore} size={56} stroke={6} label={String(overallScore)} progressColor="#f38934" textColor="#f38934" />
+                  <span className="text-[11px] font-medium leading-tight text-muted-foreground">Overall</span>
+                </div>
               )}
-            </Card>
-          )}
+            </div>
+            {activitiesPassed && (
+              <div className="mt-3 border-t border-border pt-3 text-[11px] text-muted-foreground">All mandatory categories passed.</div>
+            )}
+          </Card>
+        ) : null;
 
+        const startButton = (
           <button
             disabled={activities.length === 0}
             onClick={() => setOpen(true)}
@@ -447,8 +434,43 @@ export function CustomUnitDetail({
               </>
             )}
           </button>
-        </div>
-      </div>
+        );
+
+        // No video assigned → skip the video slot entirely (no placeholder
+        // player) and let Material/Progress reflow into a wider layout, same
+        // treatment as the Learning Path unit page.
+        if (!videoUrl) {
+          return (
+            <div className="space-y-4">
+              <div className="grid gap-4 sm:grid-cols-2">
+                {materialCard}
+                {progressCard}
+              </div>
+              {startButton}
+            </div>
+          );
+        }
+
+        return (
+          <div className="grid gap-6 lg:grid-cols-[1.6fr_1fr]">
+            <Card className="overflow-hidden !p-0">
+              <div className="relative aspect-video w-full bg-primary">
+                <UnitVideoPlayer url={videoUrl} />
+              </div>
+              <div className="p-5">
+                <div className="text-sm font-semibold text-foreground">{unit.title}</div>
+                <div className="mt-0.5 text-xs text-muted-foreground">Intro video</div>
+              </div>
+            </Card>
+
+            <div className="space-y-4">
+              {materialCard}
+              {progressCard}
+              {startButton}
+            </div>
+          </div>
+        );
+      })()}
 
       {onOpenNext && (
         <button
