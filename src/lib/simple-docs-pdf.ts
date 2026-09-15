@@ -97,10 +97,10 @@ function pageShell(opts: { docLabel: string; folio: string; bodyHtml: string }):
     ${opts.bodyHtml}
   </div>
   <div class="footer">
-    <div class="fword">VERBO LANGUAGE SOLUTIONS</div>
+    <div class="fword">Verbo Language Solutions<sup>&reg;</sup></div>
     <div class="fsub">Este documento fue generado automáticamente y es válido sin firma autógrafa.</div>
     <div class="flinks">
-      <a href="https://verboacademic.com">verboacademic.com</a>
+      <a href="https://www.verbolanguagesolutions.com">www.verbolanguagesolutions.com</a>
       &nbsp;&middot;&nbsp;
       <a href="https://wa.me/5212461152136">Contáctanos por WhatsApp</a>
     </div>

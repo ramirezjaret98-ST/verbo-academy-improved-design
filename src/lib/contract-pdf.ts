@@ -92,6 +92,12 @@ export interface ContractFields {
   startDate?: string; // ISO date — fecha de inicio de sesiones
   estimatedEndDate?: string; // ISO date — fecha de término estimada (tentativa)
   folio?: string; // p.ej. "VFP-34-26" — se arma en contracts.ts a partir del id del contrato
+  // ISO date — fecha que se muestra como "Emitido el ..." en el encabezado.
+  // 2026-09-15: antes esto SIEMPRE mostraba `new Date()` (la fecha de cada
+  // vez que se renderiza el HTML, no la fecha real de emisión) — ahora se
+  // congela aquí al crear el contrato (ver contractFieldsFromStudent) y el
+  // admin puede ajustarla manualmente en SendContractModal antes de enviar.
+  issuedDate?: string;
   // Campos heredados del modelo de cobro mensual recurrente (Enterprise/GO/
   // International) — no usados por ninguna cláusula de abajo (la variante de
   // mensualidades usa paymentType/installmentsCount/frequencyDays arriba, no
@@ -386,12 +392,12 @@ function signatureBlockHtml(f: ContractFields, opts: { signedAt?: string; studen
 
 /** Misma hoja/estilos que simple-docs-pdf.ts (pageShell) para que el
  *  contrato se vea de la misma familia visual que recibos y constancias. */
-function pageHtml(bodyHtml: string): string {
+function pageHtml(bodyHtml: string, issuedDate?: string, watermarkText?: string): string {
   return `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
 <style>
   *{box-sizing:border-box;}
   body{margin:0;padding:0;font-family:Helvetica,Arial,sans-serif;color:#1c2b36;}
-  .page{width:816px;background:#ffffff;padding:40px 56px 32px;}
+  .page{position:relative;width:816px;background:#ffffff;padding:40px 56px 32px;}
   .header{display:flex;align-items:flex-start;justify-content:space-between;}
   .brand{display:flex;align-items:center;gap:14px;}
   .brand img{width:52px;height:52px;border-radius:12px;display:block;}
@@ -414,6 +420,7 @@ function pageHtml(bodyHtml: string): string {
 </style></head>
 <body>
 <div class="page">
+  ${watermarkText ? `<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;overflow:hidden;pointer-events:none;z-index:999;"><div style="transform:rotate(-28deg);font-size:52px;font-weight:800;letter-spacing:3px;color:rgba(220,38,38,0.16);white-space:nowrap;text-transform:uppercase;">${watermarkText}</div></div>` : ""}
   <div class="header">
     <div class="brand">
       <img src="${logoUrl}" alt="Verbo">
@@ -424,7 +431,7 @@ function pageHtml(bodyHtml: string): string {
     </div>
     <div class="doc-tag">
       <div class="label">Contrato</div>
-      <div class="date">Emitido el ${fmtDate(new Date().toISOString())}</div>
+      <div class="date">Emitido el ${fmtDate(issuedDate ?? new Date().toISOString())}</div>
     </div>
   </div>
   <div class="rule"></div>
@@ -432,15 +439,15 @@ function pageHtml(bodyHtml: string): string {
     ${bodyHtml}
   </div>
   <div class="footer">
-    <div class="fword">VERBO LANGUAGE SOLUTIONS</div>
-    <div class="fsub">verboacademic.com</div>
+    <div class="fword">Verbo Language Solutions<sup>&reg;</sup></div>
+    <div class="fsub"><a href="https://www.verbolanguagesolutions.com" style="color:#6b7c88;text-decoration:none;">www.verbolanguagesolutions.com</a></div>
   </div>
 </div>
 </body></html>`;
 }
 
 export function renderContractHtml(fields: ContractFields, opts: { signedAt?: string; studentSignatureDataUrl?: string } = {}): string {
-  return pageHtml(contractBodyHtml(fields) + signatureBlockHtml(fields, opts));
+  return pageHtml(contractBodyHtml(fields) + signatureBlockHtml(fields, opts), fields.issuedDate);
 }
 
 /** Same html2canvas -> jsPDF pipeline as receipt-pdf.ts/simple-docs-pdf.ts,
@@ -476,6 +483,63 @@ export async function renderContractPdfBase64(fields: ContractFields, opts: { si
       page++;
     }
     return doc.output("datauristring");
+  } finally {
+    document.body.removeChild(container);
+  }
+}
+
+/** Convierte "Estefanía Martínez" -> "estefania-martinez", para nombres de
+ *  archivo descargables sin acentos ni espacios. */
+function slugify(name: string): string {
+  return name
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "") || "alumno";
+}
+
+/** 2026-09-15: Jaret pidió poder mandarle a un alumno una versión de
+ *  revisión ANTES de que el contrato quede formalmente enviado a firmar
+ *  (por ejemplo, mientras confirma un dato como la forma de pago) — sin
+ *  crear todavía un registro real en `student_contracts` ni gastar el
+ *  "único contrato pendiente a la vez" que exige SendContractModal. Esto
+ *  descarga LOCALMENTE (nunca se sube a Supabase, nunca pasa por
+ *  createContractAndNotify) el mismo HTML que `renderContractHtml()` — con
+ *  la MISMA cláusula de forma de pago que corresponda — pero con una marca
+ *  de agua diagonal "BORRADOR · SIN VALIDEZ LEGAL" superpuesta, para que
+ *  quede claro que no es el documento oficial. Jaret la manda por su cuenta
+ *  (WhatsApp, correo, como prefiera); cuando los datos ya estén confirmados,
+ *  usa el flujo normal de "Enviar contrato" para el documento real. */
+export async function downloadDraftContractPdf(fields: ContractFields): Promise<void> {
+  const html = pageHtml(contractBodyHtml(fields) + signatureBlockHtml(fields, {}), fields.issuedDate, "Borrador · Sin validez legal");
+  const container = document.createElement("div");
+  container.style.position = "fixed";
+  container.style.left = "-10000px";
+  container.style.top = "0";
+  container.innerHTML = html;
+  document.body.appendChild(container);
+  const pageEl = container.querySelector(".page") as HTMLElement;
+
+  try {
+    const canvas = await html2canvas(pageEl, { scale: 2, useCORS: true, backgroundColor: "#ffffff" });
+    const imgData = canvas.toDataURL("image/png");
+
+    const doc = new jsPDF({ unit: "pt", format: "letter" });
+    const pdfWidth = doc.internal.pageSize.getWidth();
+    const pdfHeight = doc.internal.pageSize.getHeight();
+    const ratio = pdfWidth / canvas.width;
+    const imgHeightPt = canvas.height * ratio;
+
+    let renderedHeight = 0;
+    let page = 0;
+    while (renderedHeight < imgHeightPt) {
+      if (page > 0) doc.addPage();
+      doc.addImage(imgData, "PNG", 0, -renderedHeight, pdfWidth, imgHeightPt);
+      renderedHeight += pdfHeight;
+      page++;
+    }
+    doc.save(`borrador-contrato-${slugify(fields.studentName)}.pdf`);
   } finally {
     document.body.removeChild(container);
   }
