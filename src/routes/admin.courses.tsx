@@ -20,11 +20,13 @@ import {
   CheckCircle2,
   Video,
   FileDown,
+  Eye,
 } from "lucide-react";
 import {
   loadActivities,
   renameUnitReferences,
 } from "@/lib/activities-store";
+import { ActivityRunner } from "./student.courses";
 import { uploadContentFile } from "@/lib/content-uploads";
 import { SignedDownloadTrigger } from "@/components/verbo/SignedMedia";
 import {
@@ -66,6 +68,7 @@ function Page() {
 
   const [unitModal, setUnitModal] = useState<{ mode: "create" | "edit"; unit?: CourseUnit } | null>(null);
   const [actModalUnit, setActModalUnit] = useState<{ unitId: string; unitTitle: string } | null>(null);
+  const [previewUnit, setPreviewUnit] = useState<CourseUnit | null>(null);
   const [activityRev, setActivityRev] = useState(0);
 
   useEffect(() => {
@@ -265,6 +268,15 @@ function Page() {
                   <Sparkles className="h-3.5 w-3.5" /> Add Activities
                 </PrimaryButton>
                 <button
+                  onClick={() => setPreviewUnit(u)}
+                  disabled={!count}
+                  title={count ? "Preview this unit's activities — nothing is saved" : "No activities to preview yet"}
+                  aria-label="Preview activities"
+                  className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-accent disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-muted-foreground"
+                >
+                  <Eye className="h-4 w-4" />
+                </button>
+                <button
                   onClick={() => setUnitModal({ mode: "edit", unit: u })}
                   className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-[#f38934]"
                   aria-label="Edit unit"
@@ -298,6 +310,16 @@ function Page() {
           unitId={actModalUnit.unitId}
           unitTitle={actModalUnit.unitTitle}
           onClose={() => { setActModalUnit(null); setActivityRev((r) => r + 1); }}
+        />
+      )}
+      {previewUnit && (
+        <ActivityRunner
+          unit={previewUnit}
+          activities={allActivities.filter((a) => a.unit_id === previewUnit.id)}
+          studentId="admin-preview"
+          readOnly={false}
+          previewMode
+          onClose={() => setPreviewUnit(null)}
         />
       )}
     </div>
