@@ -382,7 +382,14 @@ function ContractPreviewModal({
     setDownloading(true);
     try {
       await downloadDraftContractPdf(fields);
-    } catch {
+    } catch (err) {
+      // 2026-09-15: este catch se quedaba mudo (sin console.error) cuando se
+      // detectó el bug real de html2canvas + colores oklch/lab de Tailwind
+      // v4 (ver pdf-capture.ts) — costó tiempo diagnosticarlo a ciegas.
+      // Dejamos el log para que cualquier falla futura (de este botón o de
+      // cualquier otro que use renderHtmlToCanvas) sea visible en consola en
+      // vez de solo mostrar el toast genérico de abajo.
+      console.error("[SendContractModal] downloadDraftContractPdf failed", err);
       notifyError("No se pudo generar el PDF del borrador. Intenta de nuevo.", { context: `Borrador de ${studentName}` });
     } finally {
       setDownloading(false);
