@@ -13,12 +13,12 @@
 // único NO se toca el Payment Plan: createPaymentPlan() lo marcaría como ya
 // pagado de inmediato, lo cual sería incorrecto aquí (el contrato apenas se
 // está enviando a firmar, todavía no se ha cobrado).
-import { useState } from "react";
-import { FileSignature, Loader2, Check, Eye, X } from "lucide-react";
+import { useEffect, useState } from "react";
+import { FileSignature, Loader2, Check, Eye, X, AlertTriangle, Download } from "lucide-react";
 import { GhostButton, PrimaryButton } from "@/components/verbo/ui";
 import { useAuth } from "@/lib/auth";
-import { contractFieldsFromStudent, createContractAndNotify } from "@/lib/contracts";
-import { renderContractHtml, type ContractFields } from "@/lib/contract-pdf";
+import { contractFieldsFromStudent, contractsForStudent, createContractAndNotify, voidContract, type StudentContractRow } from "@/lib/contracts";
+import { renderContractHtml, downloadDraftContractPdf, type ContractFields } from "@/lib/contract-pdf";
 import { computeInstallmentSchedule, createPaymentPlan } from "@/lib/payment-plans";
 import type { User } from "@/lib/mock-data";
 import { notifyError, notifySuccess } from "@/lib/notify";
@@ -51,6 +51,52 @@ export function SendContractModal({ student, onClose }: { student: User; onClose
   const [showPreview, setShowPreview] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // 2026-09-15: antes no había forma de ver/anular un contrato pendiente ya
+  // enviado — `voidContract()` existía en contracts.ts desde el 26 de agosto
+  // pero nunca se conectó a ningún botón. Jaret preguntó explícitamente si
+  // podía "eliminar" un contrato para corregir un dato antes de que el
+  // alumno lo firme; esto expone justo eso: si ya hay un contrato PENDIENTE
+  // (todavía sin firmar) para este alumno, hay que anularlo antes de poder
+  // enviar uno nuevo — un contrato ya FIRMADO nunca se puede anular ni
+  // reemplazar desde aquí (eso preserva el rastro de auditoría; ver el
+  // comentario de voidContract). Al cargar, si hay un pendiente, se
+  // precargan sus datos en el formulario para no tener que volver a
+  // escribirlos.
+  const [existingContracts, setExistingContracts] = useState<StudentContractRow[]>([]);
+  const [loadingContracts, setLoadingContracts] = useState(true);
+  const [voiding, setVoiding] = useState(false);
+  const [voidReason, setVoidReason] = useState("");
+  const pendingContract = existingContracts.find((c) => c.status === "pending");
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const rows = await contractsForStudent(student.id);
+      if (cancelled) return;
+      setExistingContracts(rows);
+      setLoadingContracts(false);
+      const pending = rows.find((c) => c.status === "pending");
+      if (pending) setFields((f) => ({ ...f, ...pending.contract_fields }));
+    })();
+    return () => { cancelled = true; };
+  }, [student.id]);
+
+  const cancelPending = async () => {
+    if (!pendingContract) return;
+    if (!voidReason.trim()) { setError("Escribe el motivo de la anulación."); return; }
+    setError(null);
+    setVoiding(true);
+    const res = await voidContract(pendingContract.id, voidReason.trim());
+    setVoiding(false);
+    if (!res.ok) {
+      notifyError(res.error ?? "No se pudo anular el contrato.", { context: `Anulando contrato de ${student.name}` });
+      return;
+    }
+    setExistingContracts((rows) => rows.map((r) => (r.id === pendingContract.id ? { ...r, status: "void" } : r)));
+    setVoidReason("");
+    notifySuccess("Contrato pendiente anulado. Ajusta lo que necesites y envía el nuevo.");
+  };
+
   const set = <K extends keyof ContractFields>(key: K, value: ContractFields[K]) =>
     setFields((f) => ({ ...f, [key]: value }));
 
@@ -63,6 +109,10 @@ export function SendContractModal({ student, onClose }: { student: User; onClose
   const submit = async () => {
     if (!user) return;
     setError(null);
+    if (pendingContract) {
+      setError("Anula el contrato pendiente de arriba antes de enviar uno nuevo.");
+      return;
+    }
     if (isInstallments && !(fields.totalPrice && fields.totalPrice > 0 && fields.installmentsCount && fields.installmentsCount >= 1 && fields.frequencyDays && fields.frequencyDays >= 1 && fields.paymentDueDate)) {
       setError("Para mensualidades, completa precio total, número de parcialidades, frecuencia y fecha del primer pago.");
       return;
@@ -131,10 +181,42 @@ export function SendContractModal({ student, onClose }: { student: User; onClose
         ) : (
           <>
             <div className="max-h-[65vh] space-y-4 overflow-y-auto px-5 py-5">
+              {loadingContracts ? (
+                <p className="flex items-center gap-1.5 text-xs text-muted-foreground"><Loader2 className="h-3.5 w-3.5 animate-spin" /> Revisando si ya hay un contrato enviado a este alumno…</p>
+              ) : pendingContract ? (
+                <div className="space-y-2.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-900">
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                    <span>
+                      Ya hay un contrato <strong>pendiente de firma</strong> para {student.name} (folio {pendingContract.contract_fields.folio ?? pendingContract.id}, enviado el {new Date(pendingContract.created_at).toLocaleDateString("es-MX")}).
+                      Ese link sigue activo. Para corregir algo, anúlalo primero — se invalida ese link y abajo puedes ajustar los datos y enviar uno nuevo.
+                    </span>
+                  </div>
+                  <input
+                    value={voidReason}
+                    onChange={(e) => setVoidReason(e.target.value)}
+                    placeholder="Motivo de la anulación (ej. falta confirmar forma de pago)"
+                    className="w-full rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-amber-400/50"
+                  />
+                  <div className="flex justify-end">
+                    <button
+                      onClick={cancelPending}
+                      disabled={voiding}
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-amber-700 disabled:opacity-50"
+                    >
+                      {voiding ? (<><Loader2 className="h-3.5 w-3.5 animate-spin" /> Anulando…</>) : "Anular contrato pendiente"}
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+
               <p className="text-xs text-muted-foreground">
                 Estos datos ya vienen prellenados del perfil del alumno — ajústalos si algo va a ser distinto en este contrato específico antes de enviarlo.
               </p>
               <div className="grid grid-cols-2 gap-3">
+                <Field label="Fecha del contrato (aparece en el encabezado)">
+                  <input type="date" value={fields.issuedDate?.slice(0, 10) ?? ""} onChange={(e) => set("issuedDate", e.target.value)} className={inputCls} />
+                </Field>
                 <Field label="Teléfono">
                   <input value={fields.studentPhone ?? ""} onChange={(e) => set("studentPhone", e.target.value)} className={inputCls} />
                 </Field>
@@ -251,7 +333,7 @@ export function SendContractModal({ student, onClose }: { student: User; onClose
               <GhostButton onClick={() => setShowPreview(true)}><Eye className="h-3.5 w-3.5" /> Vista previa</GhostButton>
               <div className="flex items-center gap-2">
                 <GhostButton onClick={onClose} disabled={sending}>Cancelar</GhostButton>
-                <PrimaryButton onClick={submit} disabled={sending}>
+                <PrimaryButton onClick={submit} disabled={sending || !!pendingContract} title={pendingContract ? "Anula el contrato pendiente primero" : undefined}>
                   {sending ? (<><Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> Enviando…</>) : "Enviar contrato"}
                 </PrimaryButton>
               </div>
@@ -265,6 +347,7 @@ export function SendContractModal({ student, onClose }: { student: User; onClose
           fields={fields}
           studentName={student.name}
           sending={sending}
+          canSend={!pendingContract}
           onClose={() => setShowPreview(false)}
           onSend={sendFromPreview}
         />
@@ -282,15 +365,30 @@ function ContractPreviewModal({
   fields,
   studentName,
   sending,
+  canSend,
   onClose,
   onSend,
 }: {
   fields: ContractFields;
   studentName: string;
   sending: boolean;
+  canSend: boolean;
   onClose: () => void;
   onSend: () => void;
 }) {
+  const [downloading, setDownloading] = useState(false);
+
+  const downloadDraft = async () => {
+    setDownloading(true);
+    try {
+      await downloadDraftContractPdf(fields);
+    } catch {
+      notifyError("No se pudo generar el PDF del borrador. Intenta de nuevo.", { context: `Borrador de ${studentName}` });
+    } finally {
+      setDownloading(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center verbo-backdrop p-4" onClick={onClose}>
       <div
@@ -314,14 +412,20 @@ function ContractPreviewModal({
         </div>
 
         <div className="flex items-center justify-between gap-2 border-t border-border bg-secondary/30 px-5 py-4">
-          <p className="text-[11px] text-muted-foreground">Así lo verá {studentName} al abrir el link de firma.</p>
+          <GhostButton onClick={downloadDraft} disabled={downloading}>
+            {downloading ? (<><Loader2 className="h-3.5 w-3.5 animate-spin" /> Generando…</>) : (<><Download className="h-3.5 w-3.5" /> Descargar borrador (PDF)</>)}
+          </GhostButton>
           <div className="flex items-center gap-2">
+            <p className="hidden text-[11px] text-muted-foreground sm:block">Así lo verá {studentName} al abrir el link de firma.</p>
             <GhostButton onClick={onClose} disabled={sending}>Cerrar</GhostButton>
-            <PrimaryButton onClick={onSend} disabled={sending}>
+            <PrimaryButton onClick={onSend} disabled={sending || !canSend} title={!canSend ? "Anula el contrato pendiente primero" : undefined}>
               {sending ? (<><Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> Enviando…</>) : "Enviar contrato"}
             </PrimaryButton>
           </div>
         </div>
+        <p className="border-t border-border bg-amber-50/60 px-5 py-1.5 text-[10.5px] text-amber-800">
+          El PDF del borrador lleva la marca "Sin validez legal" — úsalo solo para que el alumno confirme datos antes de mandarle el contrato real.
+        </p>
       </div>
     </div>
   );
