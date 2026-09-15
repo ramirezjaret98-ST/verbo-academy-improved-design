@@ -103,15 +103,37 @@ function LoginPage() {
     if (submitting) return;
     setError("");
     setBtnState("loading");
-    later(() => {
-      // `login()` moved to real Supabase Auth (async: it awaits
-      // signInWithPassword + the lockout RPCs) — this call MUST be awaited.
-      // Left un-awaited, `res` is the Promise object itself: `res.ok` is
-      // always undefined, so every login attempt — right credentials or
-      // wrong — fell into the error branch below. That was today's "login
-      // is broken" bug, not anything related to the forgot-password change.
-      void (async () => {
+
+    // Safety net: login() (src/lib/auth.tsx) is now guaranteed to resolve —
+    // every Supabase call inside it has a timeout as of the 2026-09-15
+    // login-hang fix — but this is a second, independent guard. If the
+    // button is somehow still "loading" 20s later, force it back to an
+    // error state so the user is never stuck without feedback or a way to
+    // retry (previously: any hung/failed network call left the button
+    // spinning forever, with the only fix being a full page reload).
+    const watchdog = setTimeout(() => {
+      setBtnState((s) => {
+        if (s !== "loading") return s;
+        setError("This is taking too long. Check your connection and try again.");
+        return "error";
+      });
+    }, 20000);
+    timers.current.push(watchdog);
+
+    // `login()` moved to real Supabase Auth (async: it awaits
+    // signInWithPassword + the lockout RPCs) — this call MUST be awaited.
+    // Left un-awaited, `res` is the Promise object itself: `res.ok` is
+    // always undefined, so every login attempt — right credentials or
+    // wrong — fell into the error branch below. That was today's "login
+    // is broken" bug, not anything related to the forgot-password change.
+    //
+    // The artificial 900ms delay that used to sit here (before the request
+    // even started) was pure dead time on every single login attempt and
+    // has been removed — the request now fires immediately.
+    void (async () => {
+      try {
         const res = await login(email.trim(), password, remember);
+        clearTimeout(watchdog);
         if (!res.ok) {
           setError(res.error);
           setBtnState("error");
@@ -147,8 +169,17 @@ function LoginPage() {
           requestAnimationFrame(() => requestAnimationFrame(() => setOverlayOpen(true)));
           later(() => navigate({ to: dest }), 520);
         }, 200);
-      })();
-    }, 900);
+      } catch (err) {
+        // Defense in depth: login() already catches everything internally
+        // and always resolves, but if something else throws here, don't
+        // leave the button stuck either.
+        clearTimeout(watchdog);
+        console.error("[login] unexpected error", err);
+        setError("Something went wrong. Try again.");
+        setBtnState("error");
+        later(() => setBtnState("idle"), 900);
+      }
+    })();
   };
 
 
