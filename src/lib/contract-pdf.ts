@@ -52,8 +52,7 @@
 //      se completó con "Jaret Abner Ramírez Jiménez" para que coincida con
 //      el resto del documento. Avísame si en realidad debía ser alguien más.
 // ---------------------------------------------------------------------------
-import { jsPDF } from "jspdf";
-import { renderHtmlToCanvas } from "@/lib/pdf-capture";
+import { renderHtmlToPdf } from "@/lib/pdf-capture";
 import logoUrl from "@/assets/verbo-logo.png";
 // Reuses the SAME asset certificate.ts already uses for student
 // certificates — found while building this feature: the file exists in the
@@ -456,23 +455,7 @@ export function renderContractHtml(fields: ContractFields, opts: { signedAt?: st
  *  to be hashed, stored, and emailed, it never gets saved locally here. */
 export async function renderContractPdfBase64(fields: ContractFields, opts: { signedAt?: string; studentSignatureDataUrl?: string } = {}): Promise<string> {
   const html = renderContractHtml(fields, opts);
-  const canvas = await renderHtmlToCanvas(html);
-  const imgData = canvas.toDataURL("image/png");
-
-  const doc = new jsPDF({ unit: "pt", format: "letter" });
-  const pdfWidth = doc.internal.pageSize.getWidth();
-  const pdfHeight = doc.internal.pageSize.getHeight();
-  const ratio = pdfWidth / canvas.width;
-  const imgHeightPt = canvas.height * ratio;
-
-  let renderedHeight = 0;
-  let page = 0;
-  while (renderedHeight < imgHeightPt) {
-    if (page > 0) doc.addPage();
-    doc.addImage(imgData, "PNG", 0, -renderedHeight, pdfWidth, imgHeightPt);
-    renderedHeight += pdfHeight;
-    page++;
-  }
+  const doc = await renderHtmlToPdf(html);
   return doc.output("datauristring");
 }
 
@@ -501,22 +484,6 @@ function slugify(name: string): string {
  *  usa el flujo normal de "Enviar contrato" para el documento real. */
 export async function downloadDraftContractPdf(fields: ContractFields): Promise<void> {
   const html = pageHtml(contractBodyHtml(fields) + signatureBlockHtml(fields, {}), fields.issuedDate, "Borrador · Sin validez legal");
-  const canvas = await renderHtmlToCanvas(html);
-  const imgData = canvas.toDataURL("image/png");
-
-  const doc = new jsPDF({ unit: "pt", format: "letter" });
-  const pdfWidth = doc.internal.pageSize.getWidth();
-  const pdfHeight = doc.internal.pageSize.getHeight();
-  const ratio = pdfWidth / canvas.width;
-  const imgHeightPt = canvas.height * ratio;
-
-  let renderedHeight = 0;
-  let page = 0;
-  while (renderedHeight < imgHeightPt) {
-    if (page > 0) doc.addPage();
-    doc.addImage(imgData, "PNG", 0, -renderedHeight, pdfWidth, imgHeightPt);
-    renderedHeight += pdfHeight;
-    page++;
-  }
+  const doc = await renderHtmlToPdf(html);
   doc.save(`borrador-contrato-${slugify(fields.studentName)}.pdf`);
 }

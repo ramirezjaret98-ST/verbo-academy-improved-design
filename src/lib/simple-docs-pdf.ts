@@ -1,5 +1,4 @@
-import { jsPDF } from "jspdf";
-import { renderHtmlToCanvas } from "@/lib/pdf-capture";
+import { renderHtmlToPdf } from "@/lib/pdf-capture";
 import logoUrl from "@/assets/verbo-logo.png";
 import { supabase } from "@/integrations/supabase/client";
 import { productDisplayName } from "@/lib/certificate";
@@ -111,24 +110,7 @@ function pageShell(opts: { docLabel: string; folio: string; bodyHtml: string }):
 
 /** Shared render pipeline — same as receipt-pdf.ts / payroll-pdf.ts. */
 async function renderPdf(html: string, fileName: string): Promise<void> {
-  const canvas = await renderHtmlToCanvas(html);
-  const imgData = canvas.toDataURL("image/png");
-
-  const doc = new jsPDF({ unit: "pt", format: "letter" });
-  const pdfWidth = doc.internal.pageSize.getWidth();
-  const pdfHeight = doc.internal.pageSize.getHeight();
-  const ratio = pdfWidth / canvas.width;
-  const imgHeightPt = canvas.height * ratio;
-
-  let renderedHeight = 0;
-  let page = 0;
-  while (renderedHeight < imgHeightPt) {
-    if (page > 0) doc.addPage();
-    doc.addImage(imgData, "PNG", 0, -renderedHeight, pdfWidth, imgHeightPt);
-    renderedHeight += pdfHeight;
-    page++;
-  }
-
+  const doc = await renderHtmlToPdf(html);
   doc.save(fileName);
 }
 

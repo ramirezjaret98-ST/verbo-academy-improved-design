@@ -1,5 +1,4 @@
-import { jsPDF } from "jspdf";
-import { renderHtmlToCanvas } from "@/lib/pdf-capture";
+import { renderHtmlToPdf } from "@/lib/pdf-capture";
 import logoUrl from "@/assets/verbo-logo.png";
 import type { PaymentFrequency } from "@/lib/teacher-model";
 
@@ -247,23 +246,6 @@ export function payrollFileName(input: PayrollInput): string {
 
 /** Renders the payroll report off-screen and triggers a download. */
 export async function downloadPayrollPdf(input: PayrollInput): Promise<void> {
-  const canvas = await renderHtmlToCanvas(buildHtml(input));
-  const imgData = canvas.toDataURL("image/png");
-
-  const doc = new jsPDF({ unit: "pt", format: "letter" });
-  const pdfWidth = doc.internal.pageSize.getWidth();
-  const pdfHeight = doc.internal.pageSize.getHeight();
-  const ratio = pdfWidth / canvas.width;
-  const imgHeightPt = canvas.height * ratio;
-
-  let renderedHeight = 0;
-  let page = 0;
-  while (renderedHeight < imgHeightPt) {
-    if (page > 0) doc.addPage();
-    doc.addImage(imgData, "PNG", 0, -renderedHeight, pdfWidth, imgHeightPt);
-    renderedHeight += pdfHeight;
-    page++;
-  }
-
+  const doc = await renderHtmlToPdf(buildHtml(input));
   doc.save(payrollFileName(input));
 }
