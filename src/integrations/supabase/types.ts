@@ -3733,6 +3733,16 @@ export type Database = {
           unit_id: string
         }[]
       }
+      // 2026-09-16: fingerprint barato (unas decenas de bytes) para que el
+      // cliente sepa si el catálogo de actividades cambió sin tener que
+      // volver a descargarlo completo — ver activities-store.ts.
+      activities_version: {
+        Args: never
+        Returns: {
+          cnt: number
+          max_updated_at: string | null
+        }[]
+      }
       adjust_remaining_sessions: {
         Args: { p_delta: number; p_student_id: string }
         Returns: {
