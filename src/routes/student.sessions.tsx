@@ -47,6 +47,7 @@ import spotlightArt from "@/assets/spotlight1.png";
 import nextUpArt from "@/assets/Verbot_up_next.svg";
 import { getLessonPlan } from "@/lib/lesson-plans-store";
 import { SessionPrepModal } from "@/components/verbo/SessionPrepModal";
+import { FocusSkillsPills } from "@/components/verbo/FocusSkillsPills";
 import { NextEventCard } from "@/components/verbo/NextEventCard";
 import { VerbotHelpBubble } from "@/components/verbo/VerbotHelpBubble";
 import type { TourStep } from "@/components/verbo/GuidedTour";
@@ -642,6 +643,9 @@ function EventDetailsModal({
         {topic && (
           <div className="text-muted-foreground">{topic.levelName} — {topic.unitTitle}</div>
         )}
+      </div>
+      <div className="mt-3">
+        <FocusSkillsPills keys={plan.focus_subskills} />
       </div>
     </section>
   ) : null;

@@ -100,6 +100,7 @@ import bookIconAsset from "@/assets/book-icon.svg";
 import { useAvatar } from "@/lib/avatar-store";
 import { ProfilePeekCard } from "@/components/verbo/ProfilePeekCard";
 import { openSignedContentUrl } from "@/lib/storage-signed-url";
+import { FocusSkillsPills } from "@/components/verbo/FocusSkillsPills";
 // DashboardWelcomeTour no longer auto-fires here: the first-login moment now
 // opens the profile-completion prompt instead (see TopNav.tsx).
 
@@ -1550,15 +1551,20 @@ function StudentDashboard() {
                         What we'll cover
                       </h4>
                       {plan ? (
-                        <div className="mt-2 space-y-1 text-sm text-foreground">
-                          <div><span className="text-muted-foreground">Type:</span> {plan.type}</div>
-                          <div><span className="text-muted-foreground">Title:</span> {plan.title}</div>
-                          {topic && (
-                            <div className="text-muted-foreground">
-                              {topic.levelName} — {topic.unitTitle}
-                            </div>
-                          )}
-                        </div>
+                        <>
+                          <div className="mt-2 space-y-1 text-sm text-foreground">
+                            <div><span className="text-muted-foreground">Type:</span> {plan.type}</div>
+                            <div><span className="text-muted-foreground">Title:</span> {plan.title}</div>
+                            {topic && (
+                              <div className="text-muted-foreground">
+                                {topic.levelName} — {topic.unitTitle}
+                              </div>
+                            )}
+                          </div>
+                          <div className="mt-3">
+                            <FocusSkillsPills keys={plan.focus_subskills} />
+                          </div>
+                        </>
                       ) : (
                         <p className="mt-2 text-sm text-muted-foreground">
                           Your teacher hasn't set today's topic yet.

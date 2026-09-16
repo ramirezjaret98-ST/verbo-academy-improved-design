@@ -1887,6 +1887,15 @@ export function PerformanceEvaluationModal({
   const [scores, setScores] = useState<ScoresMap>({});
   const [activeMacro, setActiveMacro] = useState<MacroSkillDef | null>(null);
 
+  // Sub-skills the teacher chose to focus on when planning this session
+  // (PlanModal), if any — purely a visual hint here: it never pre-fills a
+  // score (there's no such thing as a score nobody actually observed) and
+  // never restricts which sub-skills can still be rated. Jaret's call
+  // 2026-09-16: "solo una marca visual", no auto-opening any macro-skill.
+  const plannedKeys = new Set(getLessonPlan(String(session.id))?.focus_subskills ?? []);
+  const macroHasPlanned = (m: MacroSkillDef) =>
+    m.subs.some((s) => plannedKeys.has(sharedSkillKey(m.key as any, s.name)));
+
   const handleContinue = () => {
     // Raw per-subskill map (0-100) — this is the record that gets written
     // to performance-store via saveSubskillEvaluation, feeding the exact
@@ -1947,6 +1956,15 @@ export function PerformanceEvaluationModal({
                       <Icon className="h-4.5 w-4.5" strokeWidth={1.7} />
                     </div>
                     <span className="text-sm font-semibold" style={{ color: "#01304a" }}>{m.key}</span>
+                    {macroHasPlanned(m) && (
+                      <span
+                        className="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold text-white"
+                        style={{ backgroundColor: "#f38934" }}
+                        title="The teacher planned to focus on at least one sub-skill here"
+                      >
+                        Planned
+                      </span>
+                    )}
                   </div>
                   <ChevronRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
                 </div>
@@ -1978,6 +1996,7 @@ export function PerformanceEvaluationModal({
           scores={scores}
           onChange={setScores}
           onClose={() => setActiveMacro(null)}
+          plannedKeys={plannedKeys}
         />
       )}
     </AccentModal>
@@ -1989,11 +2008,16 @@ function SubSkillModal({
   scores,
   onChange,
   onClose,
+  plannedKeys,
 }: {
   macro: MacroSkillDef;
   scores: ScoresMap;
   onChange: (next: ScoresMap) => void;
   onClose: () => void;
+  /** Sub-skill keys ("Macro:Sub") the teacher chose at planning time — shows
+   *  a "Planned" tag next to the matching sub-skills here. Optional so this
+   *  component still works if ever called without a lesson plan in scope. */
+  plannedKeys?: Set<string>;
 }) {
   const Icon = macro.icon;
 
@@ -2023,11 +2047,21 @@ function SubSkillModal({
             const v = scores[subKey(macro.key, s.name)];
             const active = typeof v === "number";
             const accent = active ? sliderAccent(v as number) : "#cbd5e1";
+            const isPlanned = plannedKeys?.has(sharedSkillKey(macro.key as any, s.name)) ?? false;
             return (
               <div key={s.name} className="rounded-xl border border-border bg-background p-4">
                 <div className="flex items-center justify-between gap-3">
-                  <span className="text-sm font-semibold" style={{ color: active ? "#01304a" : "#94a3b8" }}>
+                  <span className="flex items-center gap-1.5 text-sm font-semibold" style={{ color: active ? "#01304a" : "#94a3b8" }}>
                     {s.name}
+                    {isPlanned && (
+                      <span
+                        className="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold text-white"
+                        style={{ backgroundColor: "#f38934" }}
+                        title="The teacher planned to focus on this sub-skill"
+                      >
+                        Planned
+                      </span>
+                    )}
                   </span>
                   <div className="flex items-center gap-2">
                     {active ? (
