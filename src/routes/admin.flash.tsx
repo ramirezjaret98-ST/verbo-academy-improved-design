@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { Card, GhostButton, PrimaryButton, Pill, AccentModal, AccentModalFooter } from "@/components/verbo/ui";
 import { Plus, Trash2, X, Pencil, Link2, Lock, Zap, Package, Gift, Sparkles, Upload } from "lucide-react";
-import { uploadContentFile } from "@/lib/content-uploads";
+import { uploadContentFile, uploadPublicImage, MAX_PUBLIC_IMAGE_BYTES } from "@/lib/content-uploads";
 import {
   type FlashChallenge,
   type FlashProductId,
@@ -363,16 +363,27 @@ function FlashModal({
   };
   const [iconImageUrl, setIconImageUrl] = useState(editing?.icon_image_url ?? "");
   const [iconError, setIconError] = useState("");
+  const [iconUploading, setIconUploading] = useState(false);
   const [applyAllProducts, setApplyAllProducts] = useState(false);
 
-  const handleIconFile = (file?: File | null) => {
+  // 2026-09-16: antes esto leía el archivo como data URL (base64) y lo
+  // guardaba directo en `challenges.icon_image_url` — cada `select=*` sobre
+  // esa tabla (se pide así ~300 veces/día por los dos "kind" de challenge)
+  // viajaba con las imágenes completas incrustadas en el JSON, y fue la
+  // causa más grande del egress de PostgREST disparado a ~900MB/día
+  // (auditoría 2026-09-16, ver memoria del proyecto). Ahora se sube al mismo
+  // bucket público "public-assets" que usan avatares y badges, igual que
+  // `handleVideoFile` de arriba ya sube el video real a Storage.
+  const handleIconFile = async (file?: File | null) => {
     if (!file) return;
     if (!file.type.startsWith("image/")) { setIconError("Please choose an image file."); return; }
-    if (file.size > 2 * 1024 * 1024) { setIconError("Image must be 2MB or smaller."); return; }
+    if (file.size > MAX_PUBLIC_IMAGE_BYTES) { setIconError("Image must be 2MB or smaller."); return; }
     setIconError("");
-    const reader = new FileReader();
-    reader.onload = () => setIconImageUrl(String(reader.result || ""));
-    reader.readAsDataURL(file);
+    setIconUploading(true);
+    const uploaded = await uploadPublicImage(file, "challenge-icons", crypto.randomUUID());
+    setIconUploading(false);
+    if (!uploaded.ok) { setIconError(uploaded.error); return; }
+    setIconImageUrl(uploaded.url);
   };
 
   const commitNewCategory = () => {
@@ -591,9 +602,11 @@ function FlashModal({
                 <input
                   type="file"
                   accept="image/*"
+                  disabled={iconUploading}
                   onChange={(e) => handleIconFile(e.target.files?.[0])}
                   className="block w-full text-xs text-muted-foreground file:mr-3 file:rounded-md file:border file:border-border file:bg-secondary file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-foreground"
                 />
+                {iconUploading && <p className="mt-1 text-[11px] text-muted-foreground">Uploading…</p>}
                 {iconImageUrl && (
                   <button
                     type="button"

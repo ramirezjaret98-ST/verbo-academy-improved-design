@@ -20,6 +20,7 @@ import {
   updateBadge,
   deleteBadge,
 } from "@/lib/profile-badges-store";
+import { uploadPublicImage, MAX_PUBLIC_IMAGE_BYTES } from "@/lib/content-uploads";
 
 export const Route = createFileRoute("/admin/profile-badges")({ component: Page });
 
@@ -29,25 +30,28 @@ const textareaCls =
   "min-h-[96px] w-full rounded-lg border border-border bg-background p-3 text-sm text-foreground shadow-sm transition-colors focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30";
 
 const BADGE_IMAGE_ACCEPT = "image/gif,image/png,image/jpeg,image/webp";
-const BADGE_IMAGE_MAX_BYTES = 1024 * 1024;
 
-function readImageAsDataUrl(file: File): Promise<string | null> {
-  return new Promise((resolve) => {
-    if (!BADGE_IMAGE_ACCEPT.split(",").includes(file.type)) {
-      alert("Please upload a GIF, PNG, JPG or WebP image.");
-      resolve(null);
-      return;
-    }
-    if (file.size > BADGE_IMAGE_MAX_BYTES) {
-      alert("Image is too large (max 1 MB).");
-      resolve(null);
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : null);
-    reader.onerror = () => { alert("Could not read the image file."); resolve(null); };
-    reader.readAsDataURL(file);
-  });
+// 2026-09-16: antes esto leía el archivo como data URL (base64) y lo
+// guardaba directo en `badge_defs.image_url` — cada `select=*` sobre esa
+// tabla viajaba con las 37 imágenes completas incrustadas en el JSON, y eso
+// fue una de las causas del egress de PostgREST disparado a ~900MB/día
+// (auditoría 2026-09-16, ver memoria del proyecto). Ahora se sube la imagen
+// al bucket público "public-assets" y solo se guarda la URL corta.
+async function uploadBadgeImage(file: File): Promise<string | null> {
+  if (!BADGE_IMAGE_ACCEPT.split(",").includes(file.type)) {
+    alert("Please upload a GIF, PNG, JPG or WebP image.");
+    return null;
+  }
+  if (file.size > MAX_PUBLIC_IMAGE_BYTES) {
+    alert("Image is too large (max 2 MB).");
+    return null;
+  }
+  const uploaded = await uploadPublicImage(file, "badges", crypto.randomUUID());
+  if (!uploaded.ok) {
+    alert(uploaded.error);
+    return null;
+  }
+  return uploaded.url;
 }
 
 function BadgeImage({ src, size = "md" }: { src: string; size?: "md" | "lg" }) {
@@ -204,14 +208,14 @@ function BadgeModal({
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file) return;
-    const dataUrl = await readImageAsDataUrl(file);
-    if (dataUrl) setImage(dataUrl);
+    const url = await uploadBadgeImage(file);
+    if (url) setImage(url);
   };
 
   return (
     <ModalShell title={isEdit ? "Edit badge" : "Add badge"} onClose={onClose}>
       <div className="space-y-4 p-6">
-        <Field label="Image" hint="GIF, PNG, JPG or WebP. Max 1 MB. GIFs animate on the student page.">
+        <Field label="Image" hint="GIF, PNG, JPG or WebP. Max 2 MB. GIFs animate on the student page.">
           <div className="flex items-center gap-4">
             <BadgeImage src={image} size="lg" />
             <div className="flex flex-col gap-2">
