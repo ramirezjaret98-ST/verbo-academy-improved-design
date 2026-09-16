@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
-import { NotebookPen, UserRound, CalendarClock, Video } from "lucide-react";
+import { NotebookPen, UserRound, CalendarClock, Video, ChevronDown } from "lucide-react";
 import { userById } from "@/lib/mock-data";
 import { AccentModalHeader, AccentModalFooter, GhostButton, InfoStatRow } from "@/components/verbo/ui";
 import type { LessonPlan, LessonSessionType } from "@/lib/lesson-plans-store";
 import type { ExtSession } from "@/lib/sessions-store";
+import { MACRO_SKILLS, skillKey } from "@/lib/skills-taxonomy";
 import { unitsForStudent, vipUnitDoneMap } from "@/lib/vip-courses-store";
 import { tailoredUnitsForStudent, tailoredUnitDoneMap } from "@/lib/tailored-content-store";
 import {
@@ -58,6 +59,16 @@ export function PlanModal({
   const [comments, setComments] = useState(existing?.comments ?? "");
   const [vipUnitId, setVipUnitId] = useState(existing?.vip_unit_id ?? "");
   const [tailoredUnitId, setTailoredUnitId] = useState(existing?.tailored_unit_id ?? "");
+  // Sub-skills the teacher wants this session to revolve around — purely a
+  // multi-select, no scoring here (scoring stays in the Session Report).
+  // No cap on how many: Jaret's call (2026-09-16) was "sin límite".
+  const [focusSubskills, setFocusSubskills] = useState<string[]>(existing?.focus_subskills ?? []);
+  const [expandedMacro, setExpandedMacro] = useState<string | null>(null);
+
+  const toggleFocusSubskill = (macroKey: string, subName: string) => {
+    const key = skillKey(macroKey as any, subName);
+    setFocusSubskills((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
+  };
 
   const isVip = student?.product === "vip";
   const vipUnits = isVip ? unitsForStudent(student!.id) : [];
@@ -108,6 +119,7 @@ export function PlanModal({
       unit_id: showLevelUnit ? unitId : undefined,
       vip_unit_id: isVip && vipUnitId ? vipUnitId : undefined,
       tailored_unit_id: isElite && tailoredUnitId ? tailoredUnitId : undefined,
+      focus_subskills: focusSubskills.length > 0 ? focusSubskills : undefined,
       comments: comments.trim(),
       planning_status,
       saved_at: new Date().toISOString(),
@@ -246,6 +258,59 @@ export function PlanModal({
               </p>
             </div>
           )}
+
+          <div>
+            <label className="text-xs font-medium text-foreground">Sub-skills to focus this session on (optional)</label>
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              Pick as many as you want — the student will see these as a preview in their Ready modal, and
+              they'll be highlighted for you (without limiting the rest) when you fill the Session Report.
+            </p>
+            <div className="mt-2 space-y-2">
+              {MACRO_SKILLS.map((m) => {
+                const Icon = m.icon;
+                const selectedCount = m.subs.filter((s) => focusSubskills.includes(skillKey(m.key, s.name))).length;
+                const isOpen = expandedMacro === m.key;
+                return (
+                  <div key={m.key} className="overflow-hidden rounded-lg border border-border">
+                    <button
+                      type="button"
+                      onClick={() => setExpandedMacro(isOpen ? null : m.key)}
+                      className="flex w-full cursor-pointer items-center justify-between gap-2 px-3 py-2 text-left transition-colors hover:bg-secondary/40"
+                    >
+                      <span className="flex items-center gap-2 text-sm font-medium text-foreground">
+                        <Icon className="h-4 w-4" style={{ color: NAVY }} /> {m.key}
+                      </span>
+                      <span className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                        {selectedCount > 0 ? `${selectedCount} selected` : "None selected"}
+                        <ChevronDown className={`h-3.5 w-3.5 transition-transform ${isOpen ? "rotate-180" : ""}`} />
+                      </span>
+                    </button>
+                    {isOpen && (
+                      <div className="flex flex-wrap gap-1.5 border-t border-border bg-secondary/20 px-3 py-2.5">
+                        {m.subs.map((s) => {
+                          const key = skillKey(m.key, s.name);
+                          const active = focusSubskills.includes(key);
+                          return (
+                            <button
+                              key={s.name}
+                              type="button"
+                              onClick={() => toggleFocusSubskill(m.key, s.name)}
+                              className="inline-flex cursor-pointer items-center rounded-full px-2.5 py-1 text-xs font-medium transition-colors"
+                              style={active
+                                ? { backgroundColor: NAVY, color: "#ffffff" }
+                                : { backgroundColor: "var(--secondary)", color: "var(--muted-foreground)" }}
+                            >
+                              {s.name}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
 
           <div>
             <label className="text-xs font-medium text-foreground">Teacher's comments and instructions</label>

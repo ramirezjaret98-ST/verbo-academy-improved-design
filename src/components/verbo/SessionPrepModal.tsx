@@ -29,6 +29,7 @@ import { userById } from "@/lib/mock-data";
 import { unitsForStudent } from "@/lib/vip-courses-store";
 import { tailoredUnitsForStudent } from "@/lib/tailored-content-store";
 import { loadCourses, PRODUCT_TO_COURSE } from "@/lib/product-courses-store";
+import { FocusSkillsPills } from "@/components/verbo/FocusSkillsPills";
 
 interface ResolvedTopic {
   levelName: string;
@@ -117,6 +118,8 @@ export function SessionPrepModal({
               value={`${topic.levelName} — ${topic.unitTitle}`}
             />
           )}
+
+          <FocusSkillsPills keys={plan.focus_subskills} />
 
           <div>
             <div className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
