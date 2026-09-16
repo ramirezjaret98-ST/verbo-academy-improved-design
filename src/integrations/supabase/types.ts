@@ -1902,6 +1902,7 @@ export type Database = {
         Row: {
           comments: string
           custom_unit_id: number | null
+          focus_subskills: string[]
           level_id: string | null
           planning_status: string
           saved_at: string
@@ -1913,6 +1914,7 @@ export type Database = {
         Insert: {
           comments: string
           custom_unit_id?: number | null
+          focus_subskills?: string[]
           level_id?: string | null
           planning_status: string
           saved_at?: string
@@ -1924,6 +1926,7 @@ export type Database = {
         Update: {
           comments?: string
           custom_unit_id?: number | null
+          focus_subskills?: string[]
           level_id?: string | null
           planning_status?: string
           saved_at?: string
