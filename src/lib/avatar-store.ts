@@ -15,6 +15,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { registerRehydrate } from "@/lib/auth-rehydrate";
 import { legacyToUuid } from "./user-id-bridge";
 import { notifyError } from "@/lib/notify";
+import { uploadPublicImage } from "@/lib/content-uploads";
 
 const EVT = "verbo:avatars-updated";
 
@@ -82,20 +83,38 @@ if (typeof window !== "undefined") {
 }
 
 export function setAvatar(userId: string, dataUrl: string) {
-  // Optimistic: update the cache + notify immediately, persist in background.
+  // Optimistic: show the just-cropped image immediately from the data URL
+  // (no round-trip yet), then swap it for the real Storage URL once the
+  // upload + DB update below finish.
   cache.set(userId, dataUrl);
   notify();
   void (async () => {
     const uuid = await legacyToUuid(userId);
     if (!uuid) return; // no real account on file — nothing to persist to
+
+    // 2026-09-16: antes esto guardaba `dataUrl` (base64) directo en
+    // `app_users.avatar_url` — cada `select=*` sobre esa tabla viajaba con la
+    // foto completa incrustada en el JSON, y eso fue lo que disparó el
+    // egress de PostgREST (auditoría 2026-09-16, ver memoria del proyecto).
+    // Ahora se sube la imagen a Storage y solo se guarda la URL.
+    const blob = await (await fetch(dataUrl)).blob();
+    const uploaded = await uploadPublicImage(blob, "avatars", uuid);
+    if (!uploaded.ok) {
+      console.error("[avatar-store] failed to upload avatar", uploaded.error);
+      notifyError(uploaded.error, { context: "Saving profile photo" });
+      return;
+    }
     const { error } = await supabase
       .from("app_users")
-      .update({ avatar_url: dataUrl })
+      .update({ avatar_url: uploaded.url })
       .eq("id", uuid);
     if (error) {
       console.error("[avatar-store] failed to persist avatar", error);
       notifyError(error, { context: "Saving profile photo" });
+      return;
     }
+    cache.set(userId, uploaded.url);
+    notify();
   })();
 }
 

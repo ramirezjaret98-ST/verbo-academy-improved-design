@@ -45,3 +45,48 @@ export async function uploadContentFile(
   const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
   return { ok: true, url: data.publicUrl, fileName: file.name };
 }
+
+// Segundo bucket, separado de "content" a propósito: avatares, íconos de
+// badges/challenges y cualquier otra imagen "decorativa" de bajo riesgo que
+// se muestra en <img> por toda la app. Antes esto se guardaba como base64
+// directo en columnas de texto (app_users.avatar_url, badge_defs.image_url,
+// challenges.icon_image_url) — cada select=* sobre esas tablas viajaba con
+// las imágenes completas incrustadas en el JSON, y eso fue lo que disparó el
+// egress de PostgREST a ~900MB/día (auditoría 2026-09-16). "public-assets" SÍ
+// es un bucket público (a diferencia de "content"): estas imágenes no son
+// sensibles y se muestran con mucha frecuencia, así que conviene que el
+// navegador las cachee por URL en vez de repetir un viaje de firma de URL
+// cada vez.
+const PUBLIC_BUCKET = "public-assets";
+export const MAX_PUBLIC_IMAGE_BYTES = 2 * 1024 * 1024; // 2MB
+export const MAX_PUBLIC_IMAGE_ERROR = "Image is too large — please upload a file under 2MB";
+
+/** Sube una imagen al bucket público, en una ruta ESTABLE por entidad
+ *  (`${folder}/${id}.${ext}`, upsert:true) — a diferencia de
+ *  `uploadContentFile()` (ruta con UUID aleatorio, nunca se sobreescribe),
+ *  aquí SÍ se espera reemplazar la imagen de la misma entidad con el tiempo
+ *  (cambiar de avatar, editar el ícono de un badge), así que no se usa cache
+ *  inmutable de un año — se deja el cacheControl por default de Supabase. */
+export async function uploadPublicImage(
+  file: File | Blob,
+  folder: string,
+  id: string | number,
+): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
+  if (file.size > MAX_PUBLIC_IMAGE_BYTES) return { ok: false, error: MAX_PUBLIC_IMAGE_ERROR };
+  const mime = file.type || "image/png";
+  const ext = mime.split("/")[1]?.split("+")[0] || "png";
+  const path = `${folder}/${id}.${ext}`;
+  const { error } = await supabase.storage.from(PUBLIC_BUCKET).upload(path, file, {
+    contentType: mime,
+    upsert: true,
+  });
+  if (error) {
+    console.error("[content-uploads] failed to upload public image", error);
+    return { ok: false, error: "Upload failed — please try again." };
+  }
+  const { data } = supabase.storage.from(PUBLIC_BUCKET).getPublicUrl(path);
+  // Cache-busting: la ruta es estable (mismo nombre si se reemplaza la
+  // imagen), así que sin esto el navegador podría seguir sirviendo la copia
+  // vieja desde caché tras un re-upload.
+  return { ok: true, url: `${data.publicUrl}?v=${Date.now()}` };
+}
