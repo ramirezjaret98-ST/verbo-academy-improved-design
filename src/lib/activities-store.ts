@@ -236,6 +236,7 @@ type ActivityTableRow = Database["public"]["Tables"]["activities"]["Row"];
 type StaffActivityRow = Database["public"]["Functions"]["activities_for_staff"]["Returns"][number];
 type StudentActivityRow = Database["public"]["Functions"]["activities_for_student"]["Returns"][number];
 type ActivityRow = ActivityTableRow | StaffActivityRow | StudentActivityRow;
+type ActivitiesVersionRow = Database["public"]["Functions"]["activities_version"]["Returns"][number];
 type CompletionRow = Database["public"]["Tables"]["activity_completions"]["Row"];
 type UnitAttemptRow = Database["public"]["Tables"]["unit_attempts"]["Row"];
 type ScoreRow = Database["public"]["Tables"]["activity_scores"]["Row"];
@@ -336,6 +337,47 @@ let hydratePromise: Promise<void> | null = null;
 let lastAuthId: string | null | undefined;
 const listeners = new Set<() => void>();
 
+/* ---- Cache local del catálogo de actividades (localStorage) ----
+ * 2026-09-16: `activities_for_staff`/`activities_for_student` devuelven la
+ * tabla `activities` COMPLETA (~200-300KB como JSON) y se estaban llamando
+ * ~340 veces/día sin ningún cache entre cargas de página — una porción real
+ * del egress de PostgREST (ver auditoría del mismo día en la memoria del
+ * proyecto). El catálogo casi nunca cambia (solo cuando un admin edita o
+ * agrega actividades), así que antes de re-descargarlo completo se pregunta
+ * con `activities_version()` — un conteo + una fecha, unas decenas de
+ * bytes — si algo cambió desde la última vez que ESTE navegador lo bajó
+ * completo. Si no cambió, se reusa la copia guardada en vez de repetir la
+ * descarga grande. Nunca es la única fuente de verdad: Realtime sigue
+ * invalidando y re-hidratando de inmediato en cuanto la tabla cambia
+ * (ver `ensureRealtime` más abajo), y si localStorage falla o no está
+ * disponible (modo incógnito, cuota llena) simplemente se hace la descarga
+ * completa como antes. */
+const ACTIVITIES_CACHE_KEY = "verbo:activities-cache-v1";
+interface ActivitiesCacheEntry {
+  role: "staff" | "student";
+  cnt: number;
+  maxUpdatedAt: string | null;
+  rows: ActivityRow[];
+}
+function readActivitiesCache(): ActivitiesCacheEntry | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(ACTIVITIES_CACHE_KEY);
+    return raw ? (JSON.parse(raw) as ActivitiesCacheEntry) : null;
+  } catch {
+    return null;
+  }
+}
+function writeActivitiesCache(entry: ActivitiesCacheEntry) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(ACTIVITIES_CACHE_KEY, JSON.stringify(entry));
+  } catch {
+    // localStorage llena o deshabilitada — no es crítico, solo se pierde la
+    // ventaja de cache en el próximo load.
+  }
+}
+
 function notify() {
   listeners.forEach((cb) => cb());
   if (typeof window !== "undefined") {
@@ -373,26 +415,43 @@ async function hydrate(): Promise<void> {
   if (hydratePromise) return hydratePromise;
   hydratePromise = (async () => {
     const [, role] = await Promise.all([hydrateUserIdBridge(), currentRole()]);
+    const isStaff = role === "admin" || role === "teacher";
     // `activities` has no open SELECT path for this store — reads go through
     // role-scoped RPCs so students never receive `audio_name`.
-    const activitiesPromise =
-      role === "admin" || role === "teacher"
-        ? supabase.rpc("activities_for_staff")
-        : supabase.rpc("activities_for_student");
-    const [actRes, compRes, attRes, scoreRes, accessRes] = await Promise.all([
-      activitiesPromise,
+    const [versionRes, compRes, attRes, scoreRes, accessRes] = await Promise.all([
+      supabase.rpc("activities_version"),
       supabase.from("activity_completions").select("*"),
       supabase.from("unit_attempts").select("*"),
       supabase.from("activity_scores").select("*"),
       supabase.from("unit_access_events").select("*"),
     ]);
-    if (actRes.error) console.error("[activities-store] failed to load activities", actRes.error);
     if (compRes.error) console.error("[activities-store] failed to load completions", compRes.error);
     if (attRes.error) console.error("[activities-store] failed to load unit attempts", attRes.error);
     if (scoreRes.error) console.error("[activities-store] failed to load scores", scoreRes.error);
     if (accessRes.error) console.error("[activities-store] failed to load unit access events", accessRes.error);
 
-    activitiesCache = ((actRes.data ?? []) as ActivityRow[]).map(fromActivityRow);
+    if (versionRes.error) console.error("[activities-store] failed to check activities version", versionRes.error);
+    const version = !versionRes.error ? (versionRes.data?.[0] as ActivitiesVersionRow | undefined) ?? null : null;
+    const roleKey: ActivitiesCacheEntry["role"] = isStaff ? "staff" : "student";
+    const cached = version ? readActivitiesCache() : null;
+    const cacheIsFresh =
+      !!cached && !!version && cached.role === roleKey && cached.cnt === version.cnt && cached.maxUpdatedAt === version.max_updated_at;
+
+    let activityRows: ActivityRow[];
+    if (cacheIsFresh) {
+      activityRows = cached!.rows;
+    } else {
+      const actRes = isStaff ? await supabase.rpc("activities_for_staff") : await supabase.rpc("activities_for_student");
+      if (actRes.error) {
+        console.error("[activities-store] failed to load activities", actRes.error);
+        activityRows = cached?.rows ?? [];
+      } else {
+        activityRows = (actRes.data ?? []) as ActivityRow[];
+        if (version) writeActivitiesCache({ role: roleKey, cnt: version.cnt, maxUpdatedAt: version.max_updated_at, rows: activityRows });
+      }
+    }
+
+    activitiesCache = activityRows.map(fromActivityRow);
 
     const comp: Record<string, boolean> = {};
     for (const row of (compRes.data ?? []) as CompletionRow[]) {
