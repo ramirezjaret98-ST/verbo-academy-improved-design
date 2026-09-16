@@ -43,6 +43,13 @@ export interface LessonPlan {
   // Optional link to a Tailored Content unit for students on access_plan
   // "Elite". Parallel to vip_unit_id but for a fully separate mechanism.
   tailored_unit_id?: string;
+  // Sub-skills the teacher chose for this session to revolve around, keyed
+  // "Macro:Sub" — same convention as skillKey()/skills-taxonomy.ts and
+  // performance_ratings.subskills. Purely informational: it drives the
+  // "Skills we'll focus on" pills the student sees in their Ready modal and
+  // a visual hint in the Session Report, but never restricts which
+  // sub-skills a teacher can later rate. Empty/undefined = nothing chosen.
+  focus_subskills?: string[];
   comments: string;
   planning_status: "on-time" | "late";
   saved_at: string; // ISO
@@ -63,6 +70,9 @@ function fromRow(row: Row): LessonPlan {
   };
   if (row.level_id != null) plan.level_id = row.level_id;
   if (row.unit_id != null) plan.unit_id = row.unit_id;
+  if (Array.isArray(row.focus_subskills) && row.focus_subskills.length > 0) {
+    plan.focus_subskills = row.focus_subskills;
+  }
   if (row.custom_unit_id != null) {
     // custom-units-store is awaited (hydrateCustomUnits) before this runs, so
     // `findCustomUnitById` is reliable here — undefined only for a genuinely
@@ -166,6 +176,7 @@ export function saveLessonPlan(plan: LessonPlan) {
         level_id: plan.level_id ?? null,
         unit_id: plan.unit_id ?? null,
         custom_unit_id: customUnitId,
+        focus_subskills: plan.focus_subskills ?? [],
         comments: plan.comments,
         planning_status: plan.planning_status,
         saved_at: plan.saved_at,
