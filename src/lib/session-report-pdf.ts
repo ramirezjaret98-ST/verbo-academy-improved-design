@@ -242,7 +242,11 @@ export async function buildSessionReportPdf(input: SessionReportInput): Promise<
     explanation: sanitizePdfText(e.explanation),
   }));
 
-  const doc = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
+  // compress:true — este PDF es casi todo texto/vectores dibujados por jsPDF
+  // (no html2canvas), así que el ahorro es menor que en los otros generadores,
+  // pero es gratis y mantiene la misma bandera en TODOS los generadores de la
+  // app (auditoría 2026-09-16 por tamaño de archivo excesivo en Supabase).
+  const doc = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4", compress: true });
   const W = doc.internal.pageSize.getWidth();
   const MARGIN = 48;
   const contentWidth = W - MARGIN * 2;

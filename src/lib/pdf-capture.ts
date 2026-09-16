@@ -205,7 +205,12 @@ export async function renderHtmlToPdf(
     cleanup();
   }
 
-  const doc = new jsPDF({ unit: opts.unit ?? "pt", format: opts.format ?? "letter" });
+  // compress:true es la diferencia entre ~9MB y ~360KB por imagen incrustada
+  // (probado directo con jsPDF: sin esto, jsPDF guarda el PNG del canvas casi
+  // sin comprimir dentro del PDF — con esto, aplica DEFLATE de verdad). Es la
+  // causa real de los PDFs de 45+MB que reportó Jaret, no el tamaño del canvas
+  // ni el formato de imagen.
+  const doc = new jsPDF({ unit: opts.unit ?? "pt", format: opts.format ?? "letter", compress: true });
   const pdfWidth = doc.internal.pageSize.getWidth();
   const pdfHeight = doc.internal.pageSize.getHeight();
 

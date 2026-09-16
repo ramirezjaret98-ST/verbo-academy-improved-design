@@ -295,7 +295,9 @@ export async function generateLevelCertificate(input: CertificateInput): Promise
   // PDF page is sized to match the canvas exactly (unit "px", format =
   // canvas dimensions) instead of forcing it into a4's slightly different
   // aspect ratio, which left a near-blank sliver second page in testing.
-  const doc = new jsPDF({ orientation: "landscape", unit: "px", format: [canvas.width, canvas.height] });
+  // compress:true — mismo fix de tamaño que pdf-capture.ts (ver comentario
+  // ahí): sin esto jsPDF guarda el PNG del canvas casi sin comprimir.
+  const doc = new jsPDF({ orientation: "landscape", unit: "px", format: [canvas.width, canvas.height], compress: true });
   doc.addImage(imgData, "PNG", 0, 0, canvas.width, canvas.height);
 
   doc.save(certificateFileName(input));
