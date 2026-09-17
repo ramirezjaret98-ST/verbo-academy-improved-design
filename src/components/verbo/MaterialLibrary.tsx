@@ -8,6 +8,7 @@ import { useAuth } from "@/lib/auth";
 import { groupsByStudentId } from "@/lib/groups-store";
 import { SignedIframe, SignedImg, SignedVideo } from "@/components/verbo/SignedMedia";
 import { openSignedContentUrl } from "@/lib/storage-signed-url";
+import { PracticeCategorySection } from "@/components/verbo/practice/PracticeCategorySection";
 import listeningArt from "@/assets/Listiening.svg";
 import grammarArt from "@/assets/Grammar.svg";
 import vocabularyArt from "@/assets/Vocabulary_2.svg";
@@ -377,6 +378,10 @@ export function MaterialLibrary({
   const [upsell, setUpsell] = useState(false);
   const [query, setQuery] = useState("");
   const letterRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  // Only students accumulate a practice score — Teacher/Admin browsing this
+  // same library see the cards read-only (no completion tracking).
+  const { user } = useAuth();
+  const practiceStudentId = user?.role === "student" ? user.id : undefined;
 
   // Premium materials leave their original category and live in the dedicated
   // "Premium" showcase instead.
@@ -636,6 +641,10 @@ export function MaterialLibrary({
             </div>
           </div>
 
+
+          {!isPremiumView && category && (
+            <PracticeCategorySection category={category} studentId={practiceStudentId} />
+          )}
 
           <SectionTitle>
             {filtered.length} {filtered.length === 1 ? "resource" : "resources"}
