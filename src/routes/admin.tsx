@@ -37,6 +37,7 @@ const NAV_GROUPS: NavGroup[] = [
     { to: "/admin/challenges", label: "Challenges" },
     { to: "/admin/flash",      label: "Verbo Flash" },
     { to: "/admin/materials",  label: "Material Complementario" },
+    { to: "/admin/practice",   label: "Práctica Complementaria" },
   ]},
   { label: "Calendar", items: [
     { to: "/admin/calendar", label: "Overview" },
