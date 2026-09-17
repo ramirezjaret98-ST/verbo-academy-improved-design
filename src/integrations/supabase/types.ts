@@ -2492,6 +2492,83 @@ export type Database = {
           },
         ]
       }
+      practice_activities: {
+        Row: {
+          category: string
+          content: Json
+          created_at: string
+          exercises: Json
+          format: Database["public"]["Enums"]["practice_format"]
+          id: number
+          premium: boolean
+          product_lines: Database["public"]["Enums"]["product_id"][]
+          subcategory: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          category: string
+          content?: Json
+          created_at?: string
+          exercises?: Json
+          format: Database["public"]["Enums"]["practice_format"]
+          id?: never
+          premium?: boolean
+          product_lines?: Database["public"]["Enums"]["product_id"][]
+          subcategory?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          content?: Json
+          created_at?: string
+          exercises?: Json
+          format?: Database["public"]["Enums"]["practice_format"]
+          id?: never
+          premium?: boolean
+          product_lines?: Database["public"]["Enums"]["product_id"][]
+          subcategory?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      practice_scores: {
+        Row: {
+          attempted: boolean
+          attempts: number
+          best: number
+          last_at: string | null
+          practice_id: number
+          student_id: string
+        }
+        Insert: {
+          attempted?: boolean
+          attempts?: number
+          best?: number
+          last_at?: string | null
+          practice_id: number
+          student_id: string
+        }
+        Update: {
+          attempted?: boolean
+          attempts?: number
+          best?: number
+          last_at?: string | null
+          practice_id?: number
+          student_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "practice_scores_practice_id_fkey"
+            columns: ["practice_id"]
+            isOneToOne: false
+            referencedRelation: "practice_activities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       product_courses: {
         Row: {
           id: number
@@ -4071,6 +4148,7 @@ export type Database = {
       paid_entity_type: "individual" | "group"
       payment_frequency: "weekly" | "biweekly" | "monthly"
       payment_record_status: "pending" | "paid"
+      practice_format: "comparativa" | "grid" | "reading" | "carousel"
       product_id: "enterprise" | "go" | "international" | "vip"
       product_type: "performance" | "workshops" | "insights"
       session_origin: "course" | "workshop" | "spotlight" | "group"
