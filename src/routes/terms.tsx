@@ -5,7 +5,7 @@ import { Logo } from "@/components/verbo/Logo";
 export const Route = createFileRoute("/terms")({
   head: () => ({
     meta: [
-      { title: "Terms & Conditions | Verbo Language Solutions" },
+      { title: "Terms & Conditions | Verbo Academy" },
       {
         name: "description",
         content:

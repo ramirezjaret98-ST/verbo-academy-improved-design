@@ -5,7 +5,7 @@ import { Logo } from "@/components/verbo/Logo";
 import { Loader2, Check, X } from "lucide-react";
 
 export const Route = createFileRoute("/change-password")({
-  head: () => ({ meta: [{ title: "Change your password — Verbo Language Solutions" }] }),
+  head: () => ({ meta: [{ title: "Change your password — Verbo Academy" }] }),
   component: ChangePasswordPage,
 });
 

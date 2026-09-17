@@ -22,7 +22,7 @@ import { Logo } from "@/components/verbo/Logo";
 import { Loader2, Check, AlertTriangle, FileText } from "lucide-react";
 
 export const Route = createFileRoute("/facturacion/$token")({
-  head: () => ({ meta: [{ title: "Solicitar factura — Verbo Language Solutions" }] }),
+  head: () => ({ meta: [{ title: "Solicitar factura — Verbo Academy" }] }),
   component: FacturacionPage,
 });
 

@@ -18,7 +18,7 @@ import { Loader2, Check, AlertTriangle, FileSignature } from "lucide-react";
 import { renderContractHtml, renderContractPdfBase64, CONSENT_LEGEND, CONSENT_REMINDER, type ContractFields } from "@/lib/contract-pdf";
 
 export const Route = createFileRoute("/firmar-contrato/$token")({
-  head: () => ({ meta: [{ title: "Firmar contrato — Verbo Language Solutions" }] }),
+  head: () => ({ meta: [{ title: "Firmar contrato — Verbo Academy" }] }),
   component: SignContractPage,
 });
 

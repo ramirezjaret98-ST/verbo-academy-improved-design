@@ -14,9 +14,9 @@ import navyCardImage from "@/assets/navy_card_image.webp";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Verbo Language Solutions — The Language of Global Growth" },
+      { title: "Verbo Academy — The Language of Global Growth" },
       { name: "description", content: "Premium B2B English training for global teams. Private platform with live sessions, structured curriculum and measurable progress." },
-      { property: "og:title", content: "Verbo Language Solutions" },
+      { property: "og:title", content: "Verbo Academy" },
       { property: "og:description", content: "The Language of Global Growth." },
     ],
   }),

@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Check, Loader2, X } from "lucide-react";
 
 export const Route = createFileRoute("/reset-password")({
-  head: () => ({ meta: [{ title: "Reset your password — Verbo Language Solutions" }] }),
+  head: () => ({ meta: [{ title: "Reset your password — Verbo Academy" }] }),
   component: ResetPasswordPage,
 });
 

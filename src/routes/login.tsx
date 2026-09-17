@@ -36,7 +36,7 @@ function EyeToggle({ open }: { open: boolean }) {
 
 
 export const Route = createFileRoute("/login")({
-  head: () => ({ meta: [{ title: "Sign in — Verbo Language Solutions" }] }),
+  head: () => ({ meta: [{ title: "Sign in — Verbo Academy" }] }),
   component: LoginPage,
 });
 
