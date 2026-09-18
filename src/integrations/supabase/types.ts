@@ -2539,6 +2539,7 @@ export type Database = {
           attempted: boolean
           attempts: number
           best: number
+          last_answer: string | null
           last_at: string | null
           practice_id: number
           student_id: string
@@ -2547,6 +2548,7 @@ export type Database = {
           attempted?: boolean
           attempts?: number
           best?: number
+          last_answer?: string | null
           last_at?: string | null
           practice_id: number
           student_id: string
@@ -2555,6 +2557,7 @@ export type Database = {
           attempted?: boolean
           attempts?: number
           best?: number
+          last_answer?: string | null
           last_at?: string | null
           practice_id?: number
           student_id?: string
