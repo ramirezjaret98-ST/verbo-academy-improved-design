@@ -72,6 +72,11 @@ export interface PracticeExercise {
   // fill_gaps — paragraph contains literal "[blank]" markers, same as Activity.
   paragraph?: string;
   answer?: string;
+  /** Extra accepted equivalents for fill_gaps (e.g. answer:"traveled",
+   *  answers:["went"] both grade as correct). Keeps `answer` as the single
+   *  "canonical" value shown in admin/preview while letting authors accept
+   *  known synonyms — English often has more than one valid word for a gap. */
+  answers?: string[];
   // read_select — true/false (2 options) or multiple choice (3+ options).
   question?: string;
   options?: string[];
@@ -83,10 +88,14 @@ export interface PracticeExercise {
 }
 
 /** Mirrors `evaluate()` in student.courses.tsx for fill_gaps/read_select —
- *  same trim+lowercase compare, same Number(value)===correctIndex check. */
+ *  same trim+lowercase compare, same Number(value)===correctIndex check —
+ *  plus support for `answers` (accepted synonyms) on fill_gaps. */
 export function evaluatePracticeExercise(ex: PracticeExercise, value: string): boolean {
   const norm = (s: string) => s.trim().toLowerCase();
-  if (ex.type === "fill_gaps") return norm(value) === norm(ex.answer ?? "");
+  if (ex.type === "fill_gaps") {
+    const accepted = [ex.answer, ...(ex.answers ?? [])].filter((a): a is string => !!a && a.trim().length > 0);
+    return accepted.some((a) => norm(value) === norm(a));
+  }
   if (ex.type === "read_select") return Number(value) === ex.correctIndex;
   return false;
 }
@@ -154,6 +163,10 @@ export interface PracticeScore {
   attempts: number;
   lastAt: string;
   attempted: boolean;
+  /** The student's most recent raw answer (typed text, or the chosen option's
+   *  label for read_select) — reference only, shown back to teacher/admin.
+   *  Never used for grading or scoring; that's `best`/`attempted`. */
+  lastAnswer?: string;
 }
 
 /* ---------------- Sanitization ---------------- */
@@ -163,6 +176,7 @@ function sanitizeExercise(ex: PracticeExercise): PracticeExercise {
     ...ex,
     paragraph: ex.paragraph !== undefined ? sanitizeText(ex.paragraph) : undefined,
     answer: ex.answer !== undefined ? sanitizeText(ex.answer) : undefined,
+    answers: ex.answers ? ex.answers.map(sanitizeText).filter((a) => a.length > 0) : undefined,
     question: ex.question !== undefined ? sanitizeText(ex.question) : undefined,
     options: ex.options ? ex.options.map(sanitizeText) : undefined,
     feedback: ex.feedback !== undefined ? sanitizeText(ex.feedback) : undefined,
@@ -244,6 +258,7 @@ export function validateBulkPracticeItems(raw: unknown[]): { valid: PracticeActi
         type: e.type,
         paragraph: str(e.paragraph) || undefined,
         answer: str(e.answer) || undefined,
+        answers: Array.isArray(e.answers) ? (e.answers as unknown[]).map(str).filter(Boolean) : undefined,
         question: str(e.question) || undefined,
         options: Array.isArray(e.options) ? (e.options as unknown[]).map(str) : undefined,
         correctIndex: typeof e.correctIndex === "number" ? e.correctIndex : undefined,
@@ -338,6 +353,7 @@ async function hydrate(): Promise<void> {
         attempts: row.attempts,
         lastAt: row.last_at ?? "",
         attempted: row.attempted,
+        lastAnswer: row.last_answer ?? undefined,
       };
     }
     scoresCache = scores;
@@ -474,9 +490,17 @@ export function wasPracticeAttempted(studentId: string, practiceId: string): boo
   return !!scoresCache[scopedKey(studentId, practiceId)]?.attempted;
 }
 
-/** Records a completion score (0-100) for a practice card. Optimistic write
- *  with rollback on failure, mirroring recordActivityScore exactly. */
-export function recordPracticeScore(studentId: string, practiceId: string, score: number): PracticeScore {
+/** The student's most recent raw answer for this card, if any — reference
+ *  only (see PracticeScore.lastAnswer). */
+export function lastPracticeAnswerFor(studentId: string, practiceId: string): string | undefined {
+  return scoresCache[scopedKey(studentId, practiceId)]?.lastAnswer;
+}
+
+/** Records a completion score (0-100) for a practice card, plus the raw
+ *  answer text for reference (never used for grading — see PracticeScore.
+ *  lastAnswer). Optimistic write with rollback on failure, mirroring
+ *  recordActivityScore exactly. */
+export function recordPracticeScore(studentId: string, practiceId: string, score: number, answerText?: string): PracticeScore {
   const k = scopedKey(studentId, practiceId);
   const hadKey = k in scoresCache;
   const prevValue = scoresCache[k];
@@ -486,6 +510,7 @@ export function recordPracticeScore(studentId: string, practiceId: string, score
     attempts: cur.attempts + 1,
     lastAt: new Date().toISOString(),
     attempted: true,
+    lastAnswer: answerText !== undefined ? sanitizeText(answerText) : cur.lastAnswer,
   };
   scoresCache = { ...scoresCache, [k]: next };
   notify();
@@ -500,7 +525,15 @@ export function recordPracticeScore(studentId: string, practiceId: string, score
     const { error } = await supabase
       .from("practice_scores")
       .upsert(
-        { student_id: studentUuid, practice_id: Number(practiceId), best: next.best, attempts: next.attempts, attempted: next.attempted, last_at: next.lastAt },
+        {
+          student_id: studentUuid,
+          practice_id: Number(practiceId),
+          best: next.best,
+          attempts: next.attempts,
+          attempted: next.attempted,
+          last_at: next.lastAt,
+          last_answer: next.lastAnswer ?? null,
+        },
         { onConflict: "student_id,practice_id" },
       );
     if (error) {
