@@ -20,9 +20,15 @@ import {
   type ComparativaContent,
 } from "@/lib/practice-store";
 
+// English throughout — matches the interaction-chrome convention already
+// used by the unit-activities runner (student.courses.tsx: "Check Answer",
+// "Type your answer", "Nice work — moving on."). Only the format-agnostic
+// `content`/`exercises` fields authored in the JSON (definitions, tags,
+// eyebrow, question, hint, feedback) carry whatever language the admin
+// writes them in.
 function ExerciseHeaderLabel(exType: "fill_gaps" | "read_select", optionsCount: number): string {
-  if (exType === "fill_gaps") return "Completa";
-  return optionsCount <= 2 ? "Verdadero o falso" : "Opción múltiple";
+  if (exType === "fill_gaps") return "Fill in the blank";
+  return optionsCount <= 2 ? "True or False" : "Multiple Choice";
 }
 
 export function PracticeComparativaCard({
@@ -136,7 +142,7 @@ export function PracticeComparativaCard({
                     value={value}
                     onChange={(e) => setValue(e.target.value)}
                     disabled={!!checked}
-                    placeholder="Escribe tu respuesta"
+                    placeholder="Type your answer"
                     className="h-10 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground shadow-sm focus:outline-none focus:ring-2 disabled:opacity-60"
                     style={{ ["--tw-ring-color" as string]: `${theme.solid}55` }}
                   />
@@ -171,7 +177,7 @@ export function PracticeComparativaCard({
                   className="ml-auto flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold text-white shadow-sm transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
                   style={{ backgroundColor: theme.solid }}
                 >
-                  Comprobar
+                  Check Answer
                 </button>
               ) : (
                 <div className={`flex items-center justify-between gap-3 rounded-xl px-4 py-3 ${checked.ok ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" : "bg-rose-500/10 text-rose-700 dark:text-rose-300"}`}>
@@ -180,11 +186,11 @@ export function PracticeComparativaCard({
                       {checked.ok ? <CheckCircle2 className="h-4.5 w-4.5" /> : <X className="h-4.5 w-4.5" />}
                     </span>
                     <div className="text-xs font-semibold">
-                      {checked.ok ? "¡Correcto!" : (exercise.feedback?.trim() || "No es correcto, intenta de nuevo.")}
+                      {checked.ok ? "Correct!" : (exercise.feedback?.trim() || "Not quite — take another look.")}
                     </div>
                   </div>
                   <button onClick={tryAgain} className="shrink-0 text-xs font-semibold underline underline-offset-2 opacity-80 hover:opacity-100">
-                    Intentar de nuevo
+                    Try again
                   </button>
                 </div>
               )}
