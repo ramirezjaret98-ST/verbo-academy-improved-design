@@ -49,7 +49,12 @@ export function PracticeComparativaCard({
     if (!exercise) return;
     const ok = evaluatePracticeExercise(exercise, value);
     setChecked({ ok });
-    if (!readOnly) recordPracticeScore(studentId, practice.id, ok ? 100 : 0);
+    if (!readOnly) {
+      // Store the human-readable answer (the option's label for read_select,
+      // the typed text for fill_gaps) — reference only, never used to grade.
+      const answerText = exercise.type === "read_select" ? (exercise.options?.[Number(value)] ?? value) : value;
+      recordPracticeScore(studentId, practice.id, ok ? 100 : 0, answerText);
+    }
   }
 
   function tryAgain() {

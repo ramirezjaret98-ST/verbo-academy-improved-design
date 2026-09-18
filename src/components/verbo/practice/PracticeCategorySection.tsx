@@ -7,9 +7,18 @@
 // Renders nothing when there's no practice content yet for this category —
 // most categories will be empty until content gets authored, and this
 // section should never show an empty-state box competing with Materials'.
-import { SectionTitle } from "@/components/verbo/ui";
+//
+// Scaling (Jaret's decision 2026-09-17): once a category has dozens of
+// cards, show a first page only, with a "Ver más" button to reveal the
+// rest — never dump the whole library into one giant grid, and never
+// paginate/rotate silently (the alumno should be able to find everything
+// if they look for it).
+import { useState } from "react";
+import { SectionTitle, GhostButton } from "@/components/verbo/ui";
 import { usePracticeActivities } from "@/lib/practice-store";
 import { PracticeComparativaCard } from "./PracticeComparativaCard";
+
+const INITIAL_VISIBLE = 6; // two full rows at the lg:grid-cols-3 breakpoint
 
 export function PracticeCategorySection({
   category,
@@ -23,6 +32,7 @@ export function PracticeCategorySection({
   readOnly?: boolean;
 }) {
   const all = usePracticeActivities();
+  const [expanded, setExpanded] = useState(false);
   // Only "comparativa" is built so far (v1) — grid/reading/carousel land in
   // later phases per the agreed build order. Unknown formats are ignored
   // rather than crashing, so this section degrades gracefully as more
@@ -32,6 +42,9 @@ export function PracticeCategorySection({
   if (items.length === 0) return null;
 
   const noTrack = readOnly || !studentId;
+  const hasMore = items.length > INITIAL_VISIBLE;
+  const visible = expanded ? items : items.slice(0, INITIAL_VISIBLE);
+  const remaining = items.length - visible.length;
 
   return (
     <div className="space-y-3">
@@ -42,10 +55,17 @@ export function PracticeCategorySection({
         </span>
       </div>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {items.map((p) => (
+        {visible.map((p) => (
           <PracticeComparativaCard key={p.id} practice={p} studentId={studentId ?? ""} readOnly={noTrack} />
         ))}
       </div>
+      {hasMore && (
+        <div className="flex justify-center pt-1">
+          <GhostButton onClick={() => setExpanded((v) => !v)}>
+            {expanded ? "Ver menos" : `Ver más (${remaining} más)`}
+          </GhostButton>
+        </div>
+      )}
     </div>
   );
 }
