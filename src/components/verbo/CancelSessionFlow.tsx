@@ -7,7 +7,7 @@
 //   c) enough notice + quota OK  → Session Cancellation modal (Reschedule or
 //      Cancel Without Rescheduling).
 //   d) Groups: per-member statuses via applyGroupMemberCancellation.
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
 import { USERS, userById } from "@/lib/mock-data";
@@ -27,6 +27,7 @@ import {
   rescheduleQuota,
 } from "@/lib/student-requests-store";
 import { isTeacherAvailableAt, findAvailableStartSlots } from "@/lib/availability-store";
+import { hydrateTeachers, subscribeTeachers } from "@/lib/teacher-model";
 import { GhostButton, PrimaryButton } from "@/components/verbo/ui";
 import { X, AlertTriangle, CalendarClock, ArrowLeft, ShieldCheck } from "lucide-react";
 
@@ -284,6 +285,22 @@ export function RescheduleRequestModal({ session, onClose }: { session: ExtSessi
   const [dateYMD, setDateYMD] = useState<string>(todayYMD());
   const [slotISO, setSlotISO] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
+  // 2026-09-17 fix: qualifiedTeachers below used to be memoized on
+  // `[product]` alone, so it snapshotted USERS the instant this modal
+  // mounted. Real teacher profiles (teacher_status/qualified_products)
+  // load asynchronously via hydrateTeachers() — every other page that
+  // reads USERS for teacher data subscribes to re-tick when that finishes
+  // (see admin.calendar.tsx, student.sessions.tsx, etc.), but this modal
+  // never did, so a teacher who hadn't finished loading into USERS yet
+  // (e.g. student clicks through Cant Attend -> Reschedule quickly after
+  // page load) was permanently excluded from qualifiedTeachers for the
+  // life of this modal instance, even once the real data arrived — no
+  // slot on any date would ever show as available for that teacher.
+  const [teachersTick, setTeachersTick] = useState(0);
+  useEffect(() => {
+    hydrateTeachers();
+    return subscribeTeachers(() => setTeachersTick((n) => n + 1));
+  }, []);
   const isGroup = Boolean(session.group_id);
   const actingStudentId = isGroup && user ? user.id : session.student_id;
   const studentUser = userById(actingStudentId);
@@ -295,7 +312,7 @@ export function RescheduleRequestModal({ session, onClose }: { session: ExtSessi
   const qualifiedTeachers = useMemo(() => {
     return USERS.filter((u) => u.role === "teacher" && u.teacher_status === "active"
       && (!product || (u.qualified_products ?? []).includes(product)));
-  }, [product]);
+  }, [product, teachersTick]);
   const qualifiedIds = useMemo(() => qualifiedTeachers.map((t) => t.id), [qualifiedTeachers]);
 
   const submit = () => {
