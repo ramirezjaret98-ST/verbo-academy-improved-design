@@ -79,6 +79,7 @@ function Page() {
   const [exKind, setExKind] = useState<ExerciseKind>("fill_gaps");
   const [paragraph, setParagraph] = useState("");
   const [answer, setAnswer] = useState("");
+  const [altAnswersRaw, setAltAnswersRaw] = useState("");
   const [question, setQuestion] = useState("");
   const [tfCorrect, setTfCorrect] = useState<0 | 1>(0);
   const [mcOptionsRaw, setMcOptionsRaw] = useState("");
@@ -102,6 +103,7 @@ function Page() {
     setExKind("fill_gaps");
     setParagraph("");
     setAnswer("");
+    setAltAnswersRaw("");
     setQuestion("");
     setTfCorrect(0);
     setMcOptionsRaw("");
@@ -118,7 +120,8 @@ function Page() {
   const buildExercise = (): PracticeExercise | null => {
     if (exKind === "fill_gaps") {
       if (!paragraph.trim() || !answer.trim()) return null;
-      return { type: "fill_gaps", paragraph: paragraph.trim(), answer: answer.trim(), feedback: feedback.trim() || undefined, hint: hint.trim() || undefined };
+      const answers = altAnswersRaw.split(",").map((s) => s.trim()).filter(Boolean);
+      return { type: "fill_gaps", paragraph: paragraph.trim(), answer: answer.trim(), answers: answers.length ? answers : undefined, feedback: feedback.trim() || undefined, hint: hint.trim() || undefined };
     }
     if (exKind === "true_false") {
       if (!question.trim()) return null;
@@ -169,6 +172,7 @@ function Page() {
       setExKind("fill_gaps");
       setParagraph(ex.paragraph ?? "");
       setAnswer(ex.answer ?? "");
+      setAltAnswersRaw((ex.answers ?? []).join(", "));
     } else if (ex?.type === "read_select") {
       const opts = ex.options ?? [];
       if (opts.length === 2 && opts[0] === "True" && opts[1] === "False") {
@@ -266,6 +270,9 @@ function Page() {
               </Field>
               <Field label="Respuesta correcta">
                 <input className={inputCls} value={answer} onChange={(e) => setAnswer(e.target.value)} />
+              </Field>
+              <Field label="Respuestas alternas (opcional)" hint='Sinónimos válidos separados por coma — ej. "went" también se acepta si la correcta es "traveled".'>
+                <input className={inputCls} value={altAnswersRaw} onChange={(e) => setAltAnswersRaw(e.target.value)} placeholder="went, has gone" />
               </Field>
             </div>
           ) : exKind === "true_false" ? (
