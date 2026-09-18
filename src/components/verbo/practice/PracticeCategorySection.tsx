@@ -15,10 +15,16 @@
 // if they look for it).
 import { useState } from "react";
 import { SectionTitle, GhostButton } from "@/components/verbo/ui";
-import { usePracticeActivities } from "@/lib/practice-store";
+import { usePracticeActivities, type PracticeActivity } from "@/lib/practice-store";
 import { PracticeComparativaCard } from "./PracticeComparativaCard";
+import { PracticeReadingCard } from "./PracticeReadingCard";
 
 const INITIAL_VISIBLE = 6; // two full rows at the lg:grid-cols-3 breakpoint
+
+// Formats with a built student-facing component so far. Grid/Carousel land
+// in later phases per the agreed build order — unbuilt formats are ignored
+// rather than crashing, so this section degrades gracefully as more ship.
+const SUPPORTED_FORMATS: PracticeActivity["format"][] = ["comparativa", "reading"];
 
 export function PracticeCategorySection({
   category,
@@ -33,11 +39,7 @@ export function PracticeCategorySection({
 }) {
   const all = usePracticeActivities();
   const [expanded, setExpanded] = useState(false);
-  // Only "comparativa" is built so far (v1) — grid/reading/carousel land in
-  // later phases per the agreed build order. Unknown formats are ignored
-  // rather than crashing, so this section degrades gracefully as more
-  // formats ship.
-  const items = all.filter((p) => p.category === category && p.format === "comparativa");
+  const items = all.filter((p) => p.category === category && SUPPORTED_FORMATS.includes(p.format));
 
   if (items.length === 0) return null;
 
@@ -55,9 +57,17 @@ export function PracticeCategorySection({
         </span>
       </div>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {visible.map((p) => (
-          <PracticeComparativaCard key={p.id} practice={p} studentId={studentId ?? ""} readOnly={noTrack} />
-        ))}
+        {visible.map((p) =>
+          p.format === "reading" ? (
+            // Reading needs the extra width for the passage + glossary layout
+            // — spans the full row instead of squeezing into one narrow cell.
+            <div key={p.id} className="sm:col-span-2 lg:col-span-3">
+              <PracticeReadingCard practice={p} studentId={studentId ?? ""} readOnly={noTrack} />
+            </div>
+          ) : (
+            <PracticeComparativaCard key={p.id} practice={p} studentId={studentId ?? ""} readOnly={noTrack} />
+          ),
+        )}
       </div>
       {hasMore && (
         <div className="flex justify-center pt-1">
