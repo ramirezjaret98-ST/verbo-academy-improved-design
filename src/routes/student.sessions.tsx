@@ -150,7 +150,18 @@ function Page() {
   const { focus: focusParam, prep: prepParam, highlight: highlightParam } = Route.useSearch();
   const [prepModalSessionId, setPrepModalSessionId] = useState<string | null>(prepParam ?? null);
 
-  const [, tick] = useState(0);
+  // 2026-09-21 fix: this used to be `const [, tick] = useState(0)` — the
+  // counter value was thrown away, so the three subscriptions below could
+  // only force a re-render, never a recompute. The `events` useMemo further
+  // down depended on `[user]` alone, so it snapshotted whatever was in the
+  // sessions cache at mount and NEVER rebuilt it: if the page mounted before
+  // hydrate() finished (cold load straight onto /student/sessions, slow
+  // connection), the student's calendar stayed permanently empty even though
+  // the data had already arrived and the component had re-rendered. Same
+  // bug class as `qualifiedTeachers` in CancelSessionFlow.tsx (2026-09-17).
+  // Keeping the setter named `tick` so the existing call sites below are
+  // unchanged; the VALUE (`storeTick`) is what the memo needs.
+  const [storeTick, tick] = useState(0);
   const [selected, setSelected] = useState<CalendarEvent | null>(null);
   const [cantAttendFor, setCantAttendFor] = useState<ExtSession | null>(null);
   const [cancelSpotlightFor, setCancelSpotlightFor] = useState<ExtSession | null>(null);
@@ -182,7 +193,10 @@ function Page() {
     return studentCalendarEvents(user.id, {
       teacherNameOf: (id) => userById(id)?.name,
     });
-  }, [user]);
+    // `storeTick` is bumped by subscribeSessions/Teachers/Students above —
+    // it is what makes the calendar pick up sessions (and teacher names)
+    // that finish loading from Supabase after this page mounted.
+  }, [user, storeTick]);
 
   // Arriving from "View Active Clubs": open the calendar straight on the month
   // of the nearest upcoming club instead of the current month.
