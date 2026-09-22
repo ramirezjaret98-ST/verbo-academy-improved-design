@@ -189,6 +189,18 @@ export function getAvailability(teacherId: string): TeacherAvailability {
   return availabilityMap[teacherId] ?? { teacherId, weekly: emptyWeekly() };
 }
 
+/** 2026-09-21: has the availability cache actually come back from Supabase
+ *  yet? This matters because getAvailability() cannot tell the two apart: a
+ *  teacher with genuinely no hours and a teacher whose row simply hasn't
+ *  loaded both come back as an empty week. teacher.availability.tsx uses
+ *  this to keep the teacher from looking at (and, worse, SAVING) an empty
+ *  schedule that would overwrite their real hours with nothing — which
+ *  would leave their students unable to book or reschedule with them. */
+export function isAvailabilityHydrated(): boolean {
+  if (!availHydrated) void hydrateAvailability();
+  return availHydrated;
+}
+
 /** Optimistic write: updates the local cache + notifies immediately, then
  *  round-trips through the `replace_teacher_availability` RPC in the
  *  background (rolling back the optimistic change on failure). Used both by
