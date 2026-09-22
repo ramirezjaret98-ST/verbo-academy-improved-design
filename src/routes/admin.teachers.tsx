@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { USERS, SESSIONS, userById, type User, type Session } from "@/lib/mock-data";
 import { hydrateAssignments, removeAssignment, setAssignment, subscribeAssignments, allAssignments } from "@/lib/assignments-store";
 import { getProduct } from "@/lib/student-model";
+import { hydrateStudents, subscribeStudents } from "@/lib/students-store";
 import {
   QUALIFIED_PRODUCTS, DEFAULT_HOURLY_RATE, AVAILABILITY_CHANGE_DAYS,
   teacherStatus, qualifiedProducts, assignedStudents, activeStudents,
@@ -1338,11 +1339,32 @@ function TeacherFormModal({
   const mountedRef = useRef(true);
   useEffect(() => () => { mountedRef.current = false; }, []);
 
-  // Students with no teacher assigned (available for initial assignment)
-  const assignedStudentIds = useMemo(() => new Set(allAssignments().map((a) => a.student_id)), []);
+  // Students with no teacher assigned (available for initial assignment).
+  //
+  // 2026-09-21 fix: both lists below were computed once, at mount, with `[]`
+  // dependencies — but the assignment cache and the student roster both load
+  // from Supabase asynchronously. Opening this modal before they landed gave
+  // an EMPTY assignment set, so every student in the roster looked
+  // unassigned (and if the roster hadn't loaded either, the list was simply
+  // empty). Assigning a student who already has a teacher silently reassigns
+  // them, so this was a wrong list you could act on. Now the modal hydrates
+  // both stores and recomputes as they arrive.
+  const [rosterTick, bumpRoster] = useState(0);
+  useEffect(() => {
+    hydrateAssignments();
+    hydrateStudents();
+    const offAssignments = subscribeAssignments(() => bumpRoster((n) => n + 1));
+    const offStudents = subscribeStudents(() => bumpRoster((n) => n + 1));
+    return () => { offAssignments(); offStudents(); };
+  }, []);
+
+  const assignedStudentIds = useMemo(
+    () => new Set(allAssignments().map((a) => a.student_id)),
+    [rosterTick],
+  );
   const unassigned = useMemo(
     () => USERS.filter((u) => u.role === "student" && !assignedStudentIds.has(u.id)),
-    [assignedStudentIds],
+    [assignedStudentIds, rosterTick],
   );
 
   const valid = name.trim() && email.trim() && password.trim() && products.length > 0 && !!hireDate;

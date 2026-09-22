@@ -6,7 +6,7 @@ import { Card, GhostButton, PrimaryButton, SectionTitle } from "@/components/ver
 import { ConfirmAvailabilityModal } from "@/components/verbo/ConfirmAvailabilityModal";
 import {
   DAY_KEYS, DAY_LABELS, MIN_MINUTES, MAX_MINUTES,
-  emptyWeekly, getAvailability, saveAvailability,
+  emptyWeekly, getAvailability, saveAvailability, isAvailabilityHydrated,
   hasPendingRequest, submitChangeRequest, subscribeAvailability,
   minutesToTime, timeToMinutes,
   type DayKey, type Weekly,
@@ -25,25 +25,46 @@ export const Route = createFileRoute("/teacher/availability")({
 function AvailabilityPage() {
   const { user } = useAuth();
   const teacherId = user?.id ?? "";
-  const [, tick] = useState(0);
+  // 2026-09-21 fix. The counter value used to be discarded (`const [, tick]`),
+  // so the subscription below could re-render this page but never recompute
+  // anything, and the sync effect further down only ran on `[teacherId]`.
+  // The availability cache loads from Supabase asynchronously and
+  // getAvailability() returns an EMPTY week until it lands — so a teacher who
+  // opened this page on a cold load saw "Not available" on every single day,
+  // forever, and if they hit Save to fix it they overwrote their real hours
+  // with nothing. That is the failure that leaves students with no slots to
+  // book or reschedule. Now the page re-syncs from the store as the data
+  // arrives, and Save is blocked until it has.
+  const [storeTick, tick] = useState(0);
   useEffect(() => subscribeAvailability(() => tick((n) => n + 1)), []);
 
-  const stored = useMemo(() => getAvailability(teacherId), [teacherId]);
+  const stored = useMemo(() => getAvailability(teacherId), [teacherId, storeTick]);
   const [weekly, setWeekly] = useState<Weekly>(() => stored.weekly ?? emptyWeekly());
   const [pending, setPending] = useState(false);
   const [changeOpen, setChangeOpen] = useState(false);
   const [changeReason, setChangeReason] = useState("");
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [savedFlash, setSavedFlash] = useState<string | null>(null);
+  // True once the teacher has touched the form. While it is false this page
+  // mirrors the store; the moment they edit something we stop overwriting
+  // their work, so a late-arriving hydration (or another device saving)
+  // can never wipe an edit in progress.
+  const [dirty, setDirty] = useState(false);
+  const hydrated = isAvailabilityHydrated();
+
+  // Switching identity (different teacher / fresh login) starts over.
+  useEffect(() => { setDirty(false); }, [teacherId]);
 
   useEffect(() => {
+    if (dirty) return;
     setWeekly(getAvailability(teacherId).weekly);
     setPending(hasPendingRequest(teacherId));
-  }, [teacherId]);
+  }, [teacherId, storeTick, dirty]);
 
   const alreadyConfirmed = !!stored.confirmedAt;
 
   const addBlock = (day: DayKey) => {
+    setDirty(true);
     setWeekly((w) => {
       const existing = w[day];
       const last = existing[existing.length - 1];
@@ -53,9 +74,11 @@ function AvailabilityPage() {
     });
   };
   const removeBlock = (day: DayKey, idx: number) => {
+    setDirty(true);
     setWeekly((w) => ({ ...w, [day]: w[day].filter((_, i) => i !== idx) }));
   };
   const updateBlock = (day: DayKey, idx: number, patch: Partial<{ startMin: number; endMin: number }>) => {
+    setDirty(true);
     setWeekly((w) => ({
       ...w,
       [day]: w[day].map((b, i) => (i === idx ? { ...b, ...patch } : b)),
@@ -72,18 +95,29 @@ function AvailabilityPage() {
     return null;
   };
 
+  // 2026-09-21: the guard that matters. Until the store has answered, what is
+  // on screen is not the teacher's schedule — it is a placeholder empty week.
+  // Saving it would replace their real hours with nothing.
+  const notReadyMessage = "Still loading your saved schedule. Give it a second and try again.";
+
   const onSaveClick = () => {
+    if (!hydrated) { setSavedFlash(notReadyMessage); return; }
     const err = validateWeekly();
     if (err) { setSavedFlash(err); return; }
     setConfirmOpen(true);
   };
   const confirmSave = () => {
+    if (!hydrated) { setConfirmOpen(false); setSavedFlash(notReadyMessage); return; }
     saveAvailability(teacherId, weekly);
     setConfirmOpen(false);
+    // Saved: hand the form back to the store, so it keeps mirroring what is
+    // actually stored (including the write this just made).
+    setDirty(false);
     setSavedFlash("Availability saved.");
   };
 
   const submitChange = () => {
+    if (!hydrated) { setSavedFlash(notReadyMessage); return; }
     const err = validateWeekly();
     if (err) { setSavedFlash(err); return; }
     const req = submitChangeRequest(teacherId, weekly, changeReason.trim() || undefined);
@@ -122,7 +156,12 @@ function AvailabilityPage() {
                 </button>
               </div>
               {weekly[day].length === 0 && (
-                <div className="text-xs text-muted-foreground">Not available</div>
+                // 2026-09-21: an empty day means one of two very different
+                // things. Say which one, instead of telling a teacher whose
+                // data is still in flight that they have no hours.
+                <div className="text-xs text-muted-foreground">
+                  {hydrated ? "Not available" : "Loading your schedule…"}
+                </div>
               )}
               <div className="space-y-2">
                 {weekly[day].map((b, i) => (
