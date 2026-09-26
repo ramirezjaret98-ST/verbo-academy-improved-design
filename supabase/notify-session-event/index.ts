@@ -1,3 +1,4 @@
+// HISTORICAL COPY: do not deploy. Canonical source: ../functions/notify-session-event/index.ts
 // Sends the transactional emails Verbo Academy was missing entirely (bugs
 // #3 and #4 from Jaret's 2026-08-13 report):
 //   - A student cancels / can't-attend / requests a reschedule → the

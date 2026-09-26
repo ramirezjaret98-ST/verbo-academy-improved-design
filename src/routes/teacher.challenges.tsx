@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, X, Play, Upload, ExternalLink, Check, RotateCcw, Ban } from "lucide-react";
 import { useAuth } from "@/lib/auth";
+import { openSignedContentUrl } from "@/lib/storage-signed-url";
 import {
   hydrateStudents,
   subscribeStudents,
@@ -358,6 +359,7 @@ function ReviewRow({
         <div className="space-y-2">
           <a
             href={s.link}
+            onClick={(event) => { event.preventDefault(); void openSignedContentUrl(s.link); }}
             target="_blank"
             rel="noreferrer"
             className="inline-flex items-center gap-1.5 text-xs font-medium text-accent underline underline-offset-2 hover:opacity-80"
