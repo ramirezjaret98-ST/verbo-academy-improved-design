@@ -21,6 +21,7 @@
 // an individual plan, no group sessions in play yet. Revisit once
 // groups-store.ts (Tier B) is migrated and group plans go live for real users.
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 import { registerRehydrate } from "@/lib/auth-rehydrate";
 import type { Database } from "@/integrations/supabase/types";
 import { hydrateUserIdBridge, legacyToUuid, uuidToLegacySync } from "@/lib/user-id-bridge";
@@ -694,8 +695,14 @@ export function notifySessionEvent(
   const numericId = Number(sessionId);
   if (!Number.isFinite(numericId)) return;
   void supabase.functions.invoke("notify-session-event", { body: { sessionId: numericId, kind, ...(extra ? { extra } : {}) } })
-    .then(({ error }) => {
-      if (error) console.error("[sessions-store] notify-session-event failed", error);
+    .then(({ data, error }) => {
+      if (error || data?.ok === false) {
+        console.error("[sessions-store] email notification not accepted", { kind, status: error?.name });
+        toast.warning("Your change was saved, but an email notification couldn't be sent. Please let the Academy team know.");
+      }
+    })
+    .catch(() => {
+      toast.warning("Your change was saved, but an email notification couldn't be sent. Please let the Academy team know.");
     });
 }
 

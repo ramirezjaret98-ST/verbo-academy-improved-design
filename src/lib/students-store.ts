@@ -843,7 +843,7 @@ export function getSubmission(
 /** Create a submission for a challenge (status "pending_review").
  *
  *  - "normal" / "mystery_box": enforces the same 24h cooldown as
- *    completeCooldownRemaining and advances the streak counters right away with
+ *    completeCooldownRemaining and advances the streak after a successful write with
  *    the same "≤14 days keeps the streak alive" rule, storing the pre-change
  *    current_streak in `streak_before`. The streak counters stay on the local
  *    persistStudentPatch path exactly as before this migration.
@@ -851,17 +851,16 @@ export function getSubmission(
  *    teacher approval step below.
  *
  *  Optimistic: the new submission is visible immediately; a failed Supabase
- *  write rolls it back out of the cache (the streak counters, being a
- *  local-only write that doesn't fail, are left as-is on that rare failure).
+ *  write rolls it back out of the cache without advancing the streak.
  *
  *  Returns false if blocked (unknown student, cooldown, or already submitted). */
-export function submitChallenge(
+export async function submitChallenge(
   studentId: string,
   challengeId: string,
   format: ChallengeSubmissionFormat,
   link: string,
   note?: string,
-): boolean {
+): Promise<boolean> {
   const u = USERS.find((x) => x.id === studentId);
   if (!u) return false;
   const list = submissionsCache.get(studentId) ?? [];
@@ -882,23 +881,13 @@ export function submitChallenge(
     history: [],
   };
 
-  if (streakFormat) {
-    const last = u.last_completed_at ? new Date(u.last_completed_at) : null;
-    const diffDays = last ? (now.getTime() - last.getTime()) / 86_400_000 : Infinity;
-    const nextCurrent = last && diffDays <= 14 ? (u.current_streak ?? 0) + 1 : 1;
-    submission.streak_before = u.current_streak ?? 0;
-    persistStudentPatch(studentId, {
-      last_completed_at: nowIso,
-      current_streak: nextCurrent,
-      longest_streak: Math.max(u.longest_streak ?? 0, nextCurrent),
-    });
-  }
+  if (streakFormat) submission.streak_before = u.current_streak ?? 0;
 
   const prevList = list;
   submissionsCache.set(studentId, [...list, submission]);
   if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent(STUDENTS_EVENT));
 
-  void (async () => {
+  return (async () => {
     const [uuid, dbChallengeId] = await Promise.all([
       legacyToUuid(studentId),
       resolveChallengeDbId(challengeId),
@@ -907,7 +896,7 @@ export function submitChallenge(
       console.error("[students-store] failed to submit challenge — could not resolve ids", { studentId, challengeId });
       submissionsCache.set(studentId, prevList);
       if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent(STUDENTS_EVENT));
-      return;
+      return false;
     }
     const insert: SubmissionInsert = {
       student_id: uuid,
@@ -924,12 +913,26 @@ export function submitChallenge(
       console.error("[students-store] failed to submit challenge", error);
       submissionsCache.set(studentId, prevList);
       if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent(STUDENTS_EVENT));
-      return;
+      return false;
     }
     submissionDbId.set(`${studentId}:${challengeId}`, data.id);
-  })();
-
-  return true;
+    if (streakFormat) {
+      const last = u.last_completed_at ? new Date(u.last_completed_at) : null;
+      const diffDays = last ? (now.getTime() - last.getTime()) / 86_400_000 : Infinity;
+      const nextCurrent = last && diffDays <= 14 ? (u.current_streak ?? 0) + 1 : 1;
+      persistStudentPatch(studentId, {
+        last_completed_at: nowIso,
+        current_streak: nextCurrent,
+        longest_streak: Math.max(u.longest_streak ?? 0, nextCurrent),
+      });
+    }
+    return true;
+  })().catch(() => {
+    console.error("[students-store] submission could not be saved");
+    submissionsCache.set(studentId, prevList);
+    if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent(STUDENTS_EVENT));
+    return false;
+  });
 }
 
 /** Replace the delivery of a submission the teacher sent back. Only valid while
@@ -937,12 +940,12 @@ export function submitChallenge(
  *  into `challenge_submission_history` (server-side, richer than the frontend
  *  type — also keeps the archived status/feedback for audit) and returns the
  *  submission to "pending_review". Streak untouched. */
-export function resubmitChallenge(
+export async function resubmitChallenge(
   studentId: string,
   challengeId: string,
   link: string,
   note?: string,
-): boolean {
+): Promise<boolean> {
   const list = submissionsCache.get(studentId) ?? [];
   const idx = list.findIndex((s) => s.challenge_id === challengeId);
   if (idx < 0) return false;
@@ -970,7 +973,7 @@ export function resubmitChallenge(
   submissionsCache.set(studentId, next);
   if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent(STUDENTS_EVENT));
 
-  void (async () => {
+  return (async () => {
     const historyInsert: SubmissionHistoryInsert = {
       submission_id: dbId,
       link: prev.link,
@@ -984,7 +987,7 @@ export function resubmitChallenge(
       console.error("[students-store] failed to archive previous submission", historyError);
       submissionsCache.set(studentId, list);
       if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent(STUDENTS_EVENT));
-      return;
+      return false;
     }
     const update: SubmissionUpdate = {
       status: "pending_review",
@@ -995,14 +998,20 @@ export function resubmitChallenge(
       reviewed_by: null,
       teacher_feedback: null,
     };
-    const { error } = await supabase.from("challenge_submissions").update(update).eq("id", dbId);
-    if (error) {
+    const { data, error } = await supabase.from("challenge_submissions").update(update).eq("id", dbId).select("id").single();
+    if (error || !data) {
       console.error("[students-store] failed to resubmit challenge", error);
       submissionsCache.set(studentId, list);
       if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent(STUDENTS_EVENT));
+      return false;
     }
-  })();
-  return true;
+    return true;
+  })().catch(() => {
+    console.error("[students-store] resubmission could not be saved");
+    submissionsCache.set(studentId, list);
+    if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent(STUDENTS_EVENT));
+    return false;
+  });
 }
 
 /* -------------------------------------------------------------------------- */

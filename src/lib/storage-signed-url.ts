@@ -32,7 +32,7 @@
 // existing objects) — intentionally left for a separate batch.
 import { supabase } from "@/integrations/supabase/client";
 
-const SIGNABLE_BUCKETS = ["content", "materials"] as const;
+const SIGNABLE_BUCKETS = ["content", "materials", "challenge-evidence"] as const;
 type SignableBucket = (typeof SIGNABLE_BUCKETS)[number];
 
 // How long a signed URL stays valid. Long enough that opening a PDF/video
@@ -102,7 +102,14 @@ export async function resolveContentUrl(url: string | null | undefined): Promise
   const parsed = parseStorageUrl(trimmed);
   if (!parsed) return trimmed;
 
-  const key = `${parsed.bucket}/${parsed.path}`;
+  // Evidence must not reuse another signed-in account's cached authorization.
+  let accountScope = "";
+  if (parsed.bucket === "challenge-evidence") {
+    const { data } = await supabase.auth.getSession();
+    if (!data.session) return trimmed;
+    accountScope = `${data.session.user.id}:`;
+  }
+  const key = `${accountScope}${parsed.bucket}/${parsed.path}`;
   const now = Date.now();
   const cached = cache.get(key);
   if (cached && cached.expiresAt - CACHE_SAFETY_MARGIN_MS > now) return cached.url;

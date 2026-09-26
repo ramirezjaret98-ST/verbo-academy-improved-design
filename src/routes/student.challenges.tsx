@@ -44,6 +44,7 @@ import {
 import { Card, Pill, PrimaryButton, GhostButton, SuccessButton, AccentModalHeader } from "@/components/verbo/ui";
 import { Confetti } from "@/components/verbo/Confetti";
 import { useAuth } from "@/lib/auth";
+import { CHALLENGE_EVIDENCE_ACCEPT, uploadChallengeEvidence, validateChallengeEvidence } from "@/lib/challenge-evidence";
 import {
   type Challenge,
   type ChallengeProductId,
@@ -842,11 +843,12 @@ function Page() {
             icon={submitFor.icon}
             mode={submitFor.mode}
             onClose={() => setSubmitFor(null)}
-            onSubmit={(link, note) => {
+            onSubmit={async (link, note) => {
               const ok = submitFor.mode === "resubmit"
-                ? resubmitChallenge(student.id, submitFor.id, link, note)
-                : submitChallenge(student.id, submitFor.id, submitFor.format, link, note);
+                ? await resubmitChallenge(student.id, submitFor.id, link, note)
+                : await submitChallenge(student.id, submitFor.id, submitFor.format, link, note);
               if (ok) { setSubmitFor(null); setOpen(null); setTick((t) => t + 1); }
+              return ok;
             }}
           />
         )}
@@ -1125,10 +1127,10 @@ function Page() {
           icon={submitFor.icon}
           mode={submitFor.mode}
           onClose={() => setSubmitFor(null)}
-          onSubmit={(link, note) => {
+          onSubmit={async (link, note) => {
             const ok = submitFor.mode === "resubmit"
-              ? resubmitChallenge(student.id, submitFor.id, link, note)
-              : submitChallenge(student.id, submitFor.id, submitFor.format, link, note);
+              ? await resubmitChallenge(student.id, submitFor.id, link, note)
+              : await submitChallenge(student.id, submitFor.id, submitFor.format, link, note);
             if (ok) {
               setSubmitFor(null);
               setLightningOpen(null);
@@ -1136,6 +1138,7 @@ function Page() {
               setSeasonState(null);
               setTick((t) => t + 1);
             }
+            return ok;
           }}
         />
       )}
@@ -2055,10 +2058,10 @@ function ChallengeDetail({
 
 
 /* -------------------------------------------------------------------------- */
-/* Share Result modal — optional URL + locked "Upload File" (Coming soon).    */
+/* Shared submission form for normal challenges and every Flash format.      */
 /* -------------------------------------------------------------------------- */
 /** Mandatory submission modal. A challenge is only ever "delivered" through
- *  this form — the student must provide a link (uploads coming later) plus an
+ *  this form — the student must provide a link or private file plus an
  *  optional note, and the result goes to the teacher as "pending_review". */
 function SubmitChallengeModal({
   title,
@@ -2073,12 +2076,38 @@ function SubmitChallengeModal({
   icon: LucideIcon;
   mode: "submit" | "resubmit";
   onClose: () => void;
-  onSubmit: (link: string, note: string) => void;
+  onSubmit: (link: string, note: string) => Promise<boolean>;
 }) {
   const [source, setSource] = useState<"url" | "upload">("url");
   const [link, setLink] = useState("");
   const [note, setNote] = useState("");
-  const valid = source === "url" && link.trim().length > 0;
+  const [file, setFile] = useState<File | null>(null);
+  const [uploadedUrl, setUploadedUrl] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const valid = source === "url" ? /^https?:\/\/\S+$/i.test(link.trim()) : !!file && !validateChallengeEvidence(file);
+  const handleSubmit = async () => {
+    if (!valid || busy) return;
+    setBusy(true);
+    setError("");
+    try {
+      let deliveryUrl = link.trim();
+      if (source === "upload" && file) {
+        if (uploadedUrl) deliveryUrl = uploadedUrl;
+        else {
+          const result = await uploadChallengeEvidence(file);
+          if (!result.ok) { setError(result.error); return; }
+          deliveryUrl = result.url;
+          setUploadedUrl(result.url);
+        }
+      }
+      if (!await onSubmit(deliveryUrl, note.trim())) {
+        setError("Your work couldn't be submitted. Please try again or check whether it is already awaiting review.");
+      }
+    } catch {
+      setError("Your work couldn't be submitted. Please try again.");
+    } finally { setBusy(false); }
+  };
 
   return (
     <div className="fixed inset-0 z-[55] flex items-center justify-center verbo-backdrop p-4">
@@ -2093,7 +2122,7 @@ function SubmitChallengeModal({
           eyebrow={mode === "resubmit" ? "Try again" : "Submit your work"}
           title={title}
           watermark={{ type: "text", value: "SUBMIT" }}
-          onClose={onClose}
+          onClose={() => { if (!busy) onClose(); }}
         />
 
         <div className="space-y-4 p-5">
@@ -2103,51 +2132,61 @@ function SubmitChallengeModal({
           <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
-              onClick={() => setSource("url")}
+              disabled={busy}
+              onClick={() => { setSource("url"); setError(""); }}
               className={`flex items-center justify-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${source === "url" ? "border-accent bg-accent/10 text-foreground" : "border-border bg-background text-muted-foreground hover:bg-secondary"}`}
             >
-              <Link2 className="h-4 w-4" /> Video URL
+              <Link2 className="h-4 w-4" /> Share a Link
             </button>
             <button
               type="button"
-              disabled
-              title="Coming soon"
-              className="flex cursor-not-allowed items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-secondary/40 px-3 py-2 text-sm font-medium text-muted-foreground opacity-70"
+              disabled={busy}
+              onClick={() => { setSource("upload"); setError(""); }}
+              className={`flex items-center justify-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${source === "upload" ? "border-accent bg-accent/10 text-foreground" : "border-border bg-background text-muted-foreground hover:bg-secondary"}`}
             >
-              <Lock className="h-4 w-4" /> Upload File
+              <Upload className="h-4 w-4" /> Upload File
             </button>
           </div>
 
           {source === "url" ? (
             <input
+              disabled={busy}
               value={link}
               onChange={(e) => setLink(e.target.value)}
               placeholder="Paste a link (video, doc, portfolio, etc.)"
               className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-accent focus:outline-none"
             />
           ) : (
-            <div className="flex items-center gap-2 rounded-lg border border-dashed border-border bg-secondary/40 px-3 py-3 text-xs text-muted-foreground">
-              <Upload className="h-4 w-4" /> Coming soon — file uploads (pdf / video / image, max 10MB) will be available soon.
+            <div className="space-y-2 rounded-lg border border-dashed border-border bg-secondary/40 px-3 py-3">
+              <input type="file" aria-label="Choose your challenge evidence" accept={CHALLENGE_EVIDENCE_ACCEPT} disabled={busy}
+                onChange={(event) => {
+                  const selected = event.target.files?.[0] ?? null;
+                  setFile(selected); setUploadedUrl(null);
+                  setError(selected ? validateChallengeEvidence(selected) ?? "" : "");
+                }} className="w-full text-sm" />
+              <p className="text-xs text-muted-foreground">PDF, image, or video · Up to 10 MB. Only you, your teacher, and the Academy team can access your file.</p>
             </div>
           )}
 
           <textarea
+            disabled={busy}
             value={note}
             onChange={(e) => setNote(e.target.value)}
             rows={3}
             placeholder="Add a note for your teacher (optional)"
             className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-accent focus:outline-none"
           />
+          {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
         </div>
 
         <div className="flex items-center justify-end gap-3 border-t border-border bg-secondary/30 p-4">
-          <GhostButton onClick={onClose}>Cancel</GhostButton>
+          <GhostButton onClick={() => { if (!busy) onClose(); }} disabled={busy}>Cancel</GhostButton>
           <PrimaryButton
-            onClick={() => onSubmit(link.trim(), note.trim())}
-            disabled={!valid}
+            onClick={() => { void handleSubmit(); }}
+            disabled={!valid || busy}
             style={{ backgroundColor: accent, color: "#fff" }}
           >
-            <Upload className="h-3.5 w-3.5" /> {mode === "resubmit" ? "Resubmit" : "Submit"}
+            <Upload className="h-3.5 w-3.5" /> {busy ? "Submitting…" : mode === "resubmit" ? "Resubmit" : "Submit"}
           </PrimaryButton>
         </div>
       </div>
