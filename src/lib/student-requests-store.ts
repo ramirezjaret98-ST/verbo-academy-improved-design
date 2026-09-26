@@ -1,4 +1,7 @@
-// Reschedule Requests + Spotlight Requests.
+import { withTimeout } from "./net-utils";
+import { academyDateTime } from "./academy-time";
+// Reschedule Requests + Spotlight Requests. Individual reschedules are now
+// confirmed atomically by the server with the assigned teacher or reviewed.
 //
 // A student cancels a session with reschedule quota → creates a
 // `reschedule` request. Teachers see it in Teacher > Clubs (new section) and
@@ -31,6 +34,7 @@ import {
   updateSession,
   convertOwnSessionToSpotlight,
   type ExtSessionStatus,
+  refreshSessions,
 } from "./sessions-store";
 import { getStudentVideoLink } from "./students-store";
 import { notifyError } from "@/lib/notify";
@@ -65,6 +69,8 @@ type RequestRow = Database["public"]["Tables"]["student_requests"]["Row"];
 
 let cache: StudentRequest[] = [];
 let hydrated = false;
+let generation=0;
+let refreshQueued=false;
 let hydratePromise: Promise<void> | null = null;
 const listeners = new Set<() => void>();
 
@@ -101,29 +107,33 @@ function mapRow(row: RequestRow): StudentRequest {
 async function hydrate(): Promise<void> {
   if (hydrated) return;
   if (hydratePromise) return hydratePromise;
+  const version=generation;
   hydratePromise = (async () => {
     // Warm the user-id bridge first so `uuidToLegacySync` below resolves.
     await hydrateUserIdBridge();
-    const { data, error } = await supabase
-      .from("student_requests")
-      .select("*")
-      .order("requested_at", { ascending: false });
-    if (error) {
-      console.error("[student-requests-store] failed to load student_requests", error);
-      hydratePromise = null;
-      return;
-    }
+    const {data,error}=await withTimeout(Promise.resolve(supabase.from("student_requests").select("*").order("requested_at",{ascending:false})),30_000,"Refreshing requests");
+    if (version!==generation) return;
+    if (error) throw error;
     cache = (data ?? []).map(mapRow);
     hydrated = true;
     notify();
-  })();
+  })().catch(error=>console.error("[student-requests-store] refresh failed",error)).finally(()=>{
+    hydratePromise=null;
+    if(refreshQueued){refreshQueued=false;void hydrate();}
+  });
   return hydratePromise;
 }
 
-function invalidateAndRehydrate() {
-  hydrated = false;
-  hydratePromise = null;
+function invalidateAndRehydrate(reason?: "auth" | "refresh") {
+  generation++; hydrated=false;
+  if(reason==="auth"){cache=[];notify();}
+  if(hydratePromise){refreshQueued=true;return;}
   void hydrate();
+}
+
+export async function refreshStudentRequests(){
+  invalidateAndRehydrate();
+  while(hydratePromise) await hydratePromise;
 }
 
 let realtimeStarted = false;
@@ -133,12 +143,11 @@ function ensureRealtime() {
   supabase
     .channel("student-requests-changes")
     .on("postgres_changes", { event: "*", schema: "public", table: "student_requests" }, () => {
-      hydrated = false;
-      hydratePromise = null;
-      void hydrate();
+      invalidateAndRehydrate();
     })
-    .subscribe();
-  registerRehydrate(invalidateAndRehydrate);}
+    .subscribe(status=>{if(status==="SUBSCRIBED")invalidateAndRehydrate();});
+  registerRehydrate(invalidateAndRehydrate, { critical: true });
+}
 
 if (typeof window !== "undefined") {
   // Kick off hydration eagerly — `loadStudentRequests()` and the monthly
@@ -339,15 +348,21 @@ export function recordSpotlightConversion(input: {
 
 /** Shared body of claim/assign: optimistic cache flip + session
  *  materialization + background persistence of the status change. */
-function transitionRequest(
+async function transitionRequest(
   id: string,
   teacherId: string,
   newStatus: "claimed" | "assigned",
-): StudentRequest | null {
+): Promise<StudentRequest | null> {
   const idx = cache.findIndex((r) => r.id === id);
   if (idx < 0) return null;
   const r = cache[idx];
   if (r.status !== "open" && r.status !== "escalated") return null;
+  if (r.kind==="reschedule" && r.origin_session_id && !loadSessions().find(s=>s.id===r.origin_session_id)?.group_id) {
+    const ok=await resolveSessionReschedule(r.origin_session_id,r.proposed_datetime,teacherId);
+    if(!ok)return null;
+    await refreshStudentRequests();
+    return cache.find(x=>x.id===id) ?? null;
+  }
   // Extremely unlikely race: the request hasn't finished persisting yet, so
   // there's no DB row to claim. Fail gracefully instead of half-claiming.
   if (id.startsWith("temp-")) return null;
@@ -387,11 +402,11 @@ function transitionRequest(
   return updated;
 }
 
-export function claimStudentRequest(id: string, teacherId: string): StudentRequest | null {
+export function claimStudentRequest(id: string, teacherId: string): Promise<StudentRequest | null> {
   return transitionRequest(id, teacherId, "claimed");
 }
 
-export function adminAssignRequest(id: string, teacherId: string): StudentRequest | null {
+export function adminAssignRequest(id: string, teacherId: string): Promise<StudentRequest | null> {
   return transitionRequest(id, teacherId, "assigned");
 }
 
@@ -451,7 +466,7 @@ export function reschedulesUsedThisMonth(studentId: string): number {
     m = now.getMonth();
   const inMonth = (iso: string) => {
     const d = new Date(iso);
-    return d.getFullYear() === y && d.getMonth() === m;
+    return academyDateTime(iso).slice(0,7)===academyDateTime(now.toISOString()).slice(0,7);
   };
   const reqs = loadStudentRequests().filter(
     (r) =>
@@ -563,4 +578,30 @@ export async function convertSessionToSpotlight(input: {
     spotlight_context: input.spotlightContext,
   });
   return true;
+}
+
+// Typed narrow wrapper until the next full generated database-types refresh.
+const schedulingRpc = supabase.rpc.bind(supabase) as unknown as (name:string,args:Record<string,unknown>)=>Promise<{data:any;error:any}>;
+export async function rescheduleSlots(sessionId:string,date:string):Promise<{date_time:string;available:boolean}[]> {
+ const {data,error}=await schedulingRpc("student_reschedule_slots",{p_session_id:Number(sessionId),p_date:date});
+ if(error) throw error;
+ return data ?? [];
+}
+export async function requestSessionReschedule(sessionId:string,dateTime:string):Promise<"confirmed"|"review"|null> {
+ try {
+   const {data,error}=await schedulingRpc("student_request_reschedule",{p_session_id:Number(sessionId),p_datetime:dateTime});
+   if(error)throw error;
+   void Promise.all([refreshSessions(),refreshStudentRequests()]);
+   if(data?.outcome!=="confirmed" && data?.outcome!=="review")throw Error("Reschedule result unavailable");
+   return data.outcome;
+ } catch(error){notifyError(error,{context:"Rescheduling your session"});return null;}
+}
+export async function resolveSessionReschedule(sessionId:string,dateTime?:string,teacherId?:string,options?:{decline?:boolean;reason?:string;permanent?:boolean}):Promise<boolean>{
+ try {
+   const teacherUuid=teacherId ? await legacyToUuid(teacherId) : null;
+   if(teacherId && !teacherUuid)throw Error("Teacher not found");
+   const {error}=await schedulingRpc("resolve_session_reschedule",{p_session_id:Number(sessionId),p_datetime:dateTime ?? null,p_teacher_id:teacherUuid,p_decline:options?.decline ?? false,p_reason:options?.reason ?? null,p_permanent:options?.permanent ?? false});
+   if(error)throw error;
+   void Promise.all([refreshSessions(),refreshStudentRequests()]);return true;
+ }catch(error){notifyError(error,{context:"Saving reschedule"});return false;}
 }

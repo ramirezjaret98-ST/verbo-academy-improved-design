@@ -233,9 +233,9 @@ function Page() {
           kind={sub === "reschedule_requests" ? "reschedule" : "spotlight"}
           teacherId={user.id}
           requests={studentReqs}
-          onClaim={(id) => {
-            const claimed = claimStudentRequest(id, user.id);
-            if (!claimed) toast.error("This request was just claimed by another teacher");
+          onClaim={async (id) => {
+            const claimed = await claimStudentRequest(id, user.id);
+            if (!claimed) return;
             else toast.success("Request claimed and added to your calendar");
             setStudentReqs(loadStudentRequests());
           }}
@@ -456,8 +456,9 @@ function StudentRequestsSection({
   kind: "reschedule" | "spotlight";
   teacherId: string;
   requests: StudentRequest[];
-  onClaim: (id: string) => void;
+  onClaim: (id: string) => Promise<void>;
 }) {
+  const [claiming,setClaiming]=useState<string|null>(null);
   const list = useMemo(
     () => requests
       .filter((r) => r.kind === kind && (r.status === "open" || r.status === "escalated"))
@@ -539,11 +540,12 @@ function StudentRequestsSection({
                 )}
                 <div className="mt-auto pt-4">
                   <button
-                    onClick={() => onClaim(r.id)}
+                    disabled={!!claiming || (kind==="reschedule" && !yourStudent)}
+                    onClick={async()=>{setClaiming(r.id);try{await onClaim(r.id);}finally{setClaiming(null);}}}
                     className="verbo-club-cta inline-flex w-full items-center justify-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold text-white"
                     style={{ background: accent, boxShadow: `0 12px 26px -16px ${accent}` }}
                   >
-                    Claim request
+                    {claiming===r.id ? "Saving…" : kind==="reschedule" && !yourStudent ? "Admin review required" : "Claim request"}
                     <ArrowUpRight className="h-4 w-4" />
                   </button>
                 </div>

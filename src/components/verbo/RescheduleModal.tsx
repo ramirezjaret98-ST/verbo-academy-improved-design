@@ -3,6 +3,8 @@ import { CalendarClock, AlertTriangle, XCircle } from "lucide-react";
 import { AccentModal, AccentModalFooter, GhostButton, PrimaryButton } from "./ui";
 import { updateSession, notifySessionEvent, type ExtSession } from "@/lib/sessions-store";
 import { isTeacherAvailableAt } from "@/lib/availability-store";
+import { resolveSessionReschedule } from "@/lib/student-requests-store";
+import { academyDateTime, academyISO } from "@/lib/academy-time";
 import { notifySuccess } from "@/lib/notify";
 
 const HEADER_BG = "linear-gradient(135deg, #01304a 0%, #02466b 100%)";
@@ -18,12 +20,11 @@ export function RescheduleModal({
 }) {
   const [agreed, setAgreed] = useState(kind === "individual");
   const currentDT = useMemo(() => {
-    const d = new Date(session.date_time);
-    const pad = (n: number) => String(n).padStart(2, "0");
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    return academyDateTime(session.date_time);
   }, [session.date_time]);
   const [nextDT, setNextDT] = useState(currentDT);
   const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
   // 2026-08-19: this component is only ever opened from the Admin panel
   // (admin.sessions.tsx / admin.groups.tsx / admin.calendar.tsx — there is
   // no teacher/student-facing use of it), so "Rescheduled" (implying a
@@ -44,23 +45,32 @@ export function RescheduleModal({
   const [mode, setMode] = useState<"approve" | "decline">("approve");
   const [declineReason, setDeclineReason] = useState("");
 
-  const declineSubmit = () => {
+  const declineSubmit = async () => {
+    if (busy) return;
+    setBusy(true);
     // Reverts to the session's ORIGINAL schedule — no cancellation, no move.
-    updateSession(session.id, { status: "scheduled" });
+    const ok = kind === "individual"
+      ? await resolveSessionReschedule(session.id,undefined,undefined,{decline:true,reason:declineReason.trim()})
+      : await updateSession(session.id, { status: "scheduled" });
+    setBusy(false);
+    if (!ok) return;
     notifySessionEvent(session.id, "reschedule_declined", {
       ...(declineReason.trim() ? { reason: declineReason.trim() } : {}),
     });
-    notifySuccess("Reschedule request declined. The student has been notified.");
+    notifySuccess("Reschedule request declined. Notification queued for the student.");
     onClose();
   };
 
-  const submit = () => {
+  const submit = async () => {
+    if (busy) return;
     if (kind === "group" && !agreed) {
       setError("All members must agree before rescheduling.");
       return;
     }
-    const iso = new Date(nextDT).toISOString();
-    if (!isTeacherAvailableAt(session.teacher_id, iso, session.duration_minutes ?? 60)) {
+    const nextDate = new Date(academyISO(nextDT));
+    if (!Number.isFinite(nextDate.getTime())) { setError("Choose a valid date and time."); return; }
+    const iso = nextDate.toISOString();
+    if (kind === "group" && !isTeacherAvailableAt(session.teacher_id, iso, session.duration_minutes ?? 60, session.id)) {
       setError("The assigned teacher is not available at that time (outside their schedule or overlaps another session).");
       return;
     }
@@ -72,7 +82,12 @@ export function RescheduleModal({
     // date_time first so the email can show "fecha anterior" for context.
     const wasStudentRequest = session.status === "pending_reschedule";
     const previousDateTime = session.date_time;
-    updateSession(session.id, { date_time: iso, status: permanent ? "scheduled" : "rescheduled" });
+    setBusy(true);
+    const ok = kind === "individual"
+      ? await resolveSessionReschedule(session.id,iso,undefined,{permanent})
+      : await updateSession(session.id, { date_time: iso, status: permanent ? "scheduled" : "rescheduled" });
+    setBusy(false);
+    if (!ok) return;
     notifySessionEvent(session.id, wasStudentRequest ? "reschedule_approved" : "admin_rescheduled", { previousDateTime });
     // 2026-08-19: used to also ping Admin's own WhatsApp here — that link is
     // meant to alert Admin when a TEACHER/STUDENT requests something (see
@@ -92,7 +107,7 @@ export function RescheduleModal({
       title="New date & time"
       watermark={{ type: "icon", icon: CalendarClock }}
       maxWidth="max-w-md"
-      onClose={onClose}
+      onClose={() => { if (!busy) onClose(); }}
     >
       <div className="p-6">
         {mode === "decline" ? (
@@ -178,12 +193,12 @@ export function RescheduleModal({
         {mode === "decline" ? (
           <>
             <GhostButton onClick={() => setMode("approve")}>Back</GhostButton>
-            <PrimaryButton onClick={declineSubmit} accentColor="#dc2626">Confirm — can't reschedule</PrimaryButton>
+            <PrimaryButton disabled={busy} onClick={() => { void declineSubmit(); }} accentColor="#dc2626">{busy ? "Saving…" : "Confirm — can't reschedule"}</PrimaryButton>
           </>
         ) : (
           <>
-            <GhostButton onClick={onClose}>Cancel</GhostButton>
-            <PrimaryButton onClick={submit} accentColor="#f38934">Confirm Reschedule</PrimaryButton>
+            <GhostButton disabled={busy} onClick={onClose}>Cancel</GhostButton>
+            <PrimaryButton disabled={busy} onClick={() => { void submit(); }} accentColor="#f38934">{busy ? "Saving…" : "Confirm Reschedule"}</PrimaryButton>
           </>
         )}
       </AccentModalFooter>

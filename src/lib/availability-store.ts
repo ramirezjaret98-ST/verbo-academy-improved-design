@@ -17,6 +17,7 @@ import type { Database } from "@/integrations/supabase/types";
 import { hydrateUserIdBridge, legacyToUuid, uuidToLegacySync } from "@/lib/user-id-bridge";
 import { loadSessions } from "./sessions-store";
 import { notifyError } from "@/lib/notify";
+import { registerRehydrate } from "@/lib/auth-rehydrate";
 
 export type DayKey = "mon" | "tue" | "wed" | "thu" | "fri" | "sat";
 export const DAY_KEYS: DayKey[] = ["mon", "tue", "wed", "thu", "fri", "sat"];
@@ -71,6 +72,9 @@ type ReqRow = Database["public"]["Tables"]["availability_change_requests"]["Row"
 
 let availabilityMap: Record<string, TeacherAvailability> = {};
 let availHydrated = false;
+let scopeGeneration=0;
+let availQueued=false;
+let reqQueued=false;
 let availHydratePromise: Promise<void> | null = null;
 const availListeners = new Set<() => void>();
 
@@ -110,12 +114,15 @@ function mapChangeRequestRow(row: ReqRow): AvailabilityChangeRequest {
 async function hydrateAvailability(): Promise<void> {
   if (availHydrated) return;
   if (availHydratePromise) return availHydratePromise;
+  const version=scopeGeneration;
   availHydratePromise = (async () => {
     await hydrateUserIdBridge();
     const [{ data: rows, error: rowsErr }, { data: blocks, error: blocksErr }] = await Promise.all([
       supabase.from("teacher_availability").select("*"),
       supabase.from("teacher_availability_blocks").select("*").order("id", { ascending: true }),
     ]);
+    if(version!==scopeGeneration)return;
+    if(rowsErr || blocksErr)throw rowsErr ?? blocksErr;
     if (rowsErr) console.error("[availability-store] failed to load teacher_availability", rowsErr);
     if (blocksErr) console.error("[availability-store] failed to load teacher_availability_blocks", blocksErr);
     const map: Record<string, TeacherAvailability> = {};
@@ -131,55 +138,61 @@ async function hydrateAvailability(): Promise<void> {
     availabilityMap = map;
     availHydrated = true;
   })();
-  await availHydratePromise;
+  await availHydratePromise.catch(error=>console.error("[availability-store] refresh failed",error));
   availHydratePromise = null;
   notifyAvailability();
+  if(availQueued){availQueued=false;void hydrateAvailability();}
 }
 
 async function hydrateChangeRequests(): Promise<void> {
   if (reqHydrated) return;
   if (reqHydratePromise) return reqHydratePromise;
+  const version=scopeGeneration;
   reqHydratePromise = (async () => {
     await hydrateUserIdBridge();
     const { data, error } = await supabase
       .from("availability_change_requests")
       .select("*")
       .order("created_at", { ascending: false });
-    if (error) {
-      console.error("[availability-store] failed to load change requests", error);
-      reqHydrated = true;
-      return;
-    }
+    if(version!==scopeGeneration)return;
+    if(error)throw error;
     changeRequestsCache = (data ?? []).map(mapChangeRequestRow);
     reqHydrated = true;
   })();
-  await reqHydratePromise;
+  await reqHydratePromise.catch(error=>console.error("[availability-store] requests refresh failed",error));
   reqHydratePromise = null;
   notifyChangeRequests();
+  if(reqQueued){reqQueued=false;void hydrateChangeRequests();}
 }
 
 if (typeof window !== "undefined") {
+  registerRehydrate(reason => {
+    scopeGeneration++;availHydrated=false;reqHydrated=false;
+    if(reason==="auth"){availabilityMap={};changeRequestsCache=[];notifyAvailability();notifyChangeRequests();}
+    if(availHydratePromise)availQueued=true;else void hydrateAvailability();
+    if(reqHydratePromise)reqQueued=true;else void hydrateChangeRequests();
+  }, {critical:true});
   void hydrateAvailability();
   void hydrateChangeRequests();
   supabase
     .channel("teacher-availability-changes")
     .on("postgres_changes", { event: "*", schema: "public", table: "teacher_availability" }, () => {
       availHydrated = false;
-      void hydrateAvailability();
+      if(availHydratePromise)availQueued=true;else void hydrateAvailability();
     })
     .subscribe();
   supabase
     .channel("teacher-availability-blocks-changes")
     .on("postgres_changes", { event: "*", schema: "public", table: "teacher_availability_blocks" }, () => {
       availHydrated = false;
-      void hydrateAvailability();
+      if(availHydratePromise)availQueued=true;else void hydrateAvailability();
     })
     .subscribe();
   supabase
     .channel("availability-change-requests-changes")
     .on("postgres_changes", { event: "*", schema: "public", table: "availability_change_requests" }, () => {
       reqHydrated = false;
-      void hydrateChangeRequests();
+      if(reqHydratePromise)reqQueued=true;else void hydrateChangeRequests();
     })
     .subscribe();
 }
@@ -207,20 +220,20 @@ export function isAvailabilityHydrated(): boolean {
  *  the teacher's own "Save Availability" and by `approveChangeRequest`
  *  (called as admin, on the teacher's behalf — RLS allows this since the
  *  underlying tables' policies accept `is_admin()`). */
-export function saveAvailability(teacherId: string, weekly: Weekly): void {
+export async function saveAvailability(teacherId: string, weekly: Weekly): Promise<boolean> {
   const prev = availabilityMap[teacherId];
   const confirmedAt = new Date().toISOString();
   setAvailabilityEntry(teacherId, { teacherId, weekly, confirmedAt });
   notifyAvailability();
 
-  void (async () => {
+  try {
     const teacherUuid = await legacyToUuid(teacherId);
     if (!teacherUuid) {
       console.error("[availability-store] unknown teacher id", teacherId);
       setAvailabilityEntry(teacherId, prev);
       notifyAvailability();
       notifyError("Couldn't identify the teacher", { context: "Saving availability" });
-      return;
+      return false;
     }
     const blocks = DAY_KEYS.flatMap((day) =>
       weekly[day].map((b) => ({ day, startMin: b.startMin, endMin: b.endMin })),
@@ -235,8 +248,10 @@ export function saveAvailability(teacherId: string, weekly: Weekly): void {
       setAvailabilityEntry(teacherId, prev);
       notifyAvailability();
       notifyError(error, { context: "Saving availability" });
+      return false;
     }
-  })();
+    return true;
+  }catch(error){setAvailabilityEntry(teacherId,prev);notifyAvailability();notifyError(error,{context:"Saving availability"});return false;}
 }
 
 export function subscribeAvailability(cb: () => void): () => void {
@@ -359,11 +374,13 @@ const JS_DAY_TO_KEY: Record<number, DayKey | null> = {
 
 /** Does the teacher's weekly schedule cover this date/time, and no other
  *  active session overlaps? Sundays are never available. */
-export function isTeacherAvailableAt(teacherId: string, dateISO: string, durationMin = 60): boolean {
+export function isTeacherAvailableAt(teacherId: string, dateISO: string, durationMin = 60, excludeSessionId?: string): boolean {
   const d = new Date(dateISO);
-  const key = JS_DAY_TO_KEY[d.getDay()];
-  if (!key) return false;
-  const start = d.getHours() * 60 + d.getMinutes();
+  const parts=new Intl.DateTimeFormat("en-US",{timeZone:"America/Mexico_City",weekday:"short",hour:"2-digit",minute:"2-digit",hourCycle:"h23"}).formatToParts(d);
+  const part=(type:string)=>parts.find(p=>p.type===type)?.value ?? "";
+  const key=part("weekday").toLowerCase() as DayKey;
+  if (!DAY_KEYS.includes(key)) return false;
+  const start = Number(part("hour"))*60+Number(part("minute"));
   const end = start + durationMin;
   const wk = getAvailability(teacherId).weekly;
   const covered = (wk[key] ?? []).some((b) => b.startMin <= start && b.endMin >= end);
@@ -371,8 +388,9 @@ export function isTeacherAvailableAt(teacherId: string, dateISO: string, duratio
   // Overlap check against other active sessions of this teacher.
   const startMs = d.getTime();
   const endMs = startMs + durationMin * 60_000;
-  const blocking = new Set(["scheduled", "ready", "rescheduled", "rearranged", "delayed"]);
+  const blocking = new Set(["scheduled", "ready", "rescheduled", "rearranged", "delayed", "pending_reschedule"]);
   const clash = loadSessions().some((s) => {
+    if (s.id === excludeSessionId) return false;
     if (s.teacher_id !== teacherId) return false;
     if (!blocking.has(s.status)) return false;
     const sStart = new Date(s.date_time).getTime();
