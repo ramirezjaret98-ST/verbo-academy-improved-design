@@ -1,3 +1,4 @@
+import { loadScheduleEvents, SCHEDULE_EVENTS } from "./session-schedule-events-store";
 // ============================================================================
 // Internal notifications (bell) — DERIVED from existing stores.
 //
@@ -976,6 +977,11 @@ export function buildNotifications(role: Role, userId: string): Notification[] {
     role === "admin" ? adminNotifications() :
     role === "teacher" ? teacherNotifications(userId) :
     studentNotifications(userId);
+  for(const event of loadScheduleEvents()) {
+    if(role!=="admin" && (role==="student" ? event.student_id!==userId : event.teacher_id!==userId && event.previous_teacher_id!==userId))continue;
+    const title=event.kind==="pending_reschedule" ? "Reschedule request needs review" : event.kind==="reschedule_declined" ? "Reschedule request declined" : "Session schedule changed";
+    raw.push({id:`schedule-event:${event.id}`,kind:"session_changed",title,body:fmtDate(event.date_time),createdAt:event.created_at,to:role==="student" ? "/student/sessions" : role==="teacher" ? "/teacher/calendar" : "/admin/calendar",data:{sessionId:String(event.session_id)},read:false});
+  }
   const readSet = readSetFor(userId);
   return raw
     .map((n) => ({ ...n, read: !!readSet[n.id] }))
@@ -986,7 +992,7 @@ export function buildNotifications(role: Role, userId: string): Notification[] {
 // React binding — one subscription that listens to every source event.
 // ---------------------------------------------------------------------------
 const SOURCE_EVENTS = [
-  SESSIONS_EVENT, CLUBS_EVENT, RELEASE_REQUESTS_EVENT,
+  SCHEDULE_EVENTS, SESSIONS_EVENT, CLUBS_EVENT, RELEASE_REQUESTS_EVENT,
   AVAIL_EVENT, STRIKES_EVENT, ANN_EVENT, NOTIF_EVENT,
   REPORTS_EVENT, CONDUCT_REPORTS_EVENT, CONTENT_ISSUE_EVENT, FIN_ISSUES_EVENT, STUDENTS_EVENT, CHALLENGES_EVENT,
   REQUESTS_EVENT, VIP_UNITS_EVENT, TAILORED_UNITS_EVENT, LP_EVENT, LESSON_PLANS_EVENT,

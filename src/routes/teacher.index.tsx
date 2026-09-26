@@ -207,7 +207,7 @@ function TeacherDashboard() {
   const teacherUser = USERS.find((u) => u.id === user.id && u.role === "teacher") ?? null;
   const myLive = liveSessions.filter((s) => s.teacher_id === user.id);
   const in7d = now + 7 * 24 * 3600_000;
-  const upcomingLiveStatuses = new Set(["scheduled", "ready", "rescheduled", "rearranged", "delayed"]);
+  const upcomingLiveStatuses = new Set(["scheduled", "ready", "rescheduled", "rearranged", "delayed", "pending_reschedule"]);
   // Count every active session (Scheduled + Ready + rescheduled/rearranged/
   // delayed) inside the next 7 days. We union both data sources so the
   // number matches what "Plan your upcoming Sessions" / "Complete your

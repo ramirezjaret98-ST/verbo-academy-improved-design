@@ -100,7 +100,7 @@ function Page() {
     () => events
       .filter((e) =>
         (e.kind === "class" || e.kind === "workshop") &&
-        (e.status === "scheduled" || e.status === "ready" || e.status === "rescheduled") &&
+        (e.status === "scheduled" || e.status === "ready" || e.status === "rescheduled" || e.status === "rearranged" || e.status === "delayed" || e.status === "pending_reschedule") &&
         +new Date(e.date) >= Date.now() - 60 * 60_000,
       )
       .sort((a, b) => +new Date(a.date) - +new Date(b.date))
@@ -497,4 +497,3 @@ function RequestReleaseModal({ club, onClose, onSubmit }: {
     </AccentModal>
   );
 }
-

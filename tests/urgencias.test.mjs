@@ -81,12 +81,19 @@ function handlerFixture({ rejectTeacher = false, teacherEmail = 'teacher@example
       throw new Error(`Unexpected table ${table}`);
     } }; return query;
   } };
-  loadTs('../supabase/functions/notify-session-event/index.ts', {
+  handler=loadTs('../supabase/functions/notify-session-event/handler.ts', {
     'jsr:@supabase/supabase-js@2': { createClient: (_url, key) => key === 'service-test' ? service : { auth: { getUser: async () => ({ data: { user: { id: caller } } }) } } },
     './email-delivery.ts': { ...transport, sendResendEmail: async opts => { sends.push(opts); return rejectTeacher && opts.to[0] === teacherEmail ? { ok: false, status: 422, code: 'validation_error', attempts: 1 } : { ok: true, id: 'test-accepted', attempts: 1 }; } },
-  }, { Deno: { env: { get: key => key === 'SUPABASE_SERVICE_ROLE_KEY' ? 'service-test' : 'test-value' }, serve: fn => { handler = fn; } }, setTimeout: fn => { fn(); } });
-  return { sends, invoke: kind => handler(new Request('https://example.invalid', { method: 'POST', headers: { Authorization: 'Bearer fake-test', 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: 1, kind }) })) };
+  }, { Deno: { env: { get: key => key === 'SUPABASE_SERVICE_ROLE_KEY' ? 'service-test' : 'test-value' }, serve: fn => { handler = fn; } }, setTimeout: fn => { fn(); } }).handleSessionNotification;
+  return { sends, invoke: kind => handler(new Request('https://example.invalid', { method: 'POST', headers: { Authorization: 'Bearer fake-test', 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: 1, kind }) }), ["pending_reschedule","reschedule_approved","admin_rescheduled"].includes(kind) ? {sessionId:1,kind,eventId:"test-event",session:{id:1,student_id:"student-test",teacher_id:"teacher-test",date_time:"2026-10-01T15:00:00Z"}} : undefined) };
 }
+
+for(const kind of ['reschedule_approved','admin_rescheduled']) test(`${kind}: a committed move notifies the teacher and admin as well as the student`,async()=>{
+ const fixture=handlerFixture(); const body=await (await fixture.invoke(kind)).json();
+ assert.equal(body.ok,true);assert.equal(fixture.sends.length,3);
+ assert.deepEqual(fixture.sends.map(x=>x.to[0]).sort(),['admin@example.invalid','student@example.invalid','teacher@example.invalid']);
+ assert.match(fixture.sends.find(x=>x.to[0]==='teacher@example.invalid').html,/\/teacher\/calendar/);
+});
 
 for (const kind of ['cancelled', 'absent', 'pending_reschedule']) test(`${kind}: teacher, administration and student are notified separately`, async () => {
   const fixture = handlerFixture(); const response = await fixture.invoke(kind); const body = await response.json();

@@ -318,12 +318,13 @@ export function EventDetailsModal({
   const [pendingAbsentCause, setPendingAbsentCause] = useState<"student" | "teacher">(s?.absent_cause ?? "student");
   const plan = s ? getLessonPlan(s.id) : undefined;
 
-  const saveStatus = () => {
+  const saveStatus = async () => {
     if (!s) return;
-    updateSession(s.id, {
+    const saved = await updateSession(s.id, {
       status: pendingStatus,
       ...(pendingStatus === "absent" ? { absent_cause: pendingAbsentCause } : {}),
     });
+    if (!saved) return;
     setStatusEditing(false);
     notifySuccess("Session status updated.");
     onClose();
@@ -351,9 +352,9 @@ export function EventDetailsModal({
   const [pendingLink, setPendingLink] = useState(s?.teams_link ?? "");
   const [reassignOpen, setReassignOpen] = useState(false);
 
-  const saveLink = () => {
+  const saveLink = async () => {
     if (!s) return;
-    updateSession(s.id, { teams_link: pendingLink.trim() });
+    if (!await updateSession(s.id, { teams_link: pendingLink.trim() })) return;
     setLinkEditing(false);
     notifySuccess("Video call link updated.");
     onClose();

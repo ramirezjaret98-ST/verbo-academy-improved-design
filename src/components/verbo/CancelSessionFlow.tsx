@@ -1,3 +1,5 @@
+import { academyToday, academyTime } from "@/lib/academy-time";
+import { rescheduleSlots, requestSessionReschedule } from "@/lib/student-requests-store";
 // Shared "Can't Attend" / Reschedule flow.
 //
 // Extracted from student.sessions.tsx so the Student Dashboard and Live
@@ -35,17 +37,8 @@ export function hoursUntil(iso: string): number {
   return (new Date(iso).getTime() - Date.now()) / 36e5;
 }
 
-export function todayYMD(): string {
-  const d = new Date();
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  return `${yyyy}-${mm}-${dd}`;
-}
-
-export function fmtSlotTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-}
+export function todayYMD():string {return academyToday();}
+export function fmtSlotTime(iso:string):string {return academyTime(iso);}
 
 // ---------------------------------------------------------------------------
 // Can't Attend router — evaluates the 4 branches and shows the right modal.
@@ -63,23 +56,23 @@ export function CantAttendRouter({
   const used = reschedulesUsedThisMonth(user.id);
   const hours = hoursUntil(session.date_time);
   const insideLateWindow = hours < policy.noticeHours;
-  const quotaExhausted = used >= quota;
+  const quotaExhausted = used >= quota || !!session.student_reschedule_used;
   const isGroup = Boolean(session.group_id);
 
   // For groups, "Absent" is recorded per-member (top-level stays scheduled
   // unless the whole roster is out). For 1:1, top-level flips to Absent.
-  const confirmAbsent = () => {
+  const confirmAbsent = async () => {
     if (isGroup) {
       const nextMemberStatuses = { ...(session.member_statuses ?? {}), [user.id]: "absent" as ExtSessionStatus };
-      updateSession(session.id, { member_statuses: nextMemberStatuses });
+      if (!await updateSession(session.id, { member_statuses: nextMemberStatuses })) return;
       toast("You've been marked Absent. The session continues for the other members.");
     } else {
-      studentSetSessionStatus(session.id, "absent");
+      if (!await studentSetSessionStatus(session.id, "absent")) return;
       toast("Session marked as Absent.");
     }
     onClose();
   };
-  const confirmCancelNoReschedule = () => {
+  const confirmCancelNoReschedule = async () => {
     if (isGroup) {
       const res = applyGroupMemberCancellation(session.id, user.id, "cancelled");
       toast(
@@ -88,7 +81,7 @@ export function CantAttendRouter({
           : "You've cancelled this group session. Credit forfeited. The class continues for the remaining members.",
       );
     } else {
-      studentSetSessionStatus(session.id, "cancelled");
+      if (!await studentSetSessionStatus(session.id, "cancelled")) return;
       toast("Session cancelled. Credit forfeited.");
     }
     onClose();
@@ -284,6 +277,9 @@ export function RescheduleRequestModal({ session, onClose }: { session: ExtSessi
   const { user } = useAuth();
   const [dateYMD, setDateYMD] = useState<string>(todayYMD());
   const [slotISO, setSlotISO] = useState<string>("");
+  const [busy,setBusy]=useState(false);
+  const [loadingSlots,setLoadingSlots]=useState(false);
+  const [serverSlots,setServerSlots]=useState<{date_time:string;available:boolean}[]>([]);
   const [error, setError] = useState<string | null>(null);
   // 2026-09-17 fix: qualifiedTeachers below used to be memoized on
   // `[product]` alone, so it snapshotted USERS the instant this modal
@@ -307,7 +303,16 @@ export function RescheduleRequestModal({ session, onClose }: { session: ExtSessi
   const product = studentUser?.product;
   // Duration for the reschedule ALWAYS inherits from the student's profile
   // (Access Plan defines the allowed values; Admin fixed one on registration).
-  const durationMin = studentUser?.session_duration ?? session.duration_minutes ?? 60;
+  const durationMin = session.duration_minutes ?? 60;
+  const noticeHours=parseReschedulePolicy(studentUser ?? {}).noticeHours;
+  useEffect(()=>{
+    if(isGroup)return;
+    let active=true; setLoadingSlots(true);setServerSlots([]);setError(null);
+    rescheduleSlots(session.id,dateYMD).then(slots=>{if(active)setServerSlots(slots);})
+      .catch(()=>{if(active)setError("Could not load times. Choose the date again or reopen this window.");})
+      .finally(()=>{if(active)setLoadingSlots(false);});
+    return ()=>{active=false;};
+  },[session.id,dateYMD,isGroup]);
 
   const qualifiedTeachers = useMemo(() => {
     return USERS.filter((u) => u.role === "teacher" && u.teacher_status === "active"
@@ -315,8 +320,17 @@ export function RescheduleRequestModal({ session, onClose }: { session: ExtSessi
   }, [product, teachersTick]);
   const qualifiedIds = useMemo(() => qualifiedTeachers.map((t) => t.id), [qualifiedTeachers]);
 
-  const submit = () => {
+  const submit = async () => {
+    if(busy)return;
     if (!slotISO) { setError("Pick one of the available start times."); return; }
+    if(!isGroup){
+      setBusy(true);
+      const outcome=await requestSessionReschedule(session.id,slotISO);
+      setBusy(false);
+      if(!outcome){setError("Your change was not confirmed. Check the message and try again.");return;}
+      toast.success(outcome==="confirmed" ? "Session rescheduled. Confirmation emails are queued." : "Request saved for review. Your original time remains reserved; no confirmed reschedule has been used.");
+      onClose();return;
+    }
     const stillOk = qualifiedIds.some((tid) => isTeacherAvailableAt(tid, slotISO, durationMin));
     if (!stillOk) { setError("That slot is no longer available. Please pick another."); return; }
     addStudentRequest({
@@ -351,7 +365,7 @@ export function RescheduleRequestModal({ session, onClose }: { session: ExtSessi
           <h3 className="text-base font-semibold text-foreground">Reschedule Request</h3>
         </div>
         <p className="mt-2 text-xs text-muted-foreground">
-          Pick one of the available start times. Duration is fixed at <strong>{durationMin} min</strong> (from your plan). Start times are on the hour or half hour, and require at least 24h notice.
+          Pick one of the available start times. Duration is fixed at <strong>{durationMin} min</strong> (from your plan). Start times are on the hour or half hour, and require {noticeHours}h notice. All times are Mexico City time. Free times with your assigned teacher can be confirmed immediately; other times require review.
         </p>
         <div className="mt-4">
           <label className="text-xs font-medium text-foreground">Date</label>
@@ -365,13 +379,18 @@ export function RescheduleRequestModal({ session, onClose }: { session: ExtSessi
         </div>
         <div className="mt-3">
           <label className="text-xs font-medium text-foreground">Available start times</label>
-          <SlotPickerGrid
+          {isGroup ? <SlotPickerGrid
             dateYMD={dateYMD}
             durationMin={durationMin}
             qualifiedTeacherIds={qualifiedIds}
             selectedISO={slotISO}
             onSelect={(iso) => { setSlotISO(iso); setError(null); }}
-          />
+          /> : loadingSlots ? <p className="mt-3 text-xs">Loading times…</p> : <div className="mt-2 grid max-h-52 grid-cols-3 gap-2 overflow-y-auto">
+            {serverSlots.map(slot=><button type="button" key={slot.date_time} disabled={busy} onClick={()=>{setSlotISO(slot.date_time);setError(null);}} className={`rounded-lg border p-2 text-xs ${slotISO===slot.date_time ? "bg-primary text-primary-foreground" : "bg-background"}`}>
+              {fmtSlotTime(slot.date_time)}<span className="block text-[10px]">{slot.available ? "Available with your teacher" : "Request review"}</span>
+            </button>)}
+            {!serverSlots.length && <p className="col-span-3 text-xs">No times meet the notice required by your plan on this date.</p>}
+          </div>}
         </div>
         {error && (
           <div className="mt-3 flex items-start gap-2 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-xs text-destructive">
@@ -381,7 +400,7 @@ export function RescheduleRequestModal({ session, onClose }: { session: ExtSessi
         )}
         <div className="mt-5 flex justify-end gap-2">
           <GhostButton onClick={onClose}>Return</GhostButton>
-          <PrimaryButton onClick={submit}>Publish Request</PrimaryButton>
+          <PrimaryButton disabled={busy || loadingSlots || !slotISO} onClick={()=>{void submit();}}>{busy ? "Saving…" : "Confirm / Request review"}</PrimaryButton>
         </div>
       </div>
     </div>

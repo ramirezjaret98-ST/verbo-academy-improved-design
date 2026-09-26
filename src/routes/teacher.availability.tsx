@@ -1,3 +1,4 @@
+import { notifySuccess } from "@/lib/notify";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { Plus, Trash2, Info, Clock, Send } from "lucide-react";
@@ -106,14 +107,15 @@ function AvailabilityPage() {
     if (err) { setSavedFlash(err); return; }
     setConfirmOpen(true);
   };
-  const confirmSave = () => {
+  const confirmSave = async () => {
     if (!hydrated) { setConfirmOpen(false); setSavedFlash(notReadyMessage); return; }
-    saveAvailability(teacherId, weekly);
+    if (!await saveAvailability(teacherId, weekly)) return;
     setConfirmOpen(false);
     // Saved: hand the form back to the store, so it keeps mirroring what is
     // actually stored (including the write this just made).
     setDirty(false);
     setSavedFlash("Availability saved.");
+    notifySuccess("Availability saved.");
   };
 
   const submitChange = () => {

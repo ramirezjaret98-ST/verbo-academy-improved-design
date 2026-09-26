@@ -1,11 +1,9 @@
 // Shared sessions store — backed by Supabase (`public.sessions` +
 // `public.session_member_statuses` [normalized per-member status for group
 // sessions] + `public.report_admin_edits` [append-only audit log]). Global
-// cache hydrated once + Postgres Realtime, same pattern used across this
-// migration. Writes stay optimistic-sync in their public signature (update
-// cache + notify immediately, real round-trip in the background with
-// rollback on failure) — there is no real race condition on sessions the
-// way there was on club claims, so the simpler A3 pattern applies.
+// cache refreshed through Realtime, auth/focus/reconnect and a visible-tab
+// fallback. updateSession returns persistence success so callers can wait
+// before closing a modal. Failed reads preserve the previous calendar.
 //
 // Multi-row writes (a group session touching its own row + N per-member
 // rows) go through the `upsert_session_member_statuses` RPC (one DB
@@ -22,6 +20,7 @@
 // groups-store.ts (Tier B) is migrated and group plans go live for real users.
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { withTimeout } from "./net-utils";
 import { registerRehydrate } from "@/lib/auth-rehydrate";
 import type { Database } from "@/integrations/supabase/types";
 import { hydrateUserIdBridge, legacyToUuid, uuidToLegacySync } from "@/lib/user-id-bridge";
@@ -124,6 +123,7 @@ export interface ExtSession {
    *  UPDATE `sessions` directly). */
   student_connected_at?: string;
   teacher_connected_at?: string;
+  student_reschedule_used?: boolean;
 }
 
 export const SESSIONS_EVENT = "verbo:sessions-updated";
@@ -137,6 +137,8 @@ type AdminEditRow = Database["public"]["Tables"]["report_admin_edits"]["Row"];
 let sessionsCache: ExtSession[] = [];
 let hydrated = false;
 let hydratePromise: Promise<void> | null = null;
+let hydrateGeneration = 0;
+let refreshQueued = false;
 const listeners = new Set<() => void>();
 const SSR_SNAPSHOT: ExtSession[] = [];
 
@@ -189,6 +191,7 @@ function mapSessionRow(row: SessionRow, members: MemberStatusRow[], edits: Admin
     duration_minutes: row.duration_minutes,
     teams_link: row.teams_link,
     status: row.status,
+    student_reschedule_used: (row as SessionRow & {student_reschedule_used?: boolean}).student_reschedule_used ?? false,
     absent_cause: (row.absent_cause as "student" | "teacher" | null) ?? undefined,
     report_pdf_url: row.report_pdf_url ?? undefined,
     student_rating: row.student_rating ?? undefined,
@@ -224,13 +227,18 @@ async function hydrate(): Promise<void> {
   if (hydrated) return;
   if (hydratePromise) return hydratePromise;
   hydratePromise = (async () => {
+    const requestGeneration = hydrateGeneration;
     await hydrateUserIdBridge();
-    const [sessionsRes, membersRes, editsRes] = await Promise.all([
+    const [sessionsRes, membersRes, editsRes] = await withTimeout(Promise.all([
       supabase.from("sessions").select("*"),
       supabase.from("session_member_statuses").select("*"),
       supabase.from("report_admin_edits").select("*"),
-    ]);
-    if (sessionsRes.error) console.error("[sessions-store] failed to load sessions", sessionsRes.error);
+    ]),30_000,"Refreshing sessions");
+    if (requestGeneration !== hydrateGeneration) return;
+    if (sessionsRes.error) {
+      toast.warning("Couldn't refresh sessions. Showing the last saved calendar; reconnect and try again.", {id:"sessions-refresh"});
+      return;
+    }
     if (membersRes.error) console.error("[sessions-store] failed to load session_member_statuses", membersRes.error);
     if (editsRes.error) console.error("[sessions-store] failed to load report_admin_edits", editsRes.error);
 
@@ -251,16 +259,26 @@ async function hydrate(): Promise<void> {
       mapSessionRow(row, membersBySession.get(row.id) ?? [], editsBySession.get(row.id) ?? []),
     );
     hydrated = true;
-  })();
+    toast.dismiss("sessions-refresh");
+    notify();
+  })().catch(() => { toast.warning("Couldn't refresh sessions. Showing the last saved calendar; reconnect and try again.", {id:"sessions-refresh"}); }).finally(() => {
+    hydratePromise = null;
+    if (refreshQueued) { refreshQueued = false; void hydrate(); }
+  });
   await hydratePromise;
-  hydratePromise = null;
-  notify();
 }
 
-function invalidateAndRehydrate() {
+function invalidateAndRehydrate(reason?: "auth" | "refresh") {
+  hydrateGeneration++;
   hydrated = false;
-  hydratePromise = null;
+  if (reason === "auth") { sessionsCache = []; notify(); }
+  if (hydratePromise) { refreshQueued = true; return; }
   void hydrate();
+}
+
+export async function refreshSessions(): Promise<void> {
+  invalidateAndRehydrate("refresh");
+  while (hydratePromise) await hydratePromise;
 }
 
 if (typeof window !== "undefined") {
@@ -268,25 +286,22 @@ if (typeof window !== "undefined") {
   supabase
     .channel("sessions-changes")
     .on("postgres_changes", { event: "*", schema: "public", table: "sessions" }, () => {
-      hydrated = false;
-      void hydrate();
+      invalidateAndRehydrate("refresh");
     })
-    .subscribe();
+    .subscribe(status => { if (status === "SUBSCRIBED") invalidateAndRehydrate("refresh"); });
   supabase
     .channel("session-member-statuses-changes")
     .on("postgres_changes", { event: "*", schema: "public", table: "session_member_statuses" }, () => {
-      hydrated = false;
-      void hydrate();
+      invalidateAndRehydrate("refresh");
     })
     .subscribe();
   supabase
     .channel("report-admin-edits-changes")
     .on("postgres_changes", { event: "*", schema: "public", table: "report_admin_edits" }, () => {
-      hydrated = false;
-      void hydrate();
+      invalidateAndRehydrate("refresh");
     })
     .subscribe();
-  registerRehydrate(invalidateAndRehydrate);}
+  registerRehydrate(invalidateAndRehydrate, { critical: true });}
 
 export function loadSessions(): ExtSession[] {
   if (!hydrated) void hydrate();
@@ -540,15 +555,16 @@ async function upsertMemberStatuses(input: {
  *  key) — every entry present gets upserted into `session_member_statuses`
  *  via the atomic RPC; entries removed from the map are NOT deleted (no
  *  caller relies on removal, only on adding/changing one member at a time). */
-export function updateSession(id: string, patch: Partial<ExtSession>) {
+export async function updateSession(id: string, patch: Partial<ExtSession>): Promise<boolean> {
   const prev = sessionsCache.find((s) => s.id === id);
-  if (!prev) return;
+  if (!prev) { notifyError("Session unavailable", { context: "Updating session" }); return false; }
+  const numericId = Number(id);
+  if (!Number.isFinite(numericId)) return false;
   const next: ExtSession = { ...prev, ...patch };
   sessionsCache = sessionsCache.map((s) => (s.id === id ? next : s));
   notify();
 
-  const numericId = Number(id);
-  if (!Number.isFinite(numericId)) return;
+  try {
 
   if (patch.member_statuses) {
     const members = Object.entries(patch.member_statuses).map(([studentId, status]) => ({
@@ -557,13 +573,13 @@ export function updateSession(id: string, patch: Partial<ExtSession>) {
       absentCause: patch.member_absent_cause?.[studentId],
       subStatus: patch.member_sub_statuses?.[studentId],
     }));
-    void upsertMemberStatuses({ sessionId: id, members }).then((ok) => {
+    const ok = await upsertMemberStatuses({ sessionId: id, members });
       if (!ok) {
         sessionsCache = sessionsCache.map((s) => (s.id === id ? prev : s));
         notify();
         notifyError("Could not save the attendance/status change.", { context: "Updating session" });
+        return false;
       }
-    });
     // member_statuses can arrive alongside a top-level status change too
     // (rare, but keep both effects consistent) — fall through to the plain
     // update below for every OTHER field in the patch.
@@ -593,27 +609,26 @@ export function updateSession(id: string, patch: Partial<ExtSession>) {
   if (patch.holiday_makeup !== undefined) update.holiday_makeup = patch.holiday_makeup ?? null;
   if (patch.workshop_topic !== undefined) update.workshop_topic = patch.workshop_topic ?? null;
   if ("teacher_id" in patch && patch.teacher_id) {
-    void (async () => {
-      const teacherUuid = await legacyToUuid(patch.teacher_id!);
-      if (!teacherUuid) return;
-      const { error } = await supabase.from("sessions").update({ teacher_id: teacherUuid }).eq("id", numericId);
-      if (error) {
-        console.error("[sessions-store] failed to update teacher_id", error);
-        notifyError(error, { context: "Reassigning session teacher" });
-      }
-    })();
+    const teacherUuid = await legacyToUuid(patch.teacher_id);
+    if (!teacherUuid) throw new Error("Teacher unavailable");
+    update.teacher_id = teacherUuid;
   }
 
-  if (Object.keys(update).length === 0) return;
-  void (async () => {
-    const { error } = await supabase.from("sessions").update(update).eq("id", numericId);
-    if (error) {
-      console.error("[sessions-store] failed to update session", error);
-      sessionsCache = sessionsCache.map((s) => (s.id === id ? prev : s));
-      notify();
-      notifyError(error, { context: "Updating session" });
-    }
-  })();
+  if (Object.keys(update).length === 0) return true;
+  const { data, error } = await supabase.from("sessions").update(update).eq("id", numericId).select("*").single();
+  if (error || !data) throw error ?? new Error("Session no longer writable");
+  // Use the saved row, including server timestamps/fields, rather than an
+  // optimistic value as proof of persistence.
+  setSessionEntry(id, { ...next, ...mapSessionRow(data, [], []), member_statuses: next.member_statuses, member_absent_cause: next.member_absent_cause, member_sub_statuses: next.member_sub_statuses, report_admin_edits: next.report_admin_edits });
+  notify();
+  return true;
+  } catch (error) {
+    sessionsCache = sessionsCache.map(s => s.id === id ? prev : s);
+    notify();
+    notifyError(error, { context: "Updating session" });
+    void refreshSessions();
+    return false;
+  }
 }
 
 /** Self-service status flip for a student's OWN non-group session — Can't
@@ -626,21 +641,21 @@ export function updateSession(id: string, patch: Partial<ExtSession>) {
  *  DB row never actually changed. The RPC validates ownership + a whitelist
  *  of forward transitions server-side. Optimistic like every other mutator
  *  in this file (cache flips immediately, rolls back on failure). */
-export function studentSetSessionStatus(
+export async function studentSetSessionStatus(
   id: string,
   status: Extract<ExtSessionStatus, "absent" | "cancelled" | "pending_reschedule">,
   cancellationNote?: string,
 ) {
   const prev = sessionsCache.find((s) => s.id === id);
-  if (!prev) return;
+  if (!prev) return false;
   const next: ExtSession = { ...prev, status, ...(cancellationNote ? { cancellation_note: cancellationNote } : {}) };
   sessionsCache = sessionsCache.map((s) => (s.id === id ? next : s));
   notify();
 
   const numericId = Number(id);
-  if (!Number.isFinite(numericId)) return;
+  if (!Number.isFinite(numericId)) return false;
 
-  void (async () => {
+  try {
     const { error } = await supabase.rpc("student_set_session_status", {
       p_session_id: numericId,
       p_status: status,
@@ -654,6 +669,7 @@ export function studentSetSessionStatus(
       // already have shown an optimistic "done" — this is the correction
       // when the server actually rejected it.
       notifyError(error, { context: "Updating your session" });
+      return false;
     } else {
       // 2026-08-13 fix: a student cancelling/reschedule-requesting/reporting
       // "can't attend" had NO external signal at all — only the in-app bell
@@ -664,8 +680,12 @@ export function studentSetSessionStatus(
       // status change itself already succeeded above, an email hiccup
       // shouldn't roll that back.
       notifySessionEvent(numericId, status);
+      return true;
     }
-  })();
+  } catch (error) {
+    sessionsCache = sessionsCache.map(s => s.id === id ? prev : s); notify();
+    notifyError(error, {context:"Updating your session"}); return false;
+  }
 }
 
 /** Fires the `notify-session-event` Edge Function for a session status

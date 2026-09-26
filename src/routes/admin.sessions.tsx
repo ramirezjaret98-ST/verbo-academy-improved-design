@@ -1,3 +1,4 @@
+import { academyDateTime, academyISO } from "@/lib/academy-time";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { USERS, userById } from "@/lib/mock-data";
@@ -515,7 +516,7 @@ function StudentSessionsModal({
   sessions: ExtSession[];
   teachers: ReturnType<typeof USERS.filter>;
   onClose: () => void;
-  onSave: (id: string, patch: Partial<ExtSession>) => void;
+  onSave: (id: string, patch: Partial<ExtSession>) => Promise<boolean>;
 }) {
   const student = userById(studentId);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -533,19 +534,20 @@ function StudentSessionsModal({
   // Shared source of truth: the student's Video Call Link (Students profile).
   const currentTeamsLink = getStudentVideoLink(studentId) || `https://teams.microsoft.com/l/meetup/${studentId}`;
 
-  const applySessionEdit = (id: string, patch: Partial<ExtSession>, rescheduleApplied = false) => {
+  const applySessionEdit = async (id: string, patch: Partial<ExtSession>, rescheduleApplied = false) => {
     const s = sessions.find((x) => x.id === id);
     const finalPatch: Partial<ExtSession> = { ...patch };
     if (rescheduleApplied && s) {
       if (s.status === "scheduled" || s.status === "rescheduled") finalPatch.status = "rescheduled";
       else if (s.status === "ready" || s.status === "rearranged") finalPatch.status = "rescheduled";
     }
-    onSave(id, finalPatch);
-    notifySuccess("Session updated.");
+    const saved = await onSave(id, finalPatch);
+    if(saved) notifySuccess("Session updated.");
+    return saved;
   };
 
 
-  const applyBulk = (opts: {
+  const applyBulk = async (opts: {
     teamsLink: string; teacherId: string; time: string; days: number[];
     sourceDays: number[]; permanent: boolean;
   }) => {
@@ -592,8 +594,7 @@ function StudentSessionsModal({
       if (dateChanged && (s.status === "scheduled" || s.status === "rescheduled" || s.status === "ready" || s.status === "rearranged")) {
         patch.status = opts.permanent ? "scheduled" : "rescheduled";
       }
-      onSave(s.id, patch);
-      touched++;
+      if(await onSave(s.id, patch)) touched++;
     }
     setBulkOpen(false);
     notifySuccess(`${touched} session${touched === 1 ? "" : "s"} updated.`);
@@ -664,9 +665,10 @@ function StudentSessionsModal({
                   editing={editingId === s.id}
                   onEdit={() => setEditingId(s.id)}
                   onCancelEdit={() => setEditingId(null)}
-                  onSubmit={(patch, rescheduled) => {
-                    applySessionEdit(s.id, patch, rescheduled);
-                    setEditingId(null);
+                  onSubmit={async (patch, rescheduled) => {
+                    const saved = await applySessionEdit(s.id, patch, rescheduled);
+                    if(saved) setEditingId(null);
+                    return saved;
                   }}
                 />
               ))}
@@ -692,11 +694,11 @@ function SessionRow({
   editing: boolean;
   onEdit: () => void;
   onCancelEdit: () => void;
-  onSubmit: (patch: Partial<ExtSession>, rescheduled: boolean) => void;
+  onSubmit: (patch: Partial<ExtSession>, rescheduled: boolean) => Promise<boolean>;
 }) {
   const teacher = userById(session.teacher_id);
   const dt = new Date(session.date_time);
-  const dateInput = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}T${String(dt.getHours()).padStart(2, "0")}:${String(dt.getMinutes()).padStart(2, "0")}`;
+  const dateInput = academyDateTime(session.date_time);
 
   const [date, setDate] = useState(dateInput);
   const [teacherId, setTeacherId] = useState(session.teacher_id);
@@ -826,7 +828,7 @@ function SessionRow({
           <GhostButton onClick={onCancelEdit} className="!px-3 !py-1 text-xs">Cancel</GhostButton>
           <PrimaryButton
             onClick={() => {
-              const newIso = new Date(date).toISOString();
+              const newIso = academyISO(date);
               const dateChanged = newIso !== session.date_time;
               // Manual status choice wins; only auto-mark rescheduled when the
               // admin left the status untouched but moved the date.
@@ -1072,6 +1074,7 @@ function AssignTeacherModal({ request, onClose, onAssigned }: {
   onClose: () => void;
   onAssigned: () => void;
 }) {
+  const [assigning,setAssigning]=useState(false);
   const student = userById(request.student_id);
   const qualified = USERS.filter((u) =>
     u.role === "teacher" && u.teacher_status === "active"
@@ -1101,8 +1104,12 @@ function AssignTeacherModal({ request, onClose, onAssigned }: {
                   </div>
                   <div className="text-[11px] text-muted-foreground">{c.load} request{c.load === 1 ? "" : "s"} this month</div>
                 </div>
-                <PrimaryButton onClick={() => {
-                  adminAssignRequest(request.id, c.teacherId);
+                <PrimaryButton disabled={assigning} onClick={async () => {
+                  setAssigning(true);
+                  const assigned = await adminAssignRequest(request.id, c.teacherId);
+                  setAssigning(false);
+                  if (!assigned) return;
+                  notifySuccess("Request confirmed and added to the calendar.");
                   onAssigned();
                 }}>
                   Assign
