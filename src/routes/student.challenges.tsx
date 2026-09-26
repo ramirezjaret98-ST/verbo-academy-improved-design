@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { toast } from "sonner";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   ArrowLeft,
@@ -58,11 +59,13 @@ import {
   challengeProductsFor,
   challengesForAccount,
 } from "@/lib/challenges-store";
-import { totalCompletedChallenges } from "@/lib/student-model";
+import { refreshChallengeLeaderboard, useChallengeLeaderboard } from "@/lib/challenge-leaderboard-store";
 import {
   type ChallengeSubmission,
   type ChallengeSubmissionFormat,
   chooseChallenge,
+  registerChallengeStudent,
+  hydrateStudents,
   completeChallenge,
   completeCooldownRemaining,
   hasChosenChallenge,
@@ -73,7 +76,6 @@ import {
   submitChallenge,
   resubmitChallenge,
   subscribeStudents,
-  getLeaderboardCompletedCount,
   openMysteryBox,
   mysteryBoxCooldownRemaining,
   activeMysteryBoxPick,
@@ -645,6 +647,7 @@ import {
 /* -------------------------------------------------------------------------- */
 function Page() {
   const { user } = useAuth();
+  const leaderboard = useChallengeLeaderboard();
   const [challenges, setChallenges] = useState<Challenge[]>(loadChallenges);
   const [flashList, setFlashList] = useState<FlashChallenge[]>(loadFlashChallenges);
   const [flashConfig, setFlashConfig] = useState(loadFlashConfig);
@@ -669,6 +672,12 @@ function Page() {
   const [seasonState, setSeasonState] = useState<
     { season: FlashSeason; opening: boolean; reveal: FlashChallenge | null; blocked: boolean } | null
   >(null);
+
+  useEffect(() => {
+    if (!user || user.role !== "student") return;
+    registerChallengeStudent(user);
+    hydrateStudents();
+  }, [user?.id]);
 
   useEffect(() => {
     hydrateTeachers();
@@ -698,6 +707,7 @@ function Page() {
 
   if (!user) return null;
   const student = USERS.find((u) => u.id === user.id) ?? user;
+  const durableStats = leaderboard.rows.find(row => row.userId === student.id);
   const productId = (student.product ?? "go") as ChallengeProductId;
   const gradient = PRODUCT_GRADIENTS[productId] ?? PRODUCT_GRADIENTS.enterprise;
   const hasPremiumAccess = PREMIUM_ACCESS.includes(student.access_plan ?? "");
@@ -728,6 +738,24 @@ function Page() {
       accent: theme?.accent ?? categoryTheme(c.category ?? "").solid,
       icon: theme?.icon ?? categoryIcon(c.category ?? ""),
     });
+
+  const takeChallenge = (
+    c: { id: string; title: string; category?: string },
+    format: ChallengeSubmissionFormat,
+    theme?: { accent: string; icon: LucideIcon },
+  ) => {
+    registerChallengeStudent(user);
+    if (!chooseChallenge(student.id, c.id) && !hasChosenChallenge(student.id, c.id)) {
+      toast.error("Your challenge couldn't be selected. Please try again.");
+      return;
+    }
+    setTick(t => t + 1);
+    if ((format === "normal" || format === "mystery_box") && completeCooldownRemaining(student.id) !== null) {
+      toast.info(COOLDOWN_MSG);
+      return;
+    }
+    openSubmit(c, format, "submit", theme);
+  };
 
 
 
@@ -829,7 +857,7 @@ function Page() {
             chosen={hasChosenChallenge(student.id, open.id)}
             completed={hasCompletedChallenge(student.id, open.id)}
             cooldownRemaining={completeCooldownRemaining(student.id)}
-            onChoose={() => { chooseChallenge(student.id, open.id); }}
+            onChoose={() => takeChallenge(open, "normal")}
             submission={getSubmission(student.id, open.id)}
             onSubmit={() => openSubmit(open, "normal", "submit")}
             onResubmit={() => openSubmit(open, "normal", "resubmit")}
@@ -847,7 +875,7 @@ function Page() {
               const ok = submitFor.mode === "resubmit"
                 ? await resubmitChallenge(student.id, submitFor.id, link, note)
                 : await submitChallenge(student.id, submitFor.id, submitFor.format, link, note);
-              if (ok) { setSubmitFor(null); setOpen(null); setTick((t) => t + 1); }
+              if (ok) { setSubmitFor(null); setOpen(null); setTick((t) => t + 1); void refreshChallengeLeaderboard(); }
               return ok;
             }}
           />
@@ -861,13 +889,13 @@ function Page() {
     <div className="space-y-8">
       <ChallengesHero
         gradient={gradient}
-        currentStreak={student.current_streak ?? 0}
-        longestStreak={student.longest_streak ?? 0}
-        completed={totalCompletedChallenges(student)}
+        currentStreak={durableStats?.currentStreak ?? null}
+        longestStreak={durableStats?.longestStreak ?? null}
+        completed={durableStats?.completed ?? null}
       />
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <PlayerProfileCard student={student} />
+        <PlayerProfileCard student={student} completed={durableStats?.completed ?? null} />
         <LeaderboardSection currentUserId={student.id} />
       </div>
 
@@ -1089,7 +1117,7 @@ function Page() {
           chosen={mystery.reveal ? hasChosenChallenge(student.id, mystery.reveal.id) : false}
           completed={mystery.reveal ? hasCompletedChallenge(student.id, mystery.reveal.id) : false}
           cooldownRemaining={completeCooldownRemaining(student.id)}
-          onChoose={() => { if (mystery.reveal) chooseChallenge(student.id, mystery.reveal.id); }}
+          onChoose={() => { if (mystery.reveal) takeChallenge(mystery.reveal, "mystery_box", { accent: flashConfig.accent_color || "#7e22ce", icon: Gift }); }}
           submission={mystery.reveal ? getSubmission(student.id, mystery.reveal.id) : null}
           onSubmit={() => { if (mystery.reveal) openSubmit(mystery.reveal, "mystery_box", "submit", { accent: flashConfig.accent_color || "#7e22ce", icon: Gift }); }}
           onResubmit={() => { if (mystery.reveal) openSubmit(mystery.reveal, "mystery_box", "resubmit", { accent: flashConfig.accent_color || "#7e22ce", icon: Gift }); }}
@@ -1111,7 +1139,7 @@ function Page() {
           hasPremiumAccess={hasPremiumAccess}
           chosen={seasonState.reveal ? hasChosenChallenge(student.id, seasonState.reveal.id) : false}
           completed={seasonState.reveal ? hasCompletedChallenge(student.id, seasonState.reveal.id) : false}
-          onChoose={() => { if (seasonState.reveal) chooseChallenge(student.id, seasonState.reveal.id); }}
+          onChoose={() => { if (seasonState.reveal) takeChallenge(seasonState.reveal, "season", { accent: seasonState.season.accent_color || "#f38934", icon: Trophy }); }}
           submission={seasonState.reveal ? getSubmission(student.id, seasonState.reveal.id) : null}
           onSubmit={() => { if (seasonState.reveal) openSubmit(seasonState.reveal, "season", "submit", { accent: seasonState.season.accent_color || "#7e22ce", icon: Sparkles }); }}
           onResubmit={() => { if (seasonState.reveal) openSubmit(seasonState.reveal, "season", "resubmit", { accent: seasonState.season.accent_color || "#7e22ce", icon: Sparkles }); }}
@@ -1133,6 +1161,7 @@ function Page() {
               : await submitChallenge(student.id, submitFor.id, submitFor.format, link, note);
             if (ok) {
               setSubmitFor(null);
+              void refreshChallengeLeaderboard();
               setLightningOpen(null);
               setMystery({ opening: false, reveal: null, blocked: false });
               setSeasonState(null);
@@ -2110,7 +2139,7 @@ function SubmitChallengeModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[55] flex items-center justify-center verbo-backdrop p-4">
+    <div className="fixed inset-0 z-[70] flex items-center justify-center verbo-backdrop p-4">
       <div
         className="w-full max-w-lg overflow-hidden rounded-2xl border border-border bg-card shadow-elevated"
         onClick={(e) => e.stopPropagation()}
@@ -2559,12 +2588,10 @@ function SeasonRevealModal({
 
 
 /* -------------------------------------------------------------------------- */
-/* Leaderboard — top challenge completers within the same product cohort.     */
+/* Leaderboard — approved Challenges and Flash across real students.          */
 /*                                                                            */
-/* All ranking logic runs on the raw USERS + per-user LeaderboardIdentity     */
-/* stores; the component is a pure renderer that re-derives on each render    */
-/* and re-subscribes to student + identity mutations so podium updates are    */
-/* live (nickname edited in ProfileModal, new completions, etc.).             */
+/* Ranking comes from the authenticated, limited Supabase projection.        */
+/* Local demo profiles and optimistic counters never enter this ranking.     */
 /* -------------------------------------------------------------------------- */
 
 interface LeaderboardRow {
@@ -2573,52 +2600,6 @@ interface LeaderboardRow {
   useRealAvatar: boolean;
   avatarSeed: string; // used for the initials + color when useRealAvatar=false
   completed: number;
-}
-
-function useLeaderboardRows(): LeaderboardRow[] {
-  const [tick, setTick] = useState(0);
-  useEffect(() => {
-    const un1 = subscribeStudents(() => setTick((t) => t + 1));
-    const un2 = subscribeLeaderboardIdentity(() => setTick((t) => t + 1));
-    return () => { un1(); un2(); };
-  }, []);
-  return useMemo(() => {
-    void tick;
-    // Tie-break key: the student's REAL name (falling back to the stable id),
-    // never displayName — otherwise the order would shift with the purely
-    // visual nickname/real-name preference even at identical scores.
-    const sortKey = new Map<string, string>();
-    return USERS
-      .filter((u) => u.role === "student")
-      .map<LeaderboardRow>((u) => {
-        const id = getLeaderboardIdentity(u.id);
-        const useReal = id.mode === "real" || !id.nickname.trim();
-        const displayName = useReal ? u.name : id.nickname.trim();
-        sortKey.set(u.id, u.name || u.id);
-        // `challenge_submissions_select` RLS only lets a student read their
-        // OWN submissions, so `u.completed_challenges` (built from that RLS-
-        // scoped table) is only ever accurate for the viewer's own row — every
-        // OTHER student would render 0 no matter how much they've actually
-        // completed. `getLeaderboardCompletedCount()` reads a durable,
-        // cross-student count from a SECURITY DEFINER RPC instead; fall back
-        // to the local value only for the split-second before that RPC's
-        // first fetch resolves, so the board doesn't flash everyone at 0.
-        const rpcCount = getLeaderboardCompletedCount(u.id);
-        return {
-          userId: u.id,
-          displayName,
-          useRealAvatar: useReal,
-          avatarSeed: useReal ? u.name : id.nickname.trim(),
-          completed: rpcCount ?? totalCompletedChallenges(u),
-        };
-      })
-      .sort((a, b) =>
-        b.completed - a.completed
-        || (sortKey.get(a.userId) ?? a.userId).localeCompare(sortKey.get(b.userId) ?? b.userId)
-        || a.userId.localeCompare(b.userId),
-      );
-
-  }, [tick]);
 }
 
 function NicknameAvatar({ seed, className = "" }: { seed: string; className?: string }) {
@@ -2740,15 +2721,23 @@ function LeaderboardSection({
 }: {
   currentUserId: string;
 }) {
-  const rows = useLeaderboardRows();
+  const board = useChallengeLeaderboard();
+  const rows = board.rows;
   const flipRef = useFlipPositions(rows.map((r) => r.userId).join("|"));
-  if (rows.length === 0) return null;
+  if (rows.length === 0) return (
+    <section><h2 className="text-[22px] font-semibold">Leaderboard</h2>
+      <p role={board.status === "error" ? "alert" : "status"} className="mt-2 text-muted-foreground">
+        {board.status === "error" ? "The leaderboard couldn't be loaded." : board.status === "ready" ? "No students are on the leaderboard yet." : "Loading the leaderboard…"}
+      </p>
+      {board.status === "error" && <GhostButton onClick={() => { void refreshChallengeLeaderboard(); }}>Try again</GhostButton>}
+    </section>
+  );
 
   const podium = rows.slice(0, 3);
   const rest = rows.slice(3);
   // Ensure a visual "3-2-1-...” ordering: put #1 in the middle when there are 3+.
   const podiumOrdered = podium.length === 3 ? [podium[1], podium[0], podium[2]] : podium;
-  const podiumRankOf = (r: LeaderboardRow) => podium.indexOf(r); // 0..2
+  const podiumRankOf = (r: typeof rows[number]) => podium.indexOf(r); // 0..2
 
   // Derived: gap between the current user and the leader.
   const leader = rows[0];
@@ -2962,9 +2951,9 @@ function ChallengesHero({
   completed,
 }: {
   gradient: string;
-  currentStreak: number;
-  longestStreak: number;
-  completed: number;
+  currentStreak: number | null;
+  longestStreak: number | null;
+  completed: number | null;
 }) {
   const stats = [
     { icon: fireIconAsset, label: "Current streak", value: currentStreak },
@@ -3030,7 +3019,7 @@ function ChallengesHero({
                 <img src={s.icon} alt="" aria-hidden className="h-8 w-8 object-contain" />
               </span>
               <div>
-                <div className="text-2xl font-bold leading-none tracking-tight">{s.value}</div>
+                <div className="text-2xl font-bold leading-none tracking-tight">{s.value ?? "…"}</div>
                 <div className="mt-1 text-[11px] font-medium uppercase tracking-wider text-white/70">{s.label}</div>
               </div>
             </div>
@@ -3044,7 +3033,7 @@ function ChallengesHero({
 /* -------------------------------------------------------------------------- */
 /* Player profile card — avatar, editable display name and one showcase badge */
 /* -------------------------------------------------------------------------- */
-function PlayerProfileCard({ student }: { student: (typeof USERS)[number] }) {
+function PlayerProfileCard({ student, completed }: { student: (typeof USERS)[number]; completed: number | null }) {
   const avatar = useAvatar(student.id);
   const fileRef = useRef<HTMLInputElement>(null);
   const [tick, setTick] = useState(0);
@@ -3175,7 +3164,7 @@ function PlayerProfileCard({ student }: { student: (typeof USERS)[number] }) {
                 </button>
               </div>
               <div className="mt-2 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.06] px-3 py-1">
-                <span className="text-[15px] font-semibold tracking-[-0.02em] text-white">{totalCompletedChallenges(student)}</span>
+                <span className="text-[15px] font-semibold tracking-[-0.02em] text-white">{completed ?? "…"}</span>
                 <span className="text-[11px] font-medium uppercase tracking-[0.14em] text-white/50">challenges done</span>
               </div>
             </div>

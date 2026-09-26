@@ -3955,6 +3955,20 @@ export type Database = {
           legacy_id: string
         }[]
       }
+      challenge_leaderboard: {
+        Args: never
+        Returns: {
+          student_id: string
+          legacy_id: string | null
+          display_name: string
+          avatar_seed: string
+          use_real_avatar: boolean
+          completed_count: number
+          current_streak: number | null
+          longest_streak: number | null
+          last_delivery_at: string | null
+        }[]
+      }
       legacy_id_lookup: {
         Args: never
         Returns: {
