@@ -17,7 +17,7 @@ import { loadFlashChallenges } from "./flash-challenges-store";
 import { addStudentReport } from "./student-reports-store";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
-import { getKnownLegacyIds, hydrateUserIdBridge, legacyToUuid, uuidToLegacySync } from "@/lib/user-id-bridge";
+import { getKnownUserIds, hydrateUserIdBridge, legacyToUuid, uuidToLegacySync } from "@/lib/user-id-bridge";
 import { notifyError } from "@/lib/notify";
 import { withTimeout } from "@/lib/net-utils";
 
@@ -301,7 +301,7 @@ export function hydrateStudents() {
       // caller's own row / their own roster), so it's safe to use here even in
       // a plain student's own session.
       await hydrateUserIdBridge();
-      const knownIds = getKnownLegacyIds();
+      const knownIds = getKnownUserIds();
       if (knownIds.size > 0) {
         const localOnlyIds = new Set(readRegisteredStudents().map((r) => r.id));
         for (let i = USERS.length - 1; i >= 0; i--) {
@@ -426,12 +426,21 @@ function persistStudentPatch(studentId: string, patch: Partial<User>) {
  *  fire the teacher notification once. */
 export function chooseChallenge(studentId: string, challengeId: string): boolean {
   const u = USERS.find((x) => x.id === studentId);
+  if (!u || u.role !== "student") return false;
   const list = u?.chosen_challenges ?? [];
   if (list.some((c) => c.challenge_id === challengeId)) return false;
   persistStudentPatch(studentId, {
     chosen_challenges: [...list, { challenge_id: challengeId, chosen_at: new Date().toISOString() }],
   });
   return true;
+}
+
+/** Register the authenticated student before challenge actions use the shared cache.
+ *  Auth can restore a real account which has no entry in the legacy/demo roster. */
+export function registerChallengeStudent(profile: User): void {
+  if (profile.role !== "student" || USERS.some((u) => u.id === profile.id)) return;
+  const saved = readProfileOverrides()[profile.id] ?? {};
+  USERS.push({ ...profile, ...saved, id: profile.id, role: "student", name: profile.name });
 }
 
 export function hasChosenChallenge(studentId: string, challengeId: string): boolean {

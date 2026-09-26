@@ -35,6 +35,7 @@ import { supabase } from "@/integrations/supabase/client";
 
 let legacyToUuidMap = new Map<string, string>();
 let uuidToLegacyMap = new Map<string, string>();
+let knownUuids = new Set<string>();
 let hydrated = false;
 let hydratePromise: Promise<void> | null = null;
 
@@ -50,7 +51,9 @@ async function hydrate(): Promise<void> {
     }
     const nextLegacy = new Map<string, string>();
     const nextUuid = new Map<string, string>();
+    const nextKnownUuids = new Set<string>();
     for (const row of data ?? []) {
+      nextKnownUuids.add(row.id);
       if (row.legacy_id) {
         nextLegacy.set(row.legacy_id, row.id);
         nextUuid.set(row.id, row.legacy_id);
@@ -58,17 +61,17 @@ async function hydrate(): Promise<void> {
     }
     legacyToUuidMap = nextLegacy;
     uuidToLegacyMap = nextUuid;
+    knownUuids = nextKnownUuids;
     hydrated = true;
   })();
   await hydratePromise;
   hydratePromise = null;
 }
 
-/** Resolves a legacy id ("u2") to the real `app_users.id` UUID. Returns
- *  `null` if no `app_users` row carries that `legacy_id`. */
+/** Resolves a legacy id or a known real account UUID. Unknown ids return null. */
 export async function legacyToUuid(legacyId: string): Promise<string | null> {
   await hydrate();
-  return legacyToUuidMap.get(legacyId) ?? null;
+  return legacyToUuidMap.get(legacyId) ?? (knownUuids.has(legacyId) ? legacyId : null);
 }
 
 /** Resolves a real `app_users.id` UUID back to the legacy id, for display
@@ -103,6 +106,11 @@ export function hydrateUserIdBridge(): Promise<void> {
  *  hydrateUserIdBridge()` in the same flow, same rule as `uuidToLegacySync`. */
 export function getKnownLegacyIds(): Set<string> {
   return new Set(legacyToUuidMap.keys());
+}
+
+/** Cache keys for all real accounts, including accounts without a legacy id. */
+export function getKnownUserIds(): Set<string> {
+  return new Set([...legacyToUuidMap.keys(), ...knownUuids]);
 }
 
 /** Forces the next `legacyToUuid`/`uuidToLegacy`/`hydrateUserIdBridge` call to
