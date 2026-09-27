@@ -46,6 +46,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { invalidateUserIdBridge } from "@/lib/user-id-bridge";
 import { deleteUserAccount } from "@/lib/user-deletion";
 import { notifySuccess, notifyError } from "@/lib/notify";
+import { ExternalTeacherBlocks } from "@/components/verbo/ExternalTeacherBlocks";
 
 export const Route = createFileRoute("/admin/teachers")({
   component: Page,
@@ -747,6 +748,7 @@ function TeacherDetailModal({
 
           {tab === "availability" && (
             <div className="space-y-5">
+              {adminType === "super_admin" && <ExternalTeacherBlocks teacherId={t.id} />}
               <div>
                 <div className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Declared availability</div>
                 {(t.availability && t.availability.length > 0) ? (
