@@ -1,3 +1,5 @@
+import { BadgeArtwork } from "@/components/verbo/BadgeArtwork";
+import { BADGE_ART, seasonBadgeArtwork } from "@/lib/badge-artwork";
 import { createFileRoute } from "@tanstack/react-router";
 import experiencesClubs from "@/assets/experiences-clubs.png";
 import teamsLogo from "@/assets/teams-logo.webp";
@@ -1809,7 +1811,7 @@ function FeaturedBadgeStrip({ user }: { user: NonNullable<ReturnType<typeof useA
       for (const id of equippedChallenge) {
         if (id === "lightning") {
           if ((user.lightning_completions ?? 0) >= 1) {
-            out.push({ key: "lightning", name: "Lightning Bolt", icon: <Zap className="h-5 w-5 text-white" /> });
+            out.push({ key: "lightning", name: "Lightning Bolt", image: BADGE_ART.lightning, icon: <Zap className="h-5 w-5 text-white" /> });
           }
           continue;
         }
@@ -1817,7 +1819,7 @@ function FeaturedBadgeStrip({ user }: { user: NonNullable<ReturnType<typeof useA
           const seasonId = id.slice("season-".length);
           const season = seasons.find((s) => s.id === seasonId);
           if (season && (user.season_completions?.[seasonId] ?? 0) >= 1) {
-            out.push({ key: id, name: season.badge_name, icon: <Medal className="h-5 w-5 text-white" /> });
+            out.push({ key: id, name: season.badge_name, image: seasonBadgeArtwork(season.id), icon: <Medal className="h-5 w-5 text-white" /> });
           }
           continue;
         }
@@ -1866,13 +1868,12 @@ function FeaturedBadgeStrip({ user }: { user: NonNullable<ReturnType<typeof useA
         <div
           key={it.key}
           title={`Equipped: ${it.name}`}
-          className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-full shadow-md ring-2 ring-background"
-          style={{ background: "linear-gradient(135deg, #01304a, #0a4a6e)" }}
+          className="flex h-11 w-11 items-center justify-center overflow-visible rounded-full"
+          style={{ background: it.image ? undefined : "linear-gradient(135deg, #01304a, #0a4a6e)" }}
         >
-          {it.image ? <img src={it.image} alt={it.name} className="h-full w-full object-cover" /> : it.icon}
+          {it.image ? <BadgeArtwork src={it.image} alt={it.name} className="h-full w-full object-contain" /> : it.icon}
         </div>
       ))}
     </div>
   );
 }
-

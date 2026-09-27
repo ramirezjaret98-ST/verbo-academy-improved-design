@@ -1,3 +1,4 @@
+import { authenticatedCatalogCache } from "./catalog-cache-client";
 // Weekly Challenges catalog — the source of truth for Admin > Challenges.
 // Navigation: Product > Difficulty > list of challenges. VIP IS included here
 // (unlike Courses). Challenges are complementary weekly activities and do NOT
@@ -82,6 +83,7 @@ export const CHALLENGE_CATEGORIES_EVENT = "verbo:challenge-categories-updated";
 
 type ChallengeRow = Database["public"]["Tables"]["challenges"]["Row"];
 
+const catalogCache = authenticatedCatalogCache<Pick<ChallengeRow, "id" | "code" | "product" | "difficulty" | "category" | "title" | "description" | "video_url" | "premium" | "submission_instructions" | "skill_tags" | "created_at">>("challenges-standard");
 let cache: Challenge[] = [];
 let hydrated = false;
 let hydratePromise: Promise<void> | null = null;
@@ -92,7 +94,7 @@ function notify() {
   if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent(CHALLENGES_EVENT));
 }
 
-function mapRow(row: ChallengeRow): Challenge {
+function mapRow(row: Pick<ChallengeRow, "id" | "code" | "product" | "difficulty" | "category" | "title" | "description" | "video_url" | "premium" | "submission_instructions" | "skill_tags" | "created_at">): Challenge {
   return {
     id: row.code ?? String(row.id),
     product: row.product as ChallengeProductId,
@@ -112,13 +114,10 @@ async function hydrate(): Promise<void> {
   if (hydrated) return;
   if (hydratePromise) return hydratePromise;
   hydratePromise = (async () => {
-    const { data, error } = await supabase
-      .from("challenges")
-      .select("*")
-      .eq("kind", "standard");
+    const { data, error } = await catalogCache.load(() => supabase.from("challenges").select("id,code,product,difficulty,category,title,description,video_url,premium,submission_instructions,skill_tags,created_at").eq("kind", "standard"));
     if (error) {
       console.error("[challenges-store] failed to load challenges", error);
-      hydrated = true;
+      hydrated = false;
       return;
     }
     cache = (data ?? []).map(mapRow);
@@ -129,7 +128,8 @@ async function hydrate(): Promise<void> {
   notify();
 }
 
-function invalidateAndRehydrate() {
+function invalidateAndRehydrate(reason?: "auth" | "refresh") {
+  if (reason === "auth") { cache = []; notify(); }
   hydrated = false;
   hydratePromise = null;
   void hydrate();
@@ -143,7 +143,9 @@ if (typeof window !== "undefined") {
       "postgres_changes",
       { event: "*", schema: "public", table: "challenges", filter: "kind=eq.standard" },
       () => {
+        catalogCache.invalidate();
         hydrated = false;
+        hydratePromise = null;
         void hydrate();
       },
     )
@@ -180,6 +182,7 @@ function challengeEquals(a: Challenge, b: Challenge): boolean {
  *  whole write on failure). Diffs against the last-synced cache — only rows
  *  that were added, edited, or removed touch Supabase. See file header. */
 export function persistChallenges(list: Challenge[]) {
+  catalogCache.invalidate();
   const prevCache = cache;
   const prevById = new Map(prevCache.map((c) => [c.id, c]));
   const nextIds = new Set(list.map((c) => c.id));

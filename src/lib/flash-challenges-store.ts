@@ -1,3 +1,5 @@
+import { authenticatedCatalogCache } from "./catalog-cache-client";
+import { registerRehydrate } from "./auth-rehydrate";
 // Verbo Flash — complementary "surprise" challenges independent from the
 // weekly Challenges bank (challenges-store.ts), plus the Lightning live-drop
 // mechanic and Season theming.
@@ -120,6 +122,8 @@ const flashListeners = new Set<() => void>();
 // code <-> Supabase bigint id, kept in sync on every hydrate — needed to
 // resolve lightning_state.challenge_id (a real FK) to/from the frontend's
 // code-based FlashChallenge.id.
+const flashCatalogCache = authenticatedCatalogCache<ChallengeRow>("challenges-flash");
+const seasonCatalogCache = authenticatedCatalogCache<SeasonRow>("flash-seasons");
 const codeToDbId = new Map<string, number>();
 const dbIdToCode = new Map<number, string>();
 
@@ -150,13 +154,10 @@ async function hydrateFlash(): Promise<void> {
   if (flashHydrated) return;
   if (flashHydratePromise) return flashHydratePromise;
   flashHydratePromise = (async () => {
-    const { data, error } = await supabase
-      .from("challenges")
-      .select("*")
-      .eq("kind", "flash");
+    const { data, error } = await flashCatalogCache.load(() => supabase.from("challenges").select("*").eq("kind", "flash"));
     if (error) {
       console.error("[flash-challenges-store] failed to load flash challenges", error);
-      flashHydrated = true;
+      flashHydrated = false;
       return;
     }
     codeToDbId.clear();
@@ -183,7 +184,9 @@ if (typeof window !== "undefined") {
       "postgres_changes",
       { event: "*", schema: "public", table: "challenges", filter: "kind=eq.flash" },
       () => {
+        flashCatalogCache.invalidate();
         flashHydrated = false;
+        flashHydratePromise = null;
         void hydrateFlash();
       },
     )
@@ -223,6 +226,7 @@ function flashChallengeEquals(a: FlashChallenge, b: FlashChallenge): boolean {
  *  write on failure). Diffs against the last-synced cache — same convention
  *  as persistChallenges() in challenges-store.ts. */
 export function persistFlashChallenges(list: FlashChallenge[]) {
+  flashCatalogCache.invalidate();
   const prevCache = flashCache;
   const prevById = new Map(prevCache.map((c) => [c.id, c]));
   const nextIds = new Set(list.map((c) => c.id));
@@ -852,10 +856,10 @@ async function hydrateSeasons(): Promise<void> {
   if (seasonsHydrated) return;
   if (seasonsHydratePromise) return seasonsHydratePromise;
   seasonsHydratePromise = (async () => {
-    const { data, error } = await supabase.from("flash_seasons").select("*").order("created_at", { ascending: true });
+    const { data, error } = await seasonCatalogCache.load(() => supabase.from("flash_seasons").select("*").order("created_at", { ascending: true }));
     if (error) {
       console.error("[flash-challenges-store] failed to load flash_seasons", error);
-      seasonsHydrated = true;
+      seasonsHydrated = false;
       return;
     }
     seasonsCache = (data ?? []).map(mapSeasonRow);
@@ -871,7 +875,9 @@ if (typeof window !== "undefined") {
   supabase
     .channel("flash-seasons-changes")
     .on("postgres_changes", { event: "*", schema: "public", table: "flash_seasons" }, () => {
+      seasonCatalogCache.invalidate();
       seasonsHydrated = false;
+      seasonsHydratePromise = null;
       void hydrateSeasons();
     })
     .subscribe();
@@ -895,6 +901,7 @@ export function subscribeSeasons(cb: () => void): () => void {
  *  insert returns, same optimistic-temp-id convention used everywhere else
  *  in this migration. */
 export function upsertSeason(s: FlashSeason) {
+  seasonCatalogCache.invalidate();
   const prevCache = seasonsCache;
   const idx = prevCache.findIndex((x) => x.id === s.id);
   const isExisting = idx >= 0;
@@ -949,6 +956,7 @@ export function conflictingActiveSeason(id: string, list: FlashSeason[] = loadSe
 }
 
 export function deleteSeason(id: string) {
+  seasonCatalogCache.invalidate();
   const prevCache = seasonsCache;
   seasonsCache = prevCache.filter((s) => s.id !== id);
   notifySeasons();
@@ -963,3 +971,10 @@ export function deleteSeason(id: string) {
     }
   })();
 }
+
+if (typeof window !== "undefined") registerRehydrate(reason => {
+  if (reason === "auth") { flashCache = []; seasonsCache = []; codeToDbId.clear(); dbIdToCode.clear(); notifyFlash(); notifySeasons(); }
+  flashHydrated = false; seasonsHydrated = false;
+  flashHydratePromise = null; seasonsHydratePromise = null;
+  void hydrateFlash(); void hydrateSeasons();
+});

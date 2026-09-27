@@ -1,3 +1,4 @@
+import { BADGE_ART, seasonBadgeArtwork } from "./badge-artwork";
 // Shared badge-unlock logic (no JSX) — computes every badge a student has
 // earned across core Challenge badges, Lightning, Seasons and Profile Badges.
 // Consumed by BadgeUnlockCelebration.tsx and notifications-store.ts.
@@ -69,6 +70,7 @@ export function computeAllEarnedBadges(student: StudentLike): UnlockBadge[] {
       equipId: "lightning",
       kind: "lightning",
       name: "Lightning Bolt",
+      image: BADGE_ART.lightning,
       iconKind: "zap",
     });
   }
@@ -80,6 +82,7 @@ export function computeAllEarnedBadges(student: StudentLike): UnlockBadge[] {
         equipId: `season-${s.id}`,
         kind: "season",
         name: s.badge_name,
+        image: seasonBadgeArtwork(s.id),
         iconKind: "medal",
       });
     }
