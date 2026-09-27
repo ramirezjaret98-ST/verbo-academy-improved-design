@@ -55,6 +55,8 @@ import { invalidateUserIdBridge } from "@/lib/user-id-bridge";
 import { RotateCcw, Unlock as UnlockIcon, Lock as LockIcon, Trophy } from "lucide-react";
 import { ResetPasswordModal } from "@/components/verbo/ResetPasswordModal";
 import { useAuth } from "@/lib/auth";
+import { getAdminType } from "@/lib/admin-roles";
+import { DeferredWelcome } from "@/components/verbo/DeferredWelcome";
 import { loadCourses, subscribeCourses, type CourseLevel } from "@/lib/product-courses-store";
 import { reportsForStudent, subscribeStudentReports } from "@/lib/student-reports-store";
 import { deleteUserAccount } from "@/lib/user-deletion";
@@ -696,10 +698,6 @@ function Tag({ children, className = "", style }: { children: React.ReactNode; c
 // ===========================================================================
 type FormState = {
   name: string; email: string; phone: string; password: string; member_since: string;
-  /** New-student-only: send the "welcome to Verbo Academy" email (motivational
-   *  message + login credentials table + support contacts) right after this
-   *  account is created. Ignored when editing an existing student. */
-  send_welcome_email: boolean;
   company: string;
   product_type: "performance" | "workshops" | "insights";
   product: ProductId | "";
@@ -741,10 +739,6 @@ function StudentFormModal({
     email: initial?.email ?? "",
     phone: initial?.phone ?? "",
     password: initial?.password ?? "",
-    // Only meaningful for a brand-new student — default to on so the
-    // welcome email is the expected behavior, not something the admin has
-    // to remember to opt into.
-    send_welcome_email: !initial,
     member_since: initial?.member_since ?? "",
     company: initial?.company ?? "",
     product_type: (initial?.product_type as FormState["product_type"]) ?? "performance",
@@ -1000,7 +994,7 @@ function StudentFormModal({
       // why this matters. onSave() itself already surfaces the error via a
       // toast (notifyError), so there's nothing further to show here beyond
       // re-enabling the form.
-      await onSave(u, isPerf ? (f.teacher_id || undefined) : undefined, !editing ? f.send_welcome_email : undefined);
+      await onSave(u, isPerf ? (f.teacher_id || undefined) : undefined, false);
     } catch {
       // Swallow — the toast already told the admin what went wrong. Falls
       // through to the finally below so the button un-freezes.
@@ -1429,22 +1423,7 @@ function StudentFormModal({
                 </div>
                 {attemptedSave && !f.password.trim() && <p className="mt-1 text-xs text-destructive">Password is required.</p>}
               </Field>
-              {!editing && (
-                <Field label="Welcome email" icon={<Mail className="h-3.5 w-3.5" />} className="md:col-span-2">
-                  <label className="flex cursor-pointer items-center gap-2.5 rounded-lg border border-border bg-secondary/30 px-3 py-2.5 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={f.send_welcome_email}
-                      onChange={(e) => set("send_welcome_email", e.target.checked)}
-                      className="h-4 w-4 rounded border-border accent-[#01304a]"
-                    />
-                    <span className="text-foreground">Send this student a welcome email with their login credentials once the account is created</span>
-                  </label>
-                  <p className="mt-1 text-[10.5px] text-muted-foreground">
-                    Includes the email/password above in plain text, so only send it through a channel the student actually controls — double-check the email address first.
-                  </p>
-                </Field>
-              )}
+              {!editing && <p className="md:col-span-2 text-xs text-muted-foreground">The account is saved without an email. Open the student's profile to send the welcome email after preparing their course and materials.</p>}
               <Field label="Member Since" icon={<CalendarDays className="h-3.5 w-3.5" />}>
                 <input type="date" value={f.member_since} onChange={(e) => set("member_since", e.target.value)} className={inputCls} />
               </Field>
@@ -1966,6 +1945,12 @@ function StudentDetailModal({
                 <Trash2 className="h-3.5 w-3.5" /> {deleting ? "Deleting…" : "Yes, delete permanently"}
               </button>
             </div>
+          </div>
+        )}
+
+        {getAdminType(admin) === "super_admin" && (
+          <div className="border-t border-border px-5 py-4 sm:px-7">
+            <DeferredWelcome studentId={student.id} name={student.name} email={student.email} initialPassword={student.password} />
           </div>
         )}
 
