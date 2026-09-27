@@ -3260,6 +3260,53 @@ export type Database = {
           },
         ]
       }
+      teacher_external_blocks: {
+        Row: {
+          id: number
+          teacher_id: string
+          label: string
+          weekday: number
+          start_min: number
+          end_min: number
+          start_date: string
+          end_date: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: never
+          teacher_id: string
+          label: string
+          weekday: number
+          start_min: number
+          end_min: number
+          start_date: string
+          end_date: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: never
+          teacher_id?: string
+          label?: string
+          weekday?: number
+          start_min?: number
+          end_min?: number
+          start_date?: string
+          end_date?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "teacher_external_blocks_teacher_id_fkey"
+            columns: ["teacher_id"]
+            isOneToOne: false
+            referencedRelation: "app_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       teacher_kpi_monthly_snapshots: {
         Row: {
           base_composite: number | null
