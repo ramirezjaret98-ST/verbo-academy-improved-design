@@ -71,7 +71,7 @@ import {
 import { ClubReservationModal } from "@/components/verbo/ClubReservationModal";
 import type { Club } from "@/lib/clubs-store";
 import { resolvedRemainingSeats, resolvedMonthlyCap } from "@/lib/club-bookings-store";
-import { groupOfStudent, incrementGroupRemaining, effectiveSessionCounts, sessionProgressFor } from "@/lib/groups-store";
+import { groupOfStudent, effectiveSessionCounts, sessionProgressFor } from "@/lib/groups-store";
 import { useCoreFreemiumGate } from "@/components/verbo/CoreFreemiumFlow";
 import { isSilenced, hasCreditUsed as freemiumUsed, markCreditUsed as markFreemiumUsed } from "@/lib/core-freemium-store";
 import { effectiveHourlyRate, appendTeacherAdjustment } from "@/lib/teacher-tiers";
@@ -1001,12 +1001,11 @@ function SpotlightFormModal({ studentId, onClose }: { studentId: string; onClose
           <div className="mt-6 flex justify-end gap-2">
             <GhostButton onClick={() => setConfirmOverlap(null)}>Return</GhostButton>
             <PrimaryButton onClick={async () => {
-              // Group sessions aren't supported by this RPC yet (see
-              // groups-store.ts migration notes) — that path still uses the
-              // old client-side credit bump since there's no real group data
-              // to exercise it against today. Individual students' credit
-              // refund now happens server-side, atomically, inside the RPC.
               const g = groupOfStudent(studentId);
+              if (g) {
+                toast.error("A group session cannot be replaced individually. Contact your administrator.");
+                return;
+              }
               const ok = await convertSessionToSpotlight({
                 originalSessionId: confirmOverlap.session.id,
                 spotlightContext: context.trim(),
@@ -1014,9 +1013,6 @@ function SpotlightFormModal({ studentId, onClose }: { studentId: string; onClose
               if (!ok) {
                 toast.error("Couldn't replace the session — please try again.");
                 return;
-              }
-              if (g) {
-                incrementGroupRemaining(g.group.id);
               }
               // Core freemium: consume the one-shot courtesy credit.
               if (studentUser?.access_plan === "Core" && !freemiumUsed(studentId, "spotlight")) {

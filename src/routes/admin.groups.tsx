@@ -18,7 +18,7 @@ import {
 import { teachersForProduct, hydrateTeachers, subscribeTeachers } from "@/lib/teacher-model";
 import { hydrateStudents, subscribeStudents } from "@/lib/students-store";
 import {
-  loadGroups, loadGroupMembers, subscribeGroups, registerGroupWithMembers,
+  loadGroups, loadGroupMembers, hydrateGroups, subscribeGroups, registerGroupWithMembers,
   updateGroup, addMember, removeMember, restoreMember, archiveMember,
   moveMember, markGroupAsPaid, activeMembersOf, membersOf, pendingCountdownDays,
   groupById, sessionProgressFor, type Group, type GroupMember,
@@ -29,6 +29,8 @@ import { loadHolidays } from "@/lib/holidays-store";
 import { RescheduleModal } from "@/components/verbo/RescheduleModal";
 import { MarkAsPaidModal } from "@/components/verbo/MarkAsPaidModal";
 import { expectedAmountForGroup } from "@/lib/payments-log";
+import { getKnownUserIds } from "@/lib/user-id-bridge";
+import { academyISO } from "@/lib/academy-time";
 import { CalendarPlus, AlertTriangle } from "lucide-react";
 
 export const Route = createFileRoute("/admin/groups")({ component: Page });
@@ -41,10 +43,13 @@ function Page() {
   const [, tick] = useState(0);
   const [openRegister, setOpenRegister] = useState(false);
   const [detailId, setDetailId] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState("");
+  const [groupsReady, setGroupsReady] = useState(false);
 
   useEffect(() => {
     hydrateTeachers();
     hydrateStudents();
+    void hydrateGroups().then(() => { setLoadError(""); setGroupsReady(true); }).catch((error) => setLoadError(error instanceof Error ? error.message : "Could not load groups"));
     tick((n) => n + 1);
     // 2026-08-26 fix: this page never re-rendered when a demo/mock person
     // got hidden (or a real profile changed) anywhere else — member pickers
@@ -73,20 +78,21 @@ function Page() {
           <GhostButton onClick={() => setTab(tab === "bin" ? "groups" : "bin")}>
             {tab === "bin" ? "Back to Groups" : `Recycle Bin (${archivedCount})`}
           </GhostButton>
-          <PrimaryButton onClick={() => setOpenRegister(true)}>
+          <PrimaryButton onClick={() => setOpenRegister(true)} disabled={!groupsReady}>
             <Plus className="h-4 w-4" /> Register Group
           </PrimaryButton>
         </div>
       </div>
 
       {tab === "groups" ? (
-        <GroupList groups={groups} onOpen={(id) => setDetailId(id)} />
+        loadError ? <Card className="text-sm text-destructive">Groups could not load: {loadError} <button className="underline" onClick={() => void hydrateGroups(true).then(() => { setLoadError(""); setGroupsReady(true); }).catch((error) => setLoadError(String(error)))}>Retry</button></Card> : !groupsReady ? <Card className="text-sm text-muted-foreground">Loading groups…</Card> :
+          <GroupList groups={groups} onOpen={(id) => setDetailId(id)} />
       ) : (
         <RecycleBin onRestore={() => tick((n) => n + 1)} />
       )}
 
       {openRegister && (
-        <RegisterGroupModal onClose={() => setOpenRegister(false)} onSaved={() => { setOpenRegister(false); tick((n) => n + 1); }} />
+        <RegisterGroupModal onClose={() => setOpenRegister(false)} onSaved={() => { hydrateStudents(); setOpenRegister(false); tick((n) => n + 1); }} />
       )}
 
       {detailId && (
@@ -217,6 +223,7 @@ function Tag({ children, className = "", style }: { children: React.ReactNode; c
 type NewMember = { name: string; email: string; password: string; member_since: string };
 
 function RegisterGroupModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
+  const [saving, setSaving] = useState(false);
   const [name, setName] = useState("");
   const [company, setCompany] = useState("");
   const [maxCapacity, setMaxCapacity] = useState(4);
@@ -242,7 +249,8 @@ function RegisterGroupModal({ onClose, onSaved }: { onClose: () => void; onSaved
   // VIP is intentionally excluded — VIP is always Individual.
   const productOptions = PRODUCTS.filter((p) => p.id !== "vip");
   const productLevels = getProduct(product)?.levels ?? [];
-  const allTeachers = USERS.filter((u) => u.role === "teacher");
+  const knownIds = getKnownUserIds();
+  const allTeachers = USERS.filter((u) => u.role === "teacher" && knownIds.has(u.id));
   const teachers = product ? teachersForProduct(allTeachers, product as ProductId) : allTeachers;
 
   const setMember = (i: number, patch: Partial<NewMember>) => {
@@ -261,9 +269,11 @@ function RegisterGroupModal({ onClose, onSaved }: { onClose: () => void; onSaved
   const isValid = name.trim() && company.trim() && members.length >= 2 && validMembers
     && product && videoLink.trim();
 
-  const handleSave = () => {
-    if (!isValid) return;
-    registerGroupWithMembers(
+  const handleSave = async () => {
+    if (!isValid || saving) return;
+    setSaving(true);
+    try {
+      await registerGroupWithMembers(
       {
         name: name.trim(),
         company_client: company.trim(),
@@ -288,9 +298,14 @@ function RegisterGroupModal({ onClose, onSaved }: { onClose: () => void; onSaved
         addon_workshops_enabled: false,
       },
       members,
-    );
-    toast.success(`Group "${name}" registered with ${members.length} members`);
-    onSaved();
+      );
+      toast.success(`Group "${name}" registered with ${members.length} real accounts. Welcome emails are pending.`);
+      onSaved();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not register group");
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -440,9 +455,9 @@ function RegisterGroupModal({ onClose, onSaved }: { onClose: () => void; onSaved
           accentColor="#5fca16"
           className={`hover:!bg-[#4fb010] ${!isValid ? "opacity-50 cursor-not-allowed" : ""}`}
           onClick={handleSave}
-          disabled={!isValid}
+          disabled={!isValid || saving}
         >
-          Register Group
+          {saving ? "Registering…" : "Register Group"}
         </PrimaryButton>
       </AccentModalFooter>
     </AccentModal>
@@ -488,23 +503,42 @@ function GroupRescheduleButton({ groupId }: { groupId: string }) {
 // -----------------------------------------------------------------------------
 function GroupDetailModal({ groupId, onClose }: { groupId: string; onClose: () => void }) {
   const [, tick] = useState(0);
+  const [g, setDraft] = useState(() => groupById(groupId));
+  const [dirty, setDirty] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
+  const [moveFor, setMoveFor] = useState<string | null>(null);
+  const [payModalOpen, setPayModalOpen] = useState(false);
   useEffect(() => subscribeGroups(() => tick((n) => n + 1)), []);
-  const g = groupById(groupId);
+  const savedGroup = groupById(groupId);
+  useEffect(() => { if (!dirty) setDraft(savedGroup); }, [savedGroup, dirty]);
   if (!g) return null;
 
   const members = membersOf(groupId);
   const active = members.filter((m) => m.status === "active");
   const pending = members.filter((m) => m.status === "pending_removal");
-  const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
-  const [moveFor, setMoveFor] = useState<string | null>(null);
-  const [payModalOpen, setPayModalOpen] = useState(false);
 
   const patchField = <K extends keyof Group>(k: K, v: Group[K]) => {
-    updateGroup(groupId, { [k]: v } as Partial<Group>);
+    setDraft((current) => current ? { ...current, [k]: v } : current);
+    setDirty(true);
+  };
+  const patchFields = (patch: Partial<Group>) => {
+    setDraft((current) => current ? { ...current, ...patch } : current);
+    setDirty(true);
+  };
+  const save = async () => {
+    if (saving || !dirty) return;
+    setSaving(true);
+    try {
+      await updateGroup(groupId, g);
+      setDirty(false);
+      toast.success("Group changes saved");
+    } catch (error) { toast.error(String(error)); }
+    finally { setSaving(false); }
   };
 
   const productLevels = getProduct(g.product)?.levels ?? [];
-  const allTeachers = USERS.filter((u) => u.role === "teacher");
+  const allTeachers = USERS.filter((u) => u.role === "teacher" && getKnownUserIds().has(u.id));
   const teachersForField = g.product ? teachersForProduct(allTeachers, g.product) : allTeachers;
 
   const hired = g.hired_sessions ?? 0;
@@ -516,6 +550,10 @@ function GroupDetailModal({ groupId, onClose }: { groupId: string; onClose: () =
       <div className="w-full max-w-3xl overflow-hidden rounded-2xl bg-card shadow-floating">
         <ModalHeader kicker={g.company_client} title={g.name} onClose={onClose} />
         <div className="max-h-[78vh] space-y-6 overflow-y-auto px-6 py-6">
+          <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
+            <span>{dirty ? "Unsaved changes" : "Changes saved"}</span>
+            <PrimaryButton onClick={save} disabled={!dirty || saving}>{saving ? "Saving…" : "Save changes"}</PrimaryButton>
+          </div>
           {/* Shared fields */}
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             <Field label="Group Name">
@@ -537,7 +575,7 @@ function GroupDetailModal({ groupId, onClose }: { groupId: string; onClose: () =
               <select className={inputCls} value={g.product ?? ""} onChange={(e) => {
                 const p = (e.target.value || undefined) as ProductId | undefined;
                 const levels = p ? getProduct(p)?.levels ?? [] : [];
-                updateGroup(groupId, {
+                patchFields({
                   product: p,
                   contracted_levels: levels,
                   current_roadmap_level: levels[0],
@@ -557,7 +595,7 @@ function GroupDetailModal({ groupId, onClose }: { groupId: string; onClose: () =
               <input type="number" min={0} className={inputCls} value={g.hired_sessions} onChange={(e) => {
                 const hired = Number(e.target.value) || 0;
                 const remaining = Math.min(g.remaining_sessions ?? 0, hired);
-                updateGroup(groupId, { hired_sessions: hired, remaining_sessions: remaining });
+                patchFields({ hired_sessions: hired, remaining_sessions: remaining });
               }} />
             </Field>
             <Field label="Remaining Sessions">
@@ -612,7 +650,7 @@ function GroupDetailModal({ groupId, onClose }: { groupId: string; onClose: () =
               <div className="text-xs font-semibold text-muted-foreground">Progress</div>
               <div className="flex gap-2">
                 <GroupRescheduleButton groupId={groupId} />
-                <PrimaryButton onClick={() => setPayModalOpen(true)}>
+                <PrimaryButton onClick={() => setPayModalOpen(true)} disabled={dirty || saving}>
                   <CreditCard className="h-4 w-4" /> Mark as Paid
                 </PrimaryButton>
               </div>
@@ -629,7 +667,7 @@ function GroupDetailModal({ groupId, onClose }: { groupId: string; onClose: () =
           {/* Schedule Sessions — group-level bulk generator. Mirrors the
               recurrence + holiday-cascade UX of the Bulk Scheduler on
               Admin > Sessions, but produces ONE group session per date. */}
-          <GroupBulkScheduler groupId={groupId} />
+          {dirty ? <Card className="text-sm text-muted-foreground">Save group changes before scheduling sessions.</Card> : <GroupBulkScheduler groupId={groupId} />}
 
 
           {/* Roster */}
@@ -647,12 +685,12 @@ function GroupDetailModal({ groupId, onClose }: { groupId: string; onClose: () =
                   member={m}
                   onRemove={() => setConfirmRemove(m.student_id)}
                   onMove={() => setMoveFor(m.student_id)}
-                  onRestore={() => {
-                    const r = restoreMember(m.student_id);
+                  onRestore={async () => {
+                    const r = await restoreMember(m.student_id);
                     if (!r.ok) toast.error(r.reason || "Cannot restore");
                     else toast.success("Member restored");
                   }}
-                  onArchive={() => { archiveMember(m.student_id); toast.success("Member archived"); }}
+                  onArchive={() => { void archiveMember(m.student_id).then(() => toast.success("Member archived")).catch((error) => toast.error(String(error))); }}
                 />
               ))}
               {members.length === 0 && (
@@ -669,7 +707,7 @@ function GroupDetailModal({ groupId, onClose }: { groupId: string; onClose: () =
           message={`This member will enter a 30-day grace period as "Pending Removal". Their spot is freed immediately and they lose platform access, but you can Restore them within 30 days. This is different from vacation "Frozen" status.`}
           confirmLabel="Remove from Group"
           onCancel={() => setConfirmRemove(null)}
-          onConfirm={() => { removeMember(confirmRemove); setConfirmRemove(null); toast.success("Member moved to Pending Removal"); }}
+          onConfirm={() => { void removeMember(confirmRemove).then(() => { setConfirmRemove(null); toast.success("Member moved to Pending Removal"); }).catch((error) => toast.error(String(error))); }}
         />
       )}
 
@@ -752,14 +790,17 @@ function AddExistingMemberButton({ groupId, disabled }: { groupId: string; disab
   const [open, setOpen] = useState(false);
   const [studentId, setStudentId] = useState("");
 
-  const eligible = USERS.filter((u) => u.role === "student"
-    && !loadGroupMembers().some((m) => m.student_id === u.id && m.status !== "archived"));
+  const knownIds = getKnownUserIds();
+  const eligible = USERS.filter((u) => u.role === "student" && knownIds.has(u.id)
+    && !loadGroupMembers().some((m) => m.student_id === u.id));
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     if (!studentId) return;
-    const r = addMember(groupId, { student_id: studentId });
-    if (!r) toast.error("Could not add member — group is full");
-    else { toast.success("Member added"); setOpen(false); setStudentId(""); }
+    try {
+      const r = await addMember(groupId, { student_id: studentId });
+      if (!r) toast.error("Could not add member — group is full or student already belongs to a group");
+      else { toast.success("Member added"); setOpen(false); setStudentId(""); }
+    } catch (error) { toast.error(String(error)); }
   };
 
   return (
@@ -809,9 +850,9 @@ function MoveToGroupModal({ studentId, currentGroupId, onClose, onMoved }: {
     && activeMembersOf(g.id).length < g.max_capacity,
   );
 
-  const handleMove = () => {
+  const handleMove = async () => {
     if (!target) return;
-    const r = moveMember(studentId, target);
+    const r = await moveMember(studentId, target);
     if (!r.ok) toast.error(r.reason || "Could not move");
     else { toast.success("Member moved"); onMoved(); }
   };
@@ -908,9 +949,9 @@ function RestoreArchivedModal({ studentId, onClose, onDone }: { studentId: strin
   const [target, setTarget] = useState("");
   const groups = loadGroups().filter((g) => activeMembersOf(g.id).length < g.max_capacity);
 
-  const handleRestore = () => {
+  const handleRestore = async () => {
     if (!target) return;
-    const r = moveMember(studentId, target);
+    const r = await moveMember(studentId, target);
     if (!r.ok) toast.error(r.reason || "Could not restore");
     else { toast.success("Member restored"); onDone(); }
   };
@@ -1017,6 +1058,7 @@ function GroupBulkScheduler({ groupId }: { groupId: string }) {
   const [endDate, setEndDate] = useState("");
   const [time, setTime] = useState("19:00");
   const [days, setDays] = useState<number[]>([1, 3]);
+  const [scheduling, setScheduling] = useState(false);
 
   if (!g) return null;
 
@@ -1064,23 +1106,30 @@ function GroupBulkScheduler({ groupId }: { groupId: string }) {
 
   const toggleDay = (d: number) => setDays((p) => (p.includes(d) ? p.filter((x) => x !== d) : [...p, d]));
 
-  const assign = () => {
-    if (!teacherId || generated.length === 0 || overLimit) return;
+  const assign = async () => {
+    if (!teacherId || generated.length === 0 || overLimit || scheduling) return;
+    setScheduling(true);
     const duration = g.session_duration ?? 60;
     let created = 0;
-    generated.forEach((slot) => {
-      if (slot.holiday) return; // holiday hits are auto-skipped (no session created)
-      const s = addGroupSession({
+    try {
+    for (const slot of generated) {
+      if (slot.holiday) continue; // holiday hits are auto-skipped (no session created)
+      const dateKey = `${slot.date.getFullYear()}-${String(slot.date.getMonth() + 1).padStart(2, "0")}-${String(slot.date.getDate()).padStart(2, "0")}`;
+      const s = await addGroupSession({
         groupId,
         teacherId,
         teamsLink,
-        dateISO: slot.date.toISOString(),
+        dateISO: academyISO(`${dateKey}T${time}`),
         durationMinutes: duration,
       });
       if (s) created += 1;
-    });
+    }
     if (created > 0) toast.success(`${created} group session${created === 1 ? "" : "s"} scheduled`);
-    setStartDate(""); setEndDate("");
+    } catch (error) { toast.error(`${created} sessions saved. ${String(error)}`); }
+    finally {
+      if (created > 0) { setStartDate(""); setEndDate(""); }
+      setScheduling(false);
+    }
     tick((n) => n + 1);
   };
 
@@ -1157,10 +1206,10 @@ function GroupBulkScheduler({ groupId }: { groupId: string }) {
       )}
 
       <div className="mt-3 flex justify-end">
-        <button onClick={assign} disabled={!teacherId || overLimit || generated.length === 0}
+        <button onClick={assign} disabled={!teacherId || overLimit || generated.length === 0 || scheduling}
           className="inline-flex cursor-pointer items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white shadow-soft transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
           style={{ backgroundColor: GBS_ORANGE }}>
-          <CalendarPlus className="h-4 w-4" /> Schedule {generated.length > 0 ? `(${consumingCount})` : ""}
+          <CalendarPlus className="h-4 w-4" /> {scheduling ? "Saving sessions…" : `Schedule ${generated.length > 0 ? `(${consumingCount})` : ""}`}
         </button>
       </div>
     </Card>

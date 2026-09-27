@@ -1989,8 +1989,7 @@ function StudentDetailModal({
             <button
               onClick={() => {
                 if (isGrouped) {
-                  removeMember(student.id);
-                  onClose();
+                  void removeMember(student.id).then(onClose).catch((error) => notifyError(error, { context: "Removing group member" }));
                 } else {
                   patch({ status: "suspended" });
                 }

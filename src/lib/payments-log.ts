@@ -14,13 +14,7 @@
 // Realtime, same pattern used across this migration (see
 // teacher-kpi-overrides-store.ts).
 //
-// Group payments stay on localStorage for now: groups-store.ts hasn't been
-// migrated to Supabase yet (group ids are local freeform strings with no
-// bridge to the `groups.id` bigint — unlike `app_users`, `groups` has no
-// `legacy_id` column), and none of the real beta users are on a group plan
-// today, so this isn't blocking. The public API below transparently merges
-// both sources; when groups-store.ts is migrated, the group branch here can
-// be swapped for a real insert with no signature changes for callers.
+// Group and individual entries now both use public.payment_log_entries.
 // ============================================================================
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
@@ -31,6 +25,8 @@ import type { User } from "./mock-data";
 import type { Group } from "./groups-store";
 import { currentAmountForStudent } from "./payment-plans";
 import { createInvoiceRequestAndNotify } from "./invoice-requests";
+import { registerRehydrate } from "./auth-rehydrate";
+import { notifyError } from "./notify";
 
 export type PaidEntityType = "individual" | "group";
 
@@ -39,10 +35,7 @@ export type PaidEntityType = "individual" | "group";
 // campos sean opcionales ya que a veces los depositos no tienen los mismos
 // datos de transferencias y asi"). Which fields the Mark-as-Paid modal shows
 // still varies by method (his earlier answer), but none are required.
-// Individual payments only — persisted to the new payment_log_entries
-// columns; group payments carry these on the localStorage-only entry for
-// display parity, but never generate an invoice_requests row (see
-// invoice-requests.ts header).
+// Group payments do not generate invoice_requests rows.
 export type PaymentMethod = "transferencia" | "deposito" | "tarjeta" | "efectivo" | "otro";
 
 export interface PaymentDetailFields {
@@ -72,11 +65,12 @@ export const PAYMENTS_EVENT = "verbo:payments-updated";
 
 type PaymentRow = Database["public"]["Tables"]["payment_log_entries"]["Row"];
 
-// ----- Individual payments (Supabase) --------------------------------------
+// ----- Payments (Supabase) --------------------------------------------------
 
-let individualCache: PaymentLogEntry[] = [];
+let paymentCache: PaymentLogEntry[] = [];
 let hydrated = false;
 let hydratePromise: Promise<void> | null = null;
+let generation = 0;
 const listeners = new Set<() => void>();
 
 function notify() {
@@ -87,8 +81,8 @@ function notify() {
 function mapRow(row: PaymentRow): PaymentLogEntry {
   return {
     id: `pay-${row.id}`,
-    entity_type: "individual",
-    entity_id: row.student_id ? uuidToLegacySync(row.student_id) : "",
+    entity_type: row.entity_type,
+    entity_id: row.group_id != null ? String(row.group_id) : row.student_id ? uuidToLegacySync(row.student_id) : "",
     name: row.name,
     company: row.company ?? undefined,
     amount: Number(row.amount),
@@ -108,20 +102,21 @@ function mapRow(row: PaymentRow): PaymentLogEntry {
 async function hydrate(): Promise<void> {
   if (hydrated) return;
   if (hydratePromise) return hydratePromise;
+  const startedGeneration = generation;
   hydratePromise = (async () => {
     // Warm the user-id bridge first so `uuidToLegacySync` below resolves.
     await hydrateUserIdBridge();
     const { data, error } = await supabase
       .from("payment_log_entries")
       .select("*")
-      .eq("entity_type", "individual")
       .order("paid_at", { ascending: false });
+    if (startedGeneration !== generation) return;
     if (error) {
       console.error("[payments-log] failed to load payment_log_entries", error);
       hydrated = true;
       return;
     }
-    individualCache = (data ?? []).map(mapRow);
+    paymentCache = (data ?? []).map(mapRow);
     hydrated = true;
   })();
   await hydratePromise;
@@ -138,37 +133,25 @@ if (typeof window !== "undefined") {
       void hydrate();
     })
     .subscribe();
-}
-
-// ----- Group payments (localStorage — see file header) ---------------------
-
-function readGroupPayments(): PaymentLogEntry[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const all = JSON.parse(localStorage.getItem(PAYMENTS_KEY) || "[]") as PaymentLogEntry[];
-    return all.filter((p) => p.entity_type === "group");
-  } catch { return []; }
-}
-function writeGroupPayments(list: PaymentLogEntry[]) {
-  if (typeof window === "undefined") return;
-  try { localStorage.setItem(PAYMENTS_KEY, JSON.stringify(list)); } catch { /* noop */ }
+  registerRehydrate((reason) => {
+    if (reason === "auth") { generation += 1; paymentCache = []; notify(); }
+    hydrated = false;
+    const pending = hydratePromise;
+    void (pending ? pending.catch(() => {}).then(() => hydrate()) : hydrate());
+  });
 }
 
 // ----- Reads -----------------------------------------------------------
 export function loadPayments(): PaymentLogEntry[] {
   if (!hydrated) void hydrate();
-  return [...individualCache, ...readGroupPayments()];
+  return paymentCache;
 }
 
 export function subscribePayments(cb: () => void): () => void {
   if (typeof window === "undefined") return () => {};
   listeners.add(cb);
-  // Group payments live in localStorage — pick up cross-tab writes too.
-  const onStorage = (e: StorageEvent) => { if (e.key === PAYMENTS_KEY) cb(); };
-  window.addEventListener("storage", onStorage);
   return () => {
     listeners.delete(cb);
-    window.removeEventListener("storage", onStorage);
   };
 }
 
@@ -176,43 +159,30 @@ export function monthKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
-/** Log a payment. Individual payments are written to Supabase (optimistic,
- *  temp-id rollback on failure, same convention as addKpiOverride in
- *  teacher-kpi-overrides-store.ts). Group payments are logged to localStorage
- *  only — see file header. */
+/** Log a payment in Supabase with optimistic feedback. */
 export function logPayment(input: Omit<PaymentLogEntry, "id" | "month"> & { month?: string }) {
   const paidDate = new Date(input.paid_at);
   const month = input.month ?? monthKey(paidDate);
 
-  if (input.entity_type === "group") {
-    const entry: PaymentLogEntry = {
-      ...input,
-      id: `pay-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-      month,
-    };
-    writeGroupPayments([...readGroupPayments(), entry]);
-    notify();
-    return;
-  }
-
   const tempId = `temp-${Date.now()}`;
   const optimistic: PaymentLogEntry = { ...input, id: tempId, month };
-  individualCache = [optimistic, ...individualCache];
+  paymentCache = [optimistic, ...paymentCache];
   notify();
 
   void (async () => {
-    const studentUuid = await legacyToUuid(input.entity_id);
-    if (!studentUuid) {
+    const studentUuid = input.entity_type === "individual" ? await legacyToUuid(input.entity_id) : null;
+    if (input.entity_type === "individual" && !studentUuid) {
       console.error("[payments-log] unknown student id, dropping optimistic payment", input.entity_id);
-      individualCache = individualCache.filter((p) => p.id !== tempId);
+      paymentCache = paymentCache.filter((p) => p.id !== tempId);
       notify();
       return;
     }
     const { data, error } = await supabase
       .from("payment_log_entries")
       .insert({
-        entity_type: "individual",
+        entity_type: input.entity_type,
         student_id: studentUuid,
+        group_id: input.entity_type === "group" ? Number(input.entity_id) : null,
         name: input.name,
         company: input.company ?? null,
         amount: input.amount,
@@ -230,14 +200,17 @@ export function logPayment(input: Omit<PaymentLogEntry, "id" | "month"> & { mont
       .single();
     if (error || !data) {
       console.error("[payments-log] failed to save payment_log_entries", error);
-      individualCache = individualCache.filter((p) => p.id !== tempId);
+      notifyError(error ?? "Payment could not be saved", { context: "Recording payment" });
+      paymentCache = paymentCache.filter((p) => p.id !== tempId);
       notify();
       return;
     }
     const saved = mapRow(data);
-    individualCache = individualCache.map((p) => (p.id === tempId ? saved : p));
+    paymentCache = paymentCache.map((p) => (p.id === tempId ? saved : p));
     notify();
-    void createInvoiceRequestAndNotify({ paymentLogEntryId: data.id, studentUuid });
+    if (input.entity_type === "individual" && studentUuid) {
+      void createInvoiceRequestAndNotify({ paymentLogEntryId: data.id, studentUuid });
+    }
   })();
 }
 
@@ -288,29 +261,22 @@ export function paymentsForEntity(
     .sort((a, b) => +new Date(b.paid_at) - +new Date(a.paid_at));
 }
 
-/** Retention pruning: deletes every individual payment older than `cutoffMs`
- *  from Supabase (optimistic, rollback on failure), and prunes group
- *  payments older than `cutoffMs` from localStorage. Replaces the old
- *  localStorage-era `replacePayments(fullList)` — mirrors
- *  deleteOldKpiOverrides in teacher-kpi-overrides-store.ts. */
+/** Retention pruning for both individual and group payments. */
 export function deleteOldPayments(cutoffMs: number): void {
   const cutoffIso = new Date(cutoffMs).toISOString();
 
-  writeGroupPayments(readGroupPayments().filter((p) => +new Date(p.paid_at) >= cutoffMs));
-
-  const prev = individualCache;
-  individualCache = individualCache.filter((p) => +new Date(p.paid_at) >= cutoffMs);
+  const prev = paymentCache;
+  paymentCache = paymentCache.filter((p) => +new Date(p.paid_at) >= cutoffMs);
   notify();
 
   void (async () => {
     const { error } = await supabase
       .from("payment_log_entries")
       .delete()
-      .eq("entity_type", "individual")
       .lt("paid_at", cutoffIso);
     if (error) {
       console.error("[payments-log] failed to prune old payment_log_entries", error);
-      individualCache = prev;
+      paymentCache = prev;
       notify();
     }
   })();
