@@ -1,3 +1,4 @@
+import { BadgeArtwork } from "@/components/verbo/BadgeArtwork";
 // Badge unlock celebration — generic for ANY badge (core Challenge badges,
 // Lightning Bolt, Season badges, and Profile Badges). BadgeUnlockWatcher is
 // mounted once in the student layout and detects, for the current student, any
@@ -150,7 +151,7 @@ export function BadgeUnlockModal({
           )}
 
           <div
-            className="verbo-unlock-zoom group relative flex h-32 w-32 items-center justify-center overflow-hidden rounded-full border-2 border-amber-300/70 bg-amber-50"
+            className="verbo-unlock-zoom group relative flex h-32 w-32 items-center justify-center overflow-visible"
             style={{
               animation: settled
                 ? "verbo-badge-glow 2.4s ease-in-out infinite"
@@ -160,7 +161,7 @@ export function BadgeUnlockModal({
             }}
           >
             {badge.image ? (
-              <img src={badge.image} alt={badge.name} className="h-full w-full object-cover" />
+              <BadgeArtwork src={badge.image} alt={badge.name} className="h-full w-full object-contain" />
             ) : (
               ICON_BY_KIND[badge.iconKind]
             )}

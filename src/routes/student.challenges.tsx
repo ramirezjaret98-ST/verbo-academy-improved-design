@@ -1,3 +1,5 @@
+import { BadgeArtwork } from "@/components/verbo/BadgeArtwork";
+import { BADGE_ART, seasonBadgeArtwork } from "@/lib/badge-artwork";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -1301,7 +1303,7 @@ function SeasonFlashBanner({
                 }`}
                 style={!earned ? { animation: "verbo-badge-locked-pulse 2.2s ease-in-out infinite" } : undefined}
               >
-                <Medal className={`h-8 w-8 sm:h-9 sm:w-9 ${earned ? "text-white" : "text-white/70"}`} strokeWidth={1.6} />
+                <BadgeArtwork src={seasonBadgeArtwork(season.id)} animated={earned} alt={season.badge_name} className="h-full w-full object-contain" />
                 {!earned && (
                   <span className="absolute inset-0 flex items-center justify-center rounded-full bg-black/20 backdrop-blur-[1px]">
                     <Lock className="h-5 w-5 text-white sm:h-6 sm:w-6" strokeWidth={2} />
@@ -3365,6 +3367,7 @@ function ChallengeBadgesModal({
       key: "lightning",
       badgeId: "lightning",
       name: "⚡ Lightning Bolt",
+      image: BADGE_ART.lightning,
       earned: (student.lightning_completions ?? 0) >= 1,
       requirement: "Complete a Lightning challenge within its live window.",
       equippable: true,
@@ -3373,6 +3376,7 @@ function ChallengeBadgesModal({
       key: `season-${s.id}`,
       badgeId: `season-${s.id}`,
       name: s.badge_name,
+      image: seasonBadgeArtwork(s.id),
       earned: (student.season_completions?.[s.id] ?? 0) >= 1,
       requirement: `Complete a challenge during the ${s.display_name} Season.`,
       equippable: true,
@@ -3442,7 +3446,7 @@ function ChallengeBadgesModal({
                   style={{ animation: t.earned ? "verbo-badge-glow 2.2s ease-in-out infinite" : "verbo-badge-lock-pulse 2.6s ease-in-out infinite" }}
                 >
                   {t.image ? (
-                    <img src={t.image} alt="" className={`h-full w-full rounded-full object-cover ${t.earned ? "" : "grayscale opacity-60"}`} />
+                    <BadgeArtwork animated={t.earned} src={t.image} alt={t.name} className={`h-full w-full object-contain ${t.earned ? "" : "grayscale opacity-60"}`} />
                   ) : (
                     <Trophy className="h-7 w-7" />
                   )}

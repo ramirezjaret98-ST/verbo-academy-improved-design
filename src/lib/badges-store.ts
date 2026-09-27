@@ -1,3 +1,4 @@
+import { authenticatedCatalogCache } from "./catalog-cache-client";
 // Challenge Badges catalog — admin-editable list of the badges shown in
 // Student > Challenges.
 //
@@ -95,7 +96,7 @@ export const BADGES_EVENT = "verbo:challenge-badges-updated";
 
 type BadgeRow = Database["public"]["Tables"]["badge_defs"]["Row"];
 
-function fromRow(row: BadgeRow): BadgeDef {
+function fromRow(row: Pick<BadgeRow, "id" | "code" | "name" | "description" | "image_url" | "metric" | "threshold" | "system">): BadgeDef {
   const metric = row.metric as BadgeMetric;
   return {
     id: row.code,
@@ -109,6 +110,7 @@ function fromRow(row: BadgeRow): BadgeDef {
   };
 }
 
+const catalogCache = authenticatedCatalogCache<Pick<BadgeRow, "id" | "code" | "name" | "description" | "image_url" | "metric" | "threshold" | "system">>("badge_defs-challenge");
 let cache: BadgeDef[] = [];
 let hydrated = false;
 let hydratePromise: Promise<void> | null = null;
@@ -125,11 +127,7 @@ async function hydrate(): Promise<void> {
   if (hydrated) return;
   if (hydratePromise) return hydratePromise;
   hydratePromise = (async () => {
-    const { data, error } = await supabase
-      .from("badge_defs")
-      .select("*")
-      .eq("system", "challenge")
-      .order("id");
+    const { data, error } = await catalogCache.load(() => supabase.from("badge_defs").select("id,code,name,description,image_url,metric,threshold,system").eq("system", "challenge").order("id"));
     if (error) {
       console.error("[badges-store] failed to load challenge badges", error);
       hydratePromise = null;
@@ -142,7 +140,8 @@ async function hydrate(): Promise<void> {
   return hydratePromise;
 }
 
-function invalidateAndRehydrate() {
+function invalidateAndRehydrate(reason?: "auth" | "refresh") {
+  if (reason === "auth") { cache = []; notify(); }
   hydrated = false;
   hydratePromise = null;
   void hydrate();
@@ -158,6 +157,7 @@ function ensureRealtime() {
       "postgres_changes",
       { event: "*", schema: "public", table: "badge_defs" },
       () => {
+        catalogCache.invalidate();
         hydrated = false;
         hydratePromise = null;
         void hydrate();
@@ -185,6 +185,7 @@ function getSnapshot(): BadgeDef[] {
 }
 
 export async function addBadge(badge: BadgeDef): Promise<BadgeDef> {
+  catalogCache.invalidate();
   const { data, error } = await supabase
     .from("badge_defs")
     .insert({
@@ -208,6 +209,7 @@ export async function addBadge(badge: BadgeDef): Promise<BadgeDef> {
 }
 
 export async function updateBadge(badge: BadgeDef): Promise<BadgeDef> {
+  catalogCache.invalidate();
   const { data, error } = await supabase
     .from("badge_defs")
     .update({
@@ -231,6 +233,7 @@ export async function updateBadge(badge: BadgeDef): Promise<BadgeDef> {
 }
 
 export async function deleteBadge(id: string): Promise<void> {
+  catalogCache.invalidate();
   const { error } = await supabase
     .from("badge_defs")
     .delete()

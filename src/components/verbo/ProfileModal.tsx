@@ -1,3 +1,4 @@
+import { BadgeArtwork } from "@/components/verbo/BadgeArtwork";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { useAuth } from "@/lib/auth";
@@ -41,10 +42,10 @@ export function BadgeVisual({ badge, earned, size = "md" }: { badge: ProfileBadg
     : "bg-gradient-to-br from-zinc-200 to-zinc-400 text-zinc-600 grayscale";
   if (badge.image) {
     return (
-      <img
+      <BadgeArtwork animated={earned}
         src={badge.image}
         alt={badge.name}
-        className={`${box} rounded-full object-cover shadow-inner ${earned ? "" : "grayscale opacity-70"}`}
+        className={`${box} object-contain ${earned ? "" : "grayscale opacity-70"}`}
       />
     );
   }
