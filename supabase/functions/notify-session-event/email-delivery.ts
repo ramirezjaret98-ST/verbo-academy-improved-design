@@ -24,7 +24,7 @@ export async function sendResendEmail(
       const body = await response.json().catch(() => ({}));
       if (response.ok) return { ok: true, id: typeof body.id === "string" ? body.id : undefined, attempts: attempt };
       const result = { ok: false, status: response.status, code: typeof body.name === "string" ? body.name : "provider_error", attempts: attempt };
-      if (attempt === 3 || (response.status !== 429 && response.status < 500)) return result;
+      if (isQuotaExceeded(result.code) || attempt === 3 || (response.status !== 429 && response.status < 500)) return result;
       const retryAfter = Number(response.headers.get("retry-after"));
       await runtime.sleep(Math.min(5000, Math.max(1000 * attempt, Number.isFinite(retryAfter) ? retryAfter * 1000 : 0)));
     } catch {
@@ -33,6 +33,10 @@ export async function sendResendEmail(
     }
   }
   return { ok: false, code: "transport_error", attempts: 3 };
+}
+
+export function isQuotaExceeded(code?: string): boolean {
+  return code === "daily_quota_exceeded" || code === "monthly_quota_exceeded";
 }
 
 export async function emailEventKey(event: string, recipients: string[]): Promise<string> {

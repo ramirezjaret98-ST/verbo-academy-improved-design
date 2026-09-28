@@ -308,6 +308,29 @@ export function loadSessions(): ExtSession[] {
   return sessionsCache;
 }
 
+/** Persist one admin batch atomically; the server owns the single email summary. */
+export async function updateSessionsBulk(updates: Array<{ session: ExtSession; patch: Partial<ExtSession> }>): Promise<boolean> {
+  try {
+    const payload = await Promise.all(updates.map(async ({ session, patch }) => {
+      const [teacherId, previousTeacherId] = await Promise.all([
+        legacyToUuid(patch.teacher_id ?? session.teacher_id), legacyToUuid(session.teacher_id),
+      ]);
+      if (!teacherId || !previousTeacherId) throw new Error("Teacher not found");
+      return { id: Number(session.id), expected_date_time: session.date_time, expected_teacher_id: previousTeacherId,
+        patch: { date_time: patch.date_time ?? session.date_time, teacher_id: teacherId,
+          teams_link: patch.teams_link ?? session.teams_link, status: patch.status ?? session.status } };
+    }));
+    if (!payload.length) return true;
+    const { error } = await supabase.rpc("admin_update_sessions", { p_updates: payload });
+    if (error) throw error;
+    await refreshSessions();
+    return true;
+  } catch (error) {
+    notifyError(error instanceof Error ? error.message : (error as { message?: string })?.message ?? "Couldn't save the schedule. Refresh and try again.");
+    return false;
+  }
+}
+
 export function getSessionsSnapshot(): ExtSession[] {
   if (!hydrated) void hydrate();
   return sessionsCache;

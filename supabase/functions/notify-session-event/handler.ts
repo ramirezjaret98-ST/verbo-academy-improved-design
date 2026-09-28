@@ -2,7 +2,8 @@
 // Sends authenticated session notifications through Resend; recipient addresses are resolved server-side.
 // Preserve all notification kinds, Mexico City time, templates and authentication.
 import { createClient } from "jsr:@supabase/supabase-js@2";
-import { emailEventKey, sendResendEmail, uniqueRecipients } from "./email-delivery.ts";
+import { emailEventKey, uniqueRecipients, isQuotaExceeded } from "./email-delivery.ts";
+import { sendJobEmail } from "./job-delivery.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -37,7 +38,7 @@ function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 }
 
-function fmtDate(iso: string): string {
+export function fmtDate(iso: string): string {
   return new Date(iso).toLocaleString("es-MX", {
     timeZone: ACADEMY_TIMEZONE,
     weekday: "long", year: "numeric", month: "long", day: "numeric",
@@ -54,7 +55,7 @@ function fmtDate(iso: string): string {
 type Row = { label: string; value: string };
 type Cta = { label: string; href: string; color?: "orange" | "navy" };
 
-function renderEmail(opts: {
+export function renderEmail(opts: {
   eyebrow: string;
   eyebrowColor?: string;
   badge?: { symbol: string; color: string; bg: string; label: string };
@@ -262,14 +263,18 @@ export async function handleSessionNotification(req: Request, job?: any) {
   const results: Record<string, { ok: boolean; id?: string; status?: number; code?: string; attempts: number }> = {};
   const eventId = job?.eventId ?? `${sessionId}:${kind}:${session.updated_at}`;
   let sendCount = 0;
+  let quotaCode: string | undefined;
   async function sendEmail(to: string[], subject: string, html: string) {
+    if (quotaCode) return { ok: false, code: quotaCode, attempts: 0 };
     // Pace this invocation; retry 429s caused by other simultaneous events.
     if (sendCount++ > 0) await new Promise(resolve => setTimeout(resolve, 650));
-    return sendResendEmail({
+    const result = await sendJobEmail({
       apiKey: Deno.env.get("RESEND_API_KEY"),
       from: Deno.env.get("RESEND_FROM_EMAIL") || "Verbo Academy <onboarding@resend.dev>",
       to, subject, html, idempotencyKey: await emailEventKey(eventId, to),
-    });
+    }, admin, job?.eventId);
+    if (isQuotaExceeded(result.code)) quotaCode = result.code;
+    return result;
   }
 
   if (kind === "cancelled" || kind === "absent" || kind === "pending_reschedule") {
