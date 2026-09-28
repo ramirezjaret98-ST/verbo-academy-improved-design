@@ -11,7 +11,7 @@ const cors = {
 const reply = (status: number, body: Record<string, unknown>) =>
   new Response(JSON.stringify(body), { status, headers: cors });
 
-type Member = { name: string; email: string; password: string; member_since?: string };
+type Member = { name: string; email: string; member_since?: string };
 type GroupInput = {
   name: string; company_client: string; max_capacity: number;
   product: string; access_plan?: string; focus?: string;
@@ -55,14 +55,20 @@ Deno.serve(async (req: Request) => {
   for (const m of members) {
     const email = m.email?.trim().toLowerCase();
     if (!m.name?.trim() || !email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ||
-        typeof m.password !== "string" || m.password.length < 6 || emails.has(email)) {
-      return reply(400, { error: "Each member needs a distinct valid email, name and password" });
+        emails.has(email)) {
+      return reply(400, { error: "Each member needs a distinct valid email and name" });
     }
     emails.add(email);
   }
   if (group.teacher_id) {
     const { data: teacher } = await admin.from("app_users").select("role").eq("id", group.teacher_id).maybeSingle();
     if (teacher?.role !== "teacher") return reply(400, { error: "Invalid teacher" });
+  }
+
+  const passwordYear = Number(new Intl.DateTimeFormat("en", { timeZone: "America/Mexico_City", year: "numeric" }).format(new Date()));
+  const { data: password, error: passwordError } = await admin.rpc("student_temporary_password", { p_year: passwordYear });
+  if (passwordError || typeof password !== "string" || password.length < 6) {
+    return reply(503, { error: "Student temporary credential is not configured" });
   }
 
   const allowed: Array<keyof GroupInput> = [
@@ -83,14 +89,14 @@ Deno.serve(async (req: Request) => {
   try {
     for (const m of members) {
       const { data: created, error: createError } = await admin.auth.admin.createUser({
-        email: m.email.trim().toLowerCase(), password: m.password,
+        email: m.email.trim().toLowerCase(), password,
         email_confirm: true, user_metadata: { name: m.name.trim(), role: "student" },
       });
       if (createError || !created.user) throw new Error(createError?.message ?? "Account creation failed");
       createdUsers.push(created.user.id);
       const { error: profileError } = await admin.from("app_users").update({
         legacy_id: `u${crypto.randomUUID()}`, must_change_password: true, welcome_pending: true,
-        member_since: m.member_since || null,
+        welcome_password_year: passwordYear, member_since: m.member_since || null,
       }).eq("id", created.user.id);
       if (profileError) throw profileError;
       const { error: memberError } = await admin.from("group_members").insert({

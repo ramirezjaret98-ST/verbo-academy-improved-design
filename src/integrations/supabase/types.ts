@@ -246,6 +246,7 @@ export type Database = {
           member_since: string | null
           monthly_amount: number | null
           must_change_password: boolean
+          welcome_password_year: number | null
           welcome_pending: boolean
           welcome_sent_at: string | null
           mystery_box_pick_id: number | null
@@ -319,6 +320,7 @@ export type Database = {
           member_since?: string | null
           monthly_amount?: number | null
           must_change_password?: boolean
+          welcome_password_year?: number | null
           welcome_pending?: boolean
           welcome_sent_at?: string | null
           mystery_box_pick_id?: number | null
@@ -394,6 +396,7 @@ export type Database = {
           member_since?: string | null
           monthly_amount?: number | null
           must_change_password?: boolean
+          welcome_password_year?: number | null
           welcome_pending?: boolean
           welcome_sent_at?: string | null
           mystery_box_pick_id?: number | null

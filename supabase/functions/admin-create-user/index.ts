@@ -1,23 +1,4 @@
-// Admin-only: permanently deletes a REAL Supabase Auth account (and, via
-// cascade, its public.app_users row and everything that references it —
-// assignments, sessions the student took, payments, reports, etc., since
-// those tables were built with `ON DELETE CASCADE` back to app_users).
-//
-// This is the counterpart to admin-create-user. Before this existed, the
-// Admin panel could only "Suspend"/"Freeze"/"Remove access" someone (flip a
-// status field) — there was no way to actually erase a mistaken or
-// duplicate registration, including local-only "ghost" entries left behind
-// by a registration attempt that failed on the Supabase side (e.g. the
-// pre-2026-08-08 CORS bug, or a duplicate email) but still optimistically
-// showed up in the admin's own browser list.
-//
-// A handful of tables intentionally do NOT cascade from app_users (e.g.
-// `sessions.teacher_id` is `ON DELETE RESTRICT`) so that an account with
-// real class history can't be silently erased by mistake — deleting one of
-// those fails at the database level and this function relays that error
-// message as-is rather than swallowing it, so the caller can see exactly why
-// (e.g. "update or delete on table app_users violates foreign key
-// constraint ...") instead of getting a generic failure.
+// Admin-only account creation. Student welcome is a separate action.
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
 const corsHeaders = {
@@ -47,8 +28,8 @@ Deno.serve(async (req: Request) => {
     return new Response(JSON.stringify({ error: "Not authenticated" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 
-  // Service-role client — used for the admin-role check (bypasses RLS so
-  // this is reliable regardless of policy shape) and for the actual deletion.
+  // Service-role client — used for the admin-role check (bypasses RLS so this
+  // is reliable regardless of policy shape) and for the actual account creation.
   const admin = createClient(url, serviceKey);
   const { data: callerRow, error: callerRowErr } = await admin
     .from("app_users")
@@ -59,44 +40,66 @@ Deno.serve(async (req: Request) => {
     return new Response(JSON.stringify({ error: "Forbidden: admin only" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 
-  let body: { uuid?: string; confirm?: boolean };
+  let body: { legacyId?: string; email?: string; password?: string; name?: string; role?: string; adminType?: string; sendWelcomeEmail?: boolean };
   try {
     body = await req.json();
   } catch {
     return new Response(JSON.stringify({ error: "Invalid JSON body" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
-  const { uuid, confirm } = body;
-  if (!uuid) {
-    return new Response(JSON.stringify({ error: "uuid is required" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+  const { legacyId, email, password: requestedPassword, name, role, adminType } = body;
+  if (!legacyId || !email || !name || (role !== "student" && !requestedPassword) || (role !== "student" && role !== "teacher" && role !== "admin")) {
+    return new Response(JSON.stringify({ error: "legacyId, email, password, name and role ('student'|'teacher'|'admin') are required" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
-  if (confirm !== true) {
-    return new Response(JSON.stringify({ error: "confirm must be true — this permanently deletes the account" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+  if (role !== "student" && (requestedPassword?.length ?? 0) < 6) {
+    return new Response(JSON.stringify({ error: "password must be at least 6 characters" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
-  if (uuid === callerAuth.user.id) {
-    return new Response(JSON.stringify({ error: "You cannot delete your own account" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+  if (role === "admin") {
+    if (callerRow.admin_type !== "super_admin") {
+      return new Response(JSON.stringify({ error: "Forbidden: only Super Admin can create internal admin/coordinator accounts" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    const validAdminTypes = ["super_admin", "coordinator_ops", "coordinator_fin"];
+    if (!validAdminTypes.includes(adminType ?? "")) {
+      return new Response(JSON.stringify({ error: "adminType ('super_admin'|'coordinator_ops'|'coordinator_fin') is required when role is 'admin'" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
   }
 
-  const { data: targetRow, error: targetRowErr } = await admin
+  // Keep the registration year for invitations sent after a year change.
+  const passwordYear = Number(new Intl.DateTimeFormat("en", { timeZone: "America/Mexico_City", year: "numeric" }).format(new Date()));
+  let password = requestedPassword;
+  if (role === "student") {
+    const { data, error } = await admin.rpc("student_temporary_password", { p_year: passwordYear });
+    if (error || typeof data !== "string" || data.length < 6) {
+      return new Response(JSON.stringify({ error: "Student temporary credential is not configured" }), { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    password = data;
+  }
+
+  const { data: created, error: createErr } = await admin.auth.admin.createUser({
+    email,
+    password,
+    email_confirm: true,
+    user_metadata: { name, role },
+  });
+  if (createErr || !created?.user) {
+    return new Response(JSON.stringify({ error: createErr?.message ?? "Failed to create auth user" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+  }
+
+  const { error: updateErr } = await admin
     .from("app_users")
-    .select("role, admin_type")
-    .eq("id", uuid)
-    .maybeSingle();
-  if (targetRowErr || !targetRow) {
-    return new Response(JSON.stringify({ error: "User not found" }), { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-  }
-  // Deleting an internal admin/coordinator is further restricted to
-  // super_admin callers — same restriction admin-create-user applies when
-  // CREATING one, for the same reason (a regular admin/coordinator
-  // shouldn't be able to remove a super_admin, including themselves-adjacent
-  // accounts, out from under the organization).
-  if (targetRow.role === "admin" && callerRow.admin_type !== "super_admin") {
-    return new Response(JSON.stringify({ error: "Forbidden: only Super Admin can delete internal admin/coordinator accounts" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    .update({
+      legacy_id: legacyId,
+      must_change_password: true,
+      ...(role === "student" ? { welcome_pending: true, welcome_password_year: passwordYear } : {}),
+      ...(role === "admin" ? { admin_type: adminType } : {}),
+    })
+    .eq("id", created.user.id);
+  if (updateErr) {
+    // Auth user exists but the app_users patch failed — surface this clearly
+    // rather than leaving a silent half-created account with no legacy_id.
+    return new Response(JSON.stringify({ error: `Auth account created but failed to link legacy_id: ${updateErr.message}`, authUserId: created.user.id }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 
-  const { error: deleteErr } = await admin.auth.admin.deleteUser(uuid);
-  if (deleteErr) {
-    return new Response(JSON.stringify({ error: deleteErr.message }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-  }
+  // Welcome is sent only by the separate explicit admin action.
 
-  return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+  return new Response(JSON.stringify({ id: created.user.id, legacyId }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 });

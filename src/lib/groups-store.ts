@@ -410,7 +410,7 @@ export function groupsByStudentId(): Map<string, Group> {
 /** Register a brand-new group + create its member User records. */
 export async function registerGroupWithMembers(
   groupData: Omit<Group, "id" | "created_at">,
-  members: Array<{ name: string; email: string; password: string; member_since?: string }>,
+  members: Array<{ name: string; email: string; member_since?: string }>,
 ): Promise<Group> {
   const teacherUuid = groupData.teacher_id ? await legacyToUuid(groupData.teacher_id) : null;
   if (groupData.teacher_id && !teacherUuid) throw new Error("No se pudo identificar al maestro");
