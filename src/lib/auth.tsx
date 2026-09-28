@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { USERS, userById, type User, type Role } from "./mock-data";
-import { isMemberBlocked } from "./groups-store";
+import { isMemberBlockedInDatabase } from "./groups-store";
 import { hydrateAdminRoles, isUserDeactivated } from "./admin-roles";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
@@ -239,10 +239,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(null);
         return;
       }
-      if (
-        (built.role === "student" && isMemberBlocked(built.id)) ||
-        isUserDeactivated(built.id)
-      ) {
+      const groupBlocked = built.role === "student" && await withTimeout(
+        isMemberBlockedInDatabase(sessionUser.id), 10000, "group membership lookup",
+      );
+      if (groupBlocked || isUserDeactivated(built.id)) {
         authIdRef.current = null;
         setUser(null);
         void supabase.auth.signOut();
@@ -378,7 +378,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         };
       }
       // Group members in Pending Removal or Archived status lose platform access.
-      if (built.role === "student" && isMemberBlocked(built.id)) {
+      if (built.role === "student" && await withTimeout(
+        isMemberBlockedInDatabase(data.user.id), 10000, "group membership lookup",
+      )) {
         await supabase.auth.signOut();
         return { ok: false, error: "Access revoked. Contact your administrator." };
       }

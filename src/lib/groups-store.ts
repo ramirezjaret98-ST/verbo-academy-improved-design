@@ -4,14 +4,18 @@
 // live in USERS (via students-store) — this store only owns the *shared*
 // group fields plus the group ↔ member relationship.
 //
-// Persisted to localStorage and broadcast across tabs, mirroring the
-// sessions-store / clubs-store convention. Swap for Lovable Cloud later.
+// Supabase is authoritative. The in-memory cache keeps the existing
+// synchronous selectors available to the rest of Academy.
 
-import { USERS, type User } from "./mock-data";
-import { removeAssignment, setAssignment } from "./assignments-store";
 import { nextPaymentDateAfterToday, type ProductId, type AccessPlanId } from "./student-model";
 import { logPayment, expectedAmountForGroup, type PaymentDetailFields } from "./payments-log";
-import { patchStudentProfile, type StudentProfileFields } from "./students-store";
+import { hydrateStudents } from "./students-store";
+import { supabase } from "@/integrations/supabase/client";
+import type { Database } from "@/integrations/supabase/types";
+import { registerRehydrate } from "@/lib/auth-rehydrate";
+import { hydrateUserIdBridge, legacyToUuid, uuidToLegacySync, invalidateUserIdBridge } from "./user-id-bridge";
+import { notifyError } from "./notify";
+import { withTimeout } from "./net-utils";
 
 export type GroupMemberStatus = "active" | "pending_removal" | "archived";
 
@@ -56,63 +60,118 @@ export interface Group {
   created_at: string;
 }
 
-export const GROUPS_KEY = "verbo:groups";
-export const GROUP_MEMBERS_KEY = "verbo:group-members";
 export const GROUPS_EVENT = "verbo:groups-updated";
 
 // 30-day grace period before auto-archive (see remove flow).
 export const GRACE_DAYS = 30;
 
-function readJson<T>(key: string, fallback: T): T {
-  if (typeof window === "undefined") return fallback;
-  try {
-    const raw = localStorage.getItem(key);
-    return raw ? (JSON.parse(raw) as T) : fallback;
-  } catch { return fallback; }
-}
-function writeJson(key: string, value: unknown) {
-  if (typeof window === "undefined") return;
-  try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* noop */ }
-}
+type GroupRow = Database["public"]["Tables"]["groups"]["Row"];
+type MemberRow = Database["public"]["Tables"]["group_members"]["Row"];
+let groupsCache: Group[] = [];
+let membersCache: GroupMember[] = [];
+let hydrated = false;
+let hydratePromise: Promise<void> | null = null;
+let generation = 0;
+const listeners = new Set<() => void>();
+
 function broadcast() {
+  listeners.forEach((cb) => cb());
   if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent(GROUPS_EVENT));
 }
 
-export function loadGroups(): Group[] {
-  return readJson<Group[]>(GROUPS_KEY, []);
-}
-export function loadGroupMembers(): GroupMember[] {
-  // Side effect: expire any pending_removal past the grace window.
-  const members = readJson<GroupMember[]>(GROUP_MEMBERS_KEY, []);
-  const now = Date.now();
-  let mutated = false;
-  const next = members.map((m) => {
-    if (m.status === "pending_removal" && m.removal_started_at) {
-      const days = Math.floor((now - +new Date(m.removal_started_at)) / (86400_000));
-      if (days >= GRACE_DAYS) {
-        mutated = true;
-        return { ...m, status: "archived" as GroupMemberStatus, archived_at: new Date().toISOString() };
-      }
-    }
-    return m;
-  });
-  if (mutated) writeJson(GROUP_MEMBERS_KEY, next);
-  return next;
+function mapGroup(row: Partial<GroupRow> & { id: number; name: string; max_capacity: number }): Group {
+  return {
+    id: String(row.id), name: row.name, company_client: row.company_client ?? "",
+    max_capacity: row.max_capacity, product_type: "performance",
+    product: row.product ?? undefined, focus: row.focus ?? undefined,
+    access_plan: row.access_plan ?? undefined,
+    contracted_levels: row.contracted_levels ?? undefined,
+    current_roadmap_level: row.current_roadmap_level ?? undefined,
+    hired_sessions: row.hired_sessions ?? 0, remaining_sessions: row.remaining_sessions ?? 0,
+    sessions_per_week: row.sessions_per_week ?? undefined,
+    session_duration: row.session_duration ?? undefined,
+    reschedule_policy: row.reschedule_policy ?? undefined,
+    reschedule_custom_hours: row.reschedule_custom_hours ?? undefined,
+    reschedule_custom_pct: row.reschedule_custom_pct ?? undefined,
+    payment_day: row.payment_day ?? undefined, cycle_start: row.cycle_start ?? undefined,
+    next_payment: row.next_payment ?? undefined, video_call_link: row.video_call_link ?? undefined,
+    teacher_id: row.teacher_id ? uuidToLegacySync(row.teacher_id) : undefined,
+    addon_insights_per_month: row.addon_insights_per_month ?? undefined,
+    addon_bookclubs_per_month: row.addon_bookclubs_per_month ?? undefined,
+    addon_spotlight_per_month: row.addon_spotlight_per_month ?? undefined,
+    addon_workshops_enabled: row.addon_workshops_enabled ?? undefined,
+    created_at: row.created_at ?? "",
+  };
 }
 
-function persistGroups(list: Group[]) { writeJson(GROUPS_KEY, list); broadcast(); }
-function persistMembers(list: GroupMember[]) { writeJson(GROUP_MEMBERS_KEY, list); broadcast(); }
+function mapMember(row: MemberRow): GroupMember {
+  const expired = row.status === "pending_removal" && row.removal_started_at &&
+    Date.now() - new Date(row.removal_started_at).getTime() >= GRACE_DAYS * 86400_000;
+  return {
+    student_id: uuidToLegacySync(row.student_id), group_id: String(row.group_id),
+    status: expired ? "archived" : row.status, joined_at: row.joined_at,
+    removal_started_at: row.removal_started_at ?? undefined,
+    archived_at: row.archived_at ?? (expired ? new Date(new Date(row.removal_started_at!).getTime() + GRACE_DAYS * 86400_000).toISOString() : undefined),
+    prior_group_id: row.prior_group_id == null ? undefined : String(row.prior_group_id),
+  };
+}
+
+export async function hydrateGroups(force = false): Promise<void> {
+  if (typeof window === "undefined") return;
+  if (hydrated && !force) return;
+  if (hydratePromise) return hydratePromise;
+  const startedGeneration = generation;
+  const pending = (async () => {
+    await hydrateUserIdBridge();
+    const [adminGroups, visibleGroups, members] = await withTimeout(Promise.all([
+      supabase.from("groups").select("*"),
+      supabase.rpc("group_profile_for_teacher"),
+      supabase.from("group_members").select("*"),
+    ]), 15000, "groups lookup");
+    if (adminGroups.error || visibleGroups.error || members.error) {
+      throw adminGroups.error ?? visibleGroups.error ?? members.error;
+    }
+    if (startedGeneration !== generation) return;
+    const byId = new Map<number, Group>();
+    for (const row of visibleGroups.data ?? []) byId.set(row.id, mapGroup(row));
+    for (const row of adminGroups.data ?? []) byId.set(row.id, mapGroup(row));
+    groupsCache = [...byId.values()];
+    membersCache = (members.data ?? []).map(mapMember);
+    hydrated = true;
+    broadcast();
+  })();
+  hydratePromise = pending;
+  try { await pending; }
+  finally { if (hydratePromise === pending) hydratePromise = null; }
+}
+
+export function loadGroups(): Group[] { return groupsCache; }
+export function loadGroupMembers(): GroupMember[] { return membersCache; }
+
+if (typeof window !== "undefined") {
+  const reload = (reason?: "auth" | "refresh") => {
+    if (reason === "auth") {
+      generation += 1;
+      groupsCache = []; membersCache = []; broadcast();
+    }
+    hydrated = false;
+    const waiting = hydratePromise;
+    void (waiting ? waiting.catch(() => {}).then(() => hydrateGroups(true)) : hydrateGroups(true))
+      .catch((error) => console.error("[groups-store] refresh failed", error));
+  };
+  supabase.channel("academy-groups-changes")
+    .on("postgres_changes", { event: "*", schema: "public", table: "groups" }, () => reload("refresh"))
+    .on("postgres_changes", { event: "*", schema: "public", table: "group_members" }, () => reload("refresh"))
+    .subscribe();
+  registerRehydrate(reload);
+  void hydrateGroups().catch((error) => console.error("[groups-store] initial load failed", error));
+}
 
 export function subscribeGroups(cb: () => void): () => void {
   if (typeof window === "undefined") return () => {};
-  const onStorage = (e: StorageEvent) => {
-    if (e.key === GROUPS_KEY || e.key === GROUP_MEMBERS_KEY) cb();
-  };
-  window.addEventListener(GROUPS_EVENT, cb);
-  window.addEventListener("storage", onStorage);
+  listeners.add(cb);
   return () => {
-    window.removeEventListener(GROUPS_EVENT, cb);
-    window.removeEventListener("storage", onStorage);
+    listeners.delete(cb);
   };
 }
 
@@ -176,74 +235,31 @@ export function effectiveSessionCounts(
 // ---------------------------------------------------------------------------
 // Mutations
 // ---------------------------------------------------------------------------
-export function createGroup(input: Omit<Group, "id" | "created_at">): Group {
-  const g: Group = {
-    ...input,
-    id: `grp-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-    created_at: new Date().toISOString(),
-  };
-  persistGroups([...loadGroups(), g]);
-  return g;
-}
-
-export function updateGroup(id: string, patch: Partial<Group>) {
+export async function updateGroup(id: string, patch: Partial<Group>): Promise<void> {
   const before = groupById(id);
-  persistGroups(loadGroups().map((g) => (g.id === id ? { ...g, ...patch } : g)));
-  if (!before) return;
-  const after = groupById(id);
-  if (!after) return;
-  propagateGroupToMembers(before, after);
+  if (!before || !/^\d+$/.test(id)) throw new Error("Group not found");
+    const dbPatch: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(patch)) {
+      if (key === "id" || key === "created_at") continue;
+      dbPatch[key] = value ?? null;
+    }
+    if ("teacher_id" in patch) {
+      const teacherUuid = patch.teacher_id ? await legacyToUuid(patch.teacher_id) : null;
+      if (patch.teacher_id && !teacherUuid) throw new Error("No se pudo identificar al maestro");
+      dbPatch.teacher_id = teacherUuid;
+    }
+    const { error } = await supabase.from("groups").update(dbPatch as Database["public"]["Tables"]["groups"]["Update"]).eq("id", Number(id));
+    if (error) throw error;
+    await hydrateGroups(true);
+    hydrateStudents();
 }
 
-/** Sync shared Group fields onto every non-archived member's User record so
- *  admin/teacher/student surfaces stay in sync when the group is edited. */
-function propagateGroupToMembers(before: Group, after: Group) {
-  const memberFieldMap: Array<[keyof Group, keyof User | Array<keyof User>]> = [
-    ["product", "product"],
-    ["focus", "focus"],
-    ["access_plan", ["access_plan", "hired_plan"]],
-    ["contracted_levels", "contracted_levels"],
-    ["current_roadmap_level", "current_roadmap_level"],
-    ["company_client", "company"],
-    ["video_call_link", "video_call_link"],
-    ["addon_insights_per_month", "addon_insights_per_month"],
-    ["addon_bookclubs_per_month", "addon_bookclubs_per_month"],
-    ["addon_spotlight_per_month", "addon_spotlight_per_month"],
-    ["addon_workshops_enabled", "addon_workshops_enabled"],
-  ];
-  // Which fields actually changed?
-  const changed: Array<[keyof Group, keyof User | Array<keyof User>]> = memberFieldMap.filter(
-    ([gk]) => JSON.stringify(before[gk]) !== JSON.stringify(after[gk]),
-  );
-  const teacherChanged = before.teacher_id !== after.teacher_id;
-  if (changed.length === 0 && !teacherChanged) return;
-
-  const memberIds = loadGroupMembers()
-    .filter((m) => m.group_id === after.id && m.status !== "archived")
-    .map((m) => m.student_id);
-  if (memberIds.length === 0) return;
-
-  for (const sid of memberIds) {
-    const patch: Partial<User> = {};
-    for (const [gk, uk] of changed) {
-      const value = after[gk] as unknown;
-      const keys = Array.isArray(uk) ? uk : [uk];
-      for (const k of keys) {
-        (patch as unknown as Record<string, unknown>)[k as string] = value;
-      }
-    }
-    if (Object.keys(patch).length > 0) {
-      // patchStudentProfile handles the USERS mutation, the Supabase write
-      // (or localStorage fallback for local-only members), and the
-      // STUDENTS_EVENT ("verbo:students-updated") dispatch.
-      patchStudentProfile(sid, patch as Partial<StudentProfileFields>);
-    }
-
-    if (teacherChanged) {
-      if (after.teacher_id) setAssignment(sid, after.teacher_id);
-      else removeAssignment(sid);
-    }
-  }
+/** The login gate must read the database, not a possibly cold browser cache. */
+export async function isMemberBlockedInDatabase(studentUuid: string): Promise<boolean> {
+  const { data, error } = await supabase.from("group_members")
+    .select("status").eq("student_id", studentUuid).maybeSingle();
+  if (error) throw error;
+  return !!data && data.status !== "active";
 }
 
 export function markGroupAsPaid(id: string, detail?: PaymentDetailFields) {
@@ -262,43 +278,40 @@ export function markGroupAsPaid(id: string, detail?: PaymentDetailFields) {
   // Advance to the next real occurrence of the payment day (same calculation
   // used by the individual student flow) so the indicator clears immediately.
   const day = g.payment_day ?? (g.next_payment ? new Date(g.next_payment).getDate() : new Date().getDate());
-  updateGroup(id, { next_payment: nextPaymentDateAfterToday(day).toISOString() });
+  void updateGroup(id, { next_payment: nextPaymentDateAfterToday(day).toISOString().slice(0, 10) })
+    .catch((error) => notifyError(error, { context: "Updating group payment" }));
 }
 
-export function addMember(groupId: string, member: {
+export async function addMember(groupId: string, member: {
   student_id: string; joined_at?: string;
-}): GroupMember | null {
+}): Promise<GroupMember | null> {
   const g = groupById(groupId); if (!g) return null;
   if (activeMembersOf(groupId).length >= g.max_capacity) return null;
-  // If this student is already an active member somewhere, don't duplicate.
-  const existing = groupOfStudent(member.student_id);
-  if (existing && existing.member.status === "active") return null;
-  const m: GroupMember = {
-    student_id: member.student_id,
-    group_id: groupId,
-    status: "active",
+  if (loadGroupMembers().some((m) => m.student_id === member.student_id)) return null;
+  const studentUuid = await legacyToUuid(member.student_id);
+  if (!studentUuid) throw new Error("El alumno debe tener una cuenta real de Academy");
+  const { error } = await supabase.from("group_members").insert({
+    student_id: studentUuid, group_id: Number(groupId),
     joined_at: member.joined_at ?? new Date().toISOString(),
-  };
-  // Any existing pending_removal / archived record is superseded by the new
-  // active membership.
-  const next = loadGroupMembers().filter((x) => x.student_id !== member.student_id);
-  persistMembers([...next, m]);
-  // Ensure the assignments store reflects the group's teacher.
-  if (g.teacher_id) setAssignment(member.student_id, g.teacher_id);
-  return m;
+  });
+  if (error) throw error;
+  await hydrateGroups(true);
+  hydrateStudents();
+  return loadGroupMembers().find((m) => m.student_id === member.student_id) ?? null;
 }
 
 /** Remove flow — enters 30-day grace period, capacity freed immediately. */
-export function removeMember(studentId: string) {
-  const next = loadGroupMembers().map((m) =>
-    m.student_id === studentId && m.status === "active"
-      ? { ...m, status: "pending_removal" as GroupMemberStatus, removal_started_at: new Date().toISOString() }
-      : m,
-  );
-  persistMembers(next);
+export async function removeMember(studentId: string): Promise<void> {
+  const uuid = await legacyToUuid(studentId);
+  if (!uuid) throw new Error("No se pudo identificar al alumno");
+  const { error } = await supabase.from("group_members").update({
+    status: "pending_removal", removal_started_at: new Date().toISOString(), archived_at: null,
+  }).eq("student_id", uuid).eq("status", "active");
+  if (error) throw error;
+  await hydrateGroups(true);
 }
 
-export function restoreMember(studentId: string): { ok: boolean; reason?: string } {
+export async function restoreMember(studentId: string): Promise<{ ok: boolean; reason?: string }> {
   const member = loadGroupMembers().find((m) => m.student_id === studentId);
   if (!member) return { ok: false, reason: "Member not found" };
   const g = groupById(member.group_id);
@@ -306,72 +319,69 @@ export function restoreMember(studentId: string): { ok: boolean; reason?: string
   if (activeMembersOf(g.id).length >= g.max_capacity) {
     return { ok: false, reason: "No spots left in this group" };
   }
-  const next = loadGroupMembers().map((m) =>
-    m.student_id === studentId
-      ? { ...m, status: "active" as GroupMemberStatus, removal_started_at: undefined, archived_at: undefined }
-      : m,
-  );
-  persistMembers(next);
+  const uuid = await legacyToUuid(studentId);
+  if (!uuid) return { ok: false, reason: "Student account not found" };
+  const { error } = await supabase.from("group_members").update({
+    status: "active", removal_started_at: null, archived_at: null,
+  }).eq("student_id", uuid);
+  if (error) return { ok: false, reason: error.message };
+  await hydrateGroups(true);
   return { ok: true };
 }
 
-export function archiveMember(studentId: string) {
-  const next = loadGroupMembers().map((m) =>
-    m.student_id === studentId
-      ? { ...m, status: "archived" as GroupMemberStatus, archived_at: new Date().toISOString() }
-      : m,
-  );
-  persistMembers(next);
+export async function archiveMember(studentId: string): Promise<void> {
+  const uuid = await legacyToUuid(studentId);
+  if (!uuid) throw new Error("No se pudo identificar al alumno");
+  const { error } = await supabase.from("group_members").update({
+    status: "archived", archived_at: new Date().toISOString(),
+  }).eq("student_id", uuid);
+  if (error) throw error;
+  await hydrateGroups(true);
 }
 
-export function moveMember(studentId: string, targetGroupId: string): { ok: boolean; reason?: string } {
+export async function moveMember(studentId: string, targetGroupId: string): Promise<{ ok: boolean; reason?: string }> {
   const member = loadGroupMembers().find((m) => m.student_id === studentId);
   if (!member) return { ok: false, reason: "Member not found" };
   const target = groupById(targetGroupId);
   if (!target) return { ok: false, reason: "Target group not found" };
   const current = groupById(member.group_id);
-  if (current && current.company_client !== target.company_client) {
+  if (current && member.status !== "archived" && current.company_client !== target.company_client) {
     return { ok: false, reason: "Groups must belong to the same Company / Client" };
   }
   if (activeMembersOf(target.id).length >= target.max_capacity) {
     return { ok: false, reason: "No spots left in this group" };
   }
-  const next = loadGroupMembers().map((m) =>
-    m.student_id === studentId
-      ? {
-          ...m,
-          group_id: targetGroupId,
-          prior_group_id: current?.id,
-          status: "active" as GroupMemberStatus,
-          removal_started_at: undefined,
-          archived_at: undefined,
-          joined_at: new Date().toISOString(),
-        }
-      : m,
-  );
-  persistMembers(next);
-  // Reassign teacher to target group's teacher.
-  if (target.teacher_id) setAssignment(studentId, target.teacher_id);
+  const uuid = await legacyToUuid(studentId);
+  if (!uuid) return { ok: false, reason: "Student account not found" };
+  const { error } = await supabase.from("group_members").update({
+    group_id: Number(targetGroupId), prior_group_id: current ? Number(current.id) : null,
+    status: "active", removal_started_at: null, archived_at: null,
+    joined_at: new Date().toISOString(),
+  }).eq("student_id", uuid);
+  if (error) return { ok: false, reason: error.message };
+  await hydrateGroups(true);
+  hydrateStudents();
   return { ok: true };
 }
 
 /** Decrement the group's Remaining Sessions counter by one. Group progress
  *  advances once per session regardless of member count. */
 export function decrementGroupRemaining(groupId: string) {
-  const g = groupById(groupId); if (!g) return;
-  updateGroup(groupId, {
-    remaining_sessions: Math.max(0, (g.remaining_sessions ?? 0) - 1),
-  });
+  void adjustRemaining(groupId, -1);
 }
 
 /** Symmetric refund helper — bump the shared counter back up by one, capped
  *  at the group's Hired Sessions so a refund can never exceed the contract. */
 export function incrementGroupRemaining(groupId: string) {
-  const g = groupById(groupId); if (!g) return;
-  const hired = g.hired_sessions ?? 0;
-  updateGroup(groupId, {
-    remaining_sessions: Math.min(hired, (g.remaining_sessions ?? 0) + 1),
+  void adjustRemaining(groupId, 1);
+}
+
+async function adjustRemaining(groupId: string, delta: -1 | 1): Promise<void> {
+  const { error } = await supabase.rpc("adjust_group_remaining_sessions", {
+    p_group_id: Number(groupId), p_delta: delta,
   });
+  if (error) { notifyError(error, { context: "Updating group sessions" }); return; }
+  await hydrateGroups(true);
 }
 
 /** Shared "% of the contracted sessions used" helper — single source of
@@ -398,49 +408,21 @@ export function groupsByStudentId(): Map<string, Group> {
 }
 
 /** Register a brand-new group + create its member User records. */
-export function registerGroupWithMembers(
+export async function registerGroupWithMembers(
   groupData: Omit<Group, "id" | "created_at">,
   members: Array<{ name: string; email: string; password: string; member_since?: string }>,
-): { group: Group; users: User[] } {
-  const group = createGroup(groupData);
-  const users: User[] = [];
-  for (const m of members) {
-    const id = `u${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-    const u: User = {
-      id,
-      name: m.name.trim(),
-      email: m.email.trim(),
-      password: m.password,
-      role: "student",
-      product_type: "performance",
-      product: group.product,
-      focus: group.focus,
-      access_plan: group.access_plan,
-      hired_plan: group.access_plan,
-      contracted_levels: group.contracted_levels ?? [],
-      current_roadmap_level: group.current_roadmap_level,
-      company: group.company_client,
-      member_since: m.member_since,
-      status: "active",
-      insights_strikes: 0,
-      bookclub_strikes: 0,
-      video_call_link: group.video_call_link,
-      addon_insights_per_month: group.addon_insights_per_month ?? 0,
-      addon_bookclubs_per_month: group.addon_bookclubs_per_month ?? 0,
-      addon_spotlight_per_month: group.addon_spotlight_per_month ?? 0,
-      addon_workshops_enabled: group.addon_workshops_enabled ?? false,
-    };
-    USERS.push(u);
-    users.push(u);
-    addMember(group.id, { student_id: id });
-  }
-  // Persist newly-created users so a reload keeps them.
-  try {
-    if (typeof window !== "undefined") {
-      const KEY = "verbo:registered-students";
-      const prev = JSON.parse(localStorage.getItem(KEY) || "[]");
-      localStorage.setItem(KEY, JSON.stringify([...prev, ...users]));
-    }
-  } catch { /* noop */ }
-  return { group, users };
+): Promise<Group> {
+  const teacherUuid = groupData.teacher_id ? await legacyToUuid(groupData.teacher_id) : null;
+  if (groupData.teacher_id && !teacherUuid) throw new Error("No se pudo identificar al maestro");
+  const { data, error } = await supabase.functions.invoke("admin-create-group", {
+    body: { group: { ...groupData, teacher_id: teacherUuid }, members },
+  });
+  const failure = (data as { error?: string } | null)?.error;
+  if (error || failure) throw new Error(failure ?? error?.message ?? "No se pudo registrar el grupo");
+  invalidateUserIdBridge();
+  await hydrateUserIdBridge();
+  await hydrateGroups(true);
+  const group = groupById(String((data as { groupId: number }).groupId));
+  if (!group) throw new Error("El grupo se creó, pero no pudo cargarse. Actualiza la página.");
+  return group;
 }

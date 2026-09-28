@@ -3959,6 +3959,10 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      adjust_group_remaining_sessions: {
+        Args: { p_group_id: number; p_delta: number }
+        Returns: number
+      }
       admin_sessions_for_pay_review: {
         Args: { p_from: string; p_teacher_id: string; p_to: string }
         Returns: {

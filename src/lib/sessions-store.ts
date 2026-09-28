@@ -437,48 +437,43 @@ export function addWorkshopSession(input: {
  *  resolve group membership via `groupsByStudentId()` still work, while
  *  `group_id` is the real link.
  *
- *  NOTE: no beta user is on a group plan yet — `group_id` must resolve to a
- *  real row in `public.groups`, which requires `groups-store.ts` (still on
- *  localStorage) to hand out real ids. Until that's migrated, calling this
- *  with a legacy/mock group id will fail the FK and return null — implemented
- *  correctly against the real schema, just not exercisable end-to-end yet. */
-export function addGroupSession(input: {
+ *  Group ids and members now resolve to real Supabase records. The caller
+ *  waits for both the session and its roster before showing success. */
+export async function addGroupSession(input: {
   groupId: string;
   teacherId: string;
   teamsLink: string;
   dateISO?: string;
   durationMinutes?: number;
-}): ExtSession | null {
+}): Promise<ExtSession | null> {
   const roster = activeMembersOf(input.groupId);
   if (roster.length === 0) return null;
   const memberIds = roster.map((m) => m.student_id);
-  const session = createSessionInternal({
-    student_id: roster[0].student_id, // sentinel; the roster lives in Group
-    group_id: input.groupId,
-    teacher_id: input.teacherId,
+  const [studentUuid, teacherUuid] = await Promise.all([
+    legacyToUuid(roster[0].student_id), legacyToUuid(input.teacherId),
+  ]);
+  if (!studentUuid || !teacherUuid) throw new Error("Group member or teacher account unavailable");
+  const { data, error } = await supabase.from("sessions").insert({
+    student_id: studentUuid,
+    group_id: Number(input.groupId),
+    teacher_id: teacherUuid,
     date_time: input.dateISO ?? "",
     duration_minutes: input.durationMinutes ?? 60,
     teams_link: input.teamsLink,
     status: "scheduled",
+  }).select("*").single();
+  if (error || !data) throw new Error(error?.message ?? "Could not create group session");
+  const rosterSaved = await upsertMemberStatuses({
+    sessionId: String(data.id),
+    members: memberIds.map((id) => ({ studentId: id, status: "scheduled" as ExtSessionStatus })),
   });
-  // member_statuses seeded to "scheduled" for every active member, so
-  // studentCalendarEvents (which matches by student_id AND member_statuses
-  // keys) shows the class immediately, before any Session Report exists.
-  void (async () => {
-    // Give createSessionInternal's background insert a moment to land so we
-    // have a real numeric session id to attach member rows to.
-    for (let i = 0; i < 20 && sessionsCache.find((s) => s.id === session.id); i++) {
-      await new Promise((r) => setTimeout(r, 150));
-    }
-    const real = sessionsCache.find(
-      (s) => s.group_id === input.groupId && s.date_time === (input.dateISO ?? "") && s.teacher_id === input.teacherId,
-    );
-    if (!real || !Number.isFinite(Number(real.id))) return;
-    await upsertMemberStatuses({
-      sessionId: real.id,
-      members: memberIds.map((id) => ({ studentId: id, status: "scheduled" as ExtSessionStatus })),
-    });
-  })();
+  if (!rosterSaved) {
+    const { error: rollbackError } = await supabase.from("sessions").delete().eq("id", data.id);
+    throw new Error(rollbackError ? "Session created but roster failed. Contact support before retrying." : "Could not save the group roster. Please retry.");
+  }
+  const session = { ...mapSessionRow(data, [], []), member_statuses: Object.fromEntries(memberIds.map((id) => [id, "scheduled" as ExtSessionStatus])) };
+  sessionsCache = [session, ...sessionsCache.filter((s) => s.id !== session.id)];
+  notify();
   return session;
 }
 
