@@ -220,7 +220,7 @@ function Tag({ children, className = "", style }: { children: React.ReactNode; c
 // -----------------------------------------------------------------------------
 // Register Group Modal
 // -----------------------------------------------------------------------------
-type NewMember = { name: string; email: string; password: string; member_since: string };
+type NewMember = { name: string; email: string; member_since: string };
 
 function RegisterGroupModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
   const [saving, setSaving] = useState(false);
@@ -228,8 +228,8 @@ function RegisterGroupModal({ onClose, onSaved }: { onClose: () => void; onSaved
   const [company, setCompany] = useState("");
   const [maxCapacity, setMaxCapacity] = useState(4);
   const [members, setMembers] = useState<NewMember[]>([
-    { name: "", email: "", password: "", member_since: "" },
-    { name: "", email: "", password: "", member_since: "" },
+    { name: "", email: "", member_since: "" },
+    { name: "", email: "", member_since: "" },
   ]);
   const [product, setProduct] = useState<ProductId | "">("");
   const [accessPlan, setAccessPlan] = useState<AccessPlanId | "">("");
@@ -258,14 +258,14 @@ function RegisterGroupModal({ onClose, onSaved }: { onClose: () => void; onSaved
   };
   const addMemberRow = () => {
     if (members.length >= maxCapacity) return;
-    setMembers((prev) => [...prev, { name: "", email: "", password: "", member_since: "" }]);
+    setMembers((prev) => [...prev, { name: "", email: "", member_since: "" }]);
   };
   const removeMemberRow = (i: number) => {
     if (members.length <= 2) return;
     setMembers((prev) => prev.filter((_, idx) => idx !== i));
   };
 
-  const validMembers = members.every((m) => m.name.trim() && m.email.trim() && m.password.trim());
+  const validMembers = members.every((m) => m.name.trim() && m.email.trim());
   const isValid = name.trim() && company.trim() && members.length >= 2 && validMembers
     && product && videoLink.trim();
 
@@ -357,6 +357,7 @@ function RegisterGroupModal({ onClose, onSaved }: { onClose: () => void; onSaved
               <Plus className="h-3 w-3" /> Add Member
             </button>
           </div>
+          <p className="text-xs text-muted-foreground">Each member receives a real account with the standard temporary password and changes it at first login. Send each welcome email from the student profile when their material is ready.</p>
           <div className="space-y-3">
             {members.map((m, i) => (
               <div key={i} className="rounded-lg border border-border border-l-4 border-l-[#3ebbad] bg-background p-3">
@@ -371,7 +372,6 @@ function RegisterGroupModal({ onClose, onSaved }: { onClose: () => void; onSaved
                 <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
                   <input className={inputCls} placeholder="Student Name" value={m.name} onChange={(e) => setMember(i, { name: e.target.value })} />
                   <input className={inputCls} placeholder="Email" value={m.email} onChange={(e) => setMember(i, { email: e.target.value })} />
-                  <input className={inputCls} placeholder="Initial Password" value={m.password} onChange={(e) => setMember(i, { password: e.target.value })} />
                   <input type="date" className={inputCls} value={m.member_since} onChange={(e) => setMember(i, { member_since: e.target.value })} />
                 </div>
               </div>

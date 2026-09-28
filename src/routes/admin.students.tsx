@@ -272,9 +272,7 @@ function Page() {
     const { data, error } = await supabase.functions.invoke("admin-create-user", {
       body: {
         legacyId: u.id, email: u.email, password: u.password, name: u.name, role: "student",
-        // Opt-in per the "Welcome email" checkbox on the form — the
-        // function only sends when this is explicitly true.
-        sendWelcomeEmail: !!sendWelcomeEmail,
+        sendWelcomeEmail: false,
       },
     });
     const invokeError = (data as { error?: string } | null)?.error;
@@ -767,7 +765,7 @@ function StudentFormModal({
     addon_workshops_enabled: initial?.addon_workshops_enabled ?? false,
     selected_cohort_ids: initial ? cohortsForStudent(initial.id).map((x) => x.cohort.id) : [],
   }));
-  const [showPassword, setShowPassword] = useState(false);
+
   const [emailTouched, setEmailTouched] = useState(false);
   const [attemptedSave, setAttemptedSave] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -880,7 +878,7 @@ function StudentFormModal({
     ? nextPaymentDate(f.payment_day, f.cycle_start ? new Date(f.cycle_start) : new Date())
     : null;
 
-  const baseValid = f.name.trim() && isValidEmail(f.email) && f.password.trim();
+  const baseValid = f.name.trim() && isValidEmail(f.email);
   const emailFormatError = (emailTouched || attemptedSave) && f.email.trim() && !isValidEmail(f.email);
   const isValid = f.product_type === "performance"
     ? (baseValid && f.product && f.video_call_link.trim() && (!isEnterprise || f.company.trim()))
@@ -930,7 +928,7 @@ function StudentFormModal({
       const isPerfNow = f.product_type === "performance";
       const missingAcademic = isPerfNow
         && (!f.product || !f.video_call_link.trim() || (isEnterprise && !f.company.trim()));
-      const missingInfo = !f.name.trim() || !isValidEmail(f.email) || !f.password.trim();
+      const missingInfo = !f.name.trim() || !isValidEmail(f.email);
       if (missingAcademic) setTab("academic");
       else if (missingInfo) setTab("info");
       return;
@@ -1009,7 +1007,7 @@ function StudentFormModal({
   const academicMissing = attemptedSave && !isValid && isPerf
     && (!f.product || !f.video_call_link.trim() || (isEnterprise && !f.company.trim()));
   const infoMissing = attemptedSave && !isValid
-    && (!f.name.trim() || !isValidEmail(f.email) || !f.password.trim());
+    && (!f.name.trim() || !isValidEmail(f.email));
   const tabs: { id: "academic" | "financial" | "info"; label: string; dot: boolean }[] = [
     { id: "academic", label: "Academic", dot: !!academicMissing },
     ...(isPerf ? [{ id: "financial" as const, label: "Financial", dot: false }] : []),
@@ -1407,23 +1405,7 @@ function StudentFormModal({
                   className={inputCls}
                 />
               </Field>
-              <Field label="Initial Password" icon={<KeyRound className="h-3.5 w-3.5" />}>
-                <div className="relative">
-                  <input
-                    type={showPassword ? "text" : "password"}
-                    value={f.password}
-                    onChange={(e) => set("password", e.target.value)}
-                    placeholder="Set a password"
-                    className={`${inputCls} pr-9 ${attemptedSave && !f.password.trim() ? "!border-destructive focus:!border-destructive focus:!ring-destructive" : ""}`}
-                    aria-invalid={attemptedSave && !f.password.trim() ? "true" : "false"}
-                  />
-                  <button type="button" onClick={() => setShowPassword((v) => !v)} className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground hover:text-foreground" aria-label="Toggle password">
-                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </button>
-                </div>
-                {attemptedSave && !f.password.trim() && <p className="mt-1 text-xs text-destructive">Password is required.</p>}
-              </Field>
-              {!editing && <p className="md:col-span-2 text-xs text-muted-foreground">The account is saved without an email. Open the student's profile to send the welcome email after preparing their course and materials.</p>}
+              {!editing && <p className="md:col-span-2 text-xs text-muted-foreground">The standard temporary password is assigned automatically. The student changes it at first login. The account is saved without an email. Open the student's profile to send the welcome email after preparing their course and materials.</p>}
               <Field label="Member Since" icon={<CalendarDays className="h-3.5 w-3.5" />}>
                 <input type="date" value={f.member_since} onChange={(e) => set("member_since", e.target.value)} className={inputCls} />
               </Field>
@@ -1950,7 +1932,7 @@ function StudentDetailModal({
 
         {getAdminType(admin) === "super_admin" && (
           <div className="border-t border-border px-5 py-4 sm:px-7">
-            <DeferredWelcome studentId={student.id} name={student.name} email={student.email} initialPassword={student.password} />
+            <DeferredWelcome studentId={student.id} name={student.name} email={student.email} />
           </div>
         )}
 

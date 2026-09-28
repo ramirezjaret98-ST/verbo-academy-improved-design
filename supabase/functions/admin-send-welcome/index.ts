@@ -184,15 +184,18 @@ Deno.serve(async (req: Request) => {
   const { data: actor } = await admin.from("app_users").select("role,admin_type").eq("id", callerAuth.user.id).maybeSingle();
   if (actor?.role !== "admin" || actor.admin_type !== "super_admin") return json({ error: "Super Admin only" }, 403);
 
-  let body: { studentId?: string; password?: string };
+  let body: { studentId?: string };
   try { body = await req.json(); } catch { return json({ error: "Invalid body" }, 400); }
-  if (!body.studentId || !body.password || body.password.length < 6) return json({ error: "Student and temporary password are required" }, 400);
+  if (!body.studentId) return json({ error: "Student is required" }, 400);
   const { data: student, error: studentError } = await admin.from("app_users")
-    .select("id,role,name,email,welcome_pending,must_change_password")
+    .select("id,role,name,email,welcome_pending,must_change_password,welcome_password_year")
     .eq("id", body.studentId).maybeSingle();
   if (studentError || !student || student.role !== "student") return json({ error: "Student not found" }, 404);
   if (!student.welcome_pending) return json({ error: "Welcome already sent or this is an existing account" }, 409);
   if (!student.must_change_password) return json({ error: "Student has already completed first login" }, 409);
+  if (!student.welcome_password_year) return json({ error: "Registration credential is not configured" }, 409);
+  const { data: password, error: passwordError } = await admin.rpc("student_temporary_password", { p_year: student.welcome_password_year });
+  if (passwordError || typeof password !== "string" || password.length < 6) return json({ error: "Student temporary credential is not configured" }, 503);
 
   const safeName = escapeHtml(student.name ?? "");
   const safeEmail = escapeHtml(student.email ?? "");
@@ -201,7 +204,7 @@ Deno.serve(async (req: Request) => {
     eyebrow: "Bienvenida",
     title: `¡Qué gusto tenerte con nosotros, ${safeName}!`,
     bodyHtml: "Tu cuenta en Verbo Academy ya está lista. Desde ahí vas a poder ver tus próximas sesiones, tu material de estudio y tu progreso en todo momento - este es el primer paso de tu camino con nosotros. Aquí están tus datos de acceso:",
-    rows: [{ label: "Correo", value: safeEmail }, { label: "Contraseña temporal", value: escapeHtml(body.password) }],
+    rows: [{ label: "Correo", value: safeEmail }, { label: "Contraseña temporal", value: escapeHtml(password) }],
     noteHtml: "Por tu seguridad, en tu primer inicio de sesión te vamos a pedir crear una nueva contraseña.",
     cta: { label: "Ingresar a la academia", href: `${APP_URL}/login` },
     helperHtml,
