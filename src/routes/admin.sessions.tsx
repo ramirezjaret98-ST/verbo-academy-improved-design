@@ -8,6 +8,7 @@ import {
   loadSessions,
   createSession,
   updateSession,
+  updateSessionsBulk,
   subscribeSessions,
   WORKSHOP_STATUS_META,
   type ExtSession,
@@ -551,14 +552,13 @@ function StudentSessionsModal({
     teamsLink: string; teacherId: string; time: string; days: number[];
     sourceDays: number[]; permanent: boolean;
   }) => {
-    // Sync the link back to the student's shared Video Call Link field.
-    setStudentVideoLink(studentId, opts.teamsLink);
     const [hh, mm] = opts.time.split(":").map(Number);
-    let touched = 0;
+    const updates: Array<{ session: ExtSession; patch: Partial<ExtSession> }> = [];
     for (const s of sessions) {
       if (s.student_id !== studentId) continue;
-      if (["completed", "absent"].includes(s.status)) continue;
-      const dtOriginal = new Date(s.date_time);
+      if (+new Date(s.date_time) <= Date.now() || !["scheduled", "ready", "rescheduled", "rearranged", "delayed"].includes(s.status)) continue;
+      // Treat the academy's wall clock as UTC while doing calendar arithmetic.
+      const dtOriginal = new Date(academyDateTime(s.date_time) + ":00Z");
       // 2026-08-19: this used to retarget EVERY future session of the
       // student onto the new day/time pattern, with no way to leave some
       // weekdays untouched — e.g. moving just a Friday slot to Saturday
@@ -568,17 +568,17 @@ function StudentSessionsModal({
       // current sessions this bulk edit is even allowed to touch — empty
       // means "all", same as before, so nothing changes for the common case
       // (just updating the link/teacher for everyone).
-      if (opts.sourceDays.length > 0 && !opts.sourceDays.includes(dtOriginal.getDay())) continue;
+      if (opts.sourceDays.length > 0 && !opts.sourceDays.includes(dtOriginal.getUTCDay())) continue;
       const patch: Partial<ExtSession> = { teams_link: opts.teamsLink, teacher_id: opts.teacherId };
-      const dt = new Date(s.date_time);
-      dt.setHours(hh, mm, 0, 0);
-      if (opts.days.length > 0 && !opts.days.includes(dt.getDay())) {
+      const dt = new Date(dtOriginal);
+      dt.setUTCHours(hh, mm, 0, 0);
+      if (opts.days.length > 0 && !opts.days.includes(dt.getUTCDay())) {
         for (let i = 1; i <= 7; i++) {
-          const d = new Date(dt); d.setDate(d.getDate() + i);
-          if (opts.days.includes(d.getDay())) { dt.setDate(dt.getDate() + i); break; }
+          const d = new Date(dt); d.setUTCDate(d.getUTCDate() + i);
+          if (opts.days.includes(d.getUTCDay())) { dt.setUTCDate(dt.getUTCDate() + i); break; }
         }
       }
-      patch.date_time = dt.toISOString();
+      patch.date_time = academyISO(dt.toISOString().slice(0, 16));
       // Only flip the status when the date/time actually moved — mirrors
       // the single-session edit's `dateChanged` check above. Before an
       // earlier fix, applyBulk() marked EVERY affected session as
@@ -590,14 +590,17 @@ function StudentSessionsModal({
       // student's slot permanently moving to a new day) instead of
       // "Rescheduled", which reads as a one-off — same choice already
       // available on the single-session edit above.
-      const dateChanged = patch.date_time !== s.date_time;
+      const dateChanged = +new Date(patch.date_time) !== +new Date(s.date_time);
       if (dateChanged && (s.status === "scheduled" || s.status === "rescheduled" || s.status === "ready" || s.status === "rearranged")) {
         patch.status = opts.permanent ? "scheduled" : "rescheduled";
       }
-      if(await onSave(s.id, patch)) touched++;
+      updates.push({ session: s, patch });
     }
+    if (!await updateSessionsBulk(updates)) return false;
+    setStudentVideoLink(studentId, opts.teamsLink);
     setBulkOpen(false);
-    notifySuccess(`${touched} session${touched === 1 ? "" : "s"} updated.`);
+    notifySuccess(`${updates.length} session${updates.length === 1 ? "" : "s"} updated. Schedule changes are sent in one summary per recipient.`);
+    return true;
   };
 
   return (
@@ -882,7 +885,7 @@ function BulkEditForm({
   onApply: (opts: {
     teamsLink: string; teacherId: string; time: string; days: number[];
     sourceDays: number[]; permanent: boolean;
-  }) => void;
+  }) => Promise<boolean>;
 }) {
   const [teamsLink, setTeamsLink] = useState(currentTeamsLink);
   const [teacherId, setTeacherId] = useState(currentTeacherId);
@@ -894,6 +897,7 @@ function BulkEditForm({
   // matching the original (unfiltered) behavior.
   const [sourceDays, setSourceDays] = useState<number[]>([]);
   const [permanent, setPermanent] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   const toggleDay = (d: number) =>
     setDays((prev) => (prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d]));
@@ -903,6 +907,7 @@ function BulkEditForm({
   return (
     <div className="mb-5 rounded-xl border p-5" style={{ borderColor: BRAND, backgroundColor: "#f5f8fa" }}>
       <SectionBanner icon={Pencil} label="Bulk Edit · Future sessions only" color="#f38934" />
+      <p className="mb-4 text-xs text-muted-foreground">Schedule changes are sent in one summary per person, including all their affected sessions.</p>
 
       <div className="grid gap-4 md:grid-cols-2">
         <Field label="MS Teams Link (applied to all future sessions)">
@@ -994,13 +999,19 @@ function BulkEditForm({
       </label>
 
       <div className="mt-5 flex justify-end gap-2">
-        <GhostButton onClick={onCancel} className="!px-4 !py-2 text-xs">Cancel</GhostButton>
+        <GhostButton onClick={() => { if (!saving) onCancel(); }} className="!px-4 !py-2 text-xs">Cancel</GhostButton>
         <button
-          onClick={() => onApply({ teamsLink, teacherId, time, days, sourceDays, permanent })}
+          disabled={saving}
+          onClick={async () => {
+            if (saving) return;
+            setSaving(true);
+            try { await onApply({ teamsLink, teacherId, time, days, sourceDays, permanent }); }
+            finally { setSaving(false); }
+          }}
           className="inline-flex cursor-pointer items-center gap-2 rounded-lg px-4 py-2 text-xs font-medium text-white shadow-soft transition-opacity hover:opacity-90"
           style={{ backgroundColor: "#5fca16" }}
         >
-          Apply Bulk Changes
+          {saving ? "Saving…" : "Apply Bulk Changes"}
         </button>
       </div>
     </div>

@@ -1,5 +1,6 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { handleSessionNotification } from "../notify-session-event/handler.ts";
+import { handleAdminScheduleSummary } from "../notify-session-event/schedule-summary.ts";
 
 Deno.serve(async req => {
   if (req.method!=="POST") return new Response("Method not allowed",{status:405});
@@ -11,10 +12,11 @@ Deno.serve(async req => {
   if (error || !job) return new Response("Unauthorized or already processed",{status:401});
   let ok=false; let errorCode="worker_error";
   try {
-    const response=await handleSessionNotification(req,job);
+    const response=job.kind === "admin_schedule_summary" ? await handleAdminScheduleSummary(job) : await handleSessionNotification(req,job);
     const result=await response.json();
     ok=response.ok && result.ok===true;
-    errorCode=ok ? "" : JSON.stringify(Object.fromEntries(Object.entries(result.results ?? {}).map(([key,value]:[string,any])=>[key,{ok:value.ok,code:value.code,status:value.status}])));
+    const quota = Object.values(result.results ?? {}).find((value:any)=>value.code === "daily_quota_exceeded" || value.code === "monthly_quota_exceeded") as any;
+    errorCode=ok ? "" : (quota?.code ?? "") + JSON.stringify(Object.fromEntries(Object.entries(result.results ?? {}).map(([key,value]:[string,any])=>[key,{ok:value.ok,code:value.code,status:value.status}])));
   } catch { errorCode="delivery_exception"; }
   const {error:finishError}=await admin.rpc("finish_session_email_job",{p_id:body.id,p_ok:ok,p_error:errorCode || null});
   if (finishError) return new Response("Job result not saved",{status:503});
