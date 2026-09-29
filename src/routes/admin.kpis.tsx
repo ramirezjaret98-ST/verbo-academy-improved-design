@@ -3,7 +3,8 @@ import { useEffect, useMemo, useState } from "react";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
-import { USERS, SESSIONS, type User, type Session } from "@/lib/mock-data";
+import { USERS, type User } from "@/lib/mock-data";
+import { loadSessions, subscribeSessions, updateSession } from "@/lib/sessions-store";
 import { avgRating, pendingReviews, hydrateTeachers, subscribeTeachers } from "@/lib/teacher-model";
 import {
   computeTeacherKpis, ratingBand, ratingHistory,
@@ -37,16 +38,10 @@ export const Route = createFileRoute("/admin/kpis")({
 // KPIs reflect edits made there).
 const PROFILE_KEY = "verbo:teacher-profile-overrides";
 const REGISTERED_KEY = "verbo:registered-teachers";
-const REVIEW_KEY = "verbo:session-review-overrides";
 
 function read<T>(key: string, fallback: T): T {
   if (typeof window === "undefined") return fallback;
   try { return JSON.parse(localStorage.getItem(key) || "null") ?? fallback; } catch { return fallback; }
-}
-
-function write(key: string, val: unknown) {
-  if (typeof window === "undefined") return;
-  try { localStorage.setItem(key, JSON.stringify(val)); } catch { /* noop */ }
 }
 
 /** Solid pill colors per teacher tier (visual only). */
@@ -80,23 +75,11 @@ function Page() {
   >(null);
   const [reviewTarget, setReviewTarget] = useState<User | null>(null);
 
-  const markReviewed = (sessionId: string, note: string) => {
-    const s = SESSIONS.find((x) => x.id === sessionId);
-    if (s) { s.review_status = "reviewed"; s.review_note = note; }
-    const reviews = read<Record<string, Partial<Session>>>(REVIEW_KEY, {});
-    reviews[sessionId] = { review_status: "reviewed", review_note: note };
-    write(REVIEW_KEY, reviews);
-    forceTick((n) => n + 1);
-  };
+  const markReviewed = (sessionId: string, note: string) =>
+    updateSession(sessionId, { review_status: "reviewed", review_note: note });
 
-  const discardReview = (sessionId: string, note: string) => {
-    const s = SESSIONS.find((x) => x.id === sessionId);
-    if (s) { s.review_status = "discarded"; s.review_note = note; }
-    const reviews = read<Record<string, Partial<Session>>>(REVIEW_KEY, {});
-    reviews[sessionId] = { review_status: "discarded", review_note: note };
-    write(REVIEW_KEY, reviews);
-    forceTick((n) => n + 1);
-  };
+  const discardReview = (sessionId: string, note: string) =>
+    updateSession(sessionId, { review_status: "discarded", review_note: note });
 
 
   useEffect(() => {
@@ -107,14 +90,15 @@ function Page() {
     read<User[]>(REGISTERED_KEY, []).forEach((u) => {
       if (!USERS.find((x) => x.id === u.id)) USERS.push(u);
     });
-    const reviews = read<Record<string, Partial<Session>>>(REVIEW_KEY, {});
-    SESSIONS.forEach((s) => { if (reviews[s.id]) Object.assign(s, reviews[s.id]); });
+    loadSessions();
     setThreshold(getBonusThreshold());
     forceTick((n) => n + 1);
     // 2026-08-26 fix: without this, a demo teacher hidden/deleted elsewhere
     // (or a real profile updated in the background) never disappeared from
     // this page's KPI table until a hard reload.
-    return subscribeTeachers(() => forceTick((n) => n + 1));
+    const unsubT = subscribeTeachers(() => forceTick((n) => n + 1));
+    const unsubS = subscribeSessions(() => forceTick((n) => n + 1));
+    return () => { unsubT(); unsubS(); };
   }, []);
 
   // Deep-link from the Admin Overview snapshot — open the rating chart.
@@ -208,7 +192,7 @@ function Page() {
         {(
           [
             { label: "Avg rating", hint: "all teachers", value: `${overallAvg}★`, icon: Star, color: scoreScaleColor((Number(overallAvg) / 5) * 100), dynamic: true },
-            { label: "Sessions tracked", hint: "lifetime", value: SESSIONS.length, icon: CalendarClock, color: "#3ebbad" },
+            { label: "Sessions tracked", hint: "lifetime", value: loadSessions().length, icon: CalendarClock, color: "#3ebbad" },
             { label: "Teachers", hint: "active roster", value: teachers.length, icon: GraduationCap, color: "#7e22ce" },
             { label: "Avg composite", hint: "across roster", value: avgComposite, suffix: "%", icon: TrendingUp, color: scoreScaleColor(Number(avgComposite)), dynamic: true },
           ] as { label: string; hint: string; value: number | string; icon: LucideIcon; color: string; suffix?: string; dynamic?: boolean }[]
@@ -654,8 +638,8 @@ function PendingReviewsModal({
 }: {
   teacher: User;
   canDiscard: boolean;
-  onMarkReviewed: (id: string, note: string) => void;
-  onDiscardReview: (id: string, note: string) => void;
+  onMarkReviewed: (id: string, note: string) => Promise<boolean>;
+  onDiscardReview: (id: string, note: string) => Promise<boolean>;
   onClose: () => void;
 }) {
   const sessions = pendingReviews(teacher.id);

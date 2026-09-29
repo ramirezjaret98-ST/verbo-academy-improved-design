@@ -11,6 +11,7 @@ import type { Database } from "@/integrations/supabase/types";
 import { legacyToUuid } from "@/lib/user-id-bridge";
 import { notifyError } from "@/lib/notify";
 import { withTimeout } from "@/lib/net-utils";
+import { loadSessions, type ExtSession } from "./sessions-store";
 
 export const DEFAULT_HOURLY_RATE = 120; // MXN / hour
 export const AVAILABILITY_CHANGE_DAYS = 30; // teacher may request a change once per N days
@@ -132,8 +133,8 @@ export function teachersForProductSorted(
 // ----------------------------------------------------------------------------
 // KPI helpers
 // ----------------------------------------------------------------------------
-export function ratedSessions(teacherId: string): Session[] {
-  return SESSIONS.filter(
+export function ratedSessions(teacherId: string): ExtSession[] {
+  return loadSessions().filter(
     (s) =>
       s.teacher_id === teacherId &&
       typeof s.student_rating === "number" &&
@@ -150,13 +151,13 @@ export function avgRating(t: User): number | null {
   return typeof t.rating === "number" ? t.rating : null;
 }
 
-export function flaggedReviews(teacherId: string): Session[] {
-  return SESSIONS.filter(
+export function flaggedReviews(teacherId: string): ExtSession[] {
+  return loadSessions().filter(
     (s) => s.teacher_id === teacherId && typeof s.student_rating === "number" && (s.student_rating as number) <= 3,
   ).sort((a, b) => +new Date(b.date_time) - +new Date(a.date_time));
 }
 
-export function pendingReviews(teacherId: string): Session[] {
+export function pendingReviews(teacherId: string): ExtSession[] {
   return flaggedReviews(teacherId).filter((s) => {
     const st = s.review_status ?? "pending";
     return st !== "reviewed" && st !== "discarded";

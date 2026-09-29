@@ -12,6 +12,7 @@ import { hydrateStudents, subscribeStudents } from "@/lib/students-store";
 import { nextPaymentDate, daysUntil, MAX_INSIGHT_STRIKES, getProduct } from "@/lib/student-model";
 import { computeTeacherKpis } from "@/lib/teacher-kpis";
 import { pendingReviews, hydrateTeachers, subscribeTeachers } from "@/lib/teacher-model";
+import { loadSessions, subscribeSessions } from "@/lib/sessions-store";
 import { monthlySnapshot } from "@/lib/teacher-kpi-history-store";
 import { subscribeClubs } from "@/lib/clubs-store";
 import { listChangeRequests } from "@/lib/availability-store";
@@ -67,7 +68,6 @@ function countdownLabel(ms: number): string {
 // Persistence keys — hydrate teacher overrides the same way KPIs/Teachers do.
 const T_PROFILE_KEY = "verbo:teacher-profile-overrides";
 const T_REGISTERED_KEY = "verbo:registered-teachers";
-const T_REVIEW_KEY = "verbo:session-review-overrides";
 function readLS<T>(key: string, fallback: T): T {
   if (typeof window === "undefined") return fallback;
   try { return JSON.parse(localStorage.getItem(key) || "null") ?? fallback; } catch { return fallback; }
@@ -99,8 +99,7 @@ function Overview() {
     readLS<User[]>(T_REGISTERED_KEY, []).forEach((u) => {
       if (!USERS.find((x) => x.id === u.id)) USERS.push(u);
     });
-    const reviews = readLS<Record<string, Partial<Session>>>(T_REVIEW_KEY, {});
-    SESSIONS.forEach((s) => { if (reviews[s.id]) Object.assign(s, reviews[s.id]); });
+    loadSessions();
     forceTick((n) => n + 1);
     // 2026-08-26 fix: this dashboard is usually the very first page an admin
     // sees on a new device/browser, and it only ever rendered USERS once at
@@ -113,7 +112,8 @@ function Overview() {
     const unsubClubs = subscribeClubs(() => forceTick((n) => n + 1));
     const unsubStudents = subscribeStudents(() => forceTick((n) => n + 1));
     const unsubTeachers = subscribeTeachers(() => forceTick((n) => n + 1));
-    return () => { unsubClubs(); unsubStudents(); unsubTeachers(); };
+    const unsubSessions = subscribeSessions(() => forceTick((n) => n + 1));
+    return () => { unsubClubs(); unsubStudents(); unsubTeachers(); unsubSessions(); };
   }, []);
 
   const students = USERS.filter((u) => u.role === "student");
