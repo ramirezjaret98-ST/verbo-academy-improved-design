@@ -35,6 +35,20 @@ test('Student cancellation reports persistence failure and cannot dispatch an em
  assert.equal(await api.studentSetSessionStatus('1','cancelled'),false);assert.equal(context.sessionsCache[0].status,'scheduled');assert.equal(notify,0);
  context.supabase.rpc=async()=>({error:null});assert.equal(await api.studentSetSessionStatus('1','cancelled'),true);assert.equal(notify,1);
 });
+test('Admin review writes only review fields and restores the prior session when persistence fails',async()=>{
+ let failure=false, savedPatch; const original={id:'7',status:'completed',student_rating:2,review_status:'pending'};
+ const context={console,Number,Error,sessionsCache:[original],notify:()=>{},notifyError:()=>{},refreshSessions:async()=>{},
+  mapSessionRow:row=>row,setSessionEntry:(id,row)=>{context.sessionsCache=context.sessionsCache.map(s=>s.id===id?row:s)},
+  supabase:{from:table=>{assert.equal(table,'sessions');return {update:patch=>{savedPatch=patch;return {eq:()=>({select:()=>({single:async()=>failure?{data:null,error:new Error('denied')}:{data:{...original,...patch},error:null}})})}}}}}
+ };
+ const api=compile(functions('src/lib/sessions-store.ts',['updateSession']),context);
+ assert.equal(await api.updateSession('7',{review_status:'reviewed',review_note:'Followed up'}),true);
+ assert.deepEqual(JSON.parse(JSON.stringify(savedPatch)),{review_status:'reviewed',review_note:'Followed up'});
+ assert.equal(context.sessionsCache[0].review_status,'reviewed');
+ failure=true;
+ assert.equal(await api.updateSession('7',{review_status:'discarded',review_note:'Duplicate'}),false);
+ assert.equal(context.sessionsCache[0].review_status,'reviewed');
+});
 test('Email worker rejects malformed or invalid capabilities before processing, and saves partial failure for retry',async()=>{
  let handler,claim=null,processed=0;const calls=[];
  compile(source('supabase/functions/session-email-worker/index.ts'),{console,Response,Deno:{env:{get:()=>''},serve:fn=>{handler=fn}},require:name=>name.includes('handler')?{handleSessionNotification:async()=>{processed++;return Response.json({ok:false,results:{teacher:{ok:false,status:429}}})}}:{createClient:()=>({rpc:async(name,args)=>{calls.push({name,args});return {data:name==='claim_session_email_job'?claim:null,error:null}}})}});

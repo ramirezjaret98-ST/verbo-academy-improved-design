@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { USERS, SESSIONS, userById, type User, type Session } from "@/lib/mock-data";
+import { USERS, userById, type User } from "@/lib/mock-data";
+import { loadSessions, subscribeSessions, updateSession, type ExtSession } from "@/lib/sessions-store";
 import { hydrateAssignments, removeAssignment, setAssignment, subscribeAssignments, allAssignments } from "@/lib/assignments-store";
 import { getProduct } from "@/lib/student-model";
 import { hydrateStudents, subscribeStudents } from "@/lib/students-store";
@@ -60,7 +61,6 @@ export const Route = createFileRoute("/admin/teachers")({
 // ---------------------------------------------------------------------------
 const PROFILE_KEY = "verbo:teacher-profile-overrides";
 const REGISTERED_KEY = "verbo:registered-teachers";
-const REVIEW_KEY = "verbo:session-review-overrides";
 
 function read<T>(key: string, fallback: T): T {
   if (typeof window === "undefined") return fallback;
@@ -99,8 +99,7 @@ function Page() {
     read<User[]>(REGISTERED_KEY, []).forEach((u) => {
       if (!USERS.find((x) => x.id === u.id)) USERS.push(u);
     });
-    const reviews = read<Record<string, Partial<Session>>>(REVIEW_KEY, {});
-    SESSIONS.forEach((s) => { if (reviews[s.id]) Object.assign(s, reviews[s.id]); });
+    loadSessions();
     hydrateTeachers();
     hydrateAssignments();
     forceTick((n) => n + 1);
@@ -115,7 +114,8 @@ function Page() {
     // already exports subscribeTeachers() for exactly this; it just wasn't
     // wired up here.
     const unsubT = subscribeTeachers(() => forceTick((n) => n + 1));
-    return () => { unsub(); unsubA(); unsubT(); };
+    const unsubS = subscribeSessions(() => forceTick((n) => n + 1));
+    return () => { unsub(); unsubA(); unsubT(); unsubS(); };
   }, []);
 
   // Deep-link from the Admin Overview snapshot (open a teacher profile).
@@ -181,23 +181,11 @@ function Page() {
     return result;
   };
 
-  const markReviewed = (sessionId: string, note: string) => {
-    const s = SESSIONS.find((x) => x.id === sessionId);
-    if (s) { s.review_status = "reviewed"; s.review_note = note; }
-    const reviews = read<Record<string, Partial<Session>>>(REVIEW_KEY, {});
-    reviews[sessionId] = { review_status: "reviewed", review_note: note };
-    write(REVIEW_KEY, reviews);
-    forceTick((n) => n + 1);
-  };
+  const markReviewed = (sessionId: string, note: string) =>
+    updateSession(sessionId, { review_status: "reviewed", review_note: note });
 
-  const discardReview = (sessionId: string, note: string) => {
-    const s = SESSIONS.find((x) => x.id === sessionId);
-    if (s) { s.review_status = "discarded"; s.review_note = note; }
-    const reviews = read<Record<string, Partial<Session>>>(REVIEW_KEY, {});
-    reviews[sessionId] = { review_status: "discarded", review_note: note };
-    write(REVIEW_KEY, reviews);
-    forceTick((n) => n + 1);
-  };
+  const discardReview = (sessionId: string, note: string) =>
+    updateSession(sessionId, { review_status: "discarded", review_note: note });
 
   // 2026-08-29: rewritten to create the REAL Supabase Auth account FIRST
   // (awaited) and only write the optimistic USERS/localStorage bookkeeping
@@ -469,8 +457,8 @@ function TeacherDetailModal({
   onClose: () => void;
   onPersist: (u: User) => void;
   onReassign: (studentId: string, teacherId: string) => void;
-  onMarkReviewed: (sessionId: string, note: string) => void;
-  onDiscardReview: (sessionId: string, note: string) => void;
+  onMarkReviewed: (sessionId: string, note: string) => Promise<boolean>;
+  onDiscardReview: (sessionId: string, note: string) => Promise<boolean>;
   canDiscard: boolean;
   onDelete: (u: User) => Promise<{ ok: boolean; error?: string }>;
   onEdit: () => void;
@@ -1232,9 +1220,9 @@ function AddAdjustmentModal({ onClose, onSave }: { onClose: () => void; onSave: 
 export function FlaggedRow({
   session: s, onMarkReviewed, onDiscardReview, canDiscard,
 }: {
-  session: Session;
-  onMarkReviewed: (id: string, note: string) => void;
-  onDiscardReview: (id: string, note: string) => void;
+  session: ExtSession;
+  onMarkReviewed: (id: string, note: string) => Promise<boolean>;
+  onDiscardReview: (id: string, note: string) => Promise<boolean>;
   canDiscard: boolean;
 }) {
   const status = s.review_status ?? "pending";
@@ -1243,6 +1231,7 @@ export function FlaggedRow({
   const resolved = reviewed || discarded;
   const [mode, setMode] = useState<null | "review" | "discard">(null);
   const [note, setNote] = useState("");
+  const [saving, setSaving] = useState(false);
   const student = userById(s.student_id);
 
   const rowCls = resolved
@@ -1254,12 +1243,15 @@ export function FlaggedRow({
       ? <Pill tone="muted">Discarded</Pill>
       : <Pill tone="danger">Pending Review</Pill>;
 
-  const submit = () => {
-    if (!note.trim()) return;
-    if (mode === "review") onMarkReviewed(s.id, note.trim());
-    else if (mode === "discard") onDiscardReview(s.id, note.trim());
-    setMode(null);
-    setNote("");
+  const submit = async () => {
+    if (!note.trim() || saving) return;
+    setSaving(true);
+    try {
+      const saved = mode === "review"
+        ? await onMarkReviewed(s.id, note.trim())
+        : mode === "discard" && await onDiscardReview(s.id, note.trim());
+      if (saved) { setMode(null); setNote(""); }
+    } finally { setSaving(false); }
   };
 
   return (
@@ -1296,7 +1288,7 @@ export function FlaggedRow({
             />
             <div className="flex justify-end gap-2">
               <GhostBtn onClick={() => { setMode(null); setNote(""); }}>Cancel</GhostBtn>
-              <PrimaryBtn onClick={submit} disabled={!note.trim()}>
+              <PrimaryBtn onClick={submit} disabled={!note.trim() || saving}>
                 {mode === "discard" ? "Confirm discard" : "Confirm reviewed"}
               </PrimaryBtn>
             </div>
