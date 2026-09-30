@@ -11,6 +11,7 @@ import {
 } from "@/lib/clubs-store";
 import { notifySuccess, notifyError } from "@/lib/notify";
 import { InsightsDashboard } from "@/components/verbo/InsightsDashboard";
+import { ClubReservationModal } from "@/components/verbo/ClubReservationModal";
 import { CalendarView as StudentCalendarView } from "@/components/verbo/CalendarView";
 import type { CalendarEvent } from "@/lib/calendar-events";
 import {
@@ -90,6 +91,7 @@ function Page() {
   const [editing, setEditing] = useState<Club | null>(null);
   const [view, setView] = useState<ViewMode>("list");
   const [studentPreview, setStudentPreview] = useState<"home" | "calendar" | null>(null);
+  const [previewClub, setPreviewClub] = useState<Club | null>(null);
 
   useEffect(() => {
     setClubs(loadClubs());
@@ -135,8 +137,9 @@ function Page() {
   if (studentPreview) {
     const events: CalendarEvent[] = clubs.filter((c) => c.type === "insight" && c.status !== "cancelled").map((c) => ({ id: c.id, kind: "insight", date: c.date, duration_minutes: c.duration_minutes, title: c.title, subtitle: "Insight", status: c.status, spots_taken: c.spots_taken, spots_total: c.spots_total, club: c }));
     return <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-orange-200 bg-orange-50 px-5 py-3"><div><strong className="text-sm text-foreground">Insights student preview</strong><p className="text-xs text-muted-foreground">Live Academy content; quota, reservations and actions are disabled.</p></div><GhostButton onClick={() => setStudentPreview(null)}>Back to Manage Clubs</GhostButton></div>
-      {studentPreview === "home" ? <InsightsDashboard name="student" preview onExplore={() => setStudentPreview("calendar")} /> : <div className="space-y-4"><div className="flex items-center justify-between"><div><h1 className="text-2xl font-semibold">Explore Insights</h1><p className="text-sm text-muted-foreground">Read-only calendar preview.</p></div><GhostButton onClick={() => setStudentPreview("home")}>Dashboard</GhostButton></div><Card><StudentCalendarView events={events} availableKinds={["insight"]} onEventClick={() => {}} /></Card></div>}
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-orange-200 bg-orange-50 px-5 py-3"><div><strong className="text-sm text-foreground">Insights student preview</strong><p className="text-xs text-muted-foreground">Live Academy content; quota, reservations and actions are disabled.</p></div><GhostButton onClick={() => { setPreviewClub(null); setStudentPreview(null); }}>Back to Manage Clubs</GhostButton></div>
+      {studentPreview === "home" ? <InsightsDashboard name="student" preview onExplore={() => setStudentPreview("calendar")} /> : <div className="space-y-4"><div className="flex items-center justify-between"><div><h1 className="text-2xl font-semibold">Explore Insights</h1><p className="text-sm text-muted-foreground">Read-only calendar preview.</p></div><GhostButton onClick={() => { setPreviewClub(null); setStudentPreview("home"); }}>Dashboard</GhostButton></div><Card><StudentCalendarView events={events} availableKinds={["insight"]} onEventClick={(event) => { if (event.club) setPreviewClub(event.club); }} /></Card></div>}
+      {previewClub && <ClubReservationModal club={previewClub} studentId="" preview onClose={() => setPreviewClub(null)} />}
     </div>;
   }
 
