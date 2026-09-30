@@ -10,7 +10,7 @@ import {
   teacherStatus, qualifiedProducts, assignedStudents, activeStudents,
   teachersForProduct, avgRating, flaggedReviews, pendingReviews,
   PAYMENT_FREQUENCIES, paymentFrequency, defaultPaymentRecords, financialSummary,
-  patchTeacherProfile, hydrateTeachers, subscribeTeachers,
+  patchTeacherProfile, hydrateTeachers, subscribeTeachers, saveTeacherFinancial, isTeacherFinanceHydrated,
   fetchSessionsForPayReview, setSessionExcludedFromPay,
   type QualifiedProduct, type TeacherStatus, type PaymentFrequency, type PayReviewSession,
 } from "@/lib/teacher-model";
@@ -147,15 +147,37 @@ function Page() {
   }, [teachers, q, fProduct, fStatus, sortBy]);
 
   // Mutations
-  const persist = (updated: User) => {
+  const persist = async (updated: User): Promise<boolean> => {
+    const previous = USERS.find((u) => u.id === updated.id);
+    const adjustmentsChanged = JSON.stringify(previous?.adjustments ?? []) !== JSON.stringify(updated.adjustments ?? []);
+    const paymentsChanged = JSON.stringify(previous?.payment_records ?? []) !== JSON.stringify(updated.payment_records ?? []);
+    const resetHours = paymentsChanged && updated.hours_cycle === 0 && updated.hours_month === 0
+      && (previous?.hours_cycle !== 0 || previous?.hours_month !== 0);
+    if (adjustmentsChanged || paymentsChanged || resetHours) {
+      const saved = await saveTeacherFinancial(updated.id, {
+        ...(adjustmentsChanged || resetHours ? { adjustments: updated.adjustments ?? [] } : {}),
+        ...(paymentsChanged || resetHours ? { payment_records: updated.payment_records ?? [] } : {}),
+        resetHours,
+        expectedAdjustments: previous?.adjustments ?? [],
+        expectedPayments: previous?.payment_records ?? [],
+      });
+      if (!saved) return false;
+      const savedTeacher = USERS.find((u) => u.id === updated.id);
+      updated = { ...updated, adjustments: savedTeacher?.adjustments, payment_records: savedTeacher?.payment_records };
+    }
     const idx = USERS.findIndex((u) => u.id === updated.id);
     if (idx >= 0) USERS[idx] = updated; else USERS.push(updated);
     const reg = read<User[]>(REGISTERED_KEY, []);
     const ri = reg.findIndex((u) => u.id === updated.id);
-    if (ri >= 0) { reg[ri] = updated; write(REGISTERED_KEY, reg); }
+    if (ri >= 0) {
+      const { adjustments, payment_records, availability, ...profile } = updated;
+      reg[ri] = profile as User;
+      write(REGISTERED_KEY, reg);
+    }
     const { id, role, ...rest } = updated;
     patchTeacherProfile(updated.id, rest as Partial<User>);
     forceTick((n) => n + 1);
+    return true;
   };
 
   const reassignStudent = (studentId: string, teacherId: string) => {
@@ -218,8 +240,8 @@ function Page() {
     notifySuccess(`${u.name} created successfully.`);
   };
 
-  const updateTeacher = (u: User) => {
-    persist(u);
+  const updateTeacher = async (u: User) => {
+    if (!await persist(u)) throw new Error("Could not save teacher payment data");
     setFormFor(null);
     notifySuccess(`${u.name} updated.`);
   };
@@ -455,7 +477,7 @@ function TeacherDetailModal({
   teacher: User;
   teachers: User[];
   onClose: () => void;
-  onPersist: (u: User) => void;
+  onPersist: (u: User) => Promise<boolean>;
   onReassign: (studentId: string, teacherId: string) => void;
   onMarkReviewed: (sessionId: string, note: string) => Promise<boolean>;
   onDiscardReview: (sessionId: string, note: string) => Promise<boolean>;
@@ -478,6 +500,8 @@ function TeacherDetailModal({
   const [products, setProducts] = useState<QualifiedProduct[]>(qualifiedProducts(t));
   const [notes, setNotes] = useState(t.admin_notes ?? "");
   const [addAdjOpen, setAddAdjOpen] = useState(false);
+  const [, availabilityTick] = useState(0);
+  useEffect(() => subscribeAvailability(() => availabilityTick((n) => n + 1)), []);
 
   // KPI manual override (super_admin / coordinator_ops only)
   const { user: adminUser } = useAuth();
@@ -528,6 +552,8 @@ function TeacherDetailModal({
   };
 
   const flowReady = flow ? actives.every((s) => reassignMap[s.id]) : false;
+  const weeklyAvailability = getAvailability(t.id).weekly;
+  const declaredDays = DAY_KEYS.filter((day) => weeklyAvailability[day].length > 0);
 
   const confirmFlow = () => {
     if (!flow || !flowReady) return;
@@ -739,13 +765,16 @@ function TeacherDetailModal({
               {adminType === "super_admin" && <ExternalTeacherBlocks teacherId={t.id} />}
               <div>
                 <div className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Declared availability</div>
-                {(t.availability && t.availability.length > 0) ? (
+                {declaredDays.length > 0 ? (
                   <div className="space-y-2">
-                    {t.availability.map((a) => (
-                      <div key={a.day} className="flex items-center justify-between rounded-lg border border-border bg-background px-3 py-2.5">
-                        <span className="text-sm font-medium text-foreground">{a.day}</span>
+                    {declaredDays.map((day) => (
+                      <div key={day} className="flex items-center justify-between rounded-lg border border-border bg-background px-3 py-2.5">
+                        <span className="text-sm font-medium text-foreground">{DAY_LABELS[day]}</span>
                         <div className="flex flex-wrap justify-end gap-1.5">
-                          {a.slots.map((sl) => <Tag key={sl} className="bg-secondary text-secondary-foreground">{sl}</Tag>)}
+                          {weeklyAvailability[day].map((block) => {
+                            const slot = `${minutesToTime(block.startMin)}–${minutesToTime(block.endMin)}`;
+                            return <Tag key={slot} className="bg-secondary text-secondary-foreground">{slot}</Tag>;
+                          })}
                         </div>
                       </div>
                     ))}
@@ -890,10 +919,11 @@ function TeacherDetailModal({
       {addAdjOpen && (
         <AddAdjustmentModal
           onClose={() => setAddAdjOpen(false)}
-          onSave={(amount, reason) => {
+          onSave={async (amount, reason) => {
             const adj = { id: `adj-${Date.now()}`, date: new Date().toISOString(), amount, reason };
-            onPersist({ ...t, adjustments: [...(t.adjustments ?? []), adj] });
-            setAddAdjOpen(false);
+            const saved = await onPersist({ ...t, adjustments: [...(t.adjustments ?? []), adj] });
+            if (saved) setAddAdjOpen(false);
+            return saved;
           }}
         />
       )}
@@ -928,8 +958,9 @@ function cycleLabel(base = new Date()) {
   return base.toLocaleDateString("en-US", { month: "long", year: "numeric" });
 }
 
-function FinancialTab({ t, onPersist, onAddAdjustment }: { t: User; onPersist: (u: User) => void; onAddAdjustment: () => void }) {
+function FinancialTab({ t, onPersist, onAddAdjustment }: { t: User; onPersist: (u: User) => Promise<boolean>; onAddAdjustment: () => void }) {
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
   // Payment record pending a "revert to pending" confirmation (only for Paid).
   const [revertId, setRevertId] = useState<string | null>(null);
   const [bonusAmount, setBonusAmount] = useState("");
@@ -941,7 +972,12 @@ function FinancialTab({ t, onPersist, onAddAdjustment }: { t: User; onPersist: (
     : defaultPaymentRecords(paymentFrequency(t));
   const adjustments = t.adjustments ?? [];
 
-  const addBonusAdjustment = () => {
+  if (!isTeacherFinanceHydrated()) {
+    return <div className="space-y-3 text-sm text-muted-foreground">Teacher payment data is loading. <button className="underline" onClick={() => hydrateTeachers()}>Retry</button></div>;
+  }
+
+  const addBonusAdjustment = async () => {
+    if (saving) return;
     const amount = Number(bonusAmount);
     if (!Number.isFinite(amount) || amount <= 0) return;
     const adj = {
@@ -950,35 +986,40 @@ function FinancialTab({ t, onPersist, onAddAdjustment }: { t: User; onPersist: (
       amount,
       reason: "KPI compliance bonus",
     };
-    onPersist({ ...t, adjustments: [...(t.adjustments ?? []), adj] });
-    setBonusAmount("");
+    setSaving(true);
+    const saved = await onPersist({ ...t, adjustments: [...(t.adjustments ?? []), adj] });
+    setSaving(false);
+    if (saved) setBonusAmount("");
   };
 
-  const ensureRecords = () => {
-    if (!t.payment_records || t.payment_records.length === 0) {
-      onPersist({ ...t, payment_records: records });
-    }
-  };
-
-  const updateRecord = (id: string, patch: Partial<{ date: string; status: "pending" | "paid" }>) => {
+  const updateRecord = async (id: string, patch: Partial<{ date: string; status: "pending" | "paid" }>) => {
+    if (saving) return false;
     const next = records.map((r) => (r.id === id ? { ...r, ...patch } : r));
-    onPersist({ ...t, payment_records: next });
+    setSaving(true);
+    const saved = await onPersist({ ...t, payment_records: next });
+    setSaving(false);
+    return saved;
   };
 
   // Close a cycle: mark the next pending payment date as paid, reset worked
   // hours and clear manual adjustments to start a fresh cycle.
-  const closeCycle = () => {
+  const closeCycle = async () => {
     const idx = records.findIndex((r) => r.status !== "paid");
     const nextRecords = idx >= 0
       ? records.map((r, i) => (i === idx ? { ...r, status: "paid" as const } : r))
       : records;
-    onPersist({ ...t, payment_records: nextRecords, hours_cycle: 0, hours_month: 0, adjustments: [] });
+    return onPersist({ ...t, payment_records: nextRecords, hours_cycle: 0, hours_month: 0, adjustments: [] });
   };
 
   const confirmGenerate = async () => {
-    await generatePDF();
-    closeCycle();
-    setConfirmOpen(false);
+    if (saving) return;
+    setSaving(true);
+    try {
+      await generatePDF();
+      if (await closeCycle()) setConfirmOpen(false);
+    } catch (error) {
+      notifyError(error, { context: "Generating teacher payment report" });
+    } finally { setSaving(false); }
   };
 
 
@@ -1031,7 +1072,7 @@ function FinancialTab({ t, onPersist, onAddAdjustment }: { t: User; onPersist: (
             </div>
             <button
               onClick={addBonusAdjustment}
-              disabled={!(Number(bonusAmount) > 0)}
+              disabled={saving || !(Number(bonusAmount) > 0)}
               className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-success px-3 py-2 text-xs font-semibold text-success-foreground shadow-sm transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
             >
               <Plus className="h-3.5 w-3.5" /> Add as Adjustment
@@ -1064,7 +1105,8 @@ function FinancialTab({ t, onPersist, onAddAdjustment }: { t: User; onPersist: (
               <input
                 type="date"
                 value={r.date.slice(0, 10)}
-                onChange={(e) => { ensureRecords(); updateRecord(r.id, { date: e.target.value }); }}
+                onChange={(e) => { void updateRecord(r.id, { date: e.target.value }); }}
+                disabled={saving}
                 className="rounded-lg border border-input bg-background px-2.5 py-1.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
               />
               <span
@@ -1142,7 +1184,8 @@ function FinancialTab({ t, onPersist, onAddAdjustment }: { t: User; onPersist: (
             <div className="mt-5 flex items-center justify-end gap-2">
               <GhostBtn onClick={() => setRevertId(null)}>Cancel</GhostBtn>
               <button
-                onClick={() => { ensureRecords(); updateRecord(revertId, { status: "pending" }); setRevertId(null); }}
+                onClick={async () => { if (await updateRecord(revertId, { status: "pending" })) setRevertId(null); }}
+                disabled={saving}
                 className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-amber-600 px-4 py-1.5 text-xs font-semibold text-white shadow-sm transition-opacity hover:opacity-90"
               >
                 Revert to Pending
@@ -1165,6 +1208,7 @@ function FinancialTab({ t, onPersist, onAddAdjustment }: { t: User; onPersist: (
               <GhostBtn onClick={() => setConfirmOpen(false)}>Cancel</GhostBtn>
               <button
                 onClick={confirmGenerate}
+                disabled={saving}
                 className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-accent px-4 py-1.5 text-xs font-semibold text-accent-foreground shadow-sm transition-opacity hover:opacity-90"
               >
                 Confirm
@@ -1180,9 +1224,10 @@ function FinancialTab({ t, onPersist, onAddAdjustment }: { t: User; onPersist: (
 // ===========================================================================
 // ADD ADJUSTMENT MODAL (stacked over teacher detail)
 // ===========================================================================
-function AddAdjustmentModal({ onClose, onSave }: { onClose: () => void; onSave: (amount: number, reason: string) => void }) {
+function AddAdjustmentModal({ onClose, onSave }: { onClose: () => void; onSave: (amount: number, reason: string) => Promise<boolean> }) {
   const [amount, setAmount] = useState("");
   const [reason, setReason] = useState("");
+  const [saving, setSaving] = useState(false);
   const num = Number(amount);
   const valid = amount.trim() !== "" && !Number.isNaN(num) && num !== 0 && reason.trim() !== "";
 
@@ -1210,7 +1255,11 @@ function AddAdjustmentModal({ onClose, onSave }: { onClose: () => void; onSave: 
         </div>
         <div className="flex items-center justify-end gap-2 border-t border-border bg-secondary/30 px-6 py-4">
           <GhostBtn onClick={onClose}>Cancel</GhostBtn>
-          <PrimaryBtn onClick={() => onSave(num, reason.trim())} disabled={!valid}>Save</PrimaryBtn>
+          <PrimaryBtn onClick={async () => {
+            if (saving) return;
+            setSaving(true);
+            try { await onSave(num, reason.trim()); } finally { setSaving(false); }
+          }} disabled={!valid || saving}>Save</PrimaryBtn>
         </div>
       </div>
     </div>

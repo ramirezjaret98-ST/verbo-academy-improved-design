@@ -309,6 +309,24 @@ export async function releaseClub(id: string): Promise<Club | null> {
   return updateClub(id, { teacher_id: undefined, claimed_at: undefined });
 }
 
+/** Approve a release with its financial penalty in one DB transaction. */
+export async function approveClubRelease(requestId: string, penalty: number): Promise<boolean> {
+  const numericId = Number(requestId);
+  if (!Number.isInteger(numericId) || !Number.isFinite(penalty) || penalty < 0) return false;
+  const { error } = await supabase.rpc("admin_approve_club_release", {
+    p_request_id: numericId,
+    p_penalty: penalty,
+  });
+  if (error) {
+    notifyError(error, { context: "Approving club release" });
+    return false;
+  }
+  clubsHydrated = false;
+  requestsHydrated = false;
+  await Promise.all([hydrateClubs(), hydrateRequests()]);
+  return true;
+}
+
 // --- Release requests -------------------------------------------------------
 export function loadReleaseRequests(): ClubReleaseRequest[] {
   if (!requestsHydrated) void hydrateRequests();

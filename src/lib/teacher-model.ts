@@ -7,8 +7,8 @@ import { assignedStudentIdsFor } from "./assignments-store";
 import { PRODUCTS, type ProductId } from "./student-model";
 import { effectiveHourlyRate, teacherTier } from "./teacher-tiers";
 import { supabase } from "@/integrations/supabase/client";
-import type { Database } from "@/integrations/supabase/types";
-import { legacyToUuid } from "@/lib/user-id-bridge";
+import type { Database, Json } from "@/integrations/supabase/types";
+import { legacyToUuid, uuidToLegacySync } from "@/lib/user-id-bridge";
 import { notifyError } from "@/lib/notify";
 import { withTimeout } from "@/lib/net-utils";
 import { loadSessions, type ExtSession } from "./sessions-store";
@@ -172,6 +172,53 @@ export function studentName(id: string): string {
 // Supabase-backed teacher profile store (Lote 11) — mirrors students-store.ts.
 // ----------------------------------------------------------------------------
 export const TEACHERS_EVENT = "verbo:teachers-updated";
+let teacherFinanceHydrated = false;
+export function isTeacherFinanceHydrated(): boolean { return teacherFinanceHydrated; }
+
+/** Save the two financial collections in one authorized DB transaction. */
+export async function saveTeacherFinancial(
+  teacherId: string,
+  changes: {
+    adjustments?: NonNullable<User["adjustments"]>;
+    payment_records?: NonNullable<User["payment_records"]>;
+    resetHours?: boolean;
+    expectedAdjustments?: NonNullable<User["adjustments"]>;
+    expectedPayments?: NonNullable<User["payment_records"]>;
+  },
+): Promise<boolean> {
+  if (!teacherFinanceHydrated) {
+    notifyError("Teacher payment data is still loading. Try again in a moment.");
+    return false;
+  }
+  const uuid = await legacyToUuid(teacherId);
+  if (!uuid) { notifyError("Teacher account is unavailable."); return false; }
+  const { error } = await supabase.rpc("admin_save_teacher_financial", {
+    p_teacher_id: uuid,
+    p_adjustments: changes.adjustments === undefined ? null : changes.adjustments as unknown as Json,
+    p_payment_records: changes.payment_records === undefined ? null : changes.payment_records as unknown as Json,
+    p_reset_hours: changes.resetHours ?? false,
+    p_expected_adjustment_ids: changes.adjustments === undefined ? null : (changes.expectedAdjustments ?? []).map((r) => Number(r.id)).filter(Number.isInteger).sort((a, b) => a - b),
+    p_expected_payment_ids: changes.payment_records === undefined ? null : (changes.expectedPayments ?? []).map((r) => Number(r.id)).filter(Number.isInteger).sort((a, b) => a - b),
+  });
+  if (error) { notifyError(error, { context: "Saving teacher payment data" }); return false; }
+  const [adjustmentsRes, paymentsRes] = await Promise.all([
+    supabase.from("teacher_adjustments").select("*").eq("teacher_id", uuid).order("id"),
+    supabase.from("teacher_payment_records").select("*").eq("teacher_id", uuid).order("id"),
+  ]);
+  if (adjustmentsRes.error || paymentsRes.error) {
+    teacherFinanceHydrated = false;
+    notifyError(adjustmentsRes.error ?? paymentsRes.error, { context: "Refreshing teacher payment data" });
+    return true; // The transaction committed; do not invite a duplicate retry.
+  }
+  const teacher = USERS.find((u) => u.id === teacherId && u.role === "teacher");
+  if (teacher) {
+    teacher.adjustments = (adjustmentsRes.data ?? []).map((row) => ({ id: String(row.id), date: row.date, amount: row.amount, reason: row.reason }));
+    teacher.payment_records = (paymentsRes.data ?? []).map((row) => ({ id: String(row.id), date: row.date, status: row.status }));
+    if (changes.resetHours) { teacher.hours_cycle = 0; teacher.hours_month = 0; }
+    window.dispatchEvent(new CustomEvent(TEACHERS_EVENT));
+  }
+  return true;
+}
 /** Same key admin.teachers.tsx / strikes-store.ts / teacher-tiers.ts already use. */
 const TEACHER_PROFILE_KEY = "verbo:teacher-profile-overrides";
 
@@ -263,7 +310,15 @@ export function patchTeacherProfile(teacherId: string, patch: Partial<User>): vo
   const rest = { ...patch } as Partial<User>;
   delete (rest as Partial<User>).id;
   delete (rest as Partial<User>).role;
+  // These collections are hydrated from their own tables, never from this
+  // legacy browser mirror. Availability is owned by availability-store.
+  delete rest.adjustments;
+  delete rest.payment_records;
+  delete rest.availability;
   overrides[teacherId] = { ...(overrides[teacherId] ?? {}), ...rest };
+  delete overrides[teacherId].adjustments;
+  delete overrides[teacherId].payment_records;
+  delete overrides[teacherId].availability;
   writeTeacherOverrides(overrides);
   window.dispatchEvent(new CustomEvent(TEACHERS_EVENT));
   void (async () => {
@@ -300,23 +355,33 @@ export function patchTeacherProfile(teacherId: string, patch: Partial<User>): vo
  *  same pattern as hydrateStudents(). */
 export function hydrateTeachers(): void {
   if (typeof window === "undefined") return;
+  teacherFinanceHydrated = false;
   // Was imported but never called here (see the same fix in
   // students-store.ts's hydrateStudents()) — the module-load hydrate in
   // mock-data.ts now covers this too, but calling it here prunes
   // immediately off whatever's already cached locally.
   pruneHiddenMockUsers();
   const overrides = readTeacherOverrides();
-  USERS.forEach((u) => { if (u.role === "teacher" && overrides[u.id]) Object.assign(u, overrides[u.id]); });
+  USERS.forEach((u) => {
+    if (u.role !== "teacher" || !overrides[u.id]) return;
+    const safe = { ...overrides[u.id] };
+    delete safe.adjustments;
+    delete safe.payment_records;
+    delete safe.availability;
+    Object.assign(u, safe);
+  });
   void (async () => {
     // Same fix as students-store.ts's hydrateStudents() (2026-09-15): this
     // used to have no timeout and no try/catch, so a hung/failed request
     // died silently mid-flight — TEACHERS_EVENT never fired, and the page
     // stayed on stale/mock teacher data with no error shown anywhere.
     try {
-      const [selectRes, rpcRes] = await withTimeout(
+      const [selectRes, rpcRes, adjustmentsRes, paymentsRes] = await withTimeout(
         Promise.all([
           supabase.from("app_users").select("*"),
           supabase.rpc("teacher_profile_for_peek"),
+          supabase.from("teacher_adjustments").select("*").order("id"),
+          supabase.from("teacher_payment_records").select("*").order("id"),
         ]),
         15000,
         "hydrateTeachers",
@@ -366,6 +431,35 @@ export function hydrateTeachers(): void {
       };
       for (const row of selectRes.data ?? []) applyFullRow(row as unknown as Record<string, unknown>);
       for (const row of rpcRes.data ?? []) applyPeekRow(row as unknown as Record<string, unknown>);
+      if (!selectRes.error && !adjustmentsRes.error && !paymentsRes.error) {
+        const legacyByUuid = new Map((selectRes.data ?? []).map((row) => [row.id, row.legacy_id || row.id]));
+        const adjustments = new Map<string, NonNullable<User["adjustments"]>>();
+        const payments = new Map<string, NonNullable<User["payment_records"]>>();
+        for (const row of adjustmentsRes.data ?? []) {
+          const id = legacyByUuid.get(row.teacher_id) ?? uuidToLegacySync(row.teacher_id);
+          const list = adjustments.get(id) ?? [];
+          list.push({ id: String(row.id), date: row.date, amount: row.amount, reason: row.reason });
+          adjustments.set(id, list);
+        }
+        for (const row of paymentsRes.data ?? []) {
+          const id = legacyByUuid.get(row.teacher_id) ?? uuidToLegacySync(row.teacher_id);
+          const list = payments.get(id) ?? [];
+          list.push({ id: String(row.id), date: row.date, status: row.status });
+          payments.set(id, list);
+        }
+        for (const row of selectRes.data ?? []) {
+          if (row.role !== "teacher") continue;
+          const id = row.legacy_id || row.id;
+          const teacher = USERS.find((u) => u.id === id && u.role === "teacher");
+          if (teacher) {
+            teacher.adjustments = adjustments.get(id) ?? [];
+            teacher.payment_records = payments.get(id) ?? [];
+          }
+        }
+        teacherFinanceHydrated = true;
+      } else {
+        notifyError(selectRes.error ?? adjustmentsRes.error ?? paymentsRes.error, { context: "Loading teacher payment data" });
+      }
       if (!selectRes.error || !rpcRes.error) window.dispatchEvent(new CustomEvent(TEACHERS_EVENT));
     } catch (err) {
       console.error("[teacher-model] failed to load teacher profiles (timed out or network error)", err);
