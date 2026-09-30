@@ -22,6 +22,7 @@ import { authenticatedCatalogCache } from "./catalog-cache-client";
 import { supabase } from "@/integrations/supabase/client";
 import { registerRehydrate } from "@/lib/auth-rehydrate";
 import type { Database } from "@/integrations/supabase/types";
+import { addContentCategory, loadContentCategories, subscribeContentCategories } from "./content-categories-store";
 
 export type ChallengeProductId = "go" | "enterprise" | "international" | "vip";
 
@@ -76,8 +77,6 @@ export const CHALLENGES_PER_DIFFICULTY: Record<DifficultyId, number> = {
 };
 
 export const CHALLENGES_EVENT = "verbo:challenges-updated";
-export const CHALLENGE_CATEGORIES_KEY = "verbo:challenge-categories";
-export const CHALLENGE_CATEGORIES_EVENT = "verbo:challenge-categories-updated";
 
 /* ---------------- Challenges (Supabase) ---------------- */
 
@@ -318,38 +317,20 @@ export function newChallengeId(
   return `${prefix}-C${max + 1}`;
 }
 
-/* ---------------- Categories ----------------
- * Free-text category names used to tag/color-code challenges. There's no
- * dedicated Supabase table for this (categories are just a string on each
- * challenge row) and it's low-stakes single-admin UI convenience, so it
- * intentionally stays on localStorage — same as before this migration. */
+/* ---------------- Categories (Supabase) ---------------- */
 
 export function loadCategories(): string[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = localStorage.getItem(CHALLENGE_CATEGORIES_KEY);
-    if (raw) return JSON.parse(raw) as string[];
-  } catch { /* noop */ }
-  return [];
+  return loadContentCategories("challenge");
 }
 
-export function persistCategories(cats: string[]) {
-  if (typeof window === "undefined") return;
-  try {
-    localStorage.setItem(CHALLENGE_CATEGORIES_KEY, JSON.stringify(cats));
-    window.dispatchEvent(new CustomEvent(CHALLENGE_CATEGORIES_EVENT));
-  } catch { /* noop */ }
+export async function persistCategories(cats: string[]): Promise<string[]> {
+  const current = loadCategories();
+  const next = cats.find((cat) => !current.some((saved) => saved.toLowerCase() === cat.toLowerCase()));
+  return next ? addContentCategory("challenge", next) : current;
 }
 
 export function subscribeCategories(cb: () => void): () => void {
-  if (typeof window === "undefined") return () => {};
-  const onStorage = (e: StorageEvent) => { if (e.key === CHALLENGE_CATEGORIES_KEY) cb(); };
-  window.addEventListener(CHALLENGE_CATEGORIES_EVENT, cb);
-  window.addEventListener("storage", onStorage);
-  return () => {
-    window.removeEventListener(CHALLENGE_CATEGORIES_EVENT, cb);
-    window.removeEventListener("storage", onStorage);
-  };
+  return subscribeContentCategories("challenge", cb);
 }
 
 // Deterministic color per category name so badges stay stable across renders.

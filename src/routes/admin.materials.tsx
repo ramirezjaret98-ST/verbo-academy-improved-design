@@ -209,16 +209,20 @@ function Page() {
     setResourceFile(res.url);
   };
 
-  const commitNewCategory = () => {
+  const commitNewCategory = async () => {
     const trimmed = newCat.trim();
     if (!trimmed) {
       setAddingCat(false);
       return;
     }
-    addCategory(trimmed);
-    setCategory(trimmed);
-    setAddingCat(false);
-    setNewCat("");
+    try {
+      const saved = await addCategory(trimmed);
+      setCategory(saved.find((category) => category.toLowerCase() === trimmed.toLowerCase()) ?? trimmed);
+      setAddingCat(false);
+      setNewCat("");
+    } catch (error) {
+      notifyError(error, { context: "Saving material category" });
+    }
   };
 
   const onCoverFile = async (file?: File | null) => {

@@ -2140,6 +2140,24 @@ export type Database = {
           },
         ]
       }
+      content_categories: {
+        Row: {
+          scope: string
+          name: string
+          created_at: string
+        }
+        Insert: {
+          scope: string
+          name: string
+          created_at?: string
+        }
+        Update: {
+          scope?: string
+          name?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
       materials: {
         Row: {
           category: string
