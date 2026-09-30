@@ -18,7 +18,7 @@ import {
   useBookings,
 } from "@/lib/club-bookings-store";
 import { AccentModalHeader, InfoStatRow, PrimaryButton } from "@/components/verbo/ui";
-import { getClubReport, getClubAttendanceForStudent, subscribeClubReports } from "@/lib/club-reports-store";
+import { getInsightReport, getClubAttendanceForStudent, subscribeClubReports } from "@/lib/club-reports-store";
 
 function fmtLong(iso: string) {
   return new Date(iso).toLocaleString(undefined, {
@@ -45,7 +45,7 @@ export function ClubReservationModal({
 
   const booked = isBooked(studentId, club.id);
   const outcome = booked ? getClubAttendanceForStudent(club.id, studentId) : undefined;
-  const report = booked ? getClubReport(club.id) : undefined;
+  const report = booked && club.type === "insight" ? getInsightReport(club.id) : undefined;
   const used = bookingsThisMonth(studentId, club.type);
   const cap = monthlyCap(studentId, club.type);
   const isSignature = userById(studentId)?.access_plan === "Signature";

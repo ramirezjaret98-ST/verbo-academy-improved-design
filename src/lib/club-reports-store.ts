@@ -118,8 +118,16 @@ export function getClubReport(eventId: string): ClubReport | undefined {
   return reportsCache.find((r) => r.event_id === eventId);
 }
 
+export function allClubReports(): ClubReport[] {
+  return reportsCache;
+}
+
+export function getInsightReport(clubId: string): ClubReport | undefined {
+  return reportsCache.find((r) => r.event_id === clubId && r.event_type === "insight");
+}
+
 export function getClubAttendanceForStudent(clubId: string, studentId: string): ClubAttendance | undefined {
-  return reportsCache.find((r) => r.event_id === clubId && r.event_type === "insight")?.attendance[studentId];
+  return getInsightReport(clubId)?.attendance[studentId];
 }
 
 export async function saveClubReport(report: ClubReport): Promise<boolean> {
