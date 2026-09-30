@@ -31,6 +31,7 @@ import {
   newBadgeId,
 } from "@/lib/badges-store";
 import { uploadContentFile, uploadPublicImage, MAX_PUBLIC_IMAGE_BYTES } from "@/lib/content-uploads";
+import { notifyError } from "@/lib/notify";
 import {
   type Challenge,
   type ChallengeProductId,
@@ -141,13 +142,15 @@ function Page() {
     });
   };
 
-  const addCategory = (name: string) => {
-    setCategories((prev) => {
-      if (prev.includes(name)) return prev;
-      const next = [...prev, name];
-      persistCategories(next);
-      return next;
-    });
+  const addCategory = async (name: string): Promise<string> => {
+    try {
+      const saved = await persistCategories([...loadCategories(), name]);
+      setCategories(saved);
+      return saved.find((category) => category.toLowerCase() === name.toLowerCase()) ?? name;
+    } catch (error) {
+      notifyError(error, { context: "Saving challenge category" });
+      throw error;
+    }
   };
 
   const generateSkeleton = () => {
@@ -360,7 +363,7 @@ function ChallengeModal({
   categories: string[];
   existing: Challenge[];
   editing?: Challenge;
-  onAddCategory: (name: string) => void;
+  onAddCategory: (name: string) => Promise<string>;
   onClose: () => void;
   onSave: (c: Challenge) => void;
 }) {
@@ -394,13 +397,14 @@ function ChallengeModal({
     setCategory(v);
   };
 
-  const commitNewCategory = () => {
+  const commitNewCategory = async () => {
     const trimmed = newCat.trim();
     if (!trimmed) return;
-    onAddCategory(trimmed);
-    setCategory(trimmed);
-    setCreatingCat(false);
-    setNewCat("");
+    try {
+      setCategory(await onAddCategory(trimmed));
+      setCreatingCat(false);
+      setNewCat("");
+    } catch { /* The category stays in the editor so it can be retried. */ }
   };
 
   const handleSave = () => {

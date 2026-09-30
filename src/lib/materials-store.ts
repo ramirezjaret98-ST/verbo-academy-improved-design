@@ -18,16 +18,14 @@
 // optimistic temp-id-then-reconcile pattern used for Verbo Flash Seasons
 // (see flash-challenges-store.ts's upsertSeason/deleteSeason).
 //
-// Categories stay on localStorage (unchanged from before this migration) —
-// there's no dedicated Supabase table for them (they're just a free-text
-// column on each material row), same low-stakes convention already used for
-// Challenge categories in challenges-store.ts.
+// Category names are shared through public.content_categories.
 import { useSyncExternalStore } from "react";
 import { MATERIALS, type MaterialType } from "./mock-data";
 import { supabase } from "@/integrations/supabase/client";
 import { registerRehydrate } from "@/lib/auth-rehydrate";
 import type { Database } from "@/integrations/supabase/types";
 import { notifyError } from "@/lib/notify";
+import { addContentCategory, loadContentCategories, subscribeContentCategories } from "./content-categories-store";
 
 export type RestrictProduct = "go" | "enterprise" | "international";
 
@@ -54,20 +52,8 @@ export function levelsForProduct(product?: RestrictProduct | ""): string[] {
   return RESTRICT_PRODUCTS.find((p) => p.id === product)?.levels ?? [];
 }
 
-const CATEGORIES_KEY = "verbo:material-categories";
 export const MATERIALS_EVENT = "verbo:materials-updated";
 const MATERIALS_BUCKET = "materials";
-
-const SEED_CATEGORIES = [
-  "Grammar",
-  "Vocabulary",
-  "Business",
-  "Speaking",
-  "Listening",
-  "Troubleshooting",
-  "Getting Started",
-  "Study Tips",
-];
 
 /** Max size (bytes) accepted for an uploaded resource file / cover. Also
  *  enforced server-side via the `materials` bucket's file_size_limit. */
@@ -118,81 +104,37 @@ export async function uploadMaterialFile(
   return { ok: true, url: data.publicUrl };
 }
 
-/* ---------------- Categories (localStorage — see file header) ---------------- */
-
-function safeWriteCategories(v: string[]) {
-  if (typeof window === "undefined") return;
-  try {
-    localStorage.setItem(CATEGORIES_KEY, JSON.stringify(v));
-    catCache = null;
-    window.dispatchEvent(new CustomEvent(MATERIALS_EVENT));
-  } catch {
-    /* noop */
-  }
-}
-
-let catCache: string[] | null = null;
+/* ---------------- Categories (Supabase) ---------------- */
 
 export function loadCategories(): string[] {
-  if (typeof window === "undefined") return SEED_CATEGORIES;
-  const raw = localStorage.getItem(CATEGORIES_KEY);
-  if (raw) {
-    try {
-      const saved = JSON.parse(raw) as string[];
-      // Union (seeds first, no duplicates) so newly seeded categories show up
-      // for browsers that already persisted an older category list.
-      const merged: string[] = [];
-      for (const c of [...SEED_CATEGORIES, ...saved]) {
-        if (typeof c === "string" && c.trim() && !merged.some((m) => m.toLowerCase() === c.toLowerCase())) {
-          merged.push(c);
-        }
-      }
-      return merged;
-    } catch {
-      /* noop */
-    }
-  }
-  safeWriteCategories(SEED_CATEGORIES);
-  return SEED_CATEGORIES;
+  return loadContentCategories("material");
 }
 
-export function persistCategories(cats: string[]) {
-  safeWriteCategories(cats);
+export async function persistCategories(cats: string[]): Promise<string[]> {
+  const current = loadCategories();
+  const next = cats.find((cat) => !current.some((saved) => saved.toLowerCase() === cat.toLowerCase()));
+  return next ? addContentCategory("material", next) : current;
 }
 
-export function addCategory(name: string): string[] {
+export async function addCategory(name: string): Promise<string[]> {
   const trimmed = name.trim();
   const cats = loadCategories();
   if (!trimmed || cats.some((c) => c.toLowerCase() === trimmed.toLowerCase())) return cats;
-  const next = [...cats, trimmed];
-  persistCategories(next);
-  return next;
+  return addContentCategory("material", trimmed);
 }
 
 function getCategoriesSnapshot(): string[] {
-  if (catCache === null) catCache = loadCategories();
-  return catCache;
+  return loadCategories();
 }
 
 function subscribeCategories(cb: () => void): () => void {
-  if (typeof window === "undefined") return () => {};
-  const onEvent = () => {
-    catCache = null;
-    cb();
-  };
-  const onStorage = (e: StorageEvent) => {
-    if (e.key === CATEGORIES_KEY) onEvent();
-  };
-  window.addEventListener(MATERIALS_EVENT, onEvent);
-  window.addEventListener("storage", onStorage);
-  return () => {
-    window.removeEventListener(MATERIALS_EVENT, onEvent);
-    window.removeEventListener("storage", onStorage);
-  };
+  return subscribeContentCategories("material", cb);
 }
 
+const EMPTY_CATEGORIES: string[] = [];
+
 export function useCategories(): string[] {
-  return useSyncExternalStore(subscribeCategories, getCategoriesSnapshot, () => SEED_CATEGORIES);
+  return useSyncExternalStore(subscribeCategories, getCategoriesSnapshot, () => EMPTY_CATEGORIES);
 }
 
 /* ---------------- Materials (Supabase) ---------------- */

@@ -13,7 +13,7 @@ import {
 import { useNavigate } from "@tanstack/react-router";
 import { useAuth } from "@/lib/auth";
 import {
-  useNotifications, markNotificationRead, markAllNotificationsRead,
+  useNotifications, markNotificationRead, markAllNotificationsRead, isNotificationReadStateLoaded,
   type Notification, type NotificationKind,
 } from "@/lib/notifications-store";
 import { USERS } from "@/lib/mock-data";
@@ -184,6 +184,7 @@ export function NotificationsBell({ variant = "light" }: { variant?: "light" | "
   const [badgeModal, setBadgeModal] = useState<UnlockBadge | null>(null);
   const [prepModalSessionId, setPrepModalSessionId] = useState<string | null>(null);
   const ref = useRef<HTMLDivElement>(null);
+  const autoMarkAttempted = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     if (!open) return;
@@ -200,9 +201,14 @@ export function NotificationsBell({ variant = "light" }: { variant?: "light" | "
   }, [open]);
 
   useEffect(() => {
-    if (!open || !user) return;
-    const unreadIds = notifications.filter((n) => !n.read).map((n) => n.id);
+    if (!open) {
+      autoMarkAttempted.current.clear();
+      return;
+    }
+    if (!user || !isNotificationReadStateLoaded(user.id)) return;
+    const unreadIds = notifications.filter((n) => !n.read && !autoMarkAttempted.current.has(n.id)).map((n) => n.id);
     if (unreadIds.length === 0) return;
+    for (const id of unreadIds) autoMarkAttempted.current.add(id);
     markAllNotificationsRead(user.id, unreadIds);
   }, [open, user, notifications]);
 

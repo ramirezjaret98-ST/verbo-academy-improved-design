@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Card, GhostButton, PrimaryButton, Pill, AccentModal, AccentModalFooter } from "@/components/verbo/ui";
 import { Plus, Trash2, X, Pencil, Link2, Lock, Zap, Package, Gift, Sparkles, Upload } from "lucide-react";
 import { uploadContentFile, uploadPublicImage, MAX_PUBLIC_IMAGE_BYTES } from "@/lib/content-uploads";
+import { notifyError } from "@/lib/notify";
 import {
   type FlashChallenge,
   type FlashProductId,
@@ -150,13 +151,15 @@ function MysteryBoxTab() {
       return next;
     });
   };
-  const addCategory = (name: string) => {
-    setCategories((prev) => {
-      if (prev.includes(name)) return prev;
-      const next = [...prev, name];
-      persistCategories(next);
-      return next;
-    });
+  const addCategory = async (name: string): Promise<string> => {
+    try {
+      const saved = await persistCategories([...loadCategories(), name]);
+      setCategories(saved);
+      return saved.find((category) => category.toLowerCase() === name.toLowerCase()) ?? name;
+    } catch (error) {
+      notifyError(error, { context: "Saving Flash category" });
+      throw error;
+    }
   };
   const saveBoxArt = () => {
     persistFlashConfig({ ...config, box_art_url: boxArtDraft.trim() || undefined });
@@ -336,7 +339,7 @@ function FlashModal({
   seasonId?: string;
   headerBackground?: string;
   titleOverride?: string;
-  onAddCategory: (name: string) => void;
+  onAddCategory: (name: string) => Promise<string>;
   onClose: () => void;
   onSave: (cs: FlashChallenge[]) => void;
 }) {
@@ -386,13 +389,14 @@ function FlashModal({
     setIconImageUrl(uploaded.url);
   };
 
-  const commitNewCategory = () => {
+  const commitNewCategory = async () => {
     const t = newCat.trim();
     if (!t) return;
-    onAddCategory(t);
-    setCategory(t);
-    setCreatingCat(false);
-    setNewCat("");
+    try {
+      setCategory(await onAddCategory(t));
+      setCreatingCat(false);
+      setNewCat("");
+    } catch { /* Keep the name in the editor for retry. */ }
   };
 
   const handleSave = () => {
@@ -702,13 +706,15 @@ function LightningTab() {
       return next;
     });
   };
-  const addCategory = (name: string) => {
-    setCategories((prev) => {
-      if (prev.includes(name)) return prev;
-      const next = [...prev, name];
-      persistCategories(next);
-      return next;
-    });
+  const addCategory = async (name: string): Promise<string> => {
+    try {
+      const saved = await persistCategories([...loadCategories(), name]);
+      setCategories(saved);
+      return saved.find((category) => category.toLowerCase() === name.toLowerCase()) ?? name;
+    } catch (error) {
+      notifyError(error, { context: "Saving Flash category" });
+      throw error;
+    }
   };
 
   const isLive = lightning.status === "live";
@@ -1063,13 +1069,15 @@ function SeasonChallengesModal({ season, onClose }: { season: FlashSeason; onClo
       return next;
     });
   };
-  const addCategory = (name: string) => {
-    setCategories((prev) => {
-      if (prev.includes(name)) return prev;
-      const next = [...prev, name];
-      persistCategories(next);
-      return next;
-    });
+  const addCategory = async (name: string): Promise<string> => {
+    try {
+      const saved = await persistCategories([...loadCategories(), name]);
+      setCategories(saved);
+      return saved.find((category) => category.toLowerCase() === name.toLowerCase()) ?? name;
+    } catch (error) {
+      notifyError(error, { context: "Saving Flash category" });
+      throw error;
+    }
   };
 
   return (

@@ -11,7 +11,11 @@ import { loadScheduleEvents, SCHEDULE_EVENTS } from "./session-schedule-events-s
 // Adding a new notification kind = adding a derivation branch below.
 // Do NOT build a parallel event log — reuse the source of truth.
 // ============================================================================
-import { useSyncExternalStore } from "react";
+import { useEffect, useSyncExternalStore } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { registerRehydrate } from "./auth-rehydrate";
+import { legacyToUuid } from "./user-id-bridge";
+import { notifyError } from "./notify";
 import { USERS, type Role, type User } from "./mock-data";
 import { loadSessions, SESSIONS_EVENT } from "./sessions-store";
 import {
@@ -129,41 +133,96 @@ export interface Notification {
 // ---------------------------------------------------------------------------
 // Read-state persistence (per user)
 // ---------------------------------------------------------------------------
-const READ_KEY = "verbo:notifications-read";
 export const NOTIF_EVENT = "verbo:notifications-updated";
 
 type ReadMap = Record<string, Record<string, true>>; // userId -> notifId -> true
+let readMap: ReadMap = {};
+let loadedUsers = new Set<string>();
+const loadingUsers = new Map<string, Promise<void>>();
+let readGeneration = 0;
+let activeReadUserId: string | null = null;
 
-function readAllRead(): ReadMap {
-  if (typeof window === "undefined") return {};
-  try { return JSON.parse(localStorage.getItem(READ_KEY) || "{}"); } catch { return {}; }
-}
-function writeAllRead(map: ReadMap) {
-  if (typeof window === "undefined") return;
-  try {
-    localStorage.setItem(READ_KEY, JSON.stringify(map));
-    window.dispatchEvent(new CustomEvent(NOTIF_EVENT));
-  } catch { /* noop */ }
+function notifyReadChange() {
+  if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent(NOTIF_EVENT));
 }
 
 function readSetFor(userId: string): Record<string, true> {
-  return readAllRead()[userId] ?? {};
+  return readMap[userId] ?? {};
 }
 
-export function markNotificationRead(userId: string, id: string) {
-  const map = readAllRead();
-  const set = { ...(map[userId] ?? {}) };
-  set[id] = true;
-  map[userId] = set;
-  writeAllRead(map);
+async function hydrateReadState(userId: string): Promise<void> {
+  if (loadedUsers.has(userId)) return;
+  const pending = loadingUsers.get(userId);
+  if (pending) return pending;
+  const requestGeneration = readGeneration;
+  const task = (async () => {
+    const uuid = await legacyToUuid(userId);
+    if (!uuid) throw new Error("Could not resolve the notification account.");
+    const { data, error } = await supabase.from("notification_reads")
+      .select("notification_id").eq("user_id", uuid);
+    if (error) throw error;
+    if (requestGeneration !== readGeneration) return;
+    const merged = { ...readSetFor(userId) };
+    for (const row of data ?? []) merged[row.notification_id] = true;
+    readMap[userId] = merged;
+    loadedUsers.add(userId);
+    notifyReadChange();
+  })();
+  loadingUsers.set(userId, task);
+  try {
+    await task;
+  } finally {
+    if (loadingUsers.get(userId) === task) loadingUsers.delete(userId);
+  }
 }
 
-export function markAllNotificationsRead(userId: string, ids: string[]) {
-  const map = readAllRead();
-  const set = { ...(map[userId] ?? {}) };
-  for (const id of ids) set[id] = true;
-  map[userId] = set;
-  writeAllRead(map);
+function markRead(userId: string, ids: string[]) {
+  const fresh = ids.filter((id) => !readSetFor(userId)[id]);
+  if (fresh.length === 0) return;
+  readMap[userId] = { ...readSetFor(userId) };
+  for (const id of fresh) readMap[userId][id] = true;
+  notifyReadChange();
+  void (async () => {
+    try {
+      await hydrateReadState(userId);
+      const uuid = await legacyToUuid(userId);
+      if (!uuid) throw new Error("Could not resolve the notification account.");
+      const { error } = await supabase.from("notification_reads").upsert(
+        fresh.map((notification_id) => ({ user_id: uuid, notification_id })),
+        { onConflict: "user_id,notification_id", ignoreDuplicates: true },
+      );
+      if (error) throw error;
+    } catch (error) {
+      const next = { ...readSetFor(userId) };
+      for (const id of fresh) delete next[id];
+      readMap[userId] = next;
+      notifyReadChange();
+      notifyError(error, { context: "Saving notification read state" });
+    }
+  })();
+}
+
+export function markNotificationRead(userId: string, id: string) { markRead(userId, [id]); }
+
+export function markAllNotificationsRead(userId: string, ids: string[]) { markRead(userId, ids); }
+
+export function isNotificationReadStateLoaded(userId: string): boolean { return loadedUsers.has(userId); }
+
+if (typeof window !== "undefined") {
+  registerRehydrate((reason) => {
+    readGeneration++;
+    loadedUsers = new Set();
+    loadingUsers.clear();
+    if (reason === "auth") {
+      readMap = {};
+      notifyReadChange();
+    }
+    if (activeReadUserId) {
+      void hydrateReadState(activeReadUserId).catch((error) => {
+        console.error("[notifications-store] failed to refresh read state", error);
+      });
+    }
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -1024,6 +1083,14 @@ export function useNotifications(user: User | null): {
   notifications: Notification[];
   unreadCount: number;
 } {
+  useEffect(() => {
+    if (!user) return;
+    activeReadUserId = user.id;
+    void hydrateReadState(user.id).catch((error) => {
+      console.error("[notifications-store] failed to load read state", error);
+    });
+    return () => { if (activeReadUserId === user.id) activeReadUserId = null; };
+  }, [user?.id]);
   const snap = useSyncExternalStore(
     (cb) => {
       const wrapped = () => { lastTick++; cb(); };
