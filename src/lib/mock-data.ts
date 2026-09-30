@@ -59,6 +59,7 @@ export interface User {
   login_locked_at?: string | null;
   current_level?: string;
   admin_type?: AdminType; // only meaningful when role === "admin"
+  admin_disabled?: boolean; // server-authoritative internal admin access
   attendance_percentage?: number;
   avatar?: string;
   // Corporate profile (students)

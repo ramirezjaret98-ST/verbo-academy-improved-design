@@ -7,71 +7,50 @@
 //                       User Management.
 // - "coordinator_fin"   ONLY Financial (Money Lab) and KPIs.
 //
-// Newly-created accounts (from the User Management page) persist in
-// localStorage and are merged into the USERS singleton on hydrate — this
-// keeps the table's instant-feedback UI working the same as before. But
-// createInternalUser() ALSO fires a real `admin-create-user` edge-function
-// call in the background (same pattern as handleRegister() in
-// admin.students.tsx), so the account actually gets a working Supabase Auth
-// login + a real app_users row with the right role/admin_type, instead of
-// being a localStorage-only fake that can never sign in. This was a
-// confirmed bug found in the pre-launch QA audit — the old version pushed to
-// USERS/localStorage and nothing else, so newly "created" admins/coordinators
-// had no real account at all.
+// Internal admin accounts and access are read from app_users. New accounts
+// are created through the existing admin-create-user Edge Function.
 import { USERS, pruneHiddenMockUsers, type User, type Role } from "./mock-data";
 import { patchTeacherProfile } from "./teacher-model";
 import { patchStudentProfile } from "./students-store";
 import { supabase } from "@/integrations/supabase/client";
-import { invalidateUserIdBridge } from "./user-id-bridge";
+import { invalidateUserIdBridge, legacyToUuid } from "./user-id-bridge";
 
 export type AdminType = "super_admin" | "coordinator_ops" | "coordinator_fin";
 export type CoordinatorType = "operations" | "financial";
 
-const CREATED_KEY = "verbo:created-users";
-const STATUS_KEY = "verbo:user-status-overrides";
 export const USERS_EVENT = "verbo:users-updated";
 
-export interface UserStatusOverride {
-  status: "active" | "deactivated";
-}
-
-function readCreated(): User[] {
-  if (typeof window === "undefined") return [];
-  try { return JSON.parse(localStorage.getItem(CREATED_KEY) || "[]"); } catch { return []; }
-}
-function writeCreated(list: User[]) {
-  if (typeof window !== "undefined") localStorage.setItem(CREATED_KEY, JSON.stringify(list));
-}
-function readStatus(): Record<string, UserStatusOverride> {
-  if (typeof window === "undefined") return {};
-  try { return JSON.parse(localStorage.getItem(STATUS_KEY) || "{}"); } catch { return {}; }
-}
-function writeStatus(m: Record<string, UserStatusOverride>) {
-  if (typeof window !== "undefined") localStorage.setItem(STATUS_KEY, JSON.stringify(m));
-}
-
-// Seed a couple of demo coordinators so the new nav filtering is visible.
-const SEEDED: User[] = [
-  { id: "u_ops", name: "Paulina Ortiz", email: "paulina@verbo.com", password: "ops123", role: "admin", admin_type: "coordinator_ops" },
-  { id: "u_fin", name: "Ricardo Mena", email: "ricardo@verbo.com", password: "fin123", role: "admin", admin_type: "coordinator_fin" },
-];
-
-let hydrated = false;
-export function hydrateAdminRoles() {
+let hydratePromise: Promise<void> | null = null;
+export function hydrateAdminRoles(): Promise<void> {
   pruneHiddenMockUsers();
-  if (hydrated) return;
-  hydrated = true;
-  // Ensure u1 has super_admin type.
-  const u1 = USERS.find((u) => u.id === "u1");
-  if (u1 && !u1.admin_type) u1.admin_type = "super_admin";
-  // Seeded coordinators.
-  SEEDED.forEach((u) => { if (!USERS.find((x) => x.id === u.id)) USERS.push(u); });
-  // Persisted created users.
-  readCreated().forEach((u) => { if (!USERS.find((x) => x.id === u.id)) USERS.push(u); });
-  // Legacy status-override key is only used for internal admins; teacher /
-  // student deactivation piggybacks on their own status fields hydrated
-  // elsewhere (hydrateStudents + teacher profile overrides).
-
+  if (typeof window === "undefined") return Promise.resolve();
+  // Jaret confirmed these old browser records were not authoritative.
+  // Remove the old account/password and deactivation caches on upgrade.
+  try {
+    localStorage.removeItem("verbo:created-users");
+    localStorage.removeItem("verbo:user-status-overrides");
+  } catch { /* Storage can be unavailable; the database stays authoritative. */ }
+  if (hydratePromise) return hydratePromise;
+  hydratePromise = (async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
+    const { data, error } = await supabase.from("app_users")
+      .select("id,legacy_id,name,email,role,admin_type,admin_disabled")
+      .eq("role", "admin");
+    if (error) { console.error("[admin-roles] failed to load internal users", error); return; }
+    const remote = (data ?? []).map((row): User => ({
+      id: row.legacy_id || row.id, name: row.name, email: row.email,
+      password: "", role: "admin", admin_type: row.admin_type ?? undefined,
+      admin_disabled: row.admin_disabled,
+    }));
+    if (remote.length === 0) return;
+    for (let i = USERS.length - 1; i >= 0; i--) if (USERS[i].role === "admin") USERS.splice(i, 1);
+    USERS.push(...remote);
+    emit();
+  })().catch((error) => {
+    console.error("[admin-roles] failed to hydrate internal users", error);
+  }).finally(() => { hydratePromise = null; });
+  return hydratePromise;
 }
 
 export function getAdminType(user: User | null | undefined): AdminType | null {
@@ -173,29 +152,32 @@ export async function createInternalUser(
   invalidateUserIdBridge();
 
   const user: User = {
-    id, name, email, password: input.password, role: input.role,
+    id, name, email, password: "", role: input.role,
     ...(input.role === "admin" ? { admin_type: input.admin_type } : {}),
   };
   USERS.push(user);
-  const created = readCreated();
-  created.push(user);
-  writeCreated(created);
   emit();
   return { ok: true, user };
 }
 
-export function updateInternalUser(
+export async function updateInternalUser(
   userId: string,
   patch: { name?: string; admin_type?: AdminType },
-): { ok: true } | { ok: false; error: string } {
+): Promise<{ ok: true } | { ok: false; error: string }> {
   const u = USERS.find((x) => x.id === userId);
-  if (!u) return { ok: false, error: "User not found." };
-  if (patch.name !== undefined) u.name = patch.name.trim();
-  if (patch.admin_type && u.role === "admin") u.admin_type = patch.admin_type;
-  // Persist for created users; seeded/mock users only mutate in-memory.
-  const created = readCreated();
-  const idx = created.findIndex((x) => x.id === userId);
-  if (idx !== -1) { created[idx] = { ...created[idx], ...patch }; writeCreated(created); }
+  if (!u || u.role !== "admin") return { ok: false, error: "Internal user not found." };
+  const uuid = await legacyToUuid(userId);
+  if (!uuid) return { ok: false, error: "Account is unavailable in the database." };
+  const name = patch.name?.trim();
+  if (name !== undefined && !name) return { ok: false, error: "Name is required." };
+  const { data, error } = await supabase.from("app_users")
+    .update({ ...(name === undefined ? {} : { name }), ...(patch.admin_type ? { admin_type: patch.admin_type } : {}) })
+    .eq("id", uuid).eq("role", "admin")
+    .select("name,admin_type,admin_disabled").maybeSingle();
+  if (error || !data) return { ok: false, error: error?.message ?? "Could not save the account." };
+  u.name = data.name;
+  u.admin_type = data.admin_type ?? undefined;
+  u.admin_disabled = data.admin_disabled;
   emit();
   return { ok: true };
 }
@@ -209,13 +191,12 @@ export function isUserDeactivated(userId: string): boolean {
   if (!u) return false;
   if (u.role === "teacher") return (u.teacher_status ?? "active") === "frozen";
   if (u.role === "student") return (u.status ?? "active") === "suspended";
-  const st = readStatus();
-  return st[userId]?.status === "deactivated";
+  return u.admin_disabled === true;
 }
 
-export function setUserDeactivated(userId: string, deactivated: boolean) {
+export async function setUserDeactivated(userId: string, deactivated: boolean): Promise<boolean> {
   const u = USERS.find((x) => x.id === userId);
-  if (!u) return;
+  if (!u) return false;
 
   if (u.role === "teacher") {
     // Reuse the Teachers freeze/reactivate flow — same DB-backed field,
@@ -232,13 +213,14 @@ export function setUserDeactivated(userId: string, deactivated: boolean) {
     // Supabase-backed student profile store (Lote 10).
     patchStudentProfile(userId, { status: deactivated ? "suspended" : "active" });
   } else {
-    // Internal admin — no equivalent freeze page and no migrated DB field
-    // for this concept; keep the local override map (internal/coordinator
-    // accounts are not part of the Supabase migration).
-    const st = readStatus();
-    if (deactivated) st[userId] = { status: "deactivated" };
-    else delete st[userId];
-    writeStatus(st);
+    const uuid = await legacyToUuid(userId);
+    if (!uuid) return false;
+    const { data, error } = await supabase.from("app_users")
+      .update({ admin_disabled: deactivated }).eq("id", uuid).eq("role", "admin")
+      .select("admin_disabled").maybeSingle();
+    if (error || !data) { console.error("[admin-roles] failed to change internal access", error); return false; }
+    u.admin_disabled = data.admin_disabled;
   }
   emit();
+  return true;
 }

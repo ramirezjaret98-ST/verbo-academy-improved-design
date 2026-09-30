@@ -213,6 +213,7 @@ export type Database = {
           addon_spotlight_per_month: number | null
           addon_workshops_enabled: boolean | null
           admin_notes: string | null
+          admin_disabled: boolean
           admin_type: Database["public"]["Enums"]["admin_type"] | null
           attendance_percentage: number | null
           availability_request_at: string | null
@@ -287,6 +288,7 @@ export type Database = {
           addon_spotlight_per_month?: number | null
           addon_workshops_enabled?: boolean | null
           admin_notes?: string | null
+          admin_disabled?: boolean
           admin_type?: Database["public"]["Enums"]["admin_type"] | null
           attendance_percentage?: number | null
           availability_request_at?: string | null
@@ -363,6 +365,7 @@ export type Database = {
           addon_spotlight_per_month?: number | null
           addon_workshops_enabled?: boolean | null
           admin_notes?: string | null
+          admin_disabled?: boolean
           admin_type?: Database["public"]["Enums"]["admin_type"] | null
           attendance_percentage?: number | null
           availability_request_at?: string | null

@@ -188,6 +188,7 @@ async function buildUser(authId: string, email: string, timeoutMs = 12000): Prom
       email: typedRow.email,
       role: typedRow.role,
       admin_type: typedRow.admin_type ?? undefined,
+      admin_disabled: typedRow.admin_disabled,
       must_change_password: typedRow.must_change_password,
       ...(typedRow.role === "student" ? buildStudentProfilePatch(typedRow) : {}),
       ...(typedRow.role === "teacher" ? buildTeacherProfilePatch(typedRow) : {}),
@@ -242,7 +243,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const groupBlocked = built.role === "student" && await withTimeout(
         isMemberBlockedInDatabase(sessionUser.id), 10000, "group membership lookup",
       );
-      if (groupBlocked || isUserDeactivated(built.id)) {
+      if (groupBlocked || built.admin_disabled === true || isUserDeactivated(built.id)) {
         authIdRef.current = null;
         setUser(null);
         void supabase.auth.signOut();
@@ -384,7 +385,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await supabase.auth.signOut();
         return { ok: false, error: "Access revoked. Contact your administrator." };
       }
-      if (isUserDeactivated(built.id)) {
+      if (built.admin_disabled === true || isUserDeactivated(built.id)) {
         await supabase.auth.signOut();
         return { ok: false, error: "Account deactivated. Contact your administrator." };
       }
