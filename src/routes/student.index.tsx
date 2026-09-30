@@ -91,6 +91,7 @@ import { loadSeasons } from "@/lib/flash-challenges-store";
 import { loadClubs, type Club } from "@/lib/clubs-store";
 import { isBooked } from "@/lib/club-bookings-store";
 import { ClubReservationModal } from "@/components/verbo/ClubReservationModal";
+import { InsightsDashboard } from "@/components/verbo/InsightsDashboard";
 import { EVENT_KIND_META, CALENDAR_STATUS_META, calendarEventTheme } from "@/lib/calendar-events";
 import { RatingModal } from "@/components/verbo/RatingModal";
 import { ReportConductModal } from "@/components/verbo/ReportConductModal";
@@ -116,8 +117,14 @@ const MACRO_ICON_ASSETS: Record<string, string> = {
 
 
 export const Route = createFileRoute("/student/")({
-  component: StudentDashboard,
+  component: StudentLanding,
 });
+
+function StudentLanding() {
+  const { user } = useAuth();
+  if (user?.product_type === "insights") return <InsightsDashboard name={user.name.split(" ")[0]} studentId={user.id} />;
+  return <StudentDashboard />;
+}
 
 /**
  * Teacher/host avatar: shows the uploaded profile photo when the staff member

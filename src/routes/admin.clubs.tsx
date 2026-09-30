@@ -10,6 +10,9 @@ import {
   loadReleaseRequests, subscribeReleaseRequests, removeReleaseRequest,
 } from "@/lib/clubs-store";
 import { notifySuccess, notifyError } from "@/lib/notify";
+import { InsightsDashboard } from "@/components/verbo/InsightsDashboard";
+import { CalendarView as StudentCalendarView } from "@/components/verbo/CalendarView";
+import type { CalendarEvent } from "@/lib/calendar-events";
 import {
   Sparkles,
   BookOpen,
@@ -86,6 +89,7 @@ function Page() {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Club | null>(null);
   const [view, setView] = useState<ViewMode>("list");
+  const [studentPreview, setStudentPreview] = useState<"home" | "calendar" | null>(null);
 
   useEffect(() => {
     setClubs(loadClubs());
@@ -128,6 +132,14 @@ function Page() {
     setOpen(false);
   };
 
+  if (studentPreview) {
+    const events: CalendarEvent[] = clubs.filter((c) => c.type === "insight" && c.status !== "cancelled").map((c) => ({ id: c.id, kind: "insight", date: c.date, duration_minutes: c.duration_minutes, title: c.title, subtitle: "Insight", status: c.status, spots_taken: c.spots_taken, spots_total: c.spots_total, club: c }));
+    return <div className="space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-orange-200 bg-orange-50 px-5 py-3"><div><strong className="text-sm text-foreground">Insights student preview</strong><p className="text-xs text-muted-foreground">Live Academy content; quota, reservations and actions are disabled.</p></div><GhostButton onClick={() => setStudentPreview(null)}>Back to Manage Clubs</GhostButton></div>
+      {studentPreview === "home" ? <InsightsDashboard name="student" preview onExplore={() => setStudentPreview("calendar")} /> : <div className="space-y-4"><div className="flex items-center justify-between"><div><h1 className="text-2xl font-semibold">Explore Insights</h1><p className="text-sm text-muted-foreground">Read-only calendar preview.</p></div><GhostButton onClick={() => setStudentPreview("home")}>Dashboard</GhostButton></div><Card><StudentCalendarView events={events} availableKinds={["insight"]} onEventClick={() => {}} /></Card></div>}
+    </div>;
+  }
+
   return (
     <div className="space-y-8">
       <div className="flex items-start justify-between gap-4">
@@ -135,9 +147,9 @@ function Page() {
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">Manage Clubs</h1>
           <p className="mt-1 text-sm text-muted-foreground">Create and curate Verbo Insights and Book Clubs that appear on the student calendar.</p>
         </div>
-        <PrimaryButton accentColor="#5fca16" onClick={onCreate}>
+        <div className="flex flex-wrap gap-2"><GhostButton onClick={() => setStudentPreview("home")}>Preview Insights as student</GhostButton><PrimaryButton accentColor="#5fca16" onClick={onCreate}>
           <Plus className="h-4 w-4" /> Create New Club Event
-        </PrimaryButton>
+        </PrimaryButton></div>
       </div>
       <ReleaseRequestsPanel requests={requests} clubs={clubs} />
 
@@ -436,6 +448,7 @@ export function ClubFormPanel({
   const [type, setType] = useState<ClubType>(initial?.type ?? "insight");
   const [title, setTitle] = useState(initial?.title ?? "");
   const [description, setDescription] = useState(initial?.description ?? "");
+  const [topicTag, setTopicTag] = useState(initial?.topic_tag ?? "");
   const [link, setLink] = useState(initial?.link ?? "");
   const [material, setMaterial] = useState(initial?.material ?? "");
   const [materialName, setMaterialName] = useState(initial?.material ?? "");
@@ -462,7 +475,7 @@ export function ClubFormPanel({
     e.preventDefault();
     if (!title || !date) return;
     onSave({
-      type, title, description, link,
+      type, title, description, topic_tag: type === "insight" ? topicTag.trim() || undefined : undefined, link,
       material: material || undefined,
       cover_image: cover || undefined,
       teacher_id: teacherId || undefined,
@@ -526,6 +539,7 @@ export function ClubFormPanel({
         <Field label="Description">
           <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={4} placeholder="What students will learn or discuss." className={`${fieldCls} resize-none`} />
         </Field>
+        {isInsight && <Field label="Topic tag" help="Short category shown on the Insights carousel, for example Everyday Life or Viral Marketing."><input value={topicTag} onChange={(e) => setTopicTag(e.target.value)} maxLength={40} placeholder="Everyday Life" className={fieldCls} /></Field>}
 
         <ClubSectionBanner color="#3ebbad" textColor="#0b2b28" icon={ImageIcon} title="Media & Materials" />
 

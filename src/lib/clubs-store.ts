@@ -25,6 +25,7 @@ export interface Club {
   type: ClubType;
   title: string;
   description: string;
+  topic_tag?: string;
   link: string;
   material?: string;
   cover_image?: string;
@@ -89,6 +90,7 @@ function mapClubRow(row: ClubRow): Club {
     type: row.type,
     title: row.title,
     description: row.description ?? "",
+    topic_tag: row.topic_tag ?? undefined,
     link: row.link ?? "",
     material: row.material ?? undefined,
     cover_image: row.cover_image ?? undefined,
@@ -209,6 +211,7 @@ export async function createClub(data: Omit<Club, "id" | "spots_taken" | "status
       type: data.type,
       title: data.title,
       description: data.description || null,
+      topic_tag: data.topic_tag?.trim() || null,
       link: data.link || null,
       material: data.material || null,
       cover_image: data.cover_image || null,
@@ -240,6 +243,7 @@ export async function updateClub(id: string, patch: Partial<Club>): Promise<Club
   if (patch.type !== undefined) update.type = patch.type;
   if (patch.title !== undefined) update.title = patch.title;
   if (patch.description !== undefined) update.description = patch.description || null;
+  if ("topic_tag" in patch) update.topic_tag = patch.topic_tag?.trim() || null;
   if (patch.link !== undefined) update.link = patch.link || null;
   if (patch.material !== undefined) update.material = patch.material || null;
   if (patch.cover_image !== undefined) update.cover_image = patch.cover_image || null;

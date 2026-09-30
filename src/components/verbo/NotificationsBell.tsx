@@ -93,6 +93,7 @@ const NOTIF_KIND_META: Record<NotificationKind, { icon: LucideIcon; color: strin
   report_ready: { icon: FileCheck, color: TONE.success },
   session_changed: { icon: CalendarClock, color: TONE.warning },
   club_opened: { icon: Sparkles, color: TONE.violet },
+  insight_absence: { icon: Sparkles, color: TONE.violet },
   payment_or_sessions_ending_soon: { icon: AlertCircle, color: TONE.warning },
   installment_payment_due: { icon: CreditCard, color: TONE.warning },
   new_challenge_available: { icon: Trophy, color: TONE.violet },

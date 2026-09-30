@@ -11,20 +11,9 @@
 // is set, matching the old "one report per event" behavior of the
 // localStorage `Record<event_id, ClubReport>` map.
 //
-// IMPORTANT — `attendance` is accepted here for API compatibility but is NOT
-// persisted to `public.club_report_attendance` in this lote. That child
-// table requires a real `student_id` (uuid, NOT NULL FK to app_users) per
-// row, but the attendance UI (`ClubReportModal`, fed by `enrolled_names` in
-// calendar-events.ts) currently has no real per-student roster to attach:
-// book/insight events use a hardcoded fake name pool
-// (`enrolledNamesFor()`, explicitly commented in calendar-events.ts as a
-// placeholder "until the real roster ships"), and spotlight events don't
-// populate `enrolled_names` at all. Confirmed by grep that nothing in the
-// app reads `ClubReport.attendance` back, so this was already write-only —
-// migrating it into a real per-student table needs `enrolledNamesFor()`
-// rewired to the real `club_bookings` data first (already migrated, see
-// `bookingsForStudent` in club-bookings-store.ts), which is a separate,
-// slightly larger fix left for a future lote.
+// Insight and Book Club closure is atomic through submit_club_report: the
+// teacher's attendance map is validated against real club_bookings rows.
+// Spotlight remains a note-only report until its own roster is wired.
 import { supabase } from "@/integrations/supabase/client";
 import { registerRehydrate } from "@/lib/auth-rehydrate";
 import type { Database } from "@/integrations/supabase/types";
@@ -73,16 +62,19 @@ async function hydrate(): Promise<void> {
   if (hydrated) return;
   if (hydratePromise) return hydratePromise;
   hydratePromise = (async () => {
-    const [, { data, error }] = await Promise.all([
+    const [, { data, error }, attendanceResult] = await Promise.all([
       hydrateUserIdBridge(),
       supabase.from("club_reports").select("*"),
+      supabase.from("club_report_attendance").select("club_report_id,student_id,attendance"),
     ]);
     if (error) {
       console.error("[club-reports-store] failed to load", error);
     }
+    if (attendanceResult.error) console.error("[club-reports-store] failed to load attendance", attendanceResult.error);
     reportsCache = (data ?? []).map((row) => ({
       ...fromRow(row),
       teacher_id: uuidToLegacySync(row.teacher_id),
+      attendance: Object.fromEntries((attendanceResult.data ?? []).filter((a) => a.club_report_id === row.id).map((a) => [uuidToLegacySync(a.student_id), a.attendance as ClubAttendance])),
     }));
     hydrated = true;
   })();
@@ -126,38 +118,46 @@ export function getClubReport(eventId: string): ClubReport | undefined {
   return reportsCache.find((r) => r.event_id === eventId);
 }
 
-export function saveClubReport(report: ClubReport) {
-  const prev = reportsCache;
-  reportsCache = [...reportsCache.filter((r) => r.event_id !== report.event_id), report];
-  notify();
+export function getClubAttendanceForStudent(clubId: string, studentId: string): ClubAttendance | undefined {
+  return reportsCache.find((r) => r.event_id === clubId && r.event_type === "insight")?.attendance[studentId];
+}
 
-  void (async () => {
+export async function saveClubReport(report: ClubReport): Promise<boolean> {
     const teacherUuid = await legacyToUuid(report.teacher_id);
     if (!teacherUuid) {
       console.error("[club-reports-store] no app_users row for legacy id", report.teacher_id);
-      reportsCache = prev;
-      notify();
-      return;
+      return false;
     }
     const numericEventId = Number(report.event_id);
     const isClub = report.event_type === "book" || report.event_type === "insight";
-    const { error } = await supabase.from("club_reports").upsert(
+    if (!Number.isInteger(numericEventId)) return false;
+    if (isClub) {
+      const entries = await Promise.all(Object.entries(report.attendance).map(async ([legacyId, attendance]) => [await legacyToUuid(legacyId), attendance] as const));
+      if (entries.some(([id]) => !id)) return false;
+      const attendance = Object.fromEntries(entries) as Record<string, ClubAttendance>;
+      const { error } = await supabase.rpc("submit_club_report", {
+        p_club_id: numericEventId,
+        p_comments: report.comments,
+        p_attendance: attendance,
+      });
+      if (error) { console.error("[club-reports-store] failed to submit club report", error); return false; }
+    } else {
+      const { error } = await supabase.from("club_reports").upsert(
       {
         event_type: report.event_type,
-        club_id: isClub ? numericEventId : null,
-        session_id: isClub ? null : numericEventId,
+        club_id: null,
+        session_id: numericEventId,
         teacher_id: teacherUuid,
         comments: report.comments,
         submitted_at: report.submitted_at,
       },
-      { onConflict: isClub ? "club_id" : "session_id" },
+      { onConflict: "session_id" },
     );
-    if (error) {
-      console.error("[club-reports-store] failed to save report", error);
-      reportsCache = prev;
-      notify();
+      if (error) { console.error("[club-reports-store] failed to save spotlight report", error); return false; }
     }
-  })();
+    reportsCache = [...reportsCache.filter((r) => r.event_id !== report.event_id), report];
+    notify();
+    return true;
 }
 
 export function subscribeClubReports(cb: () => void): () => void {

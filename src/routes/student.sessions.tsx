@@ -69,8 +69,9 @@ import {
 } from "@/components/verbo/CancelSessionFlow";
 
 import { ClubReservationModal } from "@/components/verbo/ClubReservationModal";
-import type { Club } from "@/lib/clubs-store";
-import { resolvedRemainingSeats, resolvedMonthlyCap } from "@/lib/club-bookings-store";
+import { subscribeClubs, type Club } from "@/lib/clubs-store";
+import { resolvedRemainingSeats, resolvedMonthlyCap, subscribeBookings } from "@/lib/club-bookings-store";
+import { subscribeClubReports } from "@/lib/club-reports-store";
 import { groupOfStudent, effectiveSessionCounts, sessionProgressFor } from "@/lib/groups-store";
 import { useCoreFreemiumGate } from "@/components/verbo/CoreFreemiumFlow";
 import { isSilenced, hasCreditUsed as freemiumUsed, markCreditUsed as markFreemiumUsed } from "@/lib/core-freemium-store";
@@ -171,6 +172,13 @@ function Page() {
   const [pulseActive, setPulseActive] = useState(focusParam === "clubs");
 
   useEffect(() => subscribeSessions(() => tick((n) => n + 1)), []);
+  useEffect(() => {
+    const bump = () => tick((n) => n + 1);
+    const a = subscribeClubs(bump);
+    const b = subscribeBookings(bump);
+    const c = subscribeClubReports(bump);
+    return () => { a(); b(); c(); };
+  }, []);
   // Refresh teacher profile fields (ProfilePeekCard + qualified_products /
   // teacher_status filtering in the Spotlight & reschedule flows).
   useEffect(() => { hydrateTeachers(); hydrateStudents(); }, []);

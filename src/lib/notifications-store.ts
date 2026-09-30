@@ -22,6 +22,7 @@ import {
   loadClubs, loadReleaseRequests,
   CLUBS_EVENT, RELEASE_REQUESTS_EVENT,
 } from "./clubs-store";
+import { CLUB_REPORTS_EVENT, loadClubReports } from "./club-reports-store";
 import {
   listChangeRequests, AVAIL_EVENT,
 } from "./availability-store";
@@ -105,6 +106,7 @@ export type NotificationKind =
   | "report_ready"
   | "session_changed"
   | "club_opened"
+  | "insight_absence"
   | "payment_or_sessions_ending_soon"
   | "installment_payment_due"
   | "new_challenge_available"
@@ -716,6 +718,21 @@ function studentNotifications(studentId: string): Notification[] {
   const now = Date.now();
   const uu = USERS.find((x) => x.id === studentId);
 
+  for (const report of Object.values(loadClubReports())) {
+    if (report.event_type !== "insight" || report.attendance[studentId] !== "absent") continue;
+    out.push({
+      id: `insight-absence:${report.event_id}:${studentId}`,
+      kind: "insight_absence",
+      title: "We missed you at your Insight",
+      body: uu?.product_type === "insights"
+        ? "If you reserve a place, please join us or cancel in time so we can prepare for the group."
+        : "Your teacher marked you absent from a reserved Insight. Please cancel in time when you cannot attend.",
+      createdAt: report.submitted_at,
+      to: uu?.product_type === "insights" ? "/student/insights" : "/student/sessions",
+      read: false,
+    });
+  }
+
   // ---- Reschedule request status updates ---------------------------------
   for (const r of loadStudentRequests()) {
     if (r.student_id !== studentId) continue;
@@ -871,6 +888,7 @@ function studentNotifications(studentId: string): Notification[] {
   const SEVEN_DAYS = 7 * 24 * 3600 * 1000;
   for (const c of loadClubs()) {
     if (c.status !== "upcoming") continue;
+    if (uu?.product_type === "insights" && c.type !== "insight") continue;
     const createdIso = c.created_at ?? c.date;
     if (now - +new Date(createdIso) > SEVEN_DAYS) continue;
     const kind: AccessKind = c.type === "book" ? "book" : "insight";
@@ -881,7 +899,7 @@ function studentNotifications(studentId: string): Notification[] {
       title: `New Club open: ${c.title}`,
       body: fmtDate(c.date),
       createdAt: createdIso,
-      to: "/student/sessions",
+      to: uu?.product_type === "insights" ? "/student/insights" : "/student/sessions",
       read: false,
     });
   }
@@ -1051,7 +1069,7 @@ export function buildNotifications(role: Role, userId: string): Notification[] {
 // React binding — one subscription that listens to every source event.
 // ---------------------------------------------------------------------------
 const SOURCE_EVENTS = [
-  SCHEDULE_EVENTS, SESSIONS_EVENT, CLUBS_EVENT, RELEASE_REQUESTS_EVENT,
+  SCHEDULE_EVENTS, SESSIONS_EVENT, CLUBS_EVENT, CLUB_REPORTS_EVENT, RELEASE_REQUESTS_EVENT,
   AVAIL_EVENT, STRIKES_EVENT, ANN_EVENT, NOTIF_EVENT,
   REPORTS_EVENT, CONDUCT_REPORTS_EVENT, CONTENT_ISSUE_EVENT, FIN_ISSUES_EVENT, STUDENTS_EVENT, CHALLENGES_EVENT,
   REQUESTS_EVENT, VIP_UNITS_EVENT, TAILORED_UNITS_EVENT, LP_EVENT, LESSON_PLANS_EVENT,
