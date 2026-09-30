@@ -1,5 +1,5 @@
 import { createFileRoute, Navigate, Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { UserPlus, Pencil, X, ShieldCheck, ShieldAlert, Eye, EyeOff, KeyRound, Mail, Plus, Trash2 } from "lucide-react";
 import { USERS, type User, type AdminType } from "@/lib/mock-data";
 import { Card, SectionTitle, PrimaryButton, GhostButton, Pill } from "@/components/verbo/ui";
@@ -43,16 +43,19 @@ function coordTypeLabel(u: User): string {
 }
 
 function UsersPage() {
-  hydrateAdminRoles();
   const { user } = useAuth();
   const adminType = getAdminType(user);
   const [, force] = useState(0);
-  useEffect(() => subscribeUsers(() => force((n) => n + 1)), []);
+  useEffect(() => {
+    void hydrateAdminRoles();
+    return subscribeUsers(() => force((n) => n + 1));
+  }, []);
 
-  const rows = useMemo(() => USERS.slice(), []);
+  const rows = USERS.slice();
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<User | null>(null);
   const [resetPwFor, setResetPwFor] = useState<User | null>(null);
+  const [savingAccessFor, setSavingAccessFor] = useState<string | null>(null);
 
   if (adminType && adminType !== "super_admin") {
     return <Navigate to="/admin" />;
@@ -127,10 +130,16 @@ function UsersPage() {
                         </button>
                         {u.id !== user?.id && (
                           <button
-                            onClick={() => {
-                              setUserDeactivated(u.id, !deactivated);
-                              toast.success(deactivated ? "User reactivated." : "User deactivated.");
+                            onClick={async () => {
+                              if (savingAccessFor) return;
+                              setSavingAccessFor(u.id);
+                              try {
+                                const saved = await setUserDeactivated(u.id, !deactivated);
+                                if (saved) toast.success(deactivated ? "User reactivated." : "User deactivated.");
+                                else toast.error("Could not update account access.");
+                              } finally { setSavingAccessFor(null); }
                             }}
+                            disabled={savingAccessFor !== null}
                             className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs ${
                               deactivated
                                 ? "border border-success/40 bg-success/10 text-success hover:bg-success/15"
@@ -382,11 +391,15 @@ function CreateUserModal({ onClose }: { onClose: () => void }) {
 
 function EditUserModal({ user, onClose }: { user: User; onClose: () => void }) {
   const [name, setName] = useState(user.name);
+  const [saving, setSaving] = useState(false);
   const currentType: AdminType = (user.admin_type as AdminType) ?? "super_admin";
   const [adminType, setAdminType] = useState<AdminType>(currentType);
 
-  const save = () => {
-    const res = updateInternalUser(user.id, { name, admin_type: adminType });
+  const save = async () => {
+    if (saving) return;
+    setSaving(true);
+    const res = await updateInternalUser(user.id, { name, admin_type: adminType });
+    setSaving(false);
     if (!res.ok) { toast.error(res.error); return; }
     toast.success("User updated.");
     onClose();
@@ -422,7 +435,7 @@ function EditUserModal({ user, onClose }: { user: User; onClose: () => void }) {
         </div>
         <div className="flex justify-end gap-2 border-t border-border px-5 py-3">
           <GhostButton onClick={onClose}>Cancel</GhostButton>
-          <PrimaryButton onClick={save}>Save changes</PrimaryButton>
+          <PrimaryButton onClick={save} disabled={saving}>{saving ? "Saving…" : "Save changes"}</PrimaryButton>
         </div>
       </div>
     </div>
