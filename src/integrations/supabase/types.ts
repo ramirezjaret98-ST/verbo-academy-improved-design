@@ -3819,6 +3819,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_save_teacher_financial: {
+        Args: { p_teacher_id: string; p_adjustments?: Json | null; p_payment_records?: Json | null; p_reset_hours?: boolean; p_expected_adjustment_ids?: number[] | null; p_expected_payment_ids?: number[] | null }
+        Returns: undefined
+      }
+      admin_approve_club_release: {
+        Args: { p_request_id: number; p_penalty: number }
+        Returns: undefined
+      }
       admin_update_sessions: {
         Args: { p_updates: Json }
         Returns: number

@@ -3,11 +3,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { AccentModal, AccentModalFooter, Card, GhostButton, Pill, PrimaryButton, SectionTitle } from "@/components/verbo/ui";
 import type { LucideIcon } from "lucide-react";
 import { USERS } from "@/lib/mock-data";
-import { appendTeacherAdjustment } from "@/lib/teacher-tiers";
 import {
   type Club, type ClubType, type TimeStatus, type ClubReleaseRequest,
   assignmentOf, clubTeacherName as teacherName,
-  loadClubs, createClub, updateClub, deleteClub, subscribeClubs, releaseClub,
+  loadClubs, createClub, updateClub, deleteClub, subscribeClubs, releaseClub, approveClubRelease,
   loadReleaseRequests, subscribeReleaseRequests, removeReleaseRequest,
 } from "@/lib/clubs-store";
 import { notifySuccess, notifyError } from "@/lib/notify";
@@ -775,23 +774,11 @@ function ReleaseRequestsPanel({ requests, clubs }: { requests: ClubReleaseReques
           request={approving}
           club={clubs.find((c) => c.id === approving.club_id) ?? null}
           onClose={() => setApproving(null)}
-          onConfirm={(amount) => {
-            const club = clubs.find((c) => c.id === approving.club_id);
-            if (club) {
-              const label = club.type === "insight" ? "Insight" : "Book Club";
-              const dateStr = new Date(club.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-              appendTeacherAdjustment(
-                approving.teacher_id,
-                -Math.abs(amount),
-                `Club release penalty — ${label}: ${club.title} on ${dateStr}`,
-              );
-              void releaseClub(club.id).then((res) => {
-                if (res) notifySuccess("Release approved.");
-                else notifyError("Couldn't release the club — try again.", { context: "Approving club release" });
-              });
+          onConfirm={async (amount) => {
+            if (await approveClubRelease(approving.id, amount)) {
+              notifySuccess("Release approved.");
+              setApproving(null);
             }
-            removeReleaseRequest(approving.id);
-            setApproving(null);
           }}
         />
       )}
@@ -805,8 +792,9 @@ function ApproveReleaseModal({
   request: ClubReleaseRequest;
   club: Club | null;
   onClose: () => void;
-  onConfirm: (amount: number) => void;
+  onConfirm: (amount: number) => Promise<void>;
 }) {
+  const [saving, setSaving] = useState(false);
   const [amount, setAmount] = useState<string>(
     club?.teacher_payment != null ? String(club.teacher_payment) : "",
   );
@@ -845,9 +833,13 @@ function ApproveReleaseModal({
         </Field>
       </div>
       <div className="flex justify-end gap-2 border-t border-border bg-secondary/30 px-6 py-4">
-        <GhostButton onClick={onClose}>Cancel</GhostButton>
-        <PrimaryButton accentColor="#5fca16" disabled={!valid} onClick={() => onConfirm(parseFloat(amount))}>
-          Confirm approval
+        <GhostButton onClick={onClose} disabled={saving}>Cancel</GhostButton>
+        <PrimaryButton accentColor="#5fca16" disabled={!valid || saving} onClick={async () => {
+          if (saving) return;
+          setSaving(true);
+          try { await onConfirm(parseFloat(amount)); } finally { setSaving(false); }
+        }}>
+          {saving ? "Saving…" : "Confirm approval"}
         </PrimaryButton>
       </div>
     </AccentModal>

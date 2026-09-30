@@ -74,7 +74,6 @@ import { resolvedRemainingSeats, resolvedMonthlyCap } from "@/lib/club-bookings-
 import { groupOfStudent, effectiveSessionCounts, sessionProgressFor } from "@/lib/groups-store";
 import { useCoreFreemiumGate } from "@/components/verbo/CoreFreemiumFlow";
 import { isSilenced, hasCreditUsed as freemiumUsed, markCreditUsed as markFreemiumUsed } from "@/lib/core-freemium-store";
-import { effectiveHourlyRate, appendTeacherAdjustment } from "@/lib/teacher-tiers";
 import { hydrateTeachers, subscribeTeachers } from "@/lib/teacher-model";
 import { hydrateStudents, subscribeStudents } from "@/lib/students-store";
 import { ProfilePeekCard } from "@/components/verbo/ProfilePeekCard";
@@ -1199,25 +1198,21 @@ function SessionsRemainingCard({ studentId }: { studentId: string }) {
 // ---------------------------------------------------------------------------
 function CancelSpotlightModal({ session, onClose }: { session: ExtSession; onClose: () => void }) {
   const teacherName = userById(session.teacher_id)?.name ?? "your teacher";
-  const confirm = () => {
+  const [saving, setSaving] = useState(false);
+  const confirm = async () => {
+    if (saving) return;
+    setSaving(true);
     const hours = hoursUntil(session.date_time);
     const late = hours < 24;
     const note = late
       ? "Cancelled by student with less than 24h notice — teacher paid."
       : "Cancelled by student with 24h+ notice — no payment.";
-    studentSetSessionStatus(session.id, "cancelled", note);
-    if (late) {
-      const teacher = USERS.find((u) => u.id === session.teacher_id);
-      if (teacher) {
-        appendTeacherAdjustment(
-          teacher.id,
-          Math.round(effectiveHourlyRate(teacher)),
-          "Spotlight Session — late cancellation (paid, <24h notice)",
-        );
-      }
+    const saved = await studentSetSessionStatus(session.id, "cancelled", note);
+    setSaving(false);
+    if (saved) {
+      toast.success("Spotlight Session cancelled.");
+      onClose();
     }
-    toast.success("Spotlight Session cancelled.");
-    onClose();
   };
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center verbo-backdrop p-4">
@@ -1237,6 +1232,7 @@ function CancelSpotlightModal({ session, onClose }: { session: ExtSession; onClo
           <button
             type="button"
             onClick={confirm}
+            disabled={saving}
             className="w-full inline-flex items-center justify-center gap-2 rounded-full border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors duration-150 ease-out hover:border-destructive/40 hover:bg-destructive/10 hover:text-destructive active:scale-[0.97]"
           >
             Confirm Cancellation
