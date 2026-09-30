@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { createFileRoute, Outlet } from "@tanstack/react-router";
+import { createFileRoute, Navigate, Outlet, useRouterState } from "@tanstack/react-router";
 import { RoleGuard } from "@/components/verbo/RoleGuard";
 import { PageTransition } from "@/components/verbo/PageTransition";
 import { TopNav, type NavEntry } from "@/components/verbo/TopNav";
@@ -15,8 +15,10 @@ export const Route = createFileRoute("/student")({
 
 function StudentLayout() {
   const { user } = useAuth();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
   const productType = user?.product_type ?? "performance";
   const isVIP = user?.product === "vip";
+  const insightsOnly = productType === "insights";
 
   // Register the daily visit once per mounted student session.
   useEffect(() => {
@@ -46,6 +48,10 @@ function StudentLayout() {
       { to: "/student/resources", label: "Resources" },
       { to: "/student/challenges", label: "Challenges" },
     ];
+  }
+
+  if (insightsOnly && pathname !== "/student" && pathname !== "/student/" && pathname !== "/student/insights") {
+    return <RoleGuard allow="student"><Navigate to="/student" /></RoleGuard>;
   }
 
   return (

@@ -12,6 +12,7 @@ import { ClubReservationModal } from "@/components/verbo/ClubReservationModal";
 import type { CalendarEvent, CalendarEventKind } from "@/lib/calendar-events";
 import { isBooked, monthlyCap, bookingsThisMonth, useBookings } from "@/lib/club-bookings-store";
 import { useCoreFreemiumGate } from "@/components/verbo/CoreFreemiumFlow";
+import { getClubAttendanceForStudent, subscribeClubReports } from "@/lib/club-reports-store";
 
 
 
@@ -31,6 +32,7 @@ function clubToEvent(c: Club, studentId: string): CalendarEvent {
     spots_taken: c.spots_taken,
     spots_total: c.spots_total,
     booked: isBooked(studentId, c.id),
+    attendance_outcome: getClubAttendanceForStudent(c.id, studentId),
     club: c,
   };
 }
@@ -38,9 +40,10 @@ function clubToEvent(c: Club, studentId: string): CalendarEvent {
 
 function Page() {
   const { user } = useAuth();
-  const [, tick] = useState(0);
-  useEffect(() => subscribeClubs(() => tick((n) => n + 1)), []);
-  useBookings(); // re-render on booking changes
+  const [tick, refresh] = useState(0);
+  useEffect(() => subscribeClubs(() => refresh((n) => n + 1)), []);
+  useEffect(() => subscribeClubReports(() => refresh((n) => n + 1)), []);
+  const bookings = useBookings();
 
   const [selected, setSelected] = useState<Club | null>(null);
   const freemium = useCoreFreemiumGate(user);
@@ -50,7 +53,7 @@ function Page() {
     return loadClubs()
       .filter((c) => c.type === "insight" && c.status !== "cancelled")
       .map((c) => clubToEvent(c, user.id));
-  }, [user]);
+  }, [user, tick, bookings]);
 
 
   if (!user) return null;

@@ -17,7 +17,9 @@ import type { ExtSession, ExtSessionStatus, AttendanceSubStatus } from "./sessio
 import { loadSessions, SUB_STATUS_META } from "./sessions-store";
 import { loadClubs, type Club, type ClubType, type TimeStatus } from "./clubs-store";
 import { groupsByStudentId } from "./groups-store";
-import { isBooked } from "./club-bookings-store";
+import { isBooked, loadBookings } from "./club-bookings-store";
+import { userById } from "./mock-data";
+import { getClubAttendanceForStudent } from "./club-reports-store";
 import {
   STATUS_PALETTE,
   SUBSTITUTION_COLOR,
@@ -52,9 +54,11 @@ export interface CalendarEvent {
   spots_taken?: number;
   spots_total?: number;
   enrolled_names?: string[];
+  enrolled_students?: { id: string; name: string }[];
   /** True when the currently-viewed student already has a seat in this club.
    *  Only set by student-scoped adapters; teacher adapters leave it undefined. */
   booked?: boolean;
+  attendance_outcome?: "present" | "absent";
   /** Refinement of Absent/Cancelled status. When set, the pill renders the
    *  2-letter initials + the sub-status color instead of the base color. */
   sub_status?: AttendanceSubStatus;
@@ -92,22 +96,14 @@ function sessionEvent(s: ExtSession, title: string, subStatus?: AttendanceSubSta
 }
 
 
-// Deterministic enrolled-student placeholders — the seed data only tracks
-// spots_taken counts, so we hydrate a stable list of names for the hover
-// popover. When the real roster ships, replace with a lookup here.
-const CLUB_NAME_POOL = [
-  "Elena Ruiz", "Marco Silva", "Yuki Tanaka", "Ana Torres", "Liam Bennett",
-  "Priya Shah", "Noah Kim", "Sofía López", "Mateo Rossi", "Grace Lee",
-  "Diego Álvarez", "Emma Wright", "Hana Sato", "Kai Nakamura", "Isabela Costa",
-  "Owen Fischer", "Camila Vega", "Ruben Ortiz", "Aiko Mori", "Jonas Weber",
-  "Zara Ahmed", "Luca Bianchi", "Nora Park", "Theo Rossi", "Maya Chen",
-  "Felix Meyer", "Yara Haddad", "Iker Núñez", "Elif Demir", "Aarav Patel",
-];
-function enrolledNamesFor(c: Club): string[] {
-  const taken = Math.max(0, Math.min(c.spots_taken ?? 0, CLUB_NAME_POOL.length));
-  return CLUB_NAME_POOL.slice(0, taken);
+function enrolledStudentsFor(c: Club): { id: string; name: string }[] {
+  return loadBookings().filter((b) => b.club_id === c.id).map((b) => ({
+    id: b.student_id,
+    name: userById(b.student_id)?.name ?? "Student",
+  }));
 }
 function clubEvent(c: Club): CalendarEvent {
+  const enrolled = enrolledStudentsFor(c);
   return {
     id: c.id,
     kind: c.type === "book" ? "book_club" : "insight",
@@ -118,7 +114,8 @@ function clubEvent(c: Club): CalendarEvent {
     status: c.status,
     spots_taken: c.spots_taken,
     spots_total: c.spots_total,
-    enrolled_names: enrolledNamesFor(c),
+    enrolled_names: enrolled.map((s) => s.name),
+    enrolled_students: enrolled,
     club: c,
   };
 }
@@ -179,6 +176,7 @@ export function studentCalendarEvents(studentId: string, opts?: {
     if (c.status === "cancelled") continue;
     const ev = clubEvent(c);
     ev.booked = isBooked(studentId, c.id);
+    if (ev.booked && c.type === "insight") ev.attendance_outcome = getClubAttendanceForStudent(c.id, studentId);
     events.push(ev);
   }
   return events;
@@ -322,6 +320,10 @@ export function eventPillDisplay(
       cellLabel: meta.initials,
     };
   }
+  if (ev.kind === "insight" && ev.attendance_outcome) {
+    const absent = ev.attendance_outcome === "absent";
+    return { color: absent ? STATUS_PALETTE.absent.color : STATUS_PALETTE.completed.color, short: "IN", cellLabel: absent ? "Absent" : "Completed" };
+  }
   const kind = EVENT_KIND_META[ev.kind];
   const status = ev.status as ExtSessionStatus | undefined;
   const statusMeta = ev.kind === "class" && status ? CALENDAR_STATUS_META[status] : undefined;
@@ -354,6 +356,10 @@ export function calendarEventTheme(
       solid: isJustifiedAbsence ? "#dc0000" : meta.color,
       textTone: "light",
     };
+  }
+  if (ev.kind === "insight" && ev.attendance_outcome) {
+    const color = ev.attendance_outcome === "absent" ? STATUS_PALETTE.absent.color : STATUS_PALETTE.completed.color;
+    return { background: color, solid: color, textTone: "light" };
   }
 
   const status = ev.status as ExtSessionStatus | undefined;

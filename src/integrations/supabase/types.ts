@@ -1002,6 +1002,7 @@ export type Database = {
           teacher_id: string | null
           teacher_payment: number | null
           title: string
+          topic_tag: string | null
           type: Database["public"]["Enums"]["club_type"]
         }
         Insert: {
@@ -1020,6 +1021,7 @@ export type Database = {
           teacher_id?: string | null
           teacher_payment?: number | null
           title: string
+          topic_tag?: string | null
           type: Database["public"]["Enums"]["club_type"]
         }
         Update: {
@@ -1038,6 +1040,7 @@ export type Database = {
           teacher_id?: string | null
           teacher_payment?: number | null
           title?: string
+          topic_tag?: string | null
           type?: Database["public"]["Enums"]["club_type"]
         }
         Relationships: [
@@ -3840,6 +3843,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      submit_club_report: {
+        Args: { p_club_id: number; p_comments: string; p_attendance: Json }
+        Returns: undefined
+      }
       admin_save_teacher_financial: {
         Args: { p_teacher_id: string; p_adjustments?: Json | null; p_payment_records?: Json | null; p_reset_hours?: boolean; p_expected_adjustment_ids?: number[] | null; p_expected_payment_ids?: number[] | null }
         Returns: undefined

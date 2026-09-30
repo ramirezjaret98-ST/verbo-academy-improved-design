@@ -2,7 +2,7 @@
 // Handles the <24h cutoff, X/month cap (individual, even for Group members)
 // and both reserve + cancel actions. Same visual language as the Live
 // Sessions modals (Card / PrimaryButton / GhostButton / semantic tokens).
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, CheckCircle2, Users, CalendarClock, Clock, FileText, Video, X } from "lucide-react";
 import { toast } from "sonner";
 import type { Club } from "@/lib/clubs-store";
@@ -18,6 +18,7 @@ import {
   useBookings,
 } from "@/lib/club-bookings-store";
 import { AccentModalHeader, InfoStatRow, PrimaryButton } from "@/components/verbo/ui";
+import { getInsightReport, getClubAttendanceForStudent, subscribeClubReports } from "@/lib/club-reports-store";
 
 function fmtLong(iso: string) {
   return new Date(iso).toLocaleString(undefined, {
@@ -30,17 +31,23 @@ export function ClubReservationModal({
   club,
   studentId,
   onClose,
+  preview = false,
 }: {
   club: Club;
   studentId: string;
   onClose: () => void;
+  preview?: boolean;
 }) {
   // Subscribe so the modal re-renders after reserve/cancel.
   useBookings();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [, refreshReport] = useState(0);
+  useEffect(() => subscribeClubReports(() => refreshReport((n) => n + 1)), []);
 
-  const booked = isBooked(studentId, club.id);
+  const booked = !preview && isBooked(studentId, club.id);
+  const outcome = booked ? getClubAttendanceForStudent(club.id, studentId) : undefined;
+  const report = booked && club.type === "insight" ? getInsightReport(club.id) : undefined;
   const used = bookingsThisMonth(studentId, club.type);
   const cap = monthlyCap(studentId, club.type);
   const isSignature = userById(studentId)?.access_plan === "Signature";
@@ -155,6 +162,7 @@ export function ClubReservationModal({
 
         <div className="p-6">
         <div className="min-w-0">
+          {club.status === "completed" && booked && <div className={`mb-3 rounded-lg px-3 py-2 text-xs font-medium ${outcome === "present" ? "bg-green-50 text-green-800" : outcome === "absent" ? "bg-red-50 text-red-800" : "bg-secondary text-muted-foreground"}`}>{outcome === "present" ? "Completed · You attended" : outcome === "absent" ? "Absent · Your teacher recorded no attendance" : "This Insight has finished. Attendance is pending."}</div>}
           {booked && (
             <span className="mb-2 inline-flex items-center gap-1 rounded-full bg-success/10 px-2 py-0.5 text-[10px] font-semibold text-success">
               <CheckCircle2 className="h-3 w-3" /> You're in
@@ -166,6 +174,8 @@ export function ClubReservationModal({
           {club.description && (
             <p className="mt-1 text-sm text-muted-foreground">{club.description}</p>
           )}
+          {club.topic_tag && <span className="mt-3 inline-block rounded-full bg-orange-50 px-3 py-1 text-xs font-medium text-orange-700">{club.topic_tag}</span>}
+          {club.status === "completed" && booked && report?.comments && <div className="mt-4 rounded-xl bg-secondary/50 p-3"><div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Teacher's group notes</div><p className="mt-1 text-sm text-foreground">{report.comments}</p></div>}
         </div>
 
 
@@ -222,11 +232,11 @@ export function ClubReservationModal({
         {/* Rules */}
         <div className="mt-4 rounded-lg bg-amber-50 px-3 py-2.5 text-[11.5px] leading-relaxed text-amber-900 ring-1 ring-amber-200">
           <div>Reservations close 24h before start.</div>
-          <div className="mt-0.5">
+          {preview ? <div className="mt-0.5">Admin preview: reservation controls and personal quota are hidden.</div> : <div className="mt-0.5">
             {isSignature || !isFinite(cap)
               ? <>You have <strong>unlimited</strong> {isBook ? "Book Clubs" : "Insights"} this month.</>
               : <>You've used <strong>{used} of your {capDisplay}</strong> {isBook ? "Book Clubs" : "Insights"} this month.</>}
-          </div>
+          </div>}
         </div>
 
 
@@ -238,7 +248,7 @@ export function ClubReservationModal({
         )}
 
         <div className="mt-6">
-          {booked ? (
+          {preview || club.status === "completed" ? <PrimaryButton className="w-full justify-center" onClick={onClose}>{preview ? "Close preview" : "Close"}</PrimaryButton> : booked ? (
             <>
               {connectOpen ? (
                 <PrimaryButton

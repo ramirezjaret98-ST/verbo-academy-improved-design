@@ -24,8 +24,10 @@ import { CantAttendModal } from "@/components/verbo/CantAttendModal";
 import { subscribeStrikes } from "@/lib/strikes-store";
 import { addReleaseRequest, type Club } from "@/lib/clubs-store";
 import { ClubReportModal, type ClubReportEventInput } from "@/components/verbo/ClubReportModal";
+import { subscribeBookings } from "@/lib/club-bookings-store";
 import { getClubReport, subscribeClubReports } from "@/lib/club-reports-store";
 import { getCoverageNoteForStudent } from "@/lib/coverage-notes-store";
+import { hydrateStudents, subscribeStudents } from "@/lib/students-store";
 
 export const Route = createFileRoute("/teacher/calendar")({
   // Deep link from the notification bell (session_assigned, spotlight_cancelled,
@@ -59,15 +61,18 @@ function Page() {
   const [, tick] = useState(0);
 
   useEffect(() => {
+    void hydrateStudents();
     setSessions(loadSessions());
     setPlans(loadLessonPlans());
     const u1 = subscribeSessions(() => setSessions(loadSessions()));
     const u2 = subscribeLessonPlans(() => setPlans(loadLessonPlans()));
     const u4 = subscribeStrikes(() => tick((n) => n + 1));
     const u5 = subscribeClubReports(() => tick((n) => n + 1));
+    const u6 = subscribeBookings(() => tick((n) => n + 1));
+    const u7 = subscribeStudents(() => tick((n) => n + 1));
     const onWorkshops = (e: StorageEvent) => { if (e.key === WORKSHOPS_KEY) tick((n) => n + 1); };
     if (typeof window !== "undefined") window.addEventListener("storage", onWorkshops);
-    return () => { u1(); u2(); u4(); u5(); if (typeof window !== "undefined") window.removeEventListener("storage", onWorkshops); };
+    return () => { u1(); u2(); u4(); u5(); u6(); u7(); if (typeof window !== "undefined") window.removeEventListener("storage", onWorkshops); };
   }, []);
 
   // Build calendar events (classes + workshops + clubs) via the shared adapter.
@@ -85,7 +90,7 @@ function Page() {
       studentNameOf: (id) => userById(id)?.name,
       cohortNameOf: cohortName,
     });
-  }, [user, sessions, plans]);
+  }, [user, sessions, plans, tick]);
 
   // Deep-link target from the notification bell — see Route.validateSearch
   // above. Its own date decides which day CalendarView opens on.
@@ -121,6 +126,7 @@ function Page() {
           title: ev.title,
           date: ev.date,
           enrolled_names: ev.enrolled_names ?? [],
+          enrolled_students: ev.enrolled_students ?? [],
         });
       } else if (ev.club) {
         setClubModal(ev.club);
@@ -137,6 +143,7 @@ function Page() {
             title: ev.title,
             date: ev.date,
             enrolled_names: ev.enrolled_names ?? [],
+            enrolled_students: ev.enrolled_students ?? [],
           });
         }
         return;

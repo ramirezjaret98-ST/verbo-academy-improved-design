@@ -40,6 +40,7 @@ import { teacherCalendarEvents, EVENT_KIND_META, type CalendarEvent } from "@/li
 import { loadWorkshops } from "@/lib/workshops-store";
 import { loadClubReports, subscribeClubReports, type ClubReport } from "@/lib/club-reports-store";
 import { ClubReportModal, type ClubReportEventInput } from "@/components/verbo/ClubReportModal";
+import { subscribeBookings } from "@/lib/club-bookings-store";
 import { RatingTrendModal } from "@/components/verbo/RatingTrendModal";
 import { getCoverageNoteForStudent } from "@/lib/coverage-notes-store";
 import studentsIconAsset from "@/assets/students_assigned.svg";
@@ -150,7 +151,8 @@ function TeacherDashboard() {
     // cause as the "My Balance" page — see teacher.financial.tsx.
     hydrateTeachers();
     const u10 = subscribeTeachers(() => setAvailTick((n) => n + 1));
-    return () => { u2(); u3(); u4(); u5(); u6(); u7(); u8(); u9(); u10(); };
+    const u11 = subscribeBookings(() => setAvailTick((n) => n + 1));
+    return () => { u2(); u3(); u4(); u5(); u6(); u7(); u8(); u9(); u10(); u11(); };
   }, []);
 
   // If we arrived with ?report=<id>, auto-open Step 1 for that session
@@ -340,6 +342,7 @@ function TeacherDashboard() {
       title: ev.title,
       date: ev.date,
       enrolled_names: ev.enrolled_names ?? [],
+      enrolled_students: ev.enrolled_students ?? [],
     });
   };
 

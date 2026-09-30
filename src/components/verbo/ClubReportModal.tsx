@@ -5,7 +5,6 @@ import { notifySuccess, notifyError } from "@/lib/notify";
 import {
   saveClubReport, type ClubAttendance, type ClubReportEventType,
 } from "@/lib/club-reports-store";
-import { updateClub } from "@/lib/clubs-store";
 import { updateSession } from "@/lib/sessions-store";
 
 export interface ClubReportEventInput {
@@ -14,6 +13,7 @@ export interface ClubReportEventInput {
   title: string;
   date: string; // ISO
   enrolled_names: string[];
+  enrolled_students: { id: string; name: string }[];
 }
 
 function typeLabel(t: ClubReportEventType) {
@@ -40,11 +40,9 @@ export function ClubReportModal({
   onClose: () => void;
   onSubmitted?: () => void;
 }) {
-  const initial: Record<string, ClubAttendance> = Object.fromEntries(
-    event.enrolled_names.map((n) => [n, "present" as ClubAttendance]),
-  );
-  const [attendance, setAttendance] = useState<Record<string, ClubAttendance>>(initial);
+  const [attendance, setAttendance] = useState<Record<string, ClubAttendance>>({});
   const [comments, setComments] = useState("");
+  const [busy, setBusy] = useState(false);
 
   const fmt = new Date(event.date).toLocaleString(undefined, {
     weekday: "short", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
@@ -55,8 +53,13 @@ export function ClubReportModal({
   const toggle = (name: string, value: ClubAttendance) =>
     setAttendance((prev) => ({ ...prev, [name]: value }));
 
-  const submit = () => {
-    saveClubReport({
+  const submit = async () => {
+    if (Object.keys(attendance).length !== event.enrolled_students.length) {
+      notifyError("Mark each reserved student's attendance before submitting.", { context: "Submitting club report" });
+      return;
+    }
+    setBusy(true);
+    const saved = await saveClubReport({
       event_id: event.id,
       event_type: event.type,
       teacher_id: teacherId,
@@ -64,17 +67,12 @@ export function ClubReportModal({
       comments: comments.trim(),
       submitted_at: new Date().toISOString(),
     });
-    // Book Clubs & Insights live in clubs-store — mark them completed so
-    // Calendar and Manage Clubs reflect immediately. Spotlight events don't
-    // yet have a cross-app store; the club-reports entry alone tracks them.
-    if (event.type === "book" || event.type === "insight") {
-      void updateClub(event.id, { status: "completed" }).then((res) => {
-        if (!res) notifyError("Couldn't mark the club as completed — try again.", { context: "Submitting club report" });
-      });
-    } else if (event.type === "spotlight") {
+    setBusy(false);
+    if (!saved) { notifyError("Couldn't save the report or attendance. Check the reservations and try again.", { context: "Submitting club report" }); return; }
+    if (event.type === "spotlight") {
       updateSession(event.id, { status: "completed" });
     }
-    notifySuccess("Club Report submitted. It will be saved to the club history and visible to attendees.");
+    notifySuccess("Report and attendance saved.");
     onSubmitted?.();
     onClose();
   };
@@ -95,28 +93,28 @@ export function ClubReportModal({
         <div className="max-h-[60vh] overflow-y-auto px-6 py-5">
           <div>
             <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Attendance</div>
-            {event.enrolled_names.length === 0 ? (
+            {event.enrolled_students.length === 0 ? (
               <p className="mt-2 rounded-lg bg-secondary/40 px-3 py-2 text-xs text-muted-foreground">
                 No enrolled students on record for this event.
               </p>
             ) : (
               <ul className="mt-2 divide-y divide-border rounded-lg border border-border">
-                {event.enrolled_names.map((name) => {
-                  const val = attendance[name] ?? "present";
+                {event.enrolled_students.map(({ id, name }) => {
+                  const val = attendance[id];
                   return (
-                    <li key={name} className="flex items-center justify-between gap-3 px-3 py-2">
+                    <li key={id} className="flex items-center justify-between gap-3 px-3 py-2">
                       <div className="min-w-0 truncate text-sm text-foreground">{name}</div>
                       <div className="inline-flex overflow-hidden rounded-md border border-border">
                         <button
                           type="button"
-                          onClick={() => toggle(name, "present")}
+                          onClick={() => toggle(id, "present")}
                           className={`px-2.5 py-1 text-xs font-medium transition-colors ${val === "present" ? "bg-success text-success-foreground" : "bg-background text-muted-foreground hover:bg-secondary"}`}
                         >
                           Present
                         </button>
                         <button
                           type="button"
-                          onClick={() => toggle(name, "absent")}
+                          onClick={() => toggle(id, "absent")}
                           className={`px-2.5 py-1 text-xs font-medium transition-colors border-l border-border ${val === "absent" ? "bg-destructive text-destructive-foreground" : "bg-background text-muted-foreground hover:bg-secondary"}`}
                         >
                           Absent
@@ -128,7 +126,7 @@ export function ClubReportModal({
               </ul>
             )}
             <p className="mt-2 text-[11px] text-muted-foreground">
-              Marking Absent here is informational only — it does not trigger strikes or affect the student's monthly quota.
+              Mark each reservation as Present or Absent. Your group notes are shared with booked students.
             </p>
           </div>
 
@@ -150,7 +148,7 @@ export function ClubReportModal({
           </div>
           <div className="flex justify-end gap-2">
             <GhostButton onClick={onClose}>Cancel</GhostButton>
-            <PrimaryButton onClick={submit}>Submit Report</PrimaryButton>
+            <PrimaryButton onClick={submit} disabled={busy || Object.keys(attendance).length !== event.enrolled_students.length}>{busy ? "Saving…" : "Submit Report"}</PrimaryButton>
           </div>
         </div>
       </div>
