@@ -4,12 +4,13 @@ import { AccentModal, AccentModalFooter, Card, GhostButton, Pill, PrimaryButton,
 import type { LucideIcon } from "lucide-react";
 import { USERS } from "@/lib/mock-data";
 import {
-  type Club, type ClubType, type TimeStatus, type ClubReleaseRequest,
+  type Club, type ClubType, type ClubTitleFont, type TimeStatus, type ClubReleaseRequest,
   assignmentOf, clubTeacherName as teacherName,
   loadClubs, createClub, updateClub, deleteClub, subscribeClubs, releaseClub, approveClubRelease,
   loadReleaseRequests, subscribeReleaseRequests, removeReleaseRequest,
 } from "@/lib/clubs-store";
 import { notifySuccess, notifyError } from "@/lib/notify";
+import { uploadClubFile, removeUploadedClubFiles, validateClubFile, type UploadedClubMedia } from "@/lib/club-media";
 import { InsightsDashboard } from "@/components/verbo/InsightsDashboard";
 import { ClubReservationModal } from "@/components/verbo/ClubReservationModal";
 import { CalendarView as StudentCalendarView } from "@/components/verbo/CalendarView";
@@ -60,6 +61,12 @@ function formatDate(iso: string) {
 
 function formatDay(iso: string) {
   return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
+function toLocalDateTime(iso: string) {
+  const d = new Date(iso);
+  const local = new Date(d.getTime() - d.getTimezoneOffset() * 60_000);
+  return local.toISOString().slice(0, 16);
 }
 
 // Simple normalized similarity — no AI. Exact-ish match ignoring case/spacing.
@@ -119,19 +126,18 @@ function Page() {
     });
   };
 
-  const onSave = (data: Omit<Club, "id" | "spots_taken" | "status">) => {
+  const onSave = async (data: Omit<Club, "id" | "spots_taken" | "status">): Promise<boolean> => {
     if (editing) {
-      void updateClub(editing.id, data).then((res) => {
-        if (res) notifySuccess("Club updated.");
-        else notifyError("Couldn't save the club — try again.", { context: "Saving club" });
-      });
+      const res = await updateClub(editing.id, data);
+      if (!res) return false;
+      notifySuccess("Club updated.");
     } else {
-      void createClub(data).then((res) => {
-        if (res) notifySuccess("Club created.");
-        else notifyError("Couldn't create the club — try again.", { context: "Creating club" });
-      });
+      const res = await createClub(data);
+      if (!res) return false;
+      notifySuccess("Club published.");
     }
     setOpen(false);
+    return true;
   };
 
   if (studentPreview) {
@@ -446,22 +452,37 @@ export function ClubFormPanel({
   initial: Club | null;
   clubs: Club[];
   onClose: () => void;
-  onSave: (data: Omit<Club, "id" | "spots_taken" | "status">) => void;
+  onSave: (data: Omit<Club, "id" | "spots_taken" | "status">) => Promise<boolean>;
 }) {
   const [type, setType] = useState<ClubType>(initial?.type ?? "insight");
   const [title, setTitle] = useState(initial?.title ?? "");
   const [description, setDescription] = useState(initial?.description ?? "");
+  const [subtitle, setSubtitle] = useState(initial?.subtitle ?? "");
+  const [instructions, setInstructions] = useState(initial?.instructions ?? "");
+  const [titleFont, setTitleFont] = useState<ClubTitleFont>(initial?.title_font ?? "sans");
+  const [coverPositionX, setCoverPositionX] = useState(initial?.cover_position_x ?? 50);
+  const [coverPositionY, setCoverPositionY] = useState(initial?.cover_position_y ?? 50);
+  const [coverScale, setCoverScale] = useState(initial?.cover_scale ?? 1);
   const [topicTag, setTopicTag] = useState(initial?.topic_tag ?? "");
   const [link, setLink] = useState(initial?.link ?? "");
   const [material, setMaterial] = useState(initial?.material ?? "");
   const [materialName, setMaterialName] = useState(initial?.material ?? "");
   const [cover, setCover] = useState(initial?.cover_image ?? "");
+  const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [materialFile, setMaterialFile] = useState<File | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [formError, setFormError] = useState("");
+  const [showPreview, setShowPreview] = useState(false);
   const [teacherId, setTeacherId] = useState(initial?.teacher_id ?? "");
-  const [date, setDate] = useState(initial?.date?.slice(0, 16) ?? "");
+  const [date, setDate] = useState(initial?.date ? toLocalDateTime(initial.date) : "");
   const [duration, setDuration] = useState(initial?.duration_minutes ?? 60);
-  const [spotsTotal, setSpotsTotal] = useState(initial?.spots_total ?? (type === "book" ? 4 : 30));
+  const [spotsTotal, setSpotsTotal] = useState(initial?.spots_total ?? (type === "book" ? 6 : 4));
   const coverInputRef = useRef<HTMLInputElement>(null);
   const materialInputRef = useRef<HTMLInputElement>(null);
+  const coverObjectUrl = useMemo(() => coverFile ? URL.createObjectURL(coverFile) : null, [coverFile]);
+  const materialObjectUrl = useMemo(() => materialFile ? URL.createObjectURL(materialFile) : null, [materialFile]);
+  useEffect(() => () => { if (coverObjectUrl) URL.revokeObjectURL(coverObjectUrl); }, [coverObjectUrl]);
+  useEffect(() => () => { if (materialObjectUrl) URL.revokeObjectURL(materialObjectUrl); }, [materialObjectUrl]);
   const [teacherPayment, setTeacherPayment] = useState<string>(
     initial?.teacher_payment != null ? String(initial.teacher_payment) : "",
   );
@@ -474,19 +495,46 @@ export function ClubFormPanel({
     return clubs.find((c) => c.id !== initial?.id && c.type === type && similarTitle(c.title, title)) ?? null;
   }, [title, type, clubs, initial]);
 
-  const submit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!title || !date) return;
-    onSave({
-      type, title, description, topic_tag: type === "insight" ? topicTag.trim() || undefined : undefined, link,
-      material: material || undefined,
-      cover_image: cover || undefined,
-      teacher_id: teacherId || undefined,
-      date: new Date(date).toISOString(),
-      duration_minutes: duration,
-      spots_total: spotsTotal,
-      teacher_payment: teacherPayment.trim() === "" ? undefined : Math.max(0, parseFloat(teacherPayment) || 0),
-    });
+  const formData = (mediaCover: string, mediaMaterial: string): Omit<Club, "id" | "spots_taken" | "status"> => ({
+    type, title: title.trim(), subtitle: subtitle.trim(), description: description.trim(), instructions: instructions.trim(),
+    title_font: titleFont, cover_position_x: coverPositionX, cover_position_y: coverPositionY, cover_scale: coverScale,
+    topic_tag: type === "insight" ? topicTag.trim() || undefined : undefined, link: link.trim(),
+    material: mediaMaterial || undefined, cover_image: mediaCover || undefined,
+    teacher_id: teacherId || undefined, date: new Date(date).toISOString(), duration_minutes: duration,
+    spots_total: spotsTotal,
+    teacher_payment: teacherPayment.trim() === "" ? undefined : Math.max(0, parseFloat(teacherPayment) || 0),
+  });
+
+  const validate = (): string | null => {
+    if (!title.trim()) return "Add a title.";
+    if (!date || Number.isNaN(new Date(date).getTime())) return "Choose a valid date and time.";
+    if (duration < 5 || spotsTotal < 1) return "Check the duration and capacity.";
+    if (initial && spotsTotal < initial.spots_taken) return "Capacity cannot be below existing reservations.";
+    if (link.trim() && !/^https:\/\//i.test(link.trim())) return "The meeting link must begin with https://.";
+    if (coverFile) { const issue = validateClubFile(coverFile, "cover"); if (issue) return issue; }
+    if (materialFile) { const issue = validateClubFile(materialFile, "material"); if (issue) return issue; }
+    return null;
+  };
+
+  const submit = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    if (busy) return;
+    const issue = validate();
+    if (issue) { setFormError(issue); return; }
+    setBusy(true);
+    setFormError("");
+    const uploaded: UploadedClubMedia[] = [];
+    try {
+      const nextCover = coverFile ? await uploadClubFile(coverFile, "cover") : null;
+      if (nextCover) uploaded.push(nextCover);
+      const nextMaterial = materialFile ? await uploadClubFile(materialFile, "material") : null;
+      if (nextMaterial) uploaded.push(nextMaterial);
+      const saved = await onSave(formData(nextCover?.url ?? cover, nextMaterial?.url ?? material));
+      if (!saved) throw new Error("The club could not be saved. Your edits are still here; please retry.");
+    } catch (error) {
+      await removeUploadedClubFiles(uploaded);
+      setFormError(error instanceof Error ? error.message : "Could not save the club.");
+    } finally { setBusy(false); }
   };
 
   const isInsight = type === "insight";
@@ -502,7 +550,7 @@ export function ClubFormPanel({
       title={initial ? "Edit Club Event" : "Create New Club Event"}
       watermark={{ type: "text", value: "CLUB" }}
       maxWidth="max-w-xl"
-      onClose={onClose}
+      onClose={() => { if (!busy) onClose(); }}
     >
       <form onSubmit={submit} className="max-h-[70vh] space-y-5 overflow-y-auto px-6 py-6">
         <ClubSectionBanner color="#01304a" textColor="#ffffff" icon={Sparkles} title="Event Details" />
@@ -515,7 +563,7 @@ export function ClubFormPanel({
               <button
                 key={t}
                 type="button"
-                onClick={() => setType(t)}
+                onClick={() => { setType(t); if (!initial) setSpotsTotal(t === "book" ? 6 : 4); }}
                 className={`inline-flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-all ${
                   type === t ? "bg-[#01304a] text-white shadow-sm" : "text-muted-foreground hover:text-foreground"
                 }`}
@@ -539,8 +587,23 @@ export function ClubFormPanel({
           )}
         </Field>
 
+        <Field label="Subtitle">
+          <input value={subtitle} onChange={(e) => setSubtitle(e.target.value)} maxLength={160} placeholder="A short line beneath the title" className={fieldCls} />
+        </Field>
+
+        <Field label="Title typography">
+          <select value={titleFont} onChange={(e) => setTitleFont(e.target.value as ClubTitleFont)} className={fieldCls}>
+            <option value="sans">Verbo Sans</option>
+            <option value="serif">Editorial Serif</option>
+            <option value="display">Display</option>
+          </select>
+        </Field>
+
         <Field label="Description">
           <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={4} placeholder="What students will learn or discuss." className={`${fieldCls} resize-none`} />
+        </Field>
+        <Field label="Instructions" help="Preparation, reading or participation instructions shown separately to students.">
+          <textarea value={instructions} onChange={(e) => setInstructions(e.target.value)} rows={4} placeholder="What should students do before joining?" className={`${fieldCls} resize-none`} />
         </Field>
         {isInsight && <Field label="Topic tag" help="Short category shown on the Insights carousel, for example Everyday Life or Viral Marketing."><input value={topicTag} onChange={(e) => setTopicTag(e.target.value)} maxLength={40} placeholder="Everyday Life" className={fieldCls} /></Field>}
 
@@ -549,10 +612,10 @@ export function ClubFormPanel({
         <Field label="Cover image" help="Cover image students will see on their calendar.">
           <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border bg-secondary/30 p-8 text-center">
             <ImageIcon className="h-7 w-7 text-muted-foreground" />
-            {cover ? (
-              <img src={cover} alt="Cover preview" className="mb-2 h-32 w-full max-w-xs rounded-lg object-cover" />
+            {(coverObjectUrl || cover) ? (
+              <div className="relative mb-2 h-40 w-full max-w-xs overflow-hidden rounded-lg"><img src={coverObjectUrl || cover} alt="Cover preview" className="h-full w-full object-cover" style={{ objectPosition: `${coverPositionX}% ${coverPositionY}%`, transformOrigin: `${coverPositionX}% ${coverPositionY}%`, transform: `scale(${coverScale})` }} /></div>
             ) : (
-              <div className="mt-2 text-sm font-medium text-foreground">Drag & drop or choose an image</div>
+              <div className="mt-2 text-sm font-medium text-foreground">Choose an image</div>
             )}
             <div className="mt-1 text-xs text-muted-foreground">JPG or PNG shown on the student calendar</div>
             <input
@@ -563,9 +626,9 @@ export function ClubFormPanel({
               onChange={(e) => {
                 const file = e.target.files?.[0];
                 if (!file) return;
-                const reader = new FileReader();
-                reader.onload = () => setCover(String(reader.result));
-                reader.readAsDataURL(file);
+                const issue = validateClubFile(file, "cover");
+                if (issue) setFormError(issue);
+                else { setCoverFile(file); setFormError(""); }
                 e.target.value = "";
               }}
             />
@@ -573,34 +636,37 @@ export function ClubFormPanel({
               type="button"
               className="mt-3"
               onClick={() => {
-                if (cover) setCover("");
+                if (cover || coverFile) { setCover(""); setCoverFile(null); }
                 else coverInputRef.current?.click();
               }}
             >
-              {cover ? "Remove image" : "Choose file"}
+              {cover || coverFile ? "Remove image" : "Choose file"}
             </GhostButton>
           </div>
         </Field>
 
+        {(cover || coverFile) && <div className="grid grid-cols-3 gap-3">
+          <Field label="Horizontal"><input type="range" min={0} max={100} value={coverPositionX} onChange={(e) => setCoverPositionX(Number(e.target.value))} className="w-full" /></Field>
+          <Field label="Vertical"><input type="range" min={0} max={100} value={coverPositionY} onChange={(e) => setCoverPositionY(Number(e.target.value))} className="w-full" /></Field>
+          <Field label="Size"><input type="range" min={1} max={2} step={0.05} value={coverScale} onChange={(e) => setCoverScale(Number(e.target.value))} className="w-full" /></Field>
+        </div>}
+
         <Field label="Pre-club material">
           <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border bg-secondary/30 p-8 text-center">
             <UploadCloud className="h-7 w-7 text-muted-foreground" />
-            <div className="mt-2 text-sm font-medium text-foreground">{materialName || "Drop a PDF or image"}</div>
+            <div className="mt-2 text-sm font-medium text-foreground">{materialName || "Choose a PDF"}</div>
             <div className="mt-1 text-xs text-muted-foreground">Shared with students before the event</div>
             <input
               ref={materialInputRef}
               type="file"
-              accept="application/pdf,image/png,image/jpeg"
+              accept="application/pdf"
               className="hidden"
               onChange={(e) => {
                 const file = e.target.files?.[0];
                 if (!file) return;
-                const reader = new FileReader();
-                reader.onload = () => {
-                  setMaterial(String(reader.result));
-                  setMaterialName(file.name);
-                };
-                reader.readAsDataURL(file);
+                const issue = validateClubFile(file, "material");
+                if (issue) setFormError(issue);
+                else { setMaterialFile(file); setMaterialName(file.name); setFormError(""); }
                 e.target.value = "";
               }}
             />
@@ -608,15 +674,16 @@ export function ClubFormPanel({
               type="button"
               className="mt-3"
               onClick={() => {
-                if (material) {
+                if (material || materialFile) {
                   setMaterial("");
+                  setMaterialFile(null);
                   setMaterialName("");
                 } else {
                   materialInputRef.current?.click();
                 }
               }}
             >
-              {material ? "Remove file" : "Choose file"}
+              {material || materialFile ? "Remove file" : "Choose file"}
             </GhostButton>
           </div>
         </Field>
@@ -675,12 +742,15 @@ export function ClubFormPanel({
         </Field>
       </form>
 
+      {formError && <p role="alert" className="px-6 text-sm text-red-700">{formError}</p>}
       <AccentModalFooter>
-        <GhostButton onClick={onClose} type="button">Cancel</GhostButton>
-        <PrimaryButton accentColor="#5fca16" className="hover:!bg-[#4fb010]" onClick={submit as unknown as () => void}>
-          {initial ? "Save changes" : "Publish event"}
+        <GhostButton onClick={onClose} type="button" disabled={busy}>Cancel</GhostButton>
+        <GhostButton type="button" onClick={() => { const issue = validate(); if (issue) setFormError(issue); else { setFormError(""); setShowPreview(true); } }} disabled={busy}>Preview student modal</GhostButton>
+        <PrimaryButton accentColor="#5fca16" className="hover:!bg-[#4fb010]" onClick={() => void submit()} disabled={busy}>
+          {busy ? "Saving…" : initial ? "Save changes" : "Publish event"}
         </PrimaryButton>
       </AccentModalFooter>
+      {showPreview && <ClubReservationModal club={{ ...formData(coverObjectUrl || cover, materialObjectUrl || material), id: initial?.id ?? "preview", spots_taken: initial?.spots_taken ?? 0, status: initial?.status ?? "upcoming" }} studentId="" preview onClose={() => setShowPreview(false)} />}
     </AccentModal>
   );
 }

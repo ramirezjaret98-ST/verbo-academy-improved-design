@@ -19,6 +19,7 @@ import {
 } from "@/lib/club-bookings-store";
 import { AccentModalHeader, InfoStatRow, PrimaryButton } from "@/components/verbo/ui";
 import { getInsightReport, getClubAttendanceForStudent, subscribeClubReports } from "@/lib/club-reports-store";
+import { openClubMaterial } from "@/lib/club-media";
 
 function fmtLong(iso: string) {
   return new Date(iso).toLocaleString(undefined, {
@@ -42,6 +43,7 @@ export function ClubReservationModal({
   useBookings();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [materialError, setMaterialError] = useState<string | null>(null);
   const [, refreshReport] = useState(0);
   useEffect(() => subscribeClubReports(() => refreshReport((n) => n + 1)), []);
 
@@ -103,21 +105,29 @@ export function ClubReservationModal({
     : "linear-gradient(135deg, #01304a 0%, #05070a 100%)";
   const dateShort = new Date(club.date).toLocaleDateString(undefined, { month: "short", day: "numeric" });
   const timeShort = new Date(club.date).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  const titleFontClass = club.title_font === "serif" ? "font-serif" : club.title_font === "display" ? "font-black uppercase tracking-wide" : "font-semibold";
+  const openMaterial = async () => {
+    if (!club.material) return;
+    setMaterialError(null);
+    try { await openClubMaterial(club.material); }
+    catch (cause) { setMaterialError(cause instanceof Error ? cause.message : "Could not open the PDF."); }
+  };
 
   return (
     <div
-      className="verbo-overlay-in fixed inset-0 z-50 flex items-center justify-center verbo-backdrop p-4"
+      className={`verbo-overlay-in fixed inset-0 flex items-center justify-center verbo-backdrop p-4 ${preview ? "z-[60]" : "z-50"}`}
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="relative w-full max-w-lg overflow-hidden rounded-2xl bg-card shadow-floating"
+        className="relative max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-card shadow-floating"
       >
         {club.cover_image ? (
-          <div className="relative h-32 w-full overflow-hidden">
+          <div className="relative h-44 w-full overflow-hidden">
             <img
               src={club.cover_image}
               alt=""
               className="h-full w-full object-cover"
+              style={{ objectPosition: `${club.cover_position_x ?? 50}% ${club.cover_position_y ?? 50}%`, transformOrigin: `${club.cover_position_x ?? 50}% ${club.cover_position_y ?? 50}%`, transform: `scale(${club.cover_scale ?? 1})` }}
             />
             <div
               className="absolute inset-0"
@@ -142,9 +152,10 @@ export function ClubReservationModal({
                 <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/70">
                   {label}
                 </div>
-                <h2 className="mt-1 text-lg font-semibold tracking-tight text-white">
+                <h2 className={`mt-1 text-xl text-white ${titleFontClass}`}>
                   {club.title}
                 </h2>
+                {club.subtitle && <p className="mt-0.5 text-sm text-white/85">{club.subtitle}</p>}
               </div>
             </div>
           </div>
@@ -168,12 +179,14 @@ export function ClubReservationModal({
               <CheckCircle2 className="h-3 w-3" /> You're in
             </span>
           )}
-          <h3 className="text-lg font-semibold tracking-tight" style={{ color: "#01304a" }}>
+          <h3 className={`text-lg ${titleFontClass}`} style={{ color: "#01304a" }}>
             {club.title}
           </h3>
+          {!club.cover_image && club.subtitle && <p className="mt-0.5 text-sm font-medium text-foreground/80">{club.subtitle}</p>}
           {club.description && (
             <p className="mt-1 text-sm text-muted-foreground">{club.description}</p>
           )}
+          {club.instructions && <section className="mt-4 rounded-xl bg-secondary/50 p-3"><h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Instructions</h4><p className="mt-1 whitespace-pre-wrap text-sm text-foreground">{club.instructions}</p></section>}
           {club.topic_tag && <span className="mt-3 inline-block rounded-full bg-orange-50 px-3 py-1 text-xs font-medium text-orange-700">{club.topic_tag}</span>}
           {club.status === "completed" && booked && report?.comments && <div className="mt-4 rounded-xl bg-secondary/50 p-3"><div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Teacher's group notes</div><p className="mt-1 text-sm text-foreground">{report.comments}</p></div>}
         </div>
@@ -197,18 +210,18 @@ export function ClubReservationModal({
                 <span className="inline-flex items-center gap-1.5 text-muted-foreground">
                   <FileText className="h-4 w-4" />Material
                 </span>
-                <a
-                  href={club.material}
-                  target="_blank"
-                  rel="noreferrer"
+                <button
+                  type="button"
+                  onClick={() => void openMaterial()}
                   className="truncate text-right font-medium text-accent underline-offset-2 hover:underline"
                 >
-                  View pre-club material
-                </a>
+                  Open PDF
+                </button>
               </div>
             )}
           </div>
         )}
+        {materialError && <p role="alert" className="mt-2 text-xs text-red-700">{materialError}</p>}
 
 
         {/* Seat meter */}
@@ -248,9 +261,9 @@ export function ClubReservationModal({
         )}
 
         <div className="mt-6">
-          {preview || club.status === "completed" ? <PrimaryButton className="w-full justify-center" onClick={onClose}>{preview ? "Close preview" : "Close"}</PrimaryButton> : booked ? (
+          {preview ? <><div className="grid grid-cols-2 gap-2"><button type="button" disabled className="rounded-full bg-secondary px-4 py-2 text-sm font-medium text-muted-foreground">Reserve seat</button><button type="button" disabled className="rounded-full bg-secondary px-4 py-2 text-sm font-medium text-muted-foreground">Connect</button></div><PrimaryButton className="mt-3 w-full justify-center" onClick={onClose}>Close preview</PrimaryButton></> : club.status === "completed" ? <PrimaryButton className="w-full justify-center" onClick={onClose}>Close</PrimaryButton> : booked ? (
             <>
-              {connectOpen ? (
+              {connectOpen && club.link ? (
                 <PrimaryButton
                   className="w-full justify-center verbo-btn-glow"
                   style={{ backgroundColor: accent, boxShadow: `0 8px 20px -6px ${accent}` }}

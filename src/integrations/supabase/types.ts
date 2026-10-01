@@ -988,6 +988,12 @@ export type Database = {
       clubs: {
         Row: {
           claimed_at: string | null
+          subtitle: string | null
+          instructions: string | null
+          title_font: "sans" | "serif" | "display"
+          cover_position_x: number
+          cover_position_y: number
+          cover_scale: number
           cover_image: string | null
           created_at: string
           date: string
@@ -1007,6 +1013,12 @@ export type Database = {
         }
         Insert: {
           claimed_at?: string | null
+          subtitle?: string | null
+          instructions?: string | null
+          title_font?: "sans" | "serif" | "display"
+          cover_position_x?: number
+          cover_position_y?: number
+          cover_scale?: number
           cover_image?: string | null
           created_at?: string
           date: string
@@ -1026,6 +1038,12 @@ export type Database = {
         }
         Update: {
           claimed_at?: string | null
+          subtitle?: string | null
+          instructions?: string | null
+          title_font?: "sans" | "serif" | "display"
+          cover_position_x?: number
+          cover_position_y?: number
+          cover_scale?: number
           cover_image?: string | null
           created_at?: string
           date?: string
