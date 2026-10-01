@@ -499,10 +499,10 @@ export function ClubFormPanel({
     type, title: title.trim(), subtitle: subtitle.trim(), description: description.trim(), instructions: instructions.trim(),
     title_font: titleFont, cover_position_x: coverPositionX, cover_position_y: coverPositionY, cover_scale: coverScale,
     topic_tag: type === "insight" ? topicTag.trim() || undefined : undefined, link: link.trim(),
-    material: mediaMaterial || undefined, cover_image: mediaCover || undefined,
+    material: mediaMaterial, cover_image: mediaCover,
     teacher_id: teacherId || undefined, date: new Date(date).toISOString(), duration_minutes: duration,
     spots_total: spotsTotal,
-    teacher_payment: teacherPayment.trim() === "" ? undefined : Math.max(0, parseFloat(teacherPayment) || 0),
+    teacher_payment: teacherPayment.trim() === "" ? null : Math.max(0, parseFloat(teacherPayment) || 0),
   });
 
   const validate = (): string | null => {

@@ -44,7 +44,7 @@ export interface Club {
   status: TimeStatus;
   /** Optional payout to the teacher who delivers this club, MXN. Used as
    *  the default penalty amount when an admin approves a release request. */
-  teacher_payment?: number;
+  teacher_payment?: number | null;
   /** ISO timestamp of the current claim. Set when a teacher claims, cleared
    *  when the club is released back to "Created". Drives the 5-minute
    *  free-release window on the teacher side. */
