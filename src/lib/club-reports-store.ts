@@ -49,6 +49,9 @@ function fromRow(row: Row): ClubReport {
 let reportsCache: ClubReport[] = [];
 let hydrated = false;
 let hydratePromise: Promise<void> | null = null;
+let generation = 0;
+let fetchedAt = 0;
+const FOREGROUND_REFRESH_MS = 5 * 60 * 1000;
 const listeners = new Set<() => void>();
 
 function notify() {
@@ -61,12 +64,14 @@ function notify() {
 async function hydrate(): Promise<void> {
   if (hydrated) return;
   if (hydratePromise) return hydratePromise;
+  const requestGeneration = generation;
   hydratePromise = (async () => {
     const [, { data, error }, attendanceResult] = await Promise.all([
       hydrateUserIdBridge(),
       supabase.from("club_reports").select("*"),
       supabase.from("club_report_attendance").select("club_report_id,student_id,attendance"),
     ]);
+    if (requestGeneration !== generation) return;
     if (error) {
       console.error("[club-reports-store] failed to load", error);
     }
@@ -77,15 +82,21 @@ async function hydrate(): Promise<void> {
       attendance: Object.fromEntries((attendanceResult.data ?? []).filter((a) => a.club_report_id === row.id).map((a) => [uuidToLegacySync(a.student_id), a.attendance as ClubAttendance])),
     }));
     hydrated = true;
+    fetchedAt = Date.now();
   })();
-  await hydratePromise;
-  hydratePromise = null;
-  notify();
+  try { await hydratePromise; }
+  finally {
+    hydratePromise = null;
+    if (requestGeneration !== generation) void hydrate();
+    else notify();
+  }
 }
 
-function invalidateAndRehydrate() {
+function invalidateAndRehydrate(reason?: "auth" | "refresh") {
+  if (reason === "refresh" && Date.now() - fetchedAt < FOREGROUND_REFRESH_MS) return;
+  generation++;
   hydrated = false;
-  hydratePromise = null;
+  if (reason === "auth") { reportsCache = []; notify(); }
   void hydrate();
 }
 
@@ -96,12 +107,11 @@ function ensureRealtime() {
   supabase
     .channel("club-reports-store-changes")
     .on("postgres_changes", { event: "*", schema: "public", table: "club_reports" }, () => {
-      hydrated = false;
-      hydratePromise = null;
-      void hydrate();
+      invalidateAndRehydrate();
     })
     .subscribe();
-  registerRehydrate(invalidateAndRehydrate);}
+  registerRehydrate(invalidateAndRehydrate);
+}
 
 if (typeof window !== "undefined") {
   void hydrate();
@@ -163,6 +173,7 @@ export async function saveClubReport(report: ClubReport): Promise<boolean> {
     );
       if (error) { console.error("[club-reports-store] failed to save spotlight report", error); return false; }
     }
+    generation++;
     reportsCache = [...reportsCache.filter((r) => r.event_id !== report.event_id), report];
     notify();
     return true;

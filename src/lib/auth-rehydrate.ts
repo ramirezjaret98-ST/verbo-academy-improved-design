@@ -27,6 +27,9 @@ const rehydrateCallbacks = new Set<(reason?: RefreshReason) => void>();
 const criticalCallbacks = new Set<(reason?: RefreshReason) => void>();
 let lastAuthId: string | null | undefined;
 let lastForegroundRefresh = 0;
+let lastCriticalRefresh = 0;
+const FOREGROUND_REFRESH_MS = 2 * 60 * 1000;
+const CRITICAL_REFRESH_MS = 15_000;
 
 function refreshCallbacks(callbacks: Set<(reason?: RefreshReason) => void>, reason: RefreshReason) {
   // Supabase auth callbacks must return before stores call authenticated APIs.
@@ -45,15 +48,26 @@ export function registerRehydrate(callback: (reason?: RefreshReason) => void, op
       const authId = session?.user?.id ?? null;
       if (authId !== lastAuthId) {
         lastAuthId = authId;
+        lastForegroundRefresh = Date.now();
+        lastCriticalRefresh = lastForegroundRefresh;
         // Call all registered rehydrate callbacks.
         refreshCallbacks(rehydrateCallbacks, "auth");
       }
     });
     const foregroundRefresh = () => {
       if (document.visibilityState !== "visible" || !navigator.onLine || !lastAuthId) return;
-      if (Date.now() - lastForegroundRefresh < 15_000) return;
-      lastForegroundRefresh = Date.now();
-      refreshCallbacks(rehydrateCallbacks, "refresh");
+      const now = Date.now();
+      // Most stores already receive Realtime changes. Avoid reloading every
+      // table each time the window regains focus; keep a faster lane for
+      // scheduling and other stores explicitly marked critical.
+      if (now - lastForegroundRefresh >= FOREGROUND_REFRESH_MS) {
+        lastForegroundRefresh = now;
+        lastCriticalRefresh = now;
+        refreshCallbacks(rehydrateCallbacks, "refresh");
+      } else if (now - lastCriticalRefresh >= CRITICAL_REFRESH_MS) {
+        lastCriticalRefresh = now;
+        refreshCallbacks(criticalCallbacks, "refresh");
+      }
     };
     window.addEventListener("focus", foregroundRefresh);
     window.addEventListener("online", foregroundRefresh);
@@ -62,6 +76,7 @@ export function registerRehydrate(callback: (reason?: RefreshReason) => void, op
     // when a websocket disconnects or an event is missed, without polling all stores.
     setInterval(() => {
       if (document.visibilityState === "visible" && navigator.onLine && lastAuthId) {
+        lastCriticalRefresh = Date.now();
         refreshCallbacks(criticalCallbacks, "refresh");
       }
     }, 60_000);

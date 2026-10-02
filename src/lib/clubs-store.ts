@@ -11,6 +11,7 @@
 // between teachers, so callers must await the actual database result rather
 // than trust an optimistic local update.
 import { supabase } from "@/integrations/supabase/client";
+import { registerRehydrate } from "@/lib/auth-rehydrate";
 import type { Database } from "@/integrations/supabase/types";
 import { hydrateUserIdBridge, legacyToUuid, uuidToLegacySync } from "@/lib/user-id-bridge";
 import { USERS } from "./mock-data";
@@ -76,12 +77,19 @@ type ReleaseRow = Database["public"]["Tables"]["club_release_requests"]["Row"];
 let clubsCache: Club[] = [];
 let clubsHydrated = false;
 let clubsHydratePromise: Promise<void> | null = null;
+let clubsGeneration = 0;
+let clubsFetchedAt = 0;
 const clubListeners = new Set<() => void>();
 
 let requestsCache: ClubReleaseRequest[] = [];
 let requestsHydrated = false;
 let requestsHydratePromise: Promise<void> | null = null;
+let requestsGeneration = 0;
+let requestsFetchedAt = 0;
+let requestsStarted = false;
 const requestListeners = new Set<() => void>();
+const CLUB_REFRESH_MS = 2 * 60 * 1000;
+const REQUEST_REFRESH_MS = 5 * 60 * 1000;
 
 function notifyClubs() {
   clubListeners.forEach((cb) => cb());
@@ -134,56 +142,109 @@ function mapReleaseRow(row: ReleaseRow): ClubReleaseRequest {
 async function hydrateClubs(): Promise<void> {
   if (clubsHydrated) return;
   if (clubsHydratePromise) return clubsHydratePromise;
+  const generation = clubsGeneration;
   clubsHydratePromise = (async () => {
     await hydrateUserIdBridge();
     const { data, error } = await supabase.from("clubs").select("*");
+    if (generation !== clubsGeneration) return;
     if (error) {
       console.error("[clubs-store] failed to load clubs", error);
       clubsHydrated = true;
+      clubsFetchedAt = Date.now();
       return;
     }
     clubsCache = (data ?? []).map(mapClubRow);
     clubsHydrated = true;
+    clubsFetchedAt = Date.now();
   })();
-  await clubsHydratePromise;
-  clubsHydratePromise = null;
-  notifyClubs();
+  try { await clubsHydratePromise; }
+  finally {
+    clubsHydratePromise = null;
+    if (generation !== clubsGeneration) void hydrateClubs();
+    else notifyClubs();
+  }
 }
 
 async function hydrateRequests(): Promise<void> {
   if (requestsHydrated) return;
   if (requestsHydratePromise) return requestsHydratePromise;
+  const generation = requestsGeneration;
   requestsHydratePromise = (async () => {
     await hydrateUserIdBridge();
     const { data, error } = await supabase.from("club_release_requests").select("*");
+    if (generation !== requestsGeneration) return;
     if (error) {
       console.error("[clubs-store] failed to load release requests", error);
       requestsHydrated = true;
+      requestsFetchedAt = Date.now();
       return;
     }
     requestsCache = (data ?? []).map(mapReleaseRow);
     requestsHydrated = true;
+    requestsFetchedAt = Date.now();
   })();
-  await requestsHydratePromise;
-  requestsHydratePromise = null;
-  notifyRequests();
+  try { await requestsHydratePromise; }
+  finally {
+    requestsHydratePromise = null;
+    if (generation !== requestsGeneration) void hydrateRequests();
+    else notifyRequests();
+  }
+}
+
+function refreshClubs() {
+  clubsGeneration++;
+  clubsHydrated = false;
+  void hydrateClubs();
+}
+
+function refreshRequests() {
+  requestsGeneration++;
+  requestsHydrated = false;
+  if (requestsStarted) void hydrateRequests();
 }
 
 if (typeof window !== "undefined") {
   void hydrateClubs();
-  void hydrateRequests();
+  registerRehydrate((reason) => {
+    if (reason === "auth") {
+      clubsGeneration++;
+      requestsGeneration++;
+      clubsHydrated = false;
+      requestsHydrated = false;
+      clubsCache = [];
+      requestsCache = [];
+      notifyClubs();
+      notifyRequests();
+      void hydrateClubs();
+      if (requestsStarted) void hydrateRequests();
+      return;
+    }
+    if (Date.now() - clubsFetchedAt >= CLUB_REFRESH_MS) refreshClubs();
+    if (requestsStarted && Date.now() - requestsFetchedAt >= REQUEST_REFRESH_MS) refreshRequests();
+  });
   supabase
     .channel("clubs-changes")
-    .on("postgres_changes", { event: "*", schema: "public", table: "clubs" }, () => {
-      clubsHydrated = false;
-      void hydrateClubs();
+    .on("postgres_changes", { event: "*", schema: "public", table: "clubs" }, (payload) => {
+      // The row now contains only media references. Apply Realtime changes
+      // directly so each reservation does not trigger another full SELECT.
+      if (!clubsHydrated || clubsHydratePromise) { refreshClubs(); return; }
+      if (payload.eventType === "DELETE") {
+        const id = String(payload.old?.id ?? "");
+        if (!id) { refreshClubs(); return; }
+        clubsCache = clubsCache.filter((club) => club.id !== id);
+      } else {
+        const row = payload.new as ClubRow;
+        if (!row?.id || !row.title || !row.type) { refreshClubs(); return; }
+        const club = mapClubRow(row);
+        clubsCache = [club, ...clubsCache.filter((item) => item.id !== club.id)];
+      }
+      notifyClubs();
     })
     .subscribe();
   supabase
     .channel("club-release-requests-changes")
     .on("postgres_changes", { event: "*", schema: "public", table: "club_release_requests" }, () => {
-      requestsHydrated = false;
-      void hydrateRequests();
+      refreshRequests();
     })
     .subscribe();
 }
@@ -250,6 +311,7 @@ export async function createClub(data: Omit<Club, "id" | "spots_taken" | "status
     return null;
   }
   const club = mapClubRow(row);
+  clubsGeneration++;
   clubsCache = [club, ...clubsCache];
   notifyClubs();
   return club;
@@ -292,6 +354,7 @@ export async function updateClub(id: string, patch: Partial<Club>): Promise<Club
     return null;
   }
   const club = mapClubRow(row);
+  clubsGeneration++;
   clubsCache = clubsCache.map((c) => (c.id === id ? club : c));
   notifyClubs();
   return club;
@@ -305,6 +368,7 @@ export async function deleteClub(id: string): Promise<boolean> {
     console.error("[clubs-store] failed to delete club", error);
     return false;
   }
+  clubsGeneration++;
   clubsCache = clubsCache.filter((c) => c.id !== id);
   notifyClubs();
   return true;
@@ -332,6 +396,7 @@ export async function claimClub(id: string, teacherId: string): Promise<Club | n
     return null;
   }
   const club = mapClubRow(row);
+  clubsGeneration++;
   clubsCache = clubsCache.map((c) => (c.id === id ? club : c));
   notifyClubs();
   return club;
@@ -354,19 +419,25 @@ export async function approveClubRelease(requestId: string, penalty: number): Pr
     notifyError(error, { context: "Approving club release" });
     return false;
   }
+  clubsGeneration++;
+  requestsGeneration++;
   clubsHydrated = false;
   requestsHydrated = false;
+  await Promise.all([clubsHydratePromise, requestsHydratePromise]);
   await Promise.all([hydrateClubs(), hydrateRequests()]);
   return true;
 }
 
 // --- Release requests -------------------------------------------------------
 export function loadReleaseRequests(): ClubReleaseRequest[] {
+  requestsStarted = true;
   if (!requestsHydrated) void hydrateRequests();
   return requestsCache;
 }
 
 export function subscribeReleaseRequests(cb: () => void): () => void {
+  requestsStarted = true;
+  if (!requestsHydrated) void hydrateRequests();
   requestListeners.add(cb);
   return () => {
     requestListeners.delete(cb);
