@@ -2,7 +2,8 @@
 // Insights-only (no 1:1 sessions, no Learning Path). Reuses CalendarView
 // pinned to `insight` events, driven by the shared clubs-store. Clicking an
 // event opens the ClubReservationModal (<24h cutoff, X/month cap).
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { Sparkles } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { loadClubs, subscribeClubs, type Club } from "@/lib/clubs-store";
@@ -77,6 +78,9 @@ function Page() {
           </p>
 
         </div>
+        <Link to="/student/clubs" className="inline-flex items-center gap-2 rounded-xl bg-[#082d40] px-5 py-3 text-sm font-semibold text-white shadow-lg transition hover:-translate-y-0.5 hover:bg-[#15485e]">
+          <Sparkles className="h-4 w-4 text-[#f49a58]" /> Explore Clubs ↗
+        </Link>
       </div>
 
       <Card>

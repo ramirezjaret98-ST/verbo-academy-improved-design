@@ -13,6 +13,8 @@ import { notifySuccess, notifyError } from "@/lib/notify";
 import { uploadClubFile, removeUploadedClubFiles, validateClubFile, type UploadedClubMedia } from "@/lib/club-media";
 import { InsightsDashboard } from "@/components/verbo/InsightsDashboard";
 import { ClubReservationModal } from "@/components/verbo/ClubReservationModal";
+import { ClubCatalog } from "@/components/verbo/ClubCatalog";
+import { loadAdminCatalogRequests, updateSuggestionStatus, type ClubSuggestion, type ClubRepeatRequest } from "@/lib/club-catalog-store";
 import { CalendarView as StudentCalendarView } from "@/components/verbo/CalendarView";
 import type { CalendarEvent } from "@/lib/calendar-events";
 import {
@@ -87,7 +89,7 @@ function similarTitle(a: string, b: string) {
   return overlap >= 0.75;
 }
 
-type ViewMode = "list" | "calendar" | "history";
+type ViewMode = "list" | "calendar" | "history" | "requests";
 
 function Page() {
   const { new: openNew } = Route.useSearch();
@@ -97,7 +99,7 @@ function Page() {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Club | null>(null);
   const [view, setView] = useState<ViewMode>("list");
-  const [studentPreview, setStudentPreview] = useState<"home" | "calendar" | null>(null);
+  const [studentPreview, setStudentPreview] = useState<"home" | "calendar" | "catalog" | null>(null);
   const [previewClub, setPreviewClub] = useState<Club | null>(null);
 
   useEffect(() => {
@@ -144,7 +146,8 @@ function Page() {
     const events: CalendarEvent[] = clubs.filter((c) => c.type === "insight" && c.status !== "cancelled").map((c) => ({ id: c.id, kind: "insight", date: c.date, duration_minutes: c.duration_minutes, title: c.title, subtitle: "Insight", status: c.status, spots_taken: c.spots_taken, spots_total: c.spots_total, club: c }));
     return <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-orange-200 bg-orange-50 px-5 py-3"><div><strong className="text-sm text-foreground">Insights student preview</strong><p className="text-xs text-muted-foreground">Live Academy content; quota, reservations and actions are disabled.</p></div><GhostButton onClick={() => { setPreviewClub(null); setStudentPreview(null); }}>Back to Manage Clubs</GhostButton></div>
-      {studentPreview === "home" ? <InsightsDashboard name="student" preview onExplore={() => setStudentPreview("calendar")} /> : <div className="space-y-4"><div className="flex items-center justify-between"><div><h1 className="text-2xl font-semibold">Explore Insights</h1><p className="text-sm text-muted-foreground">Read-only calendar preview.</p></div><GhostButton onClick={() => { setPreviewClub(null); setStudentPreview("home"); }}>Dashboard</GhostButton></div><Card><StudentCalendarView events={events} availableKinds={["insight"]} onEventClick={(event) => { if (event.club) setPreviewClub(event.club); }} /></Card></div>}
+      <div className="flex gap-2"><GhostButton onClick={() => setStudentPreview("calendar")}>Calendar</GhostButton><GhostButton onClick={() => setStudentPreview("catalog")}>Catalog</GhostButton></div>
+      {studentPreview === "home" ? <InsightsDashboard name="student" preview onExplore={() => setStudentPreview("calendar")} /> : studentPreview === "catalog" ? <ClubCatalog clubs={clubs} studentId="" preview /> : <div className="space-y-4"><div className="flex items-center justify-between"><div><h1 className="text-2xl font-semibold">Explore Insights</h1><p className="text-sm text-muted-foreground">Read-only calendar preview.</p></div><GhostButton onClick={() => { setPreviewClub(null); setStudentPreview("home"); }}>Dashboard</GhostButton></div><Card><StudentCalendarView events={events} availableKinds={["insight"]} onEventClick={(event) => { if (event.club) setPreviewClub(event.club); }} /></Card></div>}
       {previewClub && <ClubReservationModal club={previewClub} studentId="" preview onClose={() => setPreviewClub(null)} />}
     </div>;
   }
@@ -156,7 +159,7 @@ function Page() {
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">Manage Clubs</h1>
           <p className="mt-1 text-sm text-muted-foreground">Create and curate Verbo Insights and Book Clubs that appear on the student calendar.</p>
         </div>
-        <div className="flex flex-wrap gap-2"><GhostButton onClick={() => setStudentPreview("home")}>Preview Insights as student</GhostButton><PrimaryButton accentColor="#5fca16" onClick={onCreate}>
+        <div className="flex flex-wrap gap-2"><GhostButton onClick={() => setStudentPreview("catalog")}>Preview catalog as student</GhostButton><PrimaryButton accentColor="#5fca16" onClick={onCreate}>
           <Plus className="h-4 w-4" /> Create New Club Event
         </PrimaryButton></div>
       </div>
@@ -168,6 +171,7 @@ function Page() {
           { id: "list", label: "List View", icon: List },
           { id: "calendar", label: "Calendar View", icon: CalendarDays },
           { id: "history", label: "Topic History", icon: History },
+          { id: "requests", label: "Catalog Requests", icon: Inbox },
         ] as { id: ViewMode; label: string; icon: typeof List }[]).map((t) => (
           <button
             key={t.id}
@@ -184,6 +188,7 @@ function Page() {
       {view === "list" && <ListView clubs={clubs} onEdit={onEdit} onDelete={onDelete} />}
       {view === "calendar" && <CalendarView clubs={clubs} onEdit={onEdit} />}
       {view === "history" && <TopicHistory clubs={clubs} />}
+      {view === "requests" && <CatalogRequestsPanel clubs={clubs} />}
 
 
       {open && <ClubFormPanel initial={editing} clubs={clubs} onClose={() => setOpen(false)} onSave={onSave} />}
@@ -194,6 +199,53 @@ function Page() {
 // ---------------------------------------------------------------------------
 // List view (existing table + Assignment column)
 // ---------------------------------------------------------------------------
+function CatalogRequestsPanel({ clubs }: { clubs: Club[] }) {
+  const [suggestions, setSuggestions] = useState<ClubSuggestion[]>([]);
+  const [repeats, setRepeats] = useState<ClubRepeatRequest[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const refresh = async () => {
+    try {
+      const data = await loadAdminCatalogRequests();
+      setSuggestions(data.suggestions);
+      setRepeats(data.repeats);
+      setError("");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not load requests.");
+    } finally { setLoading(false); }
+  };
+  useEffect(() => { void refresh(); }, []);
+  const reasonLabel: Record<string, string> = {
+    missed: "Missed it", full: "It was full", again: "Would join again",
+  };
+  const repeatGroups = Object.values(repeats.reduce<Record<string, ClubRepeatRequest[]>>((groups, request) => {
+    (groups[String(request.club_id)] ??= []).push(request);
+    return groups;
+  }, {})).sort((a, b) => b.length - a.length);
+  const changeStatus = async (id: number, status: "new" | "reviewed" | "planned" | "closed") => {
+    try {
+      await updateSuggestionStatus(id, status);
+      await refresh();
+      notifySuccess("Suggestion updated.");
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Could not update."); }
+  };
+  return <div className="space-y-5">
+    {error && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
+    <Card><div className="flex items-center justify-between gap-3"><div><SectionTitle>Suggestions from students</SectionTitle><p className="mt-1 text-sm text-muted-foreground">Ideas for Insights and Book Clubs. Review before adding a scheduled club.</p></div><GhostButton onClick={() => void refresh()}>Refresh</GhostButton></div>
+      {loading ? <p className="mt-4 text-sm text-muted-foreground">Loading…</p> : suggestions.length === 0 ? <p className="mt-4 text-sm text-muted-foreground">No suggestions yet.</p> :
+        <div className="mt-4 space-y-3">{suggestions.map((item) => <div key={item.id} className="rounded-xl border border-border p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3"><div><span className="text-[10px] font-bold uppercase tracking-wider text-accent">{item.type === "book" ? "Book Club" : "Insight"}</span><h3 className="text-base font-semibold">{item.title}</h3><p className="mt-1 whitespace-pre-wrap text-sm text-muted-foreground">{item.details || "No additional details."}</p><p className="mt-2 text-xs text-muted-foreground">{USERS.find((u) => u.id === item.student_id)?.name ?? "Student"} · {formatDate(item.created_at)}</p></div>
+            <select aria-label={`Status for ${item.title}`} value={item.status} onChange={(e) => void changeStatus(item.id, e.target.value as "new" | "reviewed" | "planned" | "closed")} className="rounded-lg border border-border bg-background px-3 py-2 text-xs"><option value="new">New</option><option value="reviewed">Reviewed</option><option value="planned">Planned</option><option value="closed">Closed</option></select>
+          </div></div>)}</div>}</Card>
+    <Card><SectionTitle>Requests for another Insight</SectionTitle><p className="mt-1 text-sm text-muted-foreground">Internal signal: consider a new edition after four distinct students request it. No event is created automatically.</p>
+      {loading ? <p className="mt-4 text-sm text-muted-foreground">Loading…</p> : repeatGroups.length === 0 ? <p className="mt-4 text-sm text-muted-foreground">No repeat requests yet.</p> :
+        <div className="mt-4 space-y-3">{repeatGroups.map((group) => {
+          const club = clubs.find((item) => item.id === String(group[0].club_id));
+          return <div key={group[0].club_id} className="rounded-xl border border-border p-4"><div className="flex justify-between gap-3"><div><h3 className="font-semibold">{club?.title ?? `Insight #${group[0].club_id}`}</h3><p className="mt-1 text-xs text-muted-foreground">{club && formatDate(club.date)}</p></div><span className={`rounded-full px-3 py-1 text-xs font-bold ${group.length >= 4 ? "bg-green-100 text-green-800" : "bg-secondary text-muted-foreground"}`}>{group.length} request{group.length === 1 ? "" : "s"}{group.length >= 4 ? " · Consider scheduling" : ""}</span></div><div className="mt-3 space-y-1 text-xs text-muted-foreground">{group.map((item) => <p key={item.id}>{USERS.find((u) => u.id === item.student_id)?.name ?? "Student"} · {reasonLabel[item.reason] ?? item.reason}</p>)}</div></div>;
+        })}</div>}</Card>
+  </div>;
+}
+
 function ListView({ clubs, onEdit, onDelete }: { clubs: Club[]; onEdit: (c: Club) => void; onDelete: (id: string) => void }) {
   return (
     <Card className="!p-0">
@@ -464,6 +516,7 @@ export function ClubFormPanel({
   const [coverPositionY, setCoverPositionY] = useState(initial?.cover_position_y ?? 50);
   const [coverScale, setCoverScale] = useState(initial?.cover_scale ?? 1);
   const [topicTag, setTopicTag] = useState(initial?.topic_tag ?? "");
+  const [catalogFeatured, setCatalogFeatured] = useState(initial?.catalog_featured ?? false);
   const [link, setLink] = useState(initial?.link ?? "");
   const [material, setMaterial] = useState(initial?.material ?? "");
   const [materialName, setMaterialName] = useState(initial?.material ?? "");
@@ -498,7 +551,7 @@ export function ClubFormPanel({
   const formData = (mediaCover: string, mediaMaterial: string): Omit<Club, "id" | "spots_taken" | "status"> => ({
     type, title: title.trim(), subtitle: subtitle.trim(), description: description.trim(), instructions: instructions.trim(),
     title_font: titleFont, cover_position_x: coverPositionX, cover_position_y: coverPositionY, cover_scale: coverScale,
-    topic_tag: type === "insight" ? topicTag.trim() || undefined : undefined, link: link.trim(),
+    topic_tag: topicTag.trim() || undefined, catalog_featured: catalogFeatured, link: link.trim(),
     material: mediaMaterial, cover_image: mediaCover,
     teacher_id: teacherId || undefined, date: new Date(date).toISOString(), duration_minutes: duration,
     spots_total: spotsTotal,
@@ -605,7 +658,11 @@ export function ClubFormPanel({
         <Field label="Instructions" help="Preparation, reading or participation instructions shown separately to students.">
           <textarea value={instructions} onChange={(e) => setInstructions(e.target.value)} rows={4} placeholder="What should students do before joining?" className={`${fieldCls} resize-none`} />
         </Field>
-        {isInsight && <Field label="Topic tag" help="Short category shown on the Insights carousel, for example Everyday Life or Viral Marketing."><input value={topicTag} onChange={(e) => setTopicTag(e.target.value)} maxLength={40} placeholder="Everyday Life" className={fieldCls} /></Field>}
+        <Field label="Catalog category" help="Used to organize the student catalog. For example Culture, Mindset or Fiction."><input value={topicTag} onChange={(e) => setTopicTag(e.target.value)} maxLength={40} placeholder="Culture" className={fieldCls} /></Field>
+        <label className="flex items-center gap-3 rounded-xl border border-border px-4 py-3 text-sm text-foreground">
+          <input type="checkbox" checked={catalogFeatured} onChange={(e) => setCatalogFeatured(e.target.checked)} />
+          Feature this club in the student catalog carousel
+        </label>
 
         <ClubSectionBanner color="#3ebbad" textColor="#0b2b28" icon={ImageIcon} title="Media & Materials" />
 
@@ -613,15 +670,15 @@ export function ClubFormPanel({
           <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border bg-secondary/30 p-8 text-center">
             <ImageIcon className="h-7 w-7 text-muted-foreground" />
             {(coverObjectUrl || cover) ? (
-              <div className="relative mb-2 h-40 w-full max-w-xs overflow-hidden rounded-lg"><img src={coverObjectUrl || cover} alt="Cover preview" className="h-full w-full object-cover" style={{ objectPosition: `${coverPositionX}% ${coverPositionY}%`, transformOrigin: `${coverPositionX}% ${coverPositionY}%`, transform: `scale(${coverScale})` }} /></div>
+              <div className="relative mb-2 h-40 w-full max-w-xs overflow-hidden rounded-lg bg-[#0b2c3d]"><img src={coverObjectUrl || cover} alt="" className="absolute inset-0 h-full w-full scale-110 object-cover opacity-45 blur-lg" /><img src={coverObjectUrl || cover} alt="Cover preview" className="relative h-full w-full object-contain" style={{ objectPosition: `${coverPositionX}% ${coverPositionY}%` }} /></div>
             ) : (
               <div className="mt-2 text-sm font-medium text-foreground">Choose an image</div>
             )}
-            <div className="mt-1 text-xs text-muted-foreground">JPG or PNG shown on the student calendar</div>
+            <div className="mt-1 text-xs text-muted-foreground">JPG, PNG or WebP, up to 8 MB. The full image is visible in the detail modal.</div>
             <input
               ref={coverInputRef}
               type="file"
-              accept="image/png,image/jpeg"
+              accept="image/png,image/jpeg,image/webp"
               className="hidden"
               onChange={(e) => {
                 const file = e.target.files?.[0];
@@ -648,7 +705,7 @@ export function ClubFormPanel({
         {(cover || coverFile) && <div className="grid grid-cols-3 gap-3">
           <Field label="Horizontal"><input type="range" min={0} max={100} value={coverPositionX} onChange={(e) => setCoverPositionX(Number(e.target.value))} className="w-full" /></Field>
           <Field label="Vertical"><input type="range" min={0} max={100} value={coverPositionY} onChange={(e) => setCoverPositionY(Number(e.target.value))} className="w-full" /></Field>
-          <Field label="Size"><input type="range" min={1} max={2} step={0.05} value={coverScale} onChange={(e) => setCoverScale(Number(e.target.value))} className="w-full" /></Field>
+          <Field label="Card zoom"><input type="range" min={1} max={2} step={0.05} value={coverScale} onChange={(e) => setCoverScale(Number(e.target.value))} className="w-full" /></Field>
         </div>}
 
         <Field label="Pre-club material">

@@ -33,6 +33,7 @@ export interface Club {
   cover_position_y?: number;
   cover_scale?: number;
   topic_tag?: string;
+  catalog_featured?: boolean;
   link: string;
   material?: string;
   cover_image?: string;
@@ -104,6 +105,7 @@ function mapClubRow(row: ClubRow): Club {
     cover_position_y: row.cover_position_y,
     cover_scale: row.cover_scale,
     topic_tag: row.topic_tag ?? undefined,
+    catalog_featured: row.catalog_featured,
     link: row.link ?? "",
     material: row.material ?? undefined,
     cover_image: row.cover_image ?? undefined,
@@ -231,6 +233,7 @@ export async function createClub(data: Omit<Club, "id" | "spots_taken" | "status
       cover_position_y: data.cover_position_y ?? 50,
       cover_scale: data.cover_scale ?? 1,
       topic_tag: data.topic_tag?.trim() || null,
+      catalog_featured: data.catalog_featured ?? false,
       link: data.link || null,
       material: data.material || null,
       cover_image: data.cover_image || null,
@@ -269,6 +272,7 @@ export async function updateClub(id: string, patch: Partial<Club>): Promise<Club
   if (patch.cover_position_y !== undefined) update.cover_position_y = patch.cover_position_y;
   if (patch.cover_scale !== undefined) update.cover_scale = patch.cover_scale;
   if ("topic_tag" in patch) update.topic_tag = patch.topic_tag?.trim() || null;
+  if (patch.catalog_featured !== undefined) update.catalog_featured = patch.catalog_featured;
   if (patch.link !== undefined) update.link = patch.link || null;
   if (patch.material !== undefined) update.material = patch.material || null;
   if (patch.cover_image !== undefined) update.cover_image = patch.cover_image || null;

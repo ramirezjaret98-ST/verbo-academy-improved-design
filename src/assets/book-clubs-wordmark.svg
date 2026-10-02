@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="330" height="100" viewBox="0 0 330 100" role="img" aria-label="Book Clubs">
+  <path d="M19 21c19-5 32-3 42 5v51c-10-8-23-10-42-5V21Zm42 5c10-8 23-10 42-5v51c-19-5-32-3-42 5V26Z" fill="none" stroke="#9bd5d0" stroke-width="4" stroke-linejoin="round"/>
+  <path d="M61 27v50" stroke="#9bd5d0" stroke-width="4"/>
+  <text x="118" y="51" fill="#fff9ef" font-family="Georgia,serif" font-size="40" letter-spacing="-2">Book Clubs</text>
+  <text x="120" y="76" fill="#a9d2d0" font-family="Arial,sans-serif" font-size="11" font-weight="700" letter-spacing="4">BY VERBO</text>
+</svg>

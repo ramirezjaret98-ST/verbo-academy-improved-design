@@ -2,7 +2,7 @@ import { supabase } from "@/integrations/supabase/client";
 
 const COVER_BUCKET = "public-assets";
 const MATERIAL_BUCKET = "materials";
-const MAX_COVER_BYTES = 2 * 1024 * 1024;
+const MAX_COVER_BYTES = 8 * 1024 * 1024;
 const MAX_MATERIAL_BYTES = 8 * 1024 * 1024;
 const PRIVATE_PREFIX = "storage://materials/";
 
@@ -10,11 +10,11 @@ export type ClubMediaKind = "cover" | "material";
 export type UploadedClubMedia = { url: string; bucket: string; path: string };
 
 export function validateClubFile(file: File, kind: ClubMediaKind): string | null {
-  const allowed = kind === "cover" ? ["image/jpeg", "image/png"] : ["application/pdf"];
+  const allowed = kind === "cover" ? ["image/jpeg", "image/png", "image/webp"] : ["application/pdf"];
   const max = kind === "cover" ? MAX_COVER_BYTES : MAX_MATERIAL_BYTES;
   if (!file.size) return "The selected file is empty.";
-  if (!allowed.includes(file.type)) return kind === "cover" ? "Choose a JPG or PNG image." : "Choose a PDF file.";
-  if (file.size > max) return `The file must be under ${kind === "cover" ? "2" : "8"} MB.`;
+  if (!allowed.includes(file.type)) return kind === "cover" ? "Choose a JPG, PNG or WebP image." : "Choose a PDF file.";
+  if (file.size > max) return "The file must be under 8 MB.";
   return null;
 }
 
@@ -23,7 +23,7 @@ export async function uploadClubFile(file: File, kind: ClubMediaKind): Promise<U
   if (problem) throw new Error(problem);
   const bucket = kind === "cover" ? COVER_BUCKET : MATERIAL_BUCKET;
   const folder = kind === "cover" ? "club-covers" : "club-materials";
-  const extension = kind === "cover" ? (file.type === "image/png" ? "png" : "jpg") : "pdf";
+  const extension = kind === "cover" ? (file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg") : "pdf";
   const path = `${folder}/${crypto.randomUUID()}.${extension}`;
   const { error } = await supabase.storage.from(bucket).upload(path, file, {
     contentType: file.type,

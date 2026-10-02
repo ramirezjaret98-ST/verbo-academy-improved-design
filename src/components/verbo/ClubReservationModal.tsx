@@ -44,6 +44,11 @@ export function ClubReservationModal({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [materialError, setMaterialError] = useState<string | null>(null);
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 15_000);
+    return () => window.clearInterval(timer);
+  }, []);
   const [, refreshReport] = useState(0);
   useEffect(() => subscribeClubReports(() => refreshReport((n) => n + 1)), []);
 
@@ -52,28 +57,23 @@ export function ClubReservationModal({
   const report = booked && club.type === "insight" ? getInsightReport(club.id) : undefined;
   const used = bookingsThisMonth(studentId, club.type);
   const cap = monthlyCap(studentId, club.type);
+  const isCore = userById(studentId)?.access_plan === "Core";
   const isSignature = userById(studentId)?.access_plan === "Signature";
   const capDisplay = isSignature || !isFinite(cap) ? "∞" : String(cap);
   const teacher = club.teacher_id ? userById(club.teacher_id) : null;
 
 
-  const reserveBlocked = useMemo(
-    () => (booked ? null : reserveBlockedReason(studentId, club)),
-    [booked, studentId, club],
-  );
-  const cancelBlocked = useMemo(
-    () => (booked ? cancelBlockedReason(club) : null),
-    [booked, club],
-  );
+  // The interval refreshes the cutoff and meeting state while this dialog is open.
+  const reserveBlocked = booked ? null : reserveBlockedReason(studentId, club);
+  const cancelBlocked = booked ? cancelBlockedReason(club) : null;
 
   const isBook = club.type === "book";
 
-  // "Connect" activates 5 minutes before the club starts, until it ends.
+  // The join action updates while the modal stays open.
   const connectOpen = useMemo(() => {
     const start = new Date(club.date).getTime();
-    const now = Date.now();
-    return now >= start - 5 * 60 * 1000 && now <= start + club.duration_minutes * 60 * 1000;
-  }, [club.date, club.duration_minutes]);
+    return now >= start - 10 * 60 * 1000 && now <= start + club.duration_minutes * 60 * 1000;
+  }, [club.date, club.duration_minutes, now]);
   // Matches calendarEventTheme() for book_club / insight so the modal reads as
   // the same entity as its calendar pill.
   const accent = isBook ? "#c2410c" : "#01304a";
@@ -119,44 +119,36 @@ export function ClubReservationModal({
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="relative max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-card shadow-floating"
+        role="dialog"
+        aria-modal="true"
+        aria-label={club.title}
+        className="relative max-h-[92dvh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-card shadow-floating"
       >
         {club.cover_image ? (
-          <div className="relative h-44 w-full overflow-hidden">
+          <div className="relative h-[280px] w-full overflow-hidden bg-[#092637] sm:h-[370px]">
+            <div
+              aria-hidden
+              className="absolute inset-[-12%] bg-cover bg-center opacity-60 blur-3xl"
+              style={{ backgroundImage: `url("${club.cover_image}")` }}
+            />
             <img
               src={club.cover_image}
               alt=""
-              className="h-full w-full object-cover"
-              style={{ objectPosition: `${club.cover_position_x ?? 50}% ${club.cover_position_y ?? 50}%`, transformOrigin: `${club.cover_position_x ?? 50}% ${club.cover_position_y ?? 50}%`, transform: `scale(${club.cover_scale ?? 1})` }}
+              className="absolute inset-0 h-full w-full object-contain"
+              style={{ objectPosition: `${club.cover_position_x ?? 50}% ${club.cover_position_y ?? 50}%` }}
             />
             <div
               className="absolute inset-0"
-              style={{ background: "linear-gradient(to top, rgba(0,0,0,0.78) 0%, rgba(0,0,0,0.35) 45%, rgba(0,0,0,0.08) 100%)" }}
+              style={{ background: "linear-gradient(to bottom, transparent 0%, transparent 46%, color-mix(in oklab, var(--card) 12%, transparent) 61%, var(--card) 100%)" }}
               aria-hidden
             />
-            <div className="absolute inset-0 flex flex-col justify-between p-4">
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white shadow-sm">
-                  <HeaderIcon className="h-5 w-5" style={{ color: accent }} />
-                </div>
-                <button
-                  type="button"
-                  onClick={onClose}
-                  aria-label="Close"
-                  className="rounded-full border border-white/40 p-1.5 text-white/80 transition-colors hover:bg-white/15 hover:text-white"
-                >
-                  <X className="h-4 w-4" />
-                </button>
+            <div className="absolute inset-x-0 top-0 flex items-start justify-between p-5">
+              <div className="rounded-full border border-white/35 bg-[#072637]/70 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.2em] text-white backdrop-blur-md">
+                {label}
               </div>
-              <div>
-                <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/70">
-                  {label}
-                </div>
-                <h2 className={`mt-1 text-xl text-white ${titleFontClass}`}>
-                  {club.title}
-                </h2>
-                {club.subtitle && <p className="mt-0.5 text-sm text-white/85">{club.subtitle}</p>}
-              </div>
+              <button type="button" onClick={onClose} aria-label="Close" className="grid h-9 w-9 place-items-center rounded-full border border-white/40 bg-[#072637]/70 text-white backdrop-blur-md transition hover:scale-105 hover:bg-[#072637]">
+                <X className="h-4 w-4" />
+              </button>
             </div>
           </div>
         ) : (
@@ -171,7 +163,7 @@ export function ClubReservationModal({
           />
         )}
 
-        <div className="p-6">
+        <div className={club.cover_image ? "-mt-12 relative px-6 pb-7 pt-0 sm:px-9" : "p-6 sm:px-9"}>
         <div className="min-w-0">
           {club.status === "completed" && booked && <div className={`mb-3 rounded-lg px-3 py-2 text-xs font-medium ${outcome === "present" ? "bg-green-50 text-green-800" : outcome === "absent" ? "bg-red-50 text-red-800" : "bg-secondary text-muted-foreground"}`}>{outcome === "present" ? "Completed · You attended" : outcome === "absent" ? "Absent · Your teacher recorded no attendance" : "This Insight has finished. Attendance is pending."}</div>}
           {booked && (
@@ -179,10 +171,10 @@ export function ClubReservationModal({
               <CheckCircle2 className="h-3 w-3" /> You're in
             </span>
           )}
-          <h3 className={`text-lg ${titleFontClass}`} style={{ color: "#01304a" }}>
+          <h3 className={`text-3xl leading-tight sm:text-4xl ${titleFontClass}`} style={{ color: "#01304a" }}>
             {club.title}
           </h3>
-          {!club.cover_image && club.subtitle && <p className="mt-0.5 text-sm font-medium text-foreground/80">{club.subtitle}</p>}
+          {club.subtitle && <p className="mt-2 text-base font-medium text-[#a8582c]">{club.subtitle}</p>}
           {club.description && (
             <p className="mt-1 text-sm text-muted-foreground">{club.description}</p>
           )}
@@ -208,14 +200,14 @@ export function ClubReservationModal({
             {club.material && (
               <div className="flex items-center justify-between gap-3">
                 <span className="inline-flex items-center gap-1.5 text-muted-foreground">
-                  <FileText className="h-4 w-4" />Material
+                  <FileText className="h-4 w-4" />Before you join
                 </span>
                 <button
                   type="button"
                   onClick={() => void openMaterial()}
                   className="truncate text-right font-medium text-accent underline-offset-2 hover:underline"
                 >
-                  Open PDF
+                  Check this before you join
                 </button>
               </div>
             )}
@@ -246,7 +238,9 @@ export function ClubReservationModal({
         <div className="mt-4 rounded-lg bg-amber-50 px-3 py-2.5 text-[11.5px] leading-relaxed text-amber-900 ring-1 ring-amber-200">
           <div>Reservations close 24h before start.</div>
           {preview ? <div className="mt-0.5">Admin preview: reservation controls and personal quota are hidden.</div> : <div className="mt-0.5">
-            {isSignature || !isFinite(cap)
+            {isCore && cap === 0
+              ? <>Core courtesy access applies while your credit is available.</>
+              : isSignature || !isFinite(cap)
               ? <>You have <strong>unlimited</strong> {isBook ? "Book Clubs" : "Insights"} this month.</>
               : <>You've used <strong>{used} of your {capDisplay}</strong> {isBook ? "Book Clubs" : "Insights"} this month.</>}
           </div>}
@@ -261,25 +255,22 @@ export function ClubReservationModal({
         )}
 
         <div className="mt-6">
-          {preview ? <><div className="grid grid-cols-2 gap-2"><button type="button" disabled className="rounded-full bg-secondary px-4 py-2 text-sm font-medium text-muted-foreground">Reserve seat</button><button type="button" disabled className="rounded-full bg-secondary px-4 py-2 text-sm font-medium text-muted-foreground">Connect</button></div><PrimaryButton className="mt-3 w-full justify-center" onClick={onClose}>Close preview</PrimaryButton></> : club.status === "completed" ? <PrimaryButton className="w-full justify-center" onClick={onClose}>Close</PrimaryButton> : booked ? (
+          {preview ? <><div className="grid grid-cols-2 gap-2"><button type="button" disabled className="rounded-full bg-secondary px-4 py-2 text-sm font-medium text-muted-foreground">Reserve seat</button><button type="button" disabled className="rounded-full bg-secondary px-4 py-2 text-sm font-medium text-muted-foreground">Join the conversation</button></div><PrimaryButton className="mt-3 w-full justify-center" onClick={onClose}>Close preview</PrimaryButton></> : club.status === "completed" ? <PrimaryButton className="w-full justify-center" onClick={onClose}>Close</PrimaryButton> : booked ? (
             <>
               {connectOpen && club.link ? (
                 <PrimaryButton
                   className="w-full justify-center verbo-btn-glow"
                   style={{ backgroundColor: accent, boxShadow: `0 8px 20px -6px ${accent}` }}
-                  onClick={() => club.link && window.open(club.link, "_blank")}
+                  onClick={() => club.link && window.open(club.link, "_blank", "noopener,noreferrer")}
                 >
-                  <Video className="h-4 w-4" /> Connect
+                  <Video className="h-4 w-4" /> Join the conversation
                 </PrimaryButton>
               ) : (
-                <button
-                  type="button"
-                  disabled
-                  title="Activates 5 minutes before your session."
-                  className="w-full inline-flex cursor-not-allowed items-center justify-center gap-2 rounded-full bg-secondary px-4 py-2 text-sm font-medium text-muted-foreground"
-                >
-                  <Video className="h-4 w-4" /> Connect
-                </button>
+                <span className="block" title={club.link ? "Available 10 minutes before the session starts." : "The meeting link is not available yet."} tabIndex={0}>
+                  <button type="button" disabled className="inline-flex w-full cursor-not-allowed items-center justify-center gap-2 rounded-full bg-secondary px-4 py-2 text-sm font-medium text-muted-foreground">
+                    <Video className="h-4 w-4" /> Join the conversation
+                  </button>
+                </span>
               )}
               <div className="mt-3 text-center">
                 <button

@@ -985,8 +985,63 @@ export type Database = {
           },
         ]
       }
+      club_suggestions: {
+        Row: {
+          id: number
+          student_id: string
+          type: Database["public"]["Enums"]["club_type"]
+          title: string
+          details: string
+          status: string
+          created_at: string
+        }
+        Insert: {
+          id?: never
+          student_id: string
+          type: Database["public"]["Enums"]["club_type"]
+          title: string
+          details?: string
+          status?: string
+          created_at?: string
+        }
+        Update: {
+          id?: never
+          student_id?: string
+          type?: Database["public"]["Enums"]["club_type"]
+          title?: string
+          details?: string
+          status?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
+      club_repeat_requests: {
+        Row: {
+          id: number
+          club_id: number
+          student_id: string
+          reason: string
+          created_at: string
+        }
+        Insert: {
+          id?: never
+          club_id: number
+          student_id: string
+          reason: string
+          created_at?: string
+        }
+        Update: {
+          id?: never
+          club_id?: number
+          student_id?: string
+          reason?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
       clubs: {
         Row: {
+          catalog_featured: boolean
           claimed_at: string | null
           subtitle: string | null
           instructions: string | null
@@ -1012,6 +1067,7 @@ export type Database = {
           type: Database["public"]["Enums"]["club_type"]
         }
         Insert: {
+          catalog_featured?: boolean
           claimed_at?: string | null
           subtitle?: string | null
           instructions?: string | null
@@ -1037,6 +1093,7 @@ export type Database = {
           type: Database["public"]["Enums"]["club_type"]
         }
         Update: {
+          catalog_featured?: boolean
           claimed_at?: string | null
           subtitle?: string | null
           instructions?: string | null

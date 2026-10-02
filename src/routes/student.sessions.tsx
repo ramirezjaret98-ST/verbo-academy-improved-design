@@ -223,6 +223,7 @@ function Page() {
     [events, highlightParam],
   );
 
+  const freemium = useCoreFreemiumGate(user);
   if (!user) return null;
 
   const policy = parseReschedulePolicy(user);
@@ -251,8 +252,6 @@ function Page() {
   if (hasInsight) studentKinds.push("insight");
   if (hasBook) studentKinds.push("book_club");
   if (hasSpot) studentKinds.push("spotlight");
-
-  const freemium = useCoreFreemiumGate(user);
 
   const handleEventClick = (ev: CalendarEvent) => {
     if (ev.club && (ev.kind === "insight" || ev.kind === "book_club")) {
@@ -285,6 +284,10 @@ function Page() {
             Your next class, your next club, your next win. All in one place.
           </p>
         </div>
+        <button type="button" onClick={() => navigate({ to: "/student/clubs" })}
+          className="inline-flex items-center gap-2 rounded-xl bg-[#082d40] px-5 py-3 text-sm font-semibold text-white shadow-lg transition hover:-translate-y-0.5 hover:bg-[#15485e]">
+          <Sparkles className="h-4 w-4 text-[#f49a58]" /> Explore Clubs <ChevronRight className="h-4 w-4" />
+        </button>
       </div>
 
 
