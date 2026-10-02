@@ -3918,6 +3918,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      resequence_lesson_plans: {
+        Args: { p_source_session_id: number; p_target_session_id: number; p_expected_snapshot?: string | null; p_apply?: boolean }
+        Returns: Json
+      }
+      undo_lesson_plan_resequence: {
+        Args: { p_event_id: string }
+        Returns: Json
+      }
       submit_club_report: {
         Args: { p_club_id: number; p_comments: string; p_attendance: Json }
         Returns: undefined
