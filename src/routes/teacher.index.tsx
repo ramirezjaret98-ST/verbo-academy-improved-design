@@ -19,6 +19,7 @@ import { savePerformance, type PerformanceRating } from "@/lib/performance-store
 import { MACRO_SKILLS as SHARED_MACRO_SKILLS, skillKey as sharedSkillKey, type BaseKey as SharedBaseKey } from "@/lib/skills-taxonomy";
 import { submitSessionReport, updateSession, loadSessions, subscribeSessions, notifySessionEvent, logSessionConnect, SUB_STATUS_META, isJustificationWindowOpen, type ExtSession, type AttendanceSubStatus } from "@/lib/sessions-store";
 import { PlanModal } from "@/components/verbo/PlanModal";
+import { ReorderLessonPlansModal } from "@/components/verbo/ReorderLessonPlansModal";
 import { downloadSessionReportPdf, sessionReportPdfBlob, sessionReportFileName } from "@/lib/session-report-pdf";
 import { downloadCollaborationPdf, downloadKpiSummaryPdf } from "@/lib/simple-docs-pdf";
 import { uploadContentFile } from "@/lib/content-uploads";
@@ -99,6 +100,7 @@ function TeacherDashboard() {
   const [evaluating, setEvaluating] = useState<ExtSession | null>(null);
   const [editing, setEditing] = useState<{ session: ExtSession; perf: PerformanceRating; subskills: Record<string, number> } | null>(null);
   const [planning, setPlanning] = useState<ExtSession | null>(null);
+  const [reordering, setReordering] = useState<ExtSession | null>(null);
   
   const [plans, setPlans] = useState<Record<string, LessonPlan>>({});
   // Live-synced canonical sessions (used by summary cards, Needs Your
@@ -1312,7 +1314,11 @@ function TeacherDashboard() {
           existing={plans[planning.id]}
           onClose={() => setPlanning(null)}
           onSave={handleSavePlan}
+          onReorder={() => { setReordering(planning); setPlanning(null); }}
         />
+      )}
+      {reordering && (
+        <ReorderLessonPlansModal source={reordering} sessions={sessions} plans={plans} onClose={() => setReordering(null)} />
       )}
       {viewing && (
         <SessionDetailsModal

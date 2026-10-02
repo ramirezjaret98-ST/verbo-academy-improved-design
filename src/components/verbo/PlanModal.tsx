@@ -23,12 +23,13 @@ const ALL_SESSION_TYPES: LessonSessionType[] = [
 ];
 
 export function PlanModal({
-  session, existing, onClose, onSave,
+  session, existing, onClose, onSave, onReorder,
 }: {
   session: ExtSession;
   existing?: LessonPlan;
   onClose: () => void;
   onSave: (plan: LessonPlan) => void;
+  onReorder?: () => void;
 }) {
   const student = userById(session.student_id);
 
@@ -327,6 +328,11 @@ export function PlanModal({
         </div>
 
         <AccentModalFooter>
+          {existing && onReorder && +new Date(session.date_time) > Date.now() &&
+            ["scheduled", "ready", "rescheduled", "rearranged", "delayed"].includes(session.status) &&
+            !session.report_locked && !session.report_submitted_at && (
+            <GhostButton onClick={onReorder} className="cursor-pointer">Reorder plans</GhostButton>
+          )}
           <GhostButton onClick={onClose} className="cursor-pointer">Cancel</GhostButton>
           <button
             onClick={submit}

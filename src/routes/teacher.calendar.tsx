@@ -13,6 +13,7 @@ import {
   loadSessions, subscribeSessions, updateSession, type ExtSession,
 } from "@/lib/sessions-store";
 import { PlanModal } from "@/components/verbo/PlanModal";
+import { ReorderLessonPlansModal } from "@/components/verbo/ReorderLessonPlansModal";
 import { CalendarView } from "@/components/verbo/CalendarView";
 import {
   teacherCalendarEvents, CALENDAR_STATUS_META, EVENT_KIND_META, calendarEventTheme,
@@ -52,6 +53,7 @@ function Page() {
   const [plans, setPlans] = useState<Record<string, LessonPlan>>({});
   
   const [planning, setPlanning] = useState<ExtSession | null>(null);
+  const [reordering, setReordering] = useState<ExtSession | null>(null);
   const [detailsFor, setDetailsFor] = useState<{ session: ExtSession; mode: "ready" | "completed"; title: string; event: CalendarEvent } | null>(null);
   const [cancelling, setCancelling] = useState<ExtSession | null>(null);
   const [clubModal, setClubModal] = useState<Club | null>(null);
@@ -299,7 +301,7 @@ function Page() {
                         boxShadow: `0 10px 24px -10px color-mix(in srgb, ${theme.solid} 85%, transparent), 0 0 0 1px color-mix(in srgb, ${theme.solid} 35%, transparent)`,
                       }}
                     >
-                      {ended && ev.status === "ready" ? (<><FileEdit className="h-4 w-4" /> Fill Session Report</>) : "Plan session"}
+                      {ended && ev.status === "ready" ? (<><FileEdit className="h-4 w-4" /> Fill Session Report</>) : plans[ev.session?.id ?? ""] ? "Review plan" : "Plan session"}
                       <ArrowRight className="h-4 w-4 transition-transform duration-200 ease-out group-hover/cta:translate-x-0.5" />
                     </button>
                   ) : (
@@ -321,7 +323,12 @@ function Page() {
           existing={plans[planning.id]}
           onClose={() => setPlanning(null)}
           onSave={handleSavePlan}
+          onReorder={() => { setReordering(planning); setPlanning(null); }}
         />
+      )}
+
+      {reordering && (
+        <ReorderLessonPlansModal source={reordering} sessions={sessions} plans={plans} onClose={() => setReordering(null)} />
       )}
 
       {detailsFor && (() => {

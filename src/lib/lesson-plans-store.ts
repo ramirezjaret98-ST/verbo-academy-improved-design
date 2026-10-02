@@ -150,6 +150,56 @@ export function getLessonPlan(sessionId: string): LessonPlan | undefined {
   return plansCache.find((p) => p.session_id === sessionId);
 }
 
+export interface LessonPlanMove {
+  session_id: number;
+  date_time: string;
+  from_session_id: number;
+  before_title: string;
+  before_unit_id: string | null;
+  after_title: string;
+  after_unit_id: string | null;
+}
+
+export interface LessonPlanResequencePreview {
+  snapshot: string;
+  moves: LessonPlanMove[];
+  event_id?: string;
+}
+
+export async function previewLessonPlanResequence(sourceId: string, targetId: string): Promise<LessonPlanResequencePreview> {
+  const { data, error } = await supabase.rpc("resequence_lesson_plans", {
+    p_source_session_id: Number(sourceId),
+    p_target_session_id: Number(targetId),
+    p_apply: false,
+  });
+  if (error) throw error;
+  return data as unknown as LessonPlanResequencePreview;
+}
+
+export async function applyLessonPlanResequence(sourceId: string, targetId: string, snapshot: string): Promise<LessonPlanResequencePreview> {
+  const { data, error } = await supabase.rpc("resequence_lesson_plans", {
+    p_source_session_id: Number(sourceId),
+    p_target_session_id: Number(targetId),
+    p_expected_snapshot: snapshot,
+    p_apply: true,
+  });
+  if (error) throw error;
+  await refreshLessonPlans();
+  return data as unknown as LessonPlanResequencePreview;
+}
+
+export async function undoLessonPlanResequence(eventId: string): Promise<void> {
+  const { error } = await supabase.rpc("undo_lesson_plan_resequence", { p_event_id: eventId });
+  if (error) throw error;
+  await refreshLessonPlans();
+}
+
+export async function refreshLessonPlans(): Promise<void> {
+  hydrated = false;
+  hydratePromise = null;
+  await hydrate();
+}
+
 export function saveLessonPlan(plan: LessonPlan) {
   const prev = plansCache;
   // 2026-08-20: capture whether a plan already existed for this session
