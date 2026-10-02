@@ -39,9 +39,9 @@ const fadeBackground = `linear-gradient(to top, ${FADE_STOPS.map(
     `${a === 1 ? "var(--navy-700)" : `color-mix(in oklab, var(--navy-700) ${Math.round(a * 100)}%, transparent)`} ${pos}%`,
 ).join(", ")})`;
 
-export function Footer({ nav = [] }: { nav?: FooterNavGroup[] }) {
+export function Footer({ nav = [], seamlessNavy = false }: { nav?: FooterNavGroup[]; seamlessNavy?: boolean }) {
   return (
-    <footer className="relative isolate mt-36 overflow-hidden md:mt-52">
+    <footer className={`relative isolate overflow-hidden ${seamlessNavy ? "mt-0" : "mt-36 md:mt-52"}`}>
       {/* Navy fade — transparent at the top, solid brand navy at the floor. */}
       <div
         aria-hidden
@@ -70,7 +70,7 @@ export function Footer({ nav = [] }: { nav?: FooterNavGroup[] }) {
           {/* Panel-specific navigation (never mixed across panels). */}
           <div className="flex flex-wrap gap-x-14 gap-y-10">
             <div className="max-w-[15rem] pr-4">
-              <p className="text-[13px] font-light leading-relaxed text-[color-mix(in_oklab,var(--navy-700)_70%,transparent)]">
+              <p className={`text-[13px] font-light leading-relaxed ${seamlessNavy ? "text-white/65" : "text-[color-mix(in_oklab,var(--navy-700)_70%,transparent)]"}`}>
                 Corporate English training built around real conversations, real
                 progress and real people.
               </p>
@@ -79,7 +79,7 @@ export function Footer({ nav = [] }: { nav?: FooterNavGroup[] }) {
 
             {nav.map((group) => (
               <nav key={group.label} className="min-w-[9rem]">
-                <p className={colTitle}>{group.label}</p>
+                <p className={seamlessNavy ? `${colTitle} !text-white/70` : colTitle}>{group.label}</p>
                 <div className="mt-4 space-y-2.5">
                   {group.items.map((it) => (
                     <Link key={it.to} to={it.to} className={linkCls}>
@@ -91,7 +91,7 @@ export function Footer({ nav = [] }: { nav?: FooterNavGroup[] }) {
             ))}
 
             <nav className="min-w-[9rem]">
-              <p className={colTitle}>Company</p>
+              <p className={seamlessNavy ? `${colTitle} !text-white/70` : colTitle}>Company</p>
               <div className="mt-4 space-y-2.5">
                 <a href={OFFICIAL_SITE_URL} target="_blank" rel="noopener noreferrer" className={linkCls}>
                   Official Website
@@ -105,7 +105,7 @@ export function Footer({ nav = [] }: { nav?: FooterNavGroup[] }) {
 
           {/* Text-only contact channels. */}
           <nav className="min-w-[9rem]">
-            <p className={colTitle}>Connect</p>
+            <p className={seamlessNavy ? `${colTitle} !text-white/70` : colTitle}>Connect</p>
             <div className="mt-4 space-y-2.5">
               {FOOTER_CONTACT_LINKS.map((l) => (
                 <a key={l.label} href={l.href} target="_blank" rel="noopener noreferrer" className={linkCls}>

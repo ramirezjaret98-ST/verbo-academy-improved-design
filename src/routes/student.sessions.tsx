@@ -42,7 +42,7 @@ import {
 } from "@/lib/calendar-events";
 import { Card, PrimaryButton, GhostButton, AccentModalHeader, InfoStatRow, AnimatedNumber } from "@/components/verbo/ui";
 
-import { X, Video, AlertTriangle, Sparkles, CalendarClock, Clock, RefreshCcw, ArrowLeft, ChevronRight, Users as UsersIcon, BookOpen, Star } from "lucide-react";
+import { X, Video, AlertTriangle, Sparkles, CalendarClock, Clock, RefreshCcw, ArrowLeft, ChevronRight, Users as UsersIcon, BookOpen, Star, MessageCircle } from "lucide-react";
 import spotlightArt from "@/assets/spotlight1.png";
 import nextUpArt from "@/assets/Verbot_up_next.svg";
 import { getLessonPlan } from "@/lib/lesson-plans-store";
@@ -285,8 +285,8 @@ function Page() {
           </p>
         </div>
         <button type="button" onClick={() => navigate({ to: "/student/clubs" })}
-          className="inline-flex items-center gap-2 rounded-xl bg-[#082d40] px-5 py-3 text-sm font-semibold text-white shadow-lg transition hover:-translate-y-0.5 hover:bg-[#15485e]">
-          <Sparkles className="h-4 w-4 text-[#f49a58]" /> Explore Clubs <ChevronRight className="h-4 w-4" />
+          className="verbo-clubs-entry inline-flex items-center gap-2 rounded-full px-5 py-3 text-sm font-semibold text-white">
+          <MessageCircle className="h-4 w-4" /> Explore Clubs <ChevronRight className="h-4 w-4" />
         </button>
       </div>
 

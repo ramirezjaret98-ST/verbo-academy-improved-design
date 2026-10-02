@@ -3,7 +3,7 @@
 // pinned to `insight` events, driven by the shared clubs-store. Clicking an
 // event opens the ClubReservationModal (<24h cutoff, X/month cap).
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Sparkles } from "lucide-react";
+import { MessageCircle } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { loadClubs, subscribeClubs, type Club } from "@/lib/clubs-store";
@@ -78,8 +78,8 @@ function Page() {
           </p>
 
         </div>
-        <Link to="/student/clubs" className="inline-flex items-center gap-2 rounded-xl bg-[#082d40] px-5 py-3 text-sm font-semibold text-white shadow-lg transition hover:-translate-y-0.5 hover:bg-[#15485e]">
-          <Sparkles className="h-4 w-4 text-[#f49a58]" /> Explore Clubs ↗
+        <Link to="/student/clubs" className="verbo-clubs-entry inline-flex items-center gap-2 rounded-full px-5 py-3 text-sm font-semibold text-white">
+          <MessageCircle className="h-4 w-4" /> Explore Clubs ↗
         </Link>
       </div>
 

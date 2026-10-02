@@ -3,6 +3,7 @@
 // and both reserve + cancel actions. Same visual language as the Live
 // Sessions modals (Card / PrimaryButton / GhostButton / semantic tokens).
 import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { AlertTriangle, CheckCircle2, Users, CalendarClock, Clock, FileText, Video, X } from "lucide-react";
 import { toast } from "sonner";
 import type { Club } from "@/lib/clubs-store";
@@ -113,16 +114,16 @@ export function ClubReservationModal({
     catch (cause) { setMaterialError(cause instanceof Error ? cause.message : "Could not open the PDF."); }
   };
 
-  return (
+  return createPortal((
     <div
-      className={`verbo-overlay-in fixed inset-0 flex items-center justify-center verbo-backdrop p-4 ${preview ? "z-[60]" : "z-50"}`}
+      className={`verbo-overlay-in fixed inset-0 flex items-start justify-center overflow-y-auto overscroll-contain verbo-backdrop p-4 sm:items-center ${preview ? "z-[60]" : "z-50"}`}
     >
       <div
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
         aria-label={club.title}
-        className="relative max-h-[92dvh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-card shadow-floating"
+        className="relative my-auto max-h-[calc(100dvh-2rem)] w-full max-w-2xl overflow-y-auto overscroll-contain rounded-2xl bg-card shadow-floating"
       >
         {club.cover_image ? (
           <div className="relative h-[280px] w-full overflow-hidden bg-[#092637] sm:h-[370px]">
@@ -311,7 +312,7 @@ export function ClubReservationModal({
 
       </div>
     </div>
-  );
+  ), document.body);
 }
 
 

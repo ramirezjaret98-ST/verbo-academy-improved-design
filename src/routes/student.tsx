@@ -19,6 +19,7 @@ function StudentLayout() {
   const productType = user?.product_type ?? "performance";
   const isVIP = user?.product === "vip";
   const insightsOnly = productType === "insights";
+  const isClubsCatalog = pathname === "/student/clubs";
 
   // Register the daily visit once per mounted student session.
   useEffect(() => {
@@ -31,7 +32,6 @@ function StudentLayout() {
     items = [
       { to: "/student", label: "Dashboard" },
       { to: "/student/insights", label: "Insights" },
-      { to: "/student/clubs", label: "Clubs" },
     ];
   } else if (productType === "workshops") {
     items = [
@@ -43,7 +43,6 @@ function StudentLayout() {
     items = [
       { to: "/student", label: "Dashboard" },
       { to: "/student/sessions", label: "Sessions & Events" },
-      { to: "/student/clubs", label: "Clubs" },
       isVIP
         ? { to: "/student/my-course", label: "My Course" }
         : { to: "/student/courses", label: "Learning Path" },
@@ -60,7 +59,7 @@ function StudentLayout() {
     <RoleGuard allow="student">
       <BadgeUnlockWatcher />
       <TopNav variant="dark" items={items} />
-      <div className="flex min-h-screen flex-col" style={{ backgroundColor: "#f4f6f8" }}>
+      <div className="flex min-h-screen flex-col" style={{ backgroundColor: isClubsCatalog ? "#061c2a" : "#f4f6f8" }}>
         <main className="mx-auto w-full max-w-7xl flex-1 pt-24 pb-10">
           <div className="px-6">
             <AnnouncementBanner />
@@ -70,7 +69,7 @@ function StudentLayout() {
           </div>
         </main>
 
-        <Footer
+        <Footer seamlessNavy={isClubsCatalog}
           nav={[{
             label: "Student",
             items: items.flatMap((i) => ("to" in i ? [{ label: i.label, to: i.to }] : [])),

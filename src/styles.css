@@ -2163,3 +2163,23 @@
   .verbo-kpi-ghost { transition: opacity 160ms ease; }
   .verbo-kpi-card:hover .verbo-kpi-ghost { transform: translateY(-50%); }
 }
+
+.verbo-clubs-entry {
+  border: 1px solid #ffb36a;
+  background: linear-gradient(115deg, #f7822a 0%, #cb4918 52%, #071923 100%);
+  box-shadow: 0 8px 24px #c74d2247, 0 2px 5px #061c2a40;
+  animation: verbo-clubs-pulse 3.8s ease-in-out infinite;
+  transition: transform .3s ease, box-shadow .3s ease, filter .3s ease;
+}
+.verbo-clubs-entry:hover,
+.verbo-clubs-entry:focus-visible {
+  transform: translateY(-2px);
+  filter: brightness(1.08);
+  box-shadow: 0 13px 29px #c74d2270, 0 2px 7px #061c2a55;
+}
+@keyframes verbo-clubs-pulse {
+  50% { box-shadow: 0 9px 27px #c74d2266, 0 2px 5px #061c2a40; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .verbo-clubs-entry { animation: none; }
+}

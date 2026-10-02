@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, ArrowRight, BookOpen, ChevronRight, Sparkles, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, BookOpen, ChevronRight, MessageCircle, Sparkles, X } from "lucide-react";
+import { createPortal } from "react-dom";
 import { toast } from "sonner";
 import type { Club, ClubType } from "@/lib/clubs-store";
 import { ClubReservationModal } from "@/components/verbo/ClubReservationModal";
@@ -95,8 +96,8 @@ export function ClubCatalog({ clubs, studentId, preview = false }: {
   const poster = (club: Club) => (
     <button className="vc-poster" key={club.id} onClick={() => openClub(club)}
       aria-label={`Explore ${club.title}, ${formatDate(club.date)}`}>
-      <span className="vc-poster-art" style={{ backgroundImage: club.cover_image ? `url("${club.cover_image}")` : undefined }}>
-        {club.cover_image && <img src={club.cover_image} alt="" loading="lazy" style={{ objectPosition: `${club.cover_position_x ?? 50}% ${club.cover_position_y ?? 50}%`, transformOrigin: `${club.cover_position_x ?? 50}% ${club.cover_position_y ?? 50}%`, transform: `scale(${club.cover_scale ?? 1})` }} />}
+      <span className="vc-poster-art">
+        {club.cover_image && <span className="vc-poster-image"><img src={club.cover_image} alt="" loading="lazy" decoding="async" style={{ objectPosition: `${club.cover_position_x ?? 50}% ${club.cover_position_y ?? 50}%`, transformOrigin: `${club.cover_position_x ?? 50}% ${club.cover_position_y ?? 50}%`, transform: `scale(${club.cover_scale ?? 1})` }} /></span>}
         <span className="vc-poster-fade" />
         {club.type === "insight" && <span className="vc-poster-title">{club.title}</span>}
         {!club.cover_image && club.type === "book" && <BookOpen className="vc-poster-placeholder" />}
@@ -133,8 +134,8 @@ export function ClubCatalog({ clubs, studentId, preview = false }: {
         onMouseLeave={() => setPauseFeature(false)} onFocus={() => setPauseFeature(true)}
         onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setPauseFeature(false); }}
         aria-label="Featured clubs">
-        <div className="vc-feature-atmosphere" style={{ backgroundImage: slide.cover_image ? `url("${slide.cover_image}")` : undefined }} />
-        {slide.cover_image && <img className="vc-feature-image" src={slide.cover_image} alt="" style={{ objectPosition: `${slide.cover_position_x ?? 50}% ${slide.cover_position_y ?? 50}%`, transformOrigin: `${slide.cover_position_x ?? 50}% ${slide.cover_position_y ?? 50}%`, transform: `scale(${slide.cover_scale ?? 1})` }} />}
+        <div className="vc-feature-atmosphere" />
+        {slide.cover_image && <img className="vc-feature-image" src={slide.cover_image} alt="" decoding="async" style={{ objectPosition: `${slide.cover_position_x ?? 50}% ${slide.cover_position_y ?? 50}%` }} />}
         <div className="vc-feature-shade" />
         <div className="vc-feature-content">
           <div className="vc-feature-copy">
@@ -157,7 +158,7 @@ export function ClubCatalog({ clubs, studentId, preview = false }: {
             </div>
           </div>
         </div>
-      </section> : <div className="vc-empty-feature"><Sparkles size={28} /><h2>No upcoming clubs yet</h2><p>New Insights and Book Clubs will appear here as soon as they are published.</p></div>}
+      </section> : <div className="vc-empty-feature"><MessageCircle size={28} /><h2>No upcoming clubs yet</h2><p>New Insights and Book Clubs will appear here as soon as they are published.</p></div>}
 
       {collection !== "book" && categories.length > 0 && <div className="vc-filters"><div><span className="vc-eyebrow">EXPLORE BY THEME</span><h2>Find a conversation for you.</h2></div>
         <div>{["all", ...categories].map((item) => <button key={item} className={category === item ? "active" : ""}
@@ -168,7 +169,7 @@ export function ClubCatalog({ clubs, studentId, preview = false }: {
       {!preview && <div className="vc-suggest-strip"><div><span className="vc-eyebrow">YOUR VOICE SHAPES THE CATALOG</span><h2>What should we explore next?</h2><p>Suggest an Insight topic or a book for Book Club.</p></div><button onClick={() => setSuggesting(true)}>Share an idea ↗</button></div>}
     </div>
     {selected && <ClubReservationModal club={selected} studentId={studentId} preview={preview} onClose={() => setSelected(null)} />}
-    {repeatClub && <div className="vc-dialog-backdrop"><section className="vc-dialog" role="dialog" aria-modal="true" aria-label={repeatClub.title}>
+    {repeatClub && createPortal(<div className="vc-dialog-backdrop"><section className="vc-dialog" role="dialog" aria-modal="true" aria-label={repeatClub.title}>
       <button className="vc-dialog-close" aria-label="Close" onClick={() => setRepeatClub(null)}><X size={20} /></button>
       <span className="vc-eyebrow">FROM THE ARCHIVE</span><h2>{repeatClub.title}</h2><p>{repeatClub.description}</p>
       <p className="vc-dialog-date">Held {formatDate(repeatClub.date)}</p>
@@ -178,9 +179,9 @@ export function ClubCatalog({ clubs, studentId, preview = false }: {
           <button key={value} className={repeatReason === value ? "active" : ""} onClick={() => setRepeatReason(value)}>{label}</button>)}</div>
         <button className="vc-primary" disabled={preview || repeatBusy} onClick={() => void askRepeat()}>{repeatBusy ? "Sending…" : "Request another edition ↗"}</button>
       </>}
-    </section></div>}
-    {repeatConfirm && <div className="vc-dialog-backdrop"><section className="vc-dialog" role="dialog" aria-modal="true" aria-label="Request received"><Sparkles size={30} /><h2>Request received</h2><p>Thank you. When four students ask for another edition, we consider bringing the Insight back.</p><button className="vc-primary" onClick={() => setRepeatConfirm(false)}>Done</button></section></div>}
-    {suggesting && <SuggestionDialog studentId={studentId} onClose={() => setSuggesting(false)} />}
+    </section></div>, document.body)}
+    {repeatConfirm && createPortal(<div className="vc-dialog-backdrop"><section className="vc-dialog" role="dialog" aria-modal="true" aria-label="Request received"><Sparkles size={30} /><h2>Request received</h2><p>Thank you. When four students ask for another edition, we consider bringing the Insight back.</p><button className="vc-primary" onClick={() => setRepeatConfirm(false)}>Done</button></section></div>, document.body)}
+    {suggesting && createPortal(<SuggestionDialog studentId={studentId} onClose={() => setSuggesting(false)} />, document.body)}
     {!preview && freemium.node}
   </div>;
 }
