@@ -9,11 +9,8 @@
 // Backed by Supabase (`public.club_bookings`). RLS: a student can
 // insert/select/update/delete their own bookings; the club's assigned
 // teacher can also see bookings for their own clubs; admins see everything.
-// A plain `select("*")` already returns exactly that scoped set for the
-// calling session (including "every booking" for admin, which is what
-// `adminCalendarEvents()` in calendar-events.ts needs to look up an
-// arbitrary student's booking) — so we use the same global-cache pattern as
-// the rest of this migration instead of a per-student Map.
+// RLS scopes the snapshot to the current session. Realtime applies individual
+// booking changes; a bounded foreground refresh repairs missed events.
 import { useSyncExternalStore } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { registerRehydrate } from "@/lib/auth-rehydrate";
@@ -63,6 +60,9 @@ type Row = Database["public"]["Tables"]["club_bookings"]["Row"];
 let cache: ClubBooking[] = [];
 let hydrated = false;
 let hydratePromise: Promise<void> | null = null;
+let generation = 0;
+let fetchedAt = 0;
+const FOREGROUND_REFRESH_MS = 2 * 60 * 1000;
 const listeners = new Set<() => void>();
 
 function notify() {
@@ -83,25 +83,34 @@ function mapRow(row: Row): ClubBooking {
 async function hydrate(): Promise<void> {
   if (hydrated) return;
   if (hydratePromise) return hydratePromise;
+  const requestGeneration = generation;
   hydratePromise = (async () => {
     await hydrateUserIdBridge();
     const { data, error } = await supabase.from("club_bookings").select("*");
+    if (requestGeneration !== generation) return;
     if (error) {
       console.error("[club-bookings-store] failed to load", error);
       hydrated = true;
+      fetchedAt = Date.now();
       return;
     }
     cache = (data ?? []).map(mapRow);
     hydrated = true;
+    fetchedAt = Date.now();
   })();
-  await hydratePromise;
-  hydratePromise = null;
-  notify();
+  try { await hydratePromise; }
+  finally {
+    hydratePromise = null;
+    if (requestGeneration !== generation) void hydrate();
+    else notify();
+  }
 }
 
-function invalidateAndRehydrate() {
+function invalidateAndRehydrate(reason?: "auth" | "refresh") {
+  if (reason === "refresh" && Date.now() - fetchedAt < FOREGROUND_REFRESH_MS) return;
+  generation++;
   hydrated = false;
-  hydratePromise = null;
+  if (reason === "auth") { cache = []; notify(); }
   void hydrate();
 }
 
@@ -109,12 +118,23 @@ if (typeof window !== "undefined") {
   void hydrate();
   supabase
     .channel("club-bookings-changes")
-    .on("postgres_changes", { event: "*", schema: "public", table: "club_bookings" }, () => {
-      hydrated = false;
-      void hydrate();
+    .on("postgres_changes", { event: "*", schema: "public", table: "club_bookings" }, (payload) => {
+      if (!hydrated || hydratePromise) { invalidateAndRehydrate(); return; }
+      if (payload.eventType === "DELETE") {
+        const id = String(payload.old?.id ?? "");
+        if (!id) { invalidateAndRehydrate(); return; }
+        cache = cache.filter((booking) => booking.id !== id);
+      } else {
+        const row = payload.new as Row;
+        if (!row?.id || !row.student_id || !row.club_id) { invalidateAndRehydrate(); return; }
+        const booking = mapRow(row);
+        cache = [booking, ...cache.filter((item) => item.id !== booking.id)];
+      }
+      notify();
     })
     .subscribe();
-  registerRehydrate(invalidateAndRehydrate);}
+  registerRehydrate(invalidateAndRehydrate);
+}
 
 export function loadBookings(): ClubBooking[] {
   if (!hydrated) void hydrate();
@@ -289,7 +309,8 @@ export async function reserveSeat(studentId: string, clubId: string): Promise<{ 
     return { ok: false, reason: error?.message || "Something went wrong. Try again." };
   }
   const booking = mapRow(data);
-  cache = [booking, ...cache];
+  generation++;
+  cache = [booking, ...cache.filter((item) => item.id !== booking.id)];
   notify();
   // spots_taken is now bumped atomically, server-side, by the
   // `club_bookings_before_insert` trigger — no client-side patch needed here
@@ -336,6 +357,7 @@ export async function cancelSeat(studentId: string, clubId: string): Promise<{ o
     console.error("[club-bookings-store] failed to cancel seat", error);
     return { ok: false, reason: error?.message || "The reservation is no longer available. Refresh and try again." };
   }
+  generation++;
   cache = cache.filter((b) => !(b.student_id === studentId && b.club_id === clubId));
   notify();
   // spots_taken is now decremented atomically, server-side, by the
