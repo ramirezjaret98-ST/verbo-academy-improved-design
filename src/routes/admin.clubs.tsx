@@ -491,6 +491,17 @@ function TopicHistory({ clubs }: { clubs: Club[] }) {
 // ---------------------------------------------------------------------------
 // Create / Edit form panel
 // ---------------------------------------------------------------------------
+function useLocalFileUrl(file: File | null): string | null {
+  const [preview, setPreview] = useState<{ file: File; url: string } | null>(null);
+  useEffect(() => {
+    if (!file) { setPreview(null); return; }
+    const url = URL.createObjectURL(file);
+    setPreview({ file, url });
+    return () => URL.revokeObjectURL(url);
+  }, [file]);
+  return preview?.file === file ? preview.url : null;
+}
+
 // 2026-08-19: exported so the Tablet quick-actions view can reuse this exact
 // form for "assign a teacher to a club" instead of building a parallel mini
 // editor — the companion sees the full club form (per Jaret's choice) but
@@ -532,10 +543,9 @@ export function ClubFormPanel({
   const [spotsTotal, setSpotsTotal] = useState(initial?.spots_total ?? (type === "book" ? 6 : 4));
   const coverInputRef = useRef<HTMLInputElement>(null);
   const materialInputRef = useRef<HTMLInputElement>(null);
-  const coverObjectUrl = useMemo(() => coverFile ? URL.createObjectURL(coverFile) : null, [coverFile]);
-  const materialObjectUrl = useMemo(() => materialFile ? URL.createObjectURL(materialFile) : null, [materialFile]);
-  useEffect(() => () => { if (coverObjectUrl) URL.revokeObjectURL(coverObjectUrl); }, [coverObjectUrl]);
-  useEffect(() => () => { if (materialObjectUrl) URL.revokeObjectURL(materialObjectUrl); }, [materialObjectUrl]);
+  const coverObjectUrl = useLocalFileUrl(coverFile);
+  const materialObjectUrl = useLocalFileUrl(materialFile);
+  const coverPreviewSrc = coverFile ? coverObjectUrl : cover;
   const [teacherPayment, setTeacherPayment] = useState<string>(
     initial?.teacher_payment != null ? String(initial.teacher_payment) : "",
   );
@@ -666,13 +676,17 @@ export function ClubFormPanel({
 
         <ClubSectionBanner color="#3ebbad" textColor="#0b2b28" icon={ImageIcon} title="Media & Materials" />
 
-        <Field label="Cover image" help="Cover image students will see on their calendar.">
+        <Field label="Cover image" help="Adjust the card crop here, then open the student modal preview to see the full cover.">
           <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border bg-secondary/30 p-8 text-center">
             <ImageIcon className="h-7 w-7 text-muted-foreground" />
-            {(coverObjectUrl || cover) ? (
-              <div className="relative mb-2 h-40 w-full max-w-xs overflow-hidden rounded-lg bg-[#0b2c3d]"><img src={coverObjectUrl || cover} alt="" className="absolute inset-0 h-full w-full scale-110 object-cover opacity-45 blur-lg" /><img src={coverObjectUrl || cover} alt="Cover preview" className="relative h-full w-full object-contain" style={{ objectPosition: `${coverPositionX}% ${coverPositionY}%` }} /></div>
+            {coverPreviewSrc ? (
+              <div className="relative mb-2 aspect-[17/11] w-full max-w-[340px] overflow-hidden rounded-lg bg-[#0b2c3d]">
+                <img src={coverPreviewSrc} alt="" className="absolute inset-0 h-full w-full scale-110 object-cover opacity-45 blur-lg" />
+                <img src={coverPreviewSrc} alt="Cover preview" className="absolute inset-0 h-full w-full object-contain" style={{ objectPosition: `${coverPositionX}% ${coverPositionY}%`, transformOrigin: `${coverPositionX}% ${coverPositionY}%`, transform: `scale(${coverScale})` }} />
+                {isInsight && <><div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-[#061c2be8] via-[#061c2b70] to-transparent" /><div className="pointer-events-none absolute left-5 top-1/2 w-[47%] -translate-y-1/2 text-left font-serif text-xl leading-tight text-white">{title || "Club title"}</div></>}
+              </div>
             ) : (
-              <div className="mt-2 text-sm font-medium text-foreground">Choose an image</div>
+              <div className="mt-2 text-sm font-medium text-foreground">{coverFile ? "Preparing image preview…" : "Choose an image"}</div>
             )}
             <div className="mt-1 text-xs text-muted-foreground">JPG, PNG or WebP, up to 8 MB. The full image is visible in the detail modal.</div>
             <input
@@ -689,23 +703,17 @@ export function ClubFormPanel({
                 e.target.value = "";
               }}
             />
-            <GhostButton
-              type="button"
-              className="mt-3"
-              onClick={() => {
-                if (cover || coverFile) { setCover(""); setCoverFile(null); }
-                else coverInputRef.current?.click();
-              }}
-            >
-              {cover || coverFile ? "Remove image" : "Choose file"}
-            </GhostButton>
+            <div className="mt-3 flex flex-wrap justify-center gap-2">
+              <GhostButton type="button" onClick={() => coverInputRef.current?.click()}>{cover || coverFile ? "Change image" : "Choose file"}</GhostButton>
+              {(cover || coverFile) && <GhostButton type="button" onClick={() => { setCover(""); setCoverFile(null); }}>Remove image</GhostButton>}
+            </div>
           </div>
         </Field>
 
         {(cover || coverFile) && <div className="grid grid-cols-3 gap-3">
-          <Field label="Horizontal"><input type="range" min={0} max={100} value={coverPositionX} onChange={(e) => setCoverPositionX(Number(e.target.value))} className="w-full" /></Field>
-          <Field label="Vertical"><input type="range" min={0} max={100} value={coverPositionY} onChange={(e) => setCoverPositionY(Number(e.target.value))} className="w-full" /></Field>
-          <Field label="Card zoom"><input type="range" min={1} max={2} step={0.05} value={coverScale} onChange={(e) => setCoverScale(Number(e.target.value))} className="w-full" /></Field>
+          <Field label={`Horizontal ${coverPositionX}%`}><input type="range" aria-label="Horizontal cover position" min={0} max={100} value={coverPositionX} onChange={(e) => setCoverPositionX(Number(e.target.value))} className="w-full" /></Field>
+          <Field label={`Vertical ${coverPositionY}%`}><input type="range" aria-label="Vertical cover position" min={0} max={100} value={coverPositionY} onChange={(e) => setCoverPositionY(Number(e.target.value))} className="w-full" /></Field>
+          <Field label={`Card zoom ${coverScale.toFixed(2)}×`}><input type="range" aria-label="Cover card zoom" min={1} max={2} step={0.05} value={coverScale} onChange={(e) => setCoverScale(Number(e.target.value))} className="w-full" /></Field>
         </div>}
 
         <Field label="Pre-club material">
