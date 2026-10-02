@@ -326,14 +326,15 @@ export async function cancelSeat(studentId: string, clubId: string): Promise<{ o
     return { ok: false, reason: "Something went wrong. Try again." };
   }
 
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("club_bookings")
     .delete()
     .eq("student_id", studentUuid)
-    .eq("club_id", numericClubId);
-  if (error) {
+    .eq("club_id", numericClubId)
+    .select("id");
+  if (error || !data?.length) {
     console.error("[club-bookings-store] failed to cancel seat", error);
-    return { ok: false, reason: "Something went wrong. Try again." };
+    return { ok: false, reason: error?.message || "The reservation is no longer available. Refresh and try again." };
   }
   cache = cache.filter((b) => !(b.student_id === studentId && b.club_id === clubId));
   notify();

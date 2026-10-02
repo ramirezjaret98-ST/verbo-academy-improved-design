@@ -380,12 +380,12 @@ function TabletPage() {
           initial={editingClub}
           clubs={allClubsList}
           onClose={() => setEditingClub(null)}
-          onSave={(data) => {
-            void updateClub(editingClub.id, data).then((res) => {
-              if (res) notifySuccess("Club updated.");
-              else notifyError("Couldn't save the club — try again.", { context: "Saving club" });
-            });
+          onSave={async (data) => {
+            const res = await updateClub(editingClub.id, data);
+            if (!res) { notifyError("Couldn't save the club — try again.", { context: "Saving club" }); return false; }
+            notifySuccess("Club updated.");
             setEditingClub(null);
+            return true;
           }}
         />
       )}

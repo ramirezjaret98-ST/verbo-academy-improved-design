@@ -17,6 +17,7 @@ import { USERS } from "./mock-data";
 import { notifyError } from "@/lib/notify";
 
 export type ClubType = "insight" | "book";
+export type ClubTitleFont = "sans" | "serif" | "display";
 export type TimeStatus = "upcoming" | "live" | "completed" | "cancelled";
 export type AssignmentStatus = "created" | "assigned";
 
@@ -25,7 +26,14 @@ export interface Club {
   type: ClubType;
   title: string;
   description: string;
+  subtitle?: string;
+  instructions?: string;
+  title_font?: ClubTitleFont;
+  cover_position_x?: number;
+  cover_position_y?: number;
+  cover_scale?: number;
   topic_tag?: string;
+  catalog_featured?: boolean;
   link: string;
   material?: string;
   cover_image?: string;
@@ -37,7 +45,7 @@ export interface Club {
   status: TimeStatus;
   /** Optional payout to the teacher who delivers this club, MXN. Used as
    *  the default penalty amount when an admin approves a release request. */
-  teacher_payment?: number;
+  teacher_payment?: number | null;
   /** ISO timestamp of the current claim. Set when a teacher claims, cleared
    *  when the club is released back to "Created". Drives the 5-minute
    *  free-release window on the teacher side. */
@@ -90,7 +98,14 @@ function mapClubRow(row: ClubRow): Club {
     type: row.type,
     title: row.title,
     description: row.description ?? "",
+    subtitle: row.subtitle ?? undefined,
+    instructions: row.instructions ?? undefined,
+    title_font: row.title_font,
+    cover_position_x: row.cover_position_x,
+    cover_position_y: row.cover_position_y,
+    cover_scale: row.cover_scale,
     topic_tag: row.topic_tag ?? undefined,
+    catalog_featured: row.catalog_featured,
     link: row.link ?? "",
     material: row.material ?? undefined,
     cover_image: row.cover_image ?? undefined,
@@ -211,7 +226,14 @@ export async function createClub(data: Omit<Club, "id" | "spots_taken" | "status
       type: data.type,
       title: data.title,
       description: data.description || null,
+      subtitle: data.subtitle?.trim() || null,
+      instructions: data.instructions?.trim() || null,
+      title_font: data.title_font ?? "sans",
+      cover_position_x: data.cover_position_x ?? 50,
+      cover_position_y: data.cover_position_y ?? 50,
+      cover_scale: data.cover_scale ?? 1,
       topic_tag: data.topic_tag?.trim() || null,
+      catalog_featured: data.catalog_featured ?? false,
       link: data.link || null,
       material: data.material || null,
       cover_image: data.cover_image || null,
@@ -243,7 +265,14 @@ export async function updateClub(id: string, patch: Partial<Club>): Promise<Club
   if (patch.type !== undefined) update.type = patch.type;
   if (patch.title !== undefined) update.title = patch.title;
   if (patch.description !== undefined) update.description = patch.description || null;
+  if ("subtitle" in patch) update.subtitle = patch.subtitle?.trim() || null;
+  if ("instructions" in patch) update.instructions = patch.instructions?.trim() || null;
+  if (patch.title_font !== undefined) update.title_font = patch.title_font;
+  if (patch.cover_position_x !== undefined) update.cover_position_x = patch.cover_position_x;
+  if (patch.cover_position_y !== undefined) update.cover_position_y = patch.cover_position_y;
+  if (patch.cover_scale !== undefined) update.cover_scale = patch.cover_scale;
   if ("topic_tag" in patch) update.topic_tag = patch.topic_tag?.trim() || null;
+  if (patch.catalog_featured !== undefined) update.catalog_featured = patch.catalog_featured;
   if (patch.link !== undefined) update.link = patch.link || null;
   if (patch.material !== undefined) update.material = patch.material || null;
   if (patch.cover_image !== undefined) update.cover_image = patch.cover_image || null;

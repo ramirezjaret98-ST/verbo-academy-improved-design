@@ -4,14 +4,17 @@ import { AccentModal, AccentModalFooter, Card, GhostButton, Pill, PrimaryButton,
 import type { LucideIcon } from "lucide-react";
 import { USERS } from "@/lib/mock-data";
 import {
-  type Club, type ClubType, type TimeStatus, type ClubReleaseRequest,
+  type Club, type ClubType, type ClubTitleFont, type TimeStatus, type ClubReleaseRequest,
   assignmentOf, clubTeacherName as teacherName,
   loadClubs, createClub, updateClub, deleteClub, subscribeClubs, releaseClub, approveClubRelease,
   loadReleaseRequests, subscribeReleaseRequests, removeReleaseRequest,
 } from "@/lib/clubs-store";
 import { notifySuccess, notifyError } from "@/lib/notify";
+import { uploadClubFile, removeUploadedClubFiles, validateClubFile, type UploadedClubMedia } from "@/lib/club-media";
 import { InsightsDashboard } from "@/components/verbo/InsightsDashboard";
 import { ClubReservationModal } from "@/components/verbo/ClubReservationModal";
+import { ClubCatalog } from "@/components/verbo/ClubCatalog";
+import { loadAdminCatalogRequests, updateSuggestionStatus, type ClubSuggestion, type ClubRepeatRequest } from "@/lib/club-catalog-store";
 import { CalendarView as StudentCalendarView } from "@/components/verbo/CalendarView";
 import type { CalendarEvent } from "@/lib/calendar-events";
 import {
@@ -62,6 +65,12 @@ function formatDay(iso: string) {
   return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
+function toLocalDateTime(iso: string) {
+  const d = new Date(iso);
+  const local = new Date(d.getTime() - d.getTimezoneOffset() * 60_000);
+  return local.toISOString().slice(0, 16);
+}
+
 // Simple normalized similarity — no AI. Exact-ish match ignoring case/spacing.
 function normalizeTitle(s: string) {
   return s.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
@@ -80,7 +89,7 @@ function similarTitle(a: string, b: string) {
   return overlap >= 0.75;
 }
 
-type ViewMode = "list" | "calendar" | "history";
+type ViewMode = "list" | "calendar" | "history" | "requests";
 
 function Page() {
   const { new: openNew } = Route.useSearch();
@@ -90,7 +99,7 @@ function Page() {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Club | null>(null);
   const [view, setView] = useState<ViewMode>("list");
-  const [studentPreview, setStudentPreview] = useState<"home" | "calendar" | null>(null);
+  const [studentPreview, setStudentPreview] = useState<"home" | "calendar" | "catalog" | null>(null);
   const [previewClub, setPreviewClub] = useState<Club | null>(null);
 
   useEffect(() => {
@@ -119,26 +128,26 @@ function Page() {
     });
   };
 
-  const onSave = (data: Omit<Club, "id" | "spots_taken" | "status">) => {
+  const onSave = async (data: Omit<Club, "id" | "spots_taken" | "status">): Promise<boolean> => {
     if (editing) {
-      void updateClub(editing.id, data).then((res) => {
-        if (res) notifySuccess("Club updated.");
-        else notifyError("Couldn't save the club — try again.", { context: "Saving club" });
-      });
+      const res = await updateClub(editing.id, data);
+      if (!res) return false;
+      notifySuccess("Club updated.");
     } else {
-      void createClub(data).then((res) => {
-        if (res) notifySuccess("Club created.");
-        else notifyError("Couldn't create the club — try again.", { context: "Creating club" });
-      });
+      const res = await createClub(data);
+      if (!res) return false;
+      notifySuccess("Club published.");
     }
     setOpen(false);
+    return true;
   };
 
   if (studentPreview) {
     const events: CalendarEvent[] = clubs.filter((c) => c.type === "insight" && c.status !== "cancelled").map((c) => ({ id: c.id, kind: "insight", date: c.date, duration_minutes: c.duration_minutes, title: c.title, subtitle: "Insight", status: c.status, spots_taken: c.spots_taken, spots_total: c.spots_total, club: c }));
     return <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-orange-200 bg-orange-50 px-5 py-3"><div><strong className="text-sm text-foreground">Insights student preview</strong><p className="text-xs text-muted-foreground">Live Academy content; quota, reservations and actions are disabled.</p></div><GhostButton onClick={() => { setPreviewClub(null); setStudentPreview(null); }}>Back to Manage Clubs</GhostButton></div>
-      {studentPreview === "home" ? <InsightsDashboard name="student" preview onExplore={() => setStudentPreview("calendar")} /> : <div className="space-y-4"><div className="flex items-center justify-between"><div><h1 className="text-2xl font-semibold">Explore Insights</h1><p className="text-sm text-muted-foreground">Read-only calendar preview.</p></div><GhostButton onClick={() => { setPreviewClub(null); setStudentPreview("home"); }}>Dashboard</GhostButton></div><Card><StudentCalendarView events={events} availableKinds={["insight"]} onEventClick={(event) => { if (event.club) setPreviewClub(event.club); }} /></Card></div>}
+      <div className="flex gap-2"><GhostButton onClick={() => setStudentPreview("calendar")}>Calendar</GhostButton><GhostButton onClick={() => setStudentPreview("catalog")}>Catalog</GhostButton></div>
+      {studentPreview === "home" ? <InsightsDashboard name="student" preview onExplore={() => setStudentPreview("calendar")} /> : studentPreview === "catalog" ? <ClubCatalog clubs={clubs} studentId="" preview /> : <div className="space-y-4"><div className="flex items-center justify-between"><div><h1 className="text-2xl font-semibold">Explore Insights</h1><p className="text-sm text-muted-foreground">Read-only calendar preview.</p></div><GhostButton onClick={() => { setPreviewClub(null); setStudentPreview("home"); }}>Dashboard</GhostButton></div><Card><StudentCalendarView events={events} availableKinds={["insight"]} onEventClick={(event) => { if (event.club) setPreviewClub(event.club); }} /></Card></div>}
       {previewClub && <ClubReservationModal club={previewClub} studentId="" preview onClose={() => setPreviewClub(null)} />}
     </div>;
   }
@@ -150,7 +159,7 @@ function Page() {
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">Manage Clubs</h1>
           <p className="mt-1 text-sm text-muted-foreground">Create and curate Verbo Insights and Book Clubs that appear on the student calendar.</p>
         </div>
-        <div className="flex flex-wrap gap-2"><GhostButton onClick={() => setStudentPreview("home")}>Preview Insights as student</GhostButton><PrimaryButton accentColor="#5fca16" onClick={onCreate}>
+        <div className="flex flex-wrap gap-2"><GhostButton onClick={() => setStudentPreview("catalog")}>Preview catalog as student</GhostButton><PrimaryButton accentColor="#5fca16" onClick={onCreate}>
           <Plus className="h-4 w-4" /> Create New Club Event
         </PrimaryButton></div>
       </div>
@@ -162,6 +171,7 @@ function Page() {
           { id: "list", label: "List View", icon: List },
           { id: "calendar", label: "Calendar View", icon: CalendarDays },
           { id: "history", label: "Topic History", icon: History },
+          { id: "requests", label: "Catalog Requests", icon: Inbox },
         ] as { id: ViewMode; label: string; icon: typeof List }[]).map((t) => (
           <button
             key={t.id}
@@ -178,6 +188,7 @@ function Page() {
       {view === "list" && <ListView clubs={clubs} onEdit={onEdit} onDelete={onDelete} />}
       {view === "calendar" && <CalendarView clubs={clubs} onEdit={onEdit} />}
       {view === "history" && <TopicHistory clubs={clubs} />}
+      {view === "requests" && <CatalogRequestsPanel clubs={clubs} />}
 
 
       {open && <ClubFormPanel initial={editing} clubs={clubs} onClose={() => setOpen(false)} onSave={onSave} />}
@@ -188,6 +199,53 @@ function Page() {
 // ---------------------------------------------------------------------------
 // List view (existing table + Assignment column)
 // ---------------------------------------------------------------------------
+function CatalogRequestsPanel({ clubs }: { clubs: Club[] }) {
+  const [suggestions, setSuggestions] = useState<ClubSuggestion[]>([]);
+  const [repeats, setRepeats] = useState<ClubRepeatRequest[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const refresh = async () => {
+    try {
+      const data = await loadAdminCatalogRequests();
+      setSuggestions(data.suggestions);
+      setRepeats(data.repeats);
+      setError("");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not load requests.");
+    } finally { setLoading(false); }
+  };
+  useEffect(() => { void refresh(); }, []);
+  const reasonLabel: Record<string, string> = {
+    missed: "Missed it", full: "It was full", again: "Would join again",
+  };
+  const repeatGroups = Object.values(repeats.reduce<Record<string, ClubRepeatRequest[]>>((groups, request) => {
+    (groups[String(request.club_id)] ??= []).push(request);
+    return groups;
+  }, {})).sort((a, b) => b.length - a.length);
+  const changeStatus = async (id: number, status: "new" | "reviewed" | "planned" | "closed") => {
+    try {
+      await updateSuggestionStatus(id, status);
+      await refresh();
+      notifySuccess("Suggestion updated.");
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Could not update."); }
+  };
+  return <div className="space-y-5">
+    {error && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
+    <Card><div className="flex items-center justify-between gap-3"><div><SectionTitle>Suggestions from students</SectionTitle><p className="mt-1 text-sm text-muted-foreground">Ideas for Insights and Book Clubs. Review before adding a scheduled club.</p></div><GhostButton onClick={() => void refresh()}>Refresh</GhostButton></div>
+      {loading ? <p className="mt-4 text-sm text-muted-foreground">Loading…</p> : suggestions.length === 0 ? <p className="mt-4 text-sm text-muted-foreground">No suggestions yet.</p> :
+        <div className="mt-4 space-y-3">{suggestions.map((item) => <div key={item.id} className="rounded-xl border border-border p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3"><div><span className="text-[10px] font-bold uppercase tracking-wider text-accent">{item.type === "book" ? "Book Club" : "Insight"}</span><h3 className="text-base font-semibold">{item.title}</h3><p className="mt-1 whitespace-pre-wrap text-sm text-muted-foreground">{item.details || "No additional details."}</p><p className="mt-2 text-xs text-muted-foreground">{USERS.find((u) => u.id === item.student_id)?.name ?? "Student"} · {formatDate(item.created_at)}</p></div>
+            <select aria-label={`Status for ${item.title}`} value={item.status} onChange={(e) => void changeStatus(item.id, e.target.value as "new" | "reviewed" | "planned" | "closed")} className="rounded-lg border border-border bg-background px-3 py-2 text-xs"><option value="new">New</option><option value="reviewed">Reviewed</option><option value="planned">Planned</option><option value="closed">Closed</option></select>
+          </div></div>)}</div>}</Card>
+    <Card><SectionTitle>Requests for another Insight</SectionTitle><p className="mt-1 text-sm text-muted-foreground">Internal signal: consider a new edition after four distinct students request it. No event is created automatically.</p>
+      {loading ? <p className="mt-4 text-sm text-muted-foreground">Loading…</p> : repeatGroups.length === 0 ? <p className="mt-4 text-sm text-muted-foreground">No repeat requests yet.</p> :
+        <div className="mt-4 space-y-3">{repeatGroups.map((group) => {
+          const club = clubs.find((item) => item.id === String(group[0].club_id));
+          return <div key={group[0].club_id} className="rounded-xl border border-border p-4"><div className="flex justify-between gap-3"><div><h3 className="font-semibold">{club?.title ?? `Insight #${group[0].club_id}`}</h3><p className="mt-1 text-xs text-muted-foreground">{club && formatDate(club.date)}</p></div><span className={`rounded-full px-3 py-1 text-xs font-bold ${group.length >= 4 ? "bg-green-100 text-green-800" : "bg-secondary text-muted-foreground"}`}>{group.length} request{group.length === 1 ? "" : "s"}{group.length >= 4 ? " · Consider scheduling" : ""}</span></div><div className="mt-3 space-y-1 text-xs text-muted-foreground">{group.map((item) => <p key={item.id}>{USERS.find((u) => u.id === item.student_id)?.name ?? "Student"} · {reasonLabel[item.reason] ?? item.reason}</p>)}</div></div>;
+        })}</div>}</Card>
+  </div>;
+}
+
 function ListView({ clubs, onEdit, onDelete }: { clubs: Club[]; onEdit: (c: Club) => void; onDelete: (id: string) => void }) {
   return (
     <Card className="!p-0">
@@ -446,22 +504,38 @@ export function ClubFormPanel({
   initial: Club | null;
   clubs: Club[];
   onClose: () => void;
-  onSave: (data: Omit<Club, "id" | "spots_taken" | "status">) => void;
+  onSave: (data: Omit<Club, "id" | "spots_taken" | "status">) => Promise<boolean>;
 }) {
   const [type, setType] = useState<ClubType>(initial?.type ?? "insight");
   const [title, setTitle] = useState(initial?.title ?? "");
   const [description, setDescription] = useState(initial?.description ?? "");
+  const [subtitle, setSubtitle] = useState(initial?.subtitle ?? "");
+  const [instructions, setInstructions] = useState(initial?.instructions ?? "");
+  const [titleFont, setTitleFont] = useState<ClubTitleFont>(initial?.title_font ?? "sans");
+  const [coverPositionX, setCoverPositionX] = useState(initial?.cover_position_x ?? 50);
+  const [coverPositionY, setCoverPositionY] = useState(initial?.cover_position_y ?? 50);
+  const [coverScale, setCoverScale] = useState(initial?.cover_scale ?? 1);
   const [topicTag, setTopicTag] = useState(initial?.topic_tag ?? "");
+  const [catalogFeatured, setCatalogFeatured] = useState(initial?.catalog_featured ?? false);
   const [link, setLink] = useState(initial?.link ?? "");
   const [material, setMaterial] = useState(initial?.material ?? "");
   const [materialName, setMaterialName] = useState(initial?.material ?? "");
   const [cover, setCover] = useState(initial?.cover_image ?? "");
+  const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [materialFile, setMaterialFile] = useState<File | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [formError, setFormError] = useState("");
+  const [showPreview, setShowPreview] = useState(false);
   const [teacherId, setTeacherId] = useState(initial?.teacher_id ?? "");
-  const [date, setDate] = useState(initial?.date?.slice(0, 16) ?? "");
+  const [date, setDate] = useState(initial?.date ? toLocalDateTime(initial.date) : "");
   const [duration, setDuration] = useState(initial?.duration_minutes ?? 60);
-  const [spotsTotal, setSpotsTotal] = useState(initial?.spots_total ?? (type === "book" ? 4 : 30));
+  const [spotsTotal, setSpotsTotal] = useState(initial?.spots_total ?? (type === "book" ? 6 : 4));
   const coverInputRef = useRef<HTMLInputElement>(null);
   const materialInputRef = useRef<HTMLInputElement>(null);
+  const coverObjectUrl = useMemo(() => coverFile ? URL.createObjectURL(coverFile) : null, [coverFile]);
+  const materialObjectUrl = useMemo(() => materialFile ? URL.createObjectURL(materialFile) : null, [materialFile]);
+  useEffect(() => () => { if (coverObjectUrl) URL.revokeObjectURL(coverObjectUrl); }, [coverObjectUrl]);
+  useEffect(() => () => { if (materialObjectUrl) URL.revokeObjectURL(materialObjectUrl); }, [materialObjectUrl]);
   const [teacherPayment, setTeacherPayment] = useState<string>(
     initial?.teacher_payment != null ? String(initial.teacher_payment) : "",
   );
@@ -474,19 +548,46 @@ export function ClubFormPanel({
     return clubs.find((c) => c.id !== initial?.id && c.type === type && similarTitle(c.title, title)) ?? null;
   }, [title, type, clubs, initial]);
 
-  const submit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!title || !date) return;
-    onSave({
-      type, title, description, topic_tag: type === "insight" ? topicTag.trim() || undefined : undefined, link,
-      material: material || undefined,
-      cover_image: cover || undefined,
-      teacher_id: teacherId || undefined,
-      date: new Date(date).toISOString(),
-      duration_minutes: duration,
-      spots_total: spotsTotal,
-      teacher_payment: teacherPayment.trim() === "" ? undefined : Math.max(0, parseFloat(teacherPayment) || 0),
-    });
+  const formData = (mediaCover: string, mediaMaterial: string): Omit<Club, "id" | "spots_taken" | "status"> => ({
+    type, title: title.trim(), subtitle: subtitle.trim(), description: description.trim(), instructions: instructions.trim(),
+    title_font: titleFont, cover_position_x: coverPositionX, cover_position_y: coverPositionY, cover_scale: coverScale,
+    topic_tag: topicTag.trim() || undefined, catalog_featured: catalogFeatured, link: link.trim(),
+    material: mediaMaterial, cover_image: mediaCover,
+    teacher_id: teacherId || undefined, date: new Date(date).toISOString(), duration_minutes: duration,
+    spots_total: spotsTotal,
+    teacher_payment: teacherPayment.trim() === "" ? null : Math.max(0, parseFloat(teacherPayment) || 0),
+  });
+
+  const validate = (): string | null => {
+    if (!title.trim()) return "Add a title.";
+    if (!date || Number.isNaN(new Date(date).getTime())) return "Choose a valid date and time.";
+    if (duration < 5 || spotsTotal < 1) return "Check the duration and capacity.";
+    if (initial && spotsTotal < initial.spots_taken) return "Capacity cannot be below existing reservations.";
+    if (link.trim() && !/^https:\/\//i.test(link.trim())) return "The meeting link must begin with https://.";
+    if (coverFile) { const issue = validateClubFile(coverFile, "cover"); if (issue) return issue; }
+    if (materialFile) { const issue = validateClubFile(materialFile, "material"); if (issue) return issue; }
+    return null;
+  };
+
+  const submit = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    if (busy) return;
+    const issue = validate();
+    if (issue) { setFormError(issue); return; }
+    setBusy(true);
+    setFormError("");
+    const uploaded: UploadedClubMedia[] = [];
+    try {
+      const nextCover = coverFile ? await uploadClubFile(coverFile, "cover") : null;
+      if (nextCover) uploaded.push(nextCover);
+      const nextMaterial = materialFile ? await uploadClubFile(materialFile, "material") : null;
+      if (nextMaterial) uploaded.push(nextMaterial);
+      const saved = await onSave(formData(nextCover?.url ?? cover, nextMaterial?.url ?? material));
+      if (!saved) throw new Error("The club could not be saved. Your edits are still here; please retry.");
+    } catch (error) {
+      await removeUploadedClubFiles(uploaded);
+      setFormError(error instanceof Error ? error.message : "Could not save the club.");
+    } finally { setBusy(false); }
   };
 
   const isInsight = type === "insight";
@@ -502,7 +603,7 @@ export function ClubFormPanel({
       title={initial ? "Edit Club Event" : "Create New Club Event"}
       watermark={{ type: "text", value: "CLUB" }}
       maxWidth="max-w-xl"
-      onClose={onClose}
+      onClose={() => { if (!busy) onClose(); }}
     >
       <form onSubmit={submit} className="max-h-[70vh] space-y-5 overflow-y-auto px-6 py-6">
         <ClubSectionBanner color="#01304a" textColor="#ffffff" icon={Sparkles} title="Event Details" />
@@ -515,7 +616,7 @@ export function ClubFormPanel({
               <button
                 key={t}
                 type="button"
-                onClick={() => setType(t)}
+                onClick={() => { setType(t); if (!initial) setSpotsTotal(t === "book" ? 6 : 4); }}
                 className={`inline-flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-all ${
                   type === t ? "bg-[#01304a] text-white shadow-sm" : "text-muted-foreground hover:text-foreground"
                 }`}
@@ -539,33 +640,52 @@ export function ClubFormPanel({
           )}
         </Field>
 
+        <Field label="Subtitle">
+          <input value={subtitle} onChange={(e) => setSubtitle(e.target.value)} maxLength={160} placeholder="A short line beneath the title" className={fieldCls} />
+        </Field>
+
+        <Field label="Title typography">
+          <select value={titleFont} onChange={(e) => setTitleFont(e.target.value as ClubTitleFont)} className={fieldCls}>
+            <option value="sans">Verbo Sans</option>
+            <option value="serif">Editorial Serif</option>
+            <option value="display">Display</option>
+          </select>
+        </Field>
+
         <Field label="Description">
           <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={4} placeholder="What students will learn or discuss." className={`${fieldCls} resize-none`} />
         </Field>
-        {isInsight && <Field label="Topic tag" help="Short category shown on the Insights carousel, for example Everyday Life or Viral Marketing."><input value={topicTag} onChange={(e) => setTopicTag(e.target.value)} maxLength={40} placeholder="Everyday Life" className={fieldCls} /></Field>}
+        <Field label="Instructions" help="Preparation, reading or participation instructions shown separately to students.">
+          <textarea value={instructions} onChange={(e) => setInstructions(e.target.value)} rows={4} placeholder="What should students do before joining?" className={`${fieldCls} resize-none`} />
+        </Field>
+        <Field label="Catalog category" help="Used to organize the student catalog. For example Culture, Mindset or Fiction."><input value={topicTag} onChange={(e) => setTopicTag(e.target.value)} maxLength={40} placeholder="Culture" className={fieldCls} /></Field>
+        <label className="flex items-center gap-3 rounded-xl border border-border px-4 py-3 text-sm text-foreground">
+          <input type="checkbox" checked={catalogFeatured} onChange={(e) => setCatalogFeatured(e.target.checked)} />
+          Feature this club in the student catalog carousel
+        </label>
 
         <ClubSectionBanner color="#3ebbad" textColor="#0b2b28" icon={ImageIcon} title="Media & Materials" />
 
         <Field label="Cover image" help="Cover image students will see on their calendar.">
           <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border bg-secondary/30 p-8 text-center">
             <ImageIcon className="h-7 w-7 text-muted-foreground" />
-            {cover ? (
-              <img src={cover} alt="Cover preview" className="mb-2 h-32 w-full max-w-xs rounded-lg object-cover" />
+            {(coverObjectUrl || cover) ? (
+              <div className="relative mb-2 h-40 w-full max-w-xs overflow-hidden rounded-lg bg-[#0b2c3d]"><img src={coverObjectUrl || cover} alt="" className="absolute inset-0 h-full w-full scale-110 object-cover opacity-45 blur-lg" /><img src={coverObjectUrl || cover} alt="Cover preview" className="relative h-full w-full object-contain" style={{ objectPosition: `${coverPositionX}% ${coverPositionY}%` }} /></div>
             ) : (
-              <div className="mt-2 text-sm font-medium text-foreground">Drag & drop or choose an image</div>
+              <div className="mt-2 text-sm font-medium text-foreground">Choose an image</div>
             )}
-            <div className="mt-1 text-xs text-muted-foreground">JPG or PNG shown on the student calendar</div>
+            <div className="mt-1 text-xs text-muted-foreground">JPG, PNG or WebP, up to 8 MB. The full image is visible in the detail modal.</div>
             <input
               ref={coverInputRef}
               type="file"
-              accept="image/png,image/jpeg"
+              accept="image/png,image/jpeg,image/webp"
               className="hidden"
               onChange={(e) => {
                 const file = e.target.files?.[0];
                 if (!file) return;
-                const reader = new FileReader();
-                reader.onload = () => setCover(String(reader.result));
-                reader.readAsDataURL(file);
+                const issue = validateClubFile(file, "cover");
+                if (issue) setFormError(issue);
+                else { setCoverFile(file); setFormError(""); }
                 e.target.value = "";
               }}
             />
@@ -573,34 +693,37 @@ export function ClubFormPanel({
               type="button"
               className="mt-3"
               onClick={() => {
-                if (cover) setCover("");
+                if (cover || coverFile) { setCover(""); setCoverFile(null); }
                 else coverInputRef.current?.click();
               }}
             >
-              {cover ? "Remove image" : "Choose file"}
+              {cover || coverFile ? "Remove image" : "Choose file"}
             </GhostButton>
           </div>
         </Field>
 
+        {(cover || coverFile) && <div className="grid grid-cols-3 gap-3">
+          <Field label="Horizontal"><input type="range" min={0} max={100} value={coverPositionX} onChange={(e) => setCoverPositionX(Number(e.target.value))} className="w-full" /></Field>
+          <Field label="Vertical"><input type="range" min={0} max={100} value={coverPositionY} onChange={(e) => setCoverPositionY(Number(e.target.value))} className="w-full" /></Field>
+          <Field label="Card zoom"><input type="range" min={1} max={2} step={0.05} value={coverScale} onChange={(e) => setCoverScale(Number(e.target.value))} className="w-full" /></Field>
+        </div>}
+
         <Field label="Pre-club material">
           <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border bg-secondary/30 p-8 text-center">
             <UploadCloud className="h-7 w-7 text-muted-foreground" />
-            <div className="mt-2 text-sm font-medium text-foreground">{materialName || "Drop a PDF or image"}</div>
+            <div className="mt-2 text-sm font-medium text-foreground">{materialName || "Choose a PDF"}</div>
             <div className="mt-1 text-xs text-muted-foreground">Shared with students before the event</div>
             <input
               ref={materialInputRef}
               type="file"
-              accept="application/pdf,image/png,image/jpeg"
+              accept="application/pdf"
               className="hidden"
               onChange={(e) => {
                 const file = e.target.files?.[0];
                 if (!file) return;
-                const reader = new FileReader();
-                reader.onload = () => {
-                  setMaterial(String(reader.result));
-                  setMaterialName(file.name);
-                };
-                reader.readAsDataURL(file);
+                const issue = validateClubFile(file, "material");
+                if (issue) setFormError(issue);
+                else { setMaterialFile(file); setMaterialName(file.name); setFormError(""); }
                 e.target.value = "";
               }}
             />
@@ -608,15 +731,16 @@ export function ClubFormPanel({
               type="button"
               className="mt-3"
               onClick={() => {
-                if (material) {
+                if (material || materialFile) {
                   setMaterial("");
+                  setMaterialFile(null);
                   setMaterialName("");
                 } else {
                   materialInputRef.current?.click();
                 }
               }}
             >
-              {material ? "Remove file" : "Choose file"}
+              {material || materialFile ? "Remove file" : "Choose file"}
             </GhostButton>
           </div>
         </Field>
@@ -675,12 +799,15 @@ export function ClubFormPanel({
         </Field>
       </form>
 
+      {formError && <p role="alert" className="px-6 text-sm text-red-700">{formError}</p>}
       <AccentModalFooter>
-        <GhostButton onClick={onClose} type="button">Cancel</GhostButton>
-        <PrimaryButton accentColor="#5fca16" className="hover:!bg-[#4fb010]" onClick={submit as unknown as () => void}>
-          {initial ? "Save changes" : "Publish event"}
+        <GhostButton onClick={onClose} type="button" disabled={busy}>Cancel</GhostButton>
+        <GhostButton type="button" onClick={() => { const issue = validate(); if (issue) setFormError(issue); else { setFormError(""); setShowPreview(true); } }} disabled={busy}>Preview student modal</GhostButton>
+        <PrimaryButton accentColor="#5fca16" className="hover:!bg-[#4fb010]" onClick={() => void submit()} disabled={busy}>
+          {busy ? "Saving…" : initial ? "Save changes" : "Publish event"}
         </PrimaryButton>
       </AccentModalFooter>
+      {showPreview && <ClubReservationModal club={{ ...formData(coverObjectUrl || cover, materialObjectUrl || material), id: initial?.id ?? "preview", spots_taken: initial?.spots_taken ?? 0, status: initial?.status ?? "upcoming" }} studentId="" preview onClose={() => setShowPreview(false)} />}
     </AccentModal>
   );
 }
