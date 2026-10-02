@@ -106,6 +106,10 @@ async function hydrate(): Promise<void> {
     ]);
     if (error) {
       console.error("[lesson-plans-store] failed to load", error);
+      // Keep the last known plans visible when a refresh fails. A transient
+      // read error after an atomic rotation must not empty teacher/student UI.
+      hydrated = false;
+      return;
     }
     plansCache = (data ?? []).map(fromRow);
     hydrated = true;
