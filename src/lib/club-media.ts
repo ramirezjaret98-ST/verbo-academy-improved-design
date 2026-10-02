@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 const COVER_BUCKET = "public-assets";
 const MATERIAL_BUCKET = "materials";
 const MAX_COVER_BYTES = 8 * 1024 * 1024;
-const MAX_MATERIAL_BYTES = 8 * 1024 * 1024;
+const MAX_MATERIAL_BYTES = 20 * 1024 * 1024;
 const PRIVATE_PREFIX = "storage://materials/";
 
 export type ClubMediaKind = "cover" | "material";
@@ -14,7 +14,7 @@ export function validateClubFile(file: File, kind: ClubMediaKind): string | null
   const max = kind === "cover" ? MAX_COVER_BYTES : MAX_MATERIAL_BYTES;
   if (!file.size) return "The selected file is empty.";
   if (!allowed.includes(file.type)) return kind === "cover" ? "Choose a JPG, PNG or WebP image." : "Choose a PDF file.";
-  if (file.size > max) return "The file must be under 8 MB.";
+  if (file.size > max) return kind === "cover" ? "The image must be under 8 MB." : "The PDF must be under 20 MB.";
   return null;
 }
 

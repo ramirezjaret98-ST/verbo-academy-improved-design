@@ -55,8 +55,8 @@ export function levelsForProduct(product?: RestrictProduct | ""): string[] {
 export const MATERIALS_EVENT = "verbo:materials-updated";
 const MATERIALS_BUCKET = "materials";
 
-/** Max size (bytes) accepted for an uploaded resource file / cover. Also
- *  enforced server-side via the `materials` bucket's file_size_limit. */
+/** Max size (bytes) accepted by the general Materials uploader. The shared
+ *  bucket allows larger admin Book Club PDFs, so this limit is client-side. */
 export const MAX_MATERIAL_FILE_BYTES = 8 * 1024 * 1024;
 export const MAX_MATERIAL_FILE_ERROR = "File is too large — please upload a file under 8MB";
 

@@ -720,7 +720,7 @@ export function ClubFormPanel({
           <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border bg-secondary/30 p-8 text-center">
             <UploadCloud className="h-7 w-7 text-muted-foreground" />
             <div className="mt-2 text-sm font-medium text-foreground">{materialName || "Choose a PDF"}</div>
-            <div className="mt-1 text-xs text-muted-foreground">Shared with students before the event</div>
+            <div className="mt-1 text-xs text-muted-foreground">Shared with students before the event · PDF up to 20 MB</div>
             <input
               ref={materialInputRef}
               type="file"
