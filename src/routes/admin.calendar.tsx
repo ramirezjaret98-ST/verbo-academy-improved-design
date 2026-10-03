@@ -7,6 +7,7 @@ import { subscribeTeachers, setSessionExcludedFromPay } from "@/lib/teacher-mode
 import { notifySuccess } from "@/lib/notify";
 import { Card, GhostButton, PrimaryButton } from "@/components/verbo/ui";
 import { CalendarView } from "@/components/verbo/CalendarView";
+import { AdminScheduleAcknowledgements } from "@/components/verbo/AdminScheduleAcknowledgements";
 import {
   adminCalendarEvents,
   EVENT_KIND_META,
@@ -108,6 +109,8 @@ function Page() {
           Read-only overview crossing student, teacher, and schedule. Pick a teacher, a student, or both to view their calendar.
         </p>
       </div>
+
+      <AdminScheduleAcknowledgements />
 
       <Card>
         <div className="grid gap-4 md:grid-cols-2">
@@ -710,3 +713,4 @@ function Row({ label, value }: { label: string; value: string }) {
     </div>
   );
 }
+

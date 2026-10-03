@@ -309,14 +309,15 @@ export function loadSessions(): ExtSession[] {
 }
 
 /** Persist one admin batch atomically; the server owns the single email summary. */
-export async function updateSessionsBulk(updates: Array<{ session: ExtSession; patch: Partial<ExtSession> }>): Promise<boolean> {
+export async function updateSessionsBulk(updates: Array<{ session: ExtSession; patch: Partial<ExtSession>; changeScope?: "one_off" | "regular" }>): Promise<boolean> {
   try {
-    const payload = await Promise.all(updates.map(async ({ session, patch }) => {
+    const payload = await Promise.all(updates.map(async ({ session, patch, changeScope }) => {
       const [teacherId, previousTeacherId] = await Promise.all([
         legacyToUuid(patch.teacher_id ?? session.teacher_id), legacyToUuid(session.teacher_id),
       ]);
       if (!teacherId || !previousTeacherId) throw new Error("Teacher not found");
       return { id: Number(session.id), expected_date_time: session.date_time, expected_teacher_id: previousTeacherId,
+        change_scope: changeScope ?? "one_off",
         patch: { date_time: patch.date_time ?? session.date_time, teacher_id: teacherId,
           teams_link: patch.teams_link ?? session.teams_link, status: patch.status ?? session.status } };
     }));
@@ -1220,3 +1221,4 @@ export function lastCoveredSummaryFor(
   if (!text) return undefined;
   return text.length > 140 ? text.slice(0, 140).trim() + "…" : text;
 }
+

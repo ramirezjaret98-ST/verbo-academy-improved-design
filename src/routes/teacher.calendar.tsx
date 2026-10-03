@@ -15,6 +15,7 @@ import {
 import { PlanModal } from "@/components/verbo/PlanModal";
 import { ReorderLessonPlansModal } from "@/components/verbo/ReorderLessonPlansModal";
 import { CalendarView } from "@/components/verbo/CalendarView";
+import { TeacherScheduleAttention, useTeacherScheduleAttention } from "@/components/verbo/TeacherScheduleAttention";
 import {
   teacherCalendarEvents, CALENDAR_STATUS_META, EVENT_KIND_META, calendarEventTheme,
   type CalendarEvent,
@@ -50,6 +51,7 @@ function Page() {
   const { highlight: highlightParam } = Route.useSearch();
 
   const [sessions, setSessions] = useState<ExtSession[]>([]);
+  const scheduleAttention = useTeacherScheduleAttention(user?.id, sessions);
   const [plans, setPlans] = useState<Record<string, LessonPlan>>({});
   
   const [planning, setPlanning] = useState<ExtSession | null>(null);
@@ -195,9 +197,12 @@ function Page() {
         </p>
       </div>
 
+      <TeacherScheduleAttention attention={scheduleAttention} inCalendar />
+
       <Card>
         <CalendarView
           events={events}
+          attentionEventIds={scheduleAttention.attentionIds}
           onEventClick={handleEventClick}
           substitutionAware
           highlightEventId={highlightParam}
@@ -511,3 +516,4 @@ function RequestReleaseModal({ club, onClose, onSubmit }: {
     </AccentModal>
   );
 }
+
