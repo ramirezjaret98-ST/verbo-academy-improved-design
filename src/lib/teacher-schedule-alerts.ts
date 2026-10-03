@@ -15,7 +15,6 @@ export function teacherScheduleAlerts(
   sessions: ExtSession[],
   events: ScheduleEvent[],
   acknowledgedEventIds: ReadonlySet<string>,
-  now = Date.now(),
 ): TeacherScheduleAlert[] {
   const currentSessions = new Map(sessions.map((session) => [Number(session.id), session]));
   const latestBySession = new Map<number, ScheduleEvent>();
@@ -30,8 +29,9 @@ export function teacherScheduleAlerts(
     if (!event.change_scope) continue;
     const session = currentSessions.get(event.session_id);
     if (!session || session.teacher_id !== teacherId || event.teacher_id !== teacherId) continue;
-    if (!["scheduled", "ready", "rescheduled", "rearranged", "delayed"].includes(session.status)) continue;
-    if (+new Date(session.date_time) < now - 60 * 60_000) continue;
+    // Keep missed or completed classes visible until acknowledged too. A
+    // teacher who opens Academy after class still needs to see the change.
+    if (!["scheduled", "ready", "rescheduled", "rearranged", "delayed", "completed", "no_show", "absent"].includes(session.status)) continue;
     if (acknowledgedEventIds.has(event.id)) continue;
     const key = event.batch_id ?? event.id;
     groups.set(key, [...(groups.get(key) ?? []), event]);
