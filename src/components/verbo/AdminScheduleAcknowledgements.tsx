@@ -60,9 +60,9 @@ export function AdminScheduleAcknowledgements() {
             <span> · {group.events.length} {group.events.length === 1 ? "session" : "sessions"}</span>
             <span> · Next: {scheduleChangeDate(group.firstSession.date_time)}</span>
           </div>
-          {digits.length >= 10 && digits.length <= 15 ?
+          {digits.length >= 11 && digits.length <= 15 ?
             <a href={`${waLink(teacher!.phone!)}?text=${encodeURIComponent(text)}`} target="_blank" rel="noopener noreferrer" className="rounded-full border border-[#01304a] px-3 py-1 font-semibold text-[#01304a]">Open WhatsApp draft</a> :
-            <span className="text-xs font-semibold text-[#9a3412]">Teacher phone needed for WhatsApp</span>}
+            <span className="text-xs font-semibold text-[#9a3412]">Full international teacher phone needed for WhatsApp</span>}
         </div>;
       })}
     </div>
