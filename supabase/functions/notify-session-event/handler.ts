@@ -315,9 +315,10 @@ export async function handleSessionNotification(req: Request, job?: any) {
         title: "Tu reporte de sesión ya está listo",
         bodyHtml: `Hola ${student?.name ?? ""}, tu profesor(a) <strong>${teacher?.name ?? ""}</strong> ya completó el reporte de tu sesión del <strong>${dateLabel}</strong>.`,
         rows: [{ label: "Fecha", value: dateLabel }, { label: "Profesor", value: teacher?.name ?? "" }],
-        cta: session.report_pdf_url
-          ? { label: "Ver reporte (PDF)", href: session.report_pdf_url }
-          : { label: "Ver en mi cuenta", href: `${APP_URL}/student/sessions` },
+        // The PDF lives in the private `content` bucket. The saved URL is a
+        // storage path reference, not a link that can be opened from email.
+        // Academy signs it after the student authenticates on the dashboard.
+        cta: { label: "Ver reporte en Academy", href: `${APP_URL}/student` },
       });
       results.student = await sendEmail([student.email], "Tu reporte de sesión ya está listo - Verbo Academy", html);
     }
