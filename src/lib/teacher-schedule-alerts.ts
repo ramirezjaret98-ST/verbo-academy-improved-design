@@ -69,4 +69,3 @@ export function scheduleChangeDirection(previous: string | null, current: string
   const duration = amount % 60 === 0 ? `${amount / 60} h` : `${amount} min`;
   return `${duration} ${minutes < 0 ? "antes" : "después"}`;
 }
-

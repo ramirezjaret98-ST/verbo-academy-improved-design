@@ -28,4 +28,3 @@ if(typeof window!=="undefined"){
   void refresh();
   supabase.channel("session-schedule-events").on("postgres_changes",{event:"INSERT",schema:"public",table:"session_schedule_events"},()=>{void refresh();}).subscribe(status=>{if(status==="SUBSCRIBED")void refresh();});
 }
-

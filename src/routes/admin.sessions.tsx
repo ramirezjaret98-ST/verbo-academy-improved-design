@@ -1134,4 +1134,3 @@ function AssignTeacherModal({ request, onClose, onAssigned }: {
     </div>
   );
 }
-

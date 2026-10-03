@@ -516,4 +516,3 @@ function RequestReleaseModal({ club, onClose, onSubmit }: {
     </AccentModal>
   );
 }
-

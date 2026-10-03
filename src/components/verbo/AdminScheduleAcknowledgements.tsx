@@ -68,4 +68,3 @@ export function AdminScheduleAcknowledgements() {
     </div>
   </Card>;
 }
-

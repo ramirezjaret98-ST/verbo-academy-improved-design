@@ -111,4 +111,3 @@ function ScheduleChangeRow({ event }: { event: ScheduleEvent }) {
     {direction && <span className="ml-2 rounded-full bg-[#b52904] px-2 py-0.5 text-xs font-bold text-white">{direction}</span>}
   </div>;
 }
-

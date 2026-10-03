@@ -1221,4 +1221,3 @@ export function lastCoveredSummaryFor(
   if (!text) return undefined;
   return text.length > 140 ? text.slice(0, 140).trim() + "…" : text;
 }
-
