@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { registerRehydrate } from "./auth-rehydrate";
 import { hydrateUserIdBridge, uuidToLegacySync } from "./user-id-bridge";
 export const SCHEDULE_EVENTS="verbo:session-schedule-events";
-export interface ScheduleEvent {id:string;session_id:number;student_id:string|null;teacher_id:string;previous_teacher_id:string|null;kind:string;date_time:string;previous_date_time:string;created_at:string;}
+export interface ScheduleEvent {id:string;session_id:number;student_id:string|null;teacher_id:string;previous_teacher_id:string|null;kind:string;date_time:string;previous_date_time:string;created_at:string;change_scope?:"one_off"|"regular"|null;batch_id?:string|null;}
 let events:ScheduleEvent[]=[];
 let generation=0;
 let pending:Promise<void>|null=null;
@@ -14,7 +14,7 @@ async function refresh(){
   const version=generation;
   pending=(async()=>{
     await hydrateUserIdBridge();
-    const {data,error}=await supabase.from("session_schedule_events" as never).select("*").order("created_at",{ascending:false}).limit(100);
+    const {data,error}=await supabase.from("session_schedule_events" as never).select("*").order("created_at",{ascending:false}).limit(500);
     if(version!==generation)return;
     if(error)throw error;
     events=((data ?? []) as unknown as ScheduleEvent[]).map(e=>({...e,student_id:e.student_id ? uuidToLegacySync(e.student_id) : null,teacher_id:uuidToLegacySync(e.teacher_id),previous_teacher_id:e.previous_teacher_id ? uuidToLegacySync(e.previous_teacher_id) : null}));

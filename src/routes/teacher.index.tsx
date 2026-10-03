@@ -1,6 +1,7 @@
 import { createFileRoute, useSearch, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth";
+import { TeacherScheduleAttention, useTeacherScheduleAttention } from "@/components/verbo/TeacherScheduleAttention";
 import { USERS, studentsOfTeacher, userById, type Session, type SessionStatus } from "@/lib/mock-data";
 import { assignedStudentIdsFor, hydrateAssignments, subscribeAssignments } from "@/lib/assignments-store";
 import { hydrateStudents, subscribeStudents } from "@/lib/students-store";
@@ -110,6 +111,7 @@ function TeacherDashboard() {
   const [liveSessions, setLiveSessions] = useState<ExtSession[]>(() =>
     typeof window === "undefined" ? [] : loadSessions()
   );
+  const scheduleAttention = useTeacherScheduleAttention(user?.id, liveSessions);
   const [clubs, setClubs] = useState<Club[]>([]);
   const [availTick, setAvailTick] = useState(0);
   const [viewing, setViewing] = useState<ExtSession | null>(null);
@@ -591,6 +593,7 @@ function TeacherDashboard() {
 
   return (
     <div className="space-y-8 sm:space-y-10">
+      <TeacherScheduleAttention attention={scheduleAttention} />
       <header className="verbo-td-in grid grid-cols-[minmax(0,1fr)_auto] items-end gap-3 border-b border-border pb-5">
         <div className="min-w-0">
           <div className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Good day,</div>

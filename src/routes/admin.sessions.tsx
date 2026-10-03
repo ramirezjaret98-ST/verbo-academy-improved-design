@@ -540,7 +540,7 @@ function StudentSessionsModal({
     const finalPatch: Partial<ExtSession> = { ...patch };
     if (rescheduleApplied && s) {
       if (s.status === "scheduled" || s.status === "rescheduled") finalPatch.status = "rescheduled";
-      else if (s.status === "ready" || s.status === "rearranged") finalPatch.status = "rescheduled";
+      else if (s.status === "rearranged") finalPatch.status = "rescheduled";
     }
     const saved = await onSave(id, finalPatch);
     if(saved) notifySuccess("Session updated.");
@@ -553,7 +553,7 @@ function StudentSessionsModal({
     sourceDays: number[]; permanent: boolean;
   }) => {
     const [hh, mm] = opts.time.split(":").map(Number);
-    const updates: Array<{ session: ExtSession; patch: Partial<ExtSession> }> = [];
+    const updates: Array<{ session: ExtSession; patch: Partial<ExtSession>; changeScope: "one_off" | "regular" }> = [];
     for (const s of sessions) {
       if (s.student_id !== studentId) continue;
       if (+new Date(s.date_time) <= Date.now() || !["scheduled", "ready", "rescheduled", "rearranged", "delayed"].includes(s.status)) continue;
@@ -591,10 +591,11 @@ function StudentSessionsModal({
       // "Rescheduled", which reads as a one-off — same choice already
       // available on the single-session edit above.
       const dateChanged = +new Date(patch.date_time) !== +new Date(s.date_time);
-      if (dateChanged && (s.status === "scheduled" || s.status === "rescheduled" || s.status === "ready" || s.status === "rearranged")) {
+      if ((dateChanged || opts.permanent) && (s.status === "scheduled" || s.status === "rescheduled" || s.status === "rearranged")) {
         patch.status = opts.permanent ? "scheduled" : "rescheduled";
       }
-      updates.push({ session: s, patch });
+      // "ready" describes a saved lesson plan. A schedule move must retain it.
+      updates.push({ session: s, patch, changeScope: opts.permanent ? "regular" : "one_off" });
     }
     if (!await updateSessionsBulk(updates)) return false;
     setStudentVideoLink(studentId, opts.teamsLink);

@@ -49,6 +49,8 @@ export interface CalendarViewProps {
    *  scrolls into view once on mount. Deep link target for the notification
    *  bell (e.g. "student cancelled a session" → jump straight to it). */
   highlightEventId?: string;
+  /** Teacher-only confirmed changes awaiting an acknowledgement. */
+  attentionEventIds?: ReadonlySet<string>;
 }
 
 
@@ -76,6 +78,7 @@ export function CalendarView({
   initialDate,
   substitutionAware = false,
   highlightEventId,
+  attentionEventIds,
 }: CalendarViewProps) {
   const [mode, setMode] = useState<CalendarViewMode>(initialMode);
   const [cursor, setCursor] = useState(() => { const d = initialDate ? new Date(initialDate) : new Date(); d.setDate(1); return d; });
@@ -115,9 +118,10 @@ export function CalendarView({
       if (!m.has(k)) m.set(k, []);
       m.get(k)!.push(e);
     }
-    for (const list of m.values()) list.sort((a, b) => +new Date(a.date) - +new Date(b.date));
+    for (const list of m.values()) list.sort((a, b) =>
+      Number(attentionEventIds?.has(b.id)) - Number(attentionEventIds?.has(a.id)) || +new Date(a.date) - +new Date(b.date));
     return m;
-  }, [filtered]);
+  }, [filtered, attentionEventIds]);
 
   const toggleKind = (k: CalendarEventKind) => {
     setEnabledKinds((prev) => {
@@ -205,6 +209,7 @@ export function CalendarView({
           pulseKinds={pulseKinds}
           substitutionAware={substitutionAware}
           highlightEventId={highlightEventId}
+          attentionEventIds={attentionEventIds}
           highlightPulsing={highlightPulsing}
           highlightScrolledRef={highlightScrolledRef}
         />
@@ -216,6 +221,7 @@ export function CalendarView({
           pulseKinds={pulseKinds}
           substitutionAware={substitutionAware}
           highlightEventId={highlightEventId}
+          attentionEventIds={attentionEventIds}
           highlightPulsing={highlightPulsing}
           highlightScrolledRef={highlightScrolledRef}
         />
@@ -259,7 +265,7 @@ export function CalendarView({
 
 function MonthGrid({
   cursor, eventsByDay, onEventClick, pulseKinds, substitutionAware,
-  highlightEventId, highlightPulsing, highlightScrolledRef,
+  highlightEventId, highlightPulsing, highlightScrolledRef, attentionEventIds,
 }: {
   cursor: Date;
   eventsByDay: Map<string, CalendarEvent[]>;
@@ -267,6 +273,7 @@ function MonthGrid({
   pulseKinds?: CalendarEventKind[];
   substitutionAware?: boolean;
   highlightEventId?: string;
+  attentionEventIds?: ReadonlySet<string>;
   highlightPulsing?: boolean;
   highlightScrolledRef?: MutableRefObject<boolean>;
 }) {
@@ -311,7 +318,8 @@ function MonthGrid({
                     index={idx}
                     ev={e}
                     onClick={() => onEventClick?.(e)}
-                    pulse={(!!pulseKinds?.includes(e.kind) || e.status === "pending_reschedule" || (highlighted && !!highlightPulsing)) && !isClubFull(e)}
+                    pulse={(!!attentionEventIds?.has(e.id) || !!pulseKinds?.includes(e.kind) || e.status === "pending_reschedule" || (highlighted && !!highlightPulsing)) && !isClubFull(e)}
+                    attention={!!attentionEventIds?.has(e.id)}
                     substitutionAware={substitutionAware}
                     highlighted={highlighted}
                     scrolledRef={highlightScrolledRef}
@@ -332,7 +340,7 @@ function MonthGrid({
 
 function DayList({
   day, events, onEventClick, pulseKinds, substitutionAware,
-  highlightEventId, highlightPulsing, highlightScrolledRef,
+  highlightEventId, highlightPulsing, highlightScrolledRef, attentionEventIds,
 }: {
   day: Date;
   events: CalendarEvent[];
@@ -340,6 +348,7 @@ function DayList({
   pulseKinds?: CalendarEventKind[];
   substitutionAware?: boolean;
   highlightEventId?: string;
+  attentionEventIds?: ReadonlySet<string>;
   highlightPulsing?: boolean;
   highlightScrolledRef?: MutableRefObject<boolean>;
 }) {
@@ -354,7 +363,8 @@ function DayList({
     <div key={dayKey(day)} className="verbo-cal-in overflow-hidden rounded-xl border border-border bg-card shadow-elevated">
       {events.map((e, idx) => {
         const highlighted = !!highlightEventId && e.id === highlightEventId;
-        const pulse = (!!pulseKinds?.includes(e.kind) || e.status === "pending_reschedule" || (highlighted && !!highlightPulsing)) && !isClubFull(e);
+        const attention = !!attentionEventIds?.has(e.id);
+        const pulse = (attention || !!pulseKinds?.includes(e.kind) || e.status === "pending_reschedule" || (highlighted && !!highlightPulsing)) && !isClubFull(e);
         const display = eventPillDisplay(e, { substitutionAware });
         return (
         <button
@@ -366,7 +376,7 @@ function DayList({
             }
           }}
           onClick={() => onEventClick?.(e)}
-          style={{ animationDelay: `${idx * 35}ms`, ...(pulse || highlighted ? { ["--verbo-focus-pulse-color" as string]: display.color } : {}) }}
+          style={{ animationDelay: `${idx * 35}ms`, ...(pulse || highlighted ? { ["--verbo-focus-pulse-color" as string]: attention ? "#b52904" : display.color } : {}) }}
           className={`verbo-cal-pill flex w-full items-center gap-4 border-b border-border p-3 text-left transition-[background-color,transform] duration-200 ease-out last:border-0 hover:bg-secondary/60 hover:translate-x-0.5 active:scale-[0.995] ${
             pulse ? "verbo-focus-pulse" : highlighted ? "verbo-target-ring" : ""
           }`}
@@ -407,6 +417,7 @@ function DayList({
             <div className="truncate text-sm font-medium text-foreground">{e.title}</div>
             {e.subtitle && <div className="truncate text-xs text-muted-foreground">{e.subtitle}</div>}
           </div>
+          {attention && <span className="rounded-full bg-[#b52904] px-2 py-0.5 text-[10px] font-bold text-white">Schedule changed</span>}
           {e.status && (e.kind === "class" || e.kind === "workshop") && (
             <span
               className="inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold"
@@ -435,7 +446,7 @@ function DayList({
 }
 
 function EventPill({
-  ev, onClick, pulse = false, substitutionAware = false, index = 0, highlighted = false, scrolledRef,
+  ev, onClick, pulse = false, substitutionAware = false, index = 0, highlighted = false, scrolledRef, attention = false,
 }: {
   ev: CalendarEvent;
   onClick: () => void;
@@ -443,6 +454,7 @@ function EventPill({
   substitutionAware?: boolean;
   index?: number;
   highlighted?: boolean;
+  attention?: boolean;
   scrolledRef?: MutableRefObject<boolean>;
 }) {
   const display = eventPillDisplay(ev, { substitutionAware });
@@ -475,7 +487,7 @@ function EventPill({
           color: display.borderColor ? "#01304a" : "#ffffff",
           borderColor: display.borderColor ?? "transparent",
           animationDelay: `${index * 40}ms`,
-          ...(pulse || highlighted ? { ["--verbo-focus-pulse-color" as string]: display.color } : {}),
+          ...(pulse || highlighted ? { ["--verbo-focus-pulse-color" as string]: attention ? "#b52904" : display.color } : {}),
         }}
 
         title={
@@ -495,6 +507,7 @@ function EventPill({
             {display.short}
           </span>
         )}
+        {attention && <span className="shrink-0 rounded bg-[#b52904] px-1 text-[9px] font-bold text-white">Changed</span>}
         <span className="truncate">
           {isClub
             ? `${fmtTime(ev.date)} · ${ev.title}${missed ? " · Missed" : seats ? ` · ${seats}` : ""}`
