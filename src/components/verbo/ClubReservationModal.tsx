@@ -89,7 +89,7 @@ export function ClubReservationModal({
     const res = await reserveSeat(studentId, club.id);
     setBusy(false);
     if (!res.ok) { setError(res.reason); return; }
-    toast.success("Seat reserved. See you there!");
+    toast.success("Tu lugar está reservado. Revisa tu correo de confirmación.");
   };
   const onCancel = async () => {
     setBusy(true);
