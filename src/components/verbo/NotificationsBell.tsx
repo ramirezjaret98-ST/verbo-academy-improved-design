@@ -63,6 +63,7 @@ const NOTIF_KIND_META: Record<NotificationKind, { icon: LucideIcon; color: strin
   avail_request_approved: { icon: CheckCircle2, color: TONE.success },
   avail_request_rejected: { icon: XCircle, color: TONE.danger },
   club_claim_confirmed: { icon: CheckCircle2, color: TONE.success },
+  club_seat_reserved: { icon: Users, color: TONE.success },
   club_released: { icon: CalendarX, color: TONE.neutral },
   freeze_applied: { icon: Snowflake, color: TONE.danger },
   kpi_below_threshold: { icon: TrendingDown, color: TONE.warning },

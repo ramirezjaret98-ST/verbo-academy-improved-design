@@ -16,8 +16,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { registerRehydrate } from "@/lib/auth-rehydrate";
 import type { Database } from "@/integrations/supabase/types";
 import { hydrateUserIdBridge, legacyToUuid, uuidToLegacySync } from "@/lib/user-id-bridge";
-import { loadClubs, clubTeacherName, type Club, type ClubType } from "./clubs-store";
-import { notifyAccountEvent } from "./account-notify";
+import { loadClubs, type Club, type ClubType } from "./clubs-store";
 import { groupsByStudentId } from "./groups-store";
 import { userById } from "./mock-data";
 import type { AccessPlanId } from "./student-model";
@@ -317,13 +316,8 @@ export async function reserveSeat(studentId: string, clubId: string): Promise<{ 
   // (and doing one here would double-count it). clubs-store's own Realtime
   // subscription picks up the trigger's update.
 
-  // 2026-08-20: "¡ya tienes tu lugar!" confirmation — the reassuring email
-  // Jaret specifically asked for on any action a student takes. Fire-and-forget.
-  notifyAccountEvent(studentUuid, "club_confirmed", {
-    clubName: club.title,
-    clubDate: club.date,
-    clubHost: clubTeacherName(club.teacher_id) ?? undefined,
-  });
+  // The INSERT trigger records the bell event and queues all reservation
+  // emails, including the student's confirmation. Do not send from the browser.
 
   // Core freemium: consume the one-shot courtesy credit at confirmation.
   if (userById(studentId)?.access_plan === "Core") {

@@ -54,6 +54,7 @@ import { loadLessonPlans, LESSON_PLANS_EVENT } from "./lesson-plans-store";
 import {
   resolvedRemainingSeats, type AccessKind,
 } from "./club-bookings-store";
+import { CLUB_BOOKING_EVENTS_EVENT, loadClubBookingEvents } from "./club-booking-events-store";
 import { groupsByStudentId } from "./groups-store";
 import { computeAllEarnedBadges } from "./badge-unlock";
 import { hasSeenBadgeUnlock, BADGE_UNLOCK_SEEN_EVENT } from "./badge-unlock-seen-store";
@@ -71,6 +72,7 @@ export type NotificationKind =
   | "avail_request_approved"
   | "avail_request_rejected"
   | "club_claim_confirmed"
+  | "club_seat_reserved"
   | "club_released"
   | "freeze_applied"
   | "kpi_below_threshold"
@@ -248,6 +250,14 @@ function fmtDate(iso: string): string {
 function teacherNotifications(teacherId: string): Notification[] {
   const out: Notification[] = [];
   const now = Date.now();
+  for (const event of loadClubBookingEvents()) {
+    if (event.teacher_id !== teacherId) continue;
+    const student = USERS.find(user => user.id === event.student_id);
+    out.push({ id: `club-booking:${event.id}`, kind: "club_seat_reserved",
+      title: "A student reserved your club",
+      body: `${student?.name ?? "Student"} · ${event.club_title} · ${fmtDate(event.club_date)}`,
+      createdAt: event.created_at, to: "/teacher/clubs", read: false });
+  }
 
   // ---- New sessions assigned (Scheduled / Ready in the future) -----------
   for (const s of loadSessions()) {
@@ -527,6 +537,13 @@ function teacherNotifications(teacherId: string): Notification[] {
 // ---------------------------------------------------------------------------
 function adminNotifications(): Notification[] {
   const out: Notification[] = [];
+  for (const event of loadClubBookingEvents()) {
+    const student = USERS.find(user => user.id === event.student_id);
+    out.push({ id: `club-booking:${event.id}`, kind: "club_seat_reserved",
+      title: "New club reservation",
+      body: `${student?.name ?? "Student"} · ${event.club_title} · ${fmtDate(event.club_date)}`,
+      createdAt: event.created_at, to: "/admin/clubs", read: false });
+  }
 
   // ---- Needs Substitute cases -------------------------------------------
   for (const s of loadSessions()) {
@@ -1069,7 +1086,7 @@ export function buildNotifications(role: Role, userId: string): Notification[] {
 // React binding — one subscription that listens to every source event.
 // ---------------------------------------------------------------------------
 const SOURCE_EVENTS = [
-  SCHEDULE_EVENTS, SESSIONS_EVENT, CLUBS_EVENT, CLUB_REPORTS_EVENT, RELEASE_REQUESTS_EVENT,
+  SCHEDULE_EVENTS, SESSIONS_EVENT, CLUBS_EVENT, CLUB_REPORTS_EVENT, RELEASE_REQUESTS_EVENT, CLUB_BOOKING_EVENTS_EVENT,
   AVAIL_EVENT, STRIKES_EVENT, ANN_EVENT, NOTIF_EVENT,
   REPORTS_EVENT, CONDUCT_REPORTS_EVENT, CONTENT_ISSUE_EVENT, FIN_ISSUES_EVENT, STUDENTS_EVENT, CHALLENGES_EVENT,
   REQUESTS_EVENT, VIP_UNITS_EVENT, TAILORED_UNITS_EVENT, LP_EVENT, LESSON_PLANS_EVENT,
