@@ -120,7 +120,7 @@ const PRODUCT_TYPE_OPTIONS: {
 }[] = [
   { id: "performance", name: "Performance Sessions", blurb: "Live 1:1 English program (Enterprise, GO, International, VIP).", icon: Gauge },
   { id: "workshops", name: "Focus Workshops", blurb: "Short-form workshops only. No live 1:1 sessions.", icon: Layers },
-  { id: "insights", name: "Insights", blurb: "Insights access only. No live sessions or workshops.", icon: Lightbulb },
+  { id: "insights", name: "Clubs", blurb: "Insights, Book Clubs, or both. No live 1:1 sessions or workshops.", icon: Lightbulb },
 ];
 
 function initials(name: string) {
@@ -884,7 +884,7 @@ function StudentFormModal({
     ? (baseValid && f.product && f.video_call_link.trim() && (!isEnterprise || f.company.trim()))
     : f.product_type === "workshops"
       ? baseValid // participants can be added later, but a cohort selection is recommended
-      : baseValid; // insights standalone
+      : (baseValid && (f.addon_insights_per_month > 0 || f.addon_bookclubs_per_month > 0)); // clubs standalone
 
   const pickProductType = (pt: FormState["product_type"]) => {
     setF((prev) => {
@@ -909,8 +909,10 @@ function StudentFormModal({
         custom_price: "",
         video_call_link: "",
         teacher_id: "",
-        addon_insights_per_month: pt === "insights" ? (prev.addon_insights_per_month || 1) : 0,
-        addon_bookclubs_per_month: 0,
+        addon_insights_per_month: pt === "insights"
+          ? (prev.addon_insights_per_month || prev.addon_bookclubs_per_month ? prev.addon_insights_per_month : 1)
+          : 0,
+        addon_bookclubs_per_month: pt === "insights" ? prev.addon_bookclubs_per_month : 0,
         addon_spotlight_per_month: 0,
         addon_workshops_enabled: pt === "workshops",
       };
@@ -973,7 +975,7 @@ function StudentFormModal({
       admin_notes: initial?.admin_notes,
       next_payment: initial?.next_payment,
       addon_insights_per_month: Number(f.addon_insights_per_month) || 0,
-      addon_bookclubs_per_month: isPerf ? (Number(f.addon_bookclubs_per_month) || 0) : 0,
+      addon_bookclubs_per_month: f.product_type !== "workshops" ? (Number(f.addon_bookclubs_per_month) || 0) : 0,
       addon_spotlight_per_month: isPerf ? (Number(f.addon_spotlight_per_month) || 0) : 0,
       addon_workshops_enabled: f.product_type === "workshops" ? true : (isPerf && f.addon_workshops_enabled),
     };
@@ -1091,13 +1093,17 @@ function StudentFormModal({
               </Step>
             )}
 
-            {/* BRANCH: INSIGHTS — standalone */}
+            {/* BRANCH: CLUBS — standalone; `insights` is the legacy DB key. */}
             {f.product_type === "insights" && (
-              <Step n={2} title="Insights Access">
-                <p className="mb-3 text-[11px] text-muted-foreground">Standalone Insights customer. Set the monthly cap for this person.</p>
+              <Step n={2} title="Clubs Access">
+                <p className="mb-3 text-[11px] text-muted-foreground">Choose the collections this person has contracted. Set 0 for a collection they cannot access.</p>
                 <Field label="Insights (per month)" icon={<Lightbulb className="h-3.5 w-3.5" />}>
                   <input type="number" min={0} value={f.addon_insights_per_month} onChange={(e) => setAddon("insights", Number(e.target.value))} className={inputCls} />
                 </Field>
+                <Field label="Book Clubs (per month)" icon={<Users className="h-3.5 w-3.5" />}>
+                  <input type="number" min={0} value={f.addon_bookclubs_per_month} onChange={(e) => setAddon("bookclubs", Number(e.target.value))} className={inputCls} />
+                </Field>
+                {attemptedSave && f.addon_insights_per_month <= 0 && f.addon_bookclubs_per_month <= 0 && <p className="text-xs text-destructive">Choose at least one club collection.</p>}
               </Step>
             )}
 

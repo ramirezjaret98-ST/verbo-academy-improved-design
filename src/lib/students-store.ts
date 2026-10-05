@@ -7,6 +7,7 @@
 // duplicating it. Editing the link here reflects in Students and vice-versa.
 import {
   USERS,
+  isAuthenticatedStudent,
   pruneHiddenMockUsers,
   type User,
   type ChallengeSubmission,
@@ -204,7 +205,11 @@ export function hydrateStudents() {
   // whatever's already cached locally, without waiting on that async fetch.
   pruneHiddenMockUsers();
   const overrides = readProfileOverrides();
-  USERS.forEach((u) => { if (overrides[u.id]) Object.assign(u, overrides[u.id]); });
+  USERS.forEach((u) => {
+    // The signed-in student's app_users row was already loaded by Auth.
+    // A stale browser override must not replace its real club allowances.
+    if (!isAuthenticatedStudent(u.id) && overrides[u.id]) Object.assign(u, overrides[u.id]);
+  });
   readRegisteredStudents().forEach((u) => {
     if (!USERS.find((x) => x.id === u.id)) USERS.push(u);
   });

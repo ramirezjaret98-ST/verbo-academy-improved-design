@@ -18,7 +18,7 @@ function StudentLayout() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const productType = user?.product_type ?? "performance";
   const isVIP = user?.product === "vip";
-  const insightsOnly = productType === "insights";
+  const clubsOnly = productType === "insights";
   const isClubsCatalog = pathname === "/student/clubs";
 
   // Register the daily visit once per mounted student session.
@@ -31,7 +31,7 @@ function StudentLayout() {
   if (productType === "insights") {
     items = [
       { to: "/student", label: "Dashboard" },
-      { to: "/student/insights", label: "Insights" },
+      { to: "/student/clubs", label: "Clubs" },
     ];
   } else if (productType === "workshops") {
     items = [
@@ -51,7 +51,7 @@ function StudentLayout() {
     ];
   }
 
-  if (insightsOnly && pathname !== "/student" && pathname !== "/student/" && pathname !== "/student/insights" && pathname !== "/student/clubs") {
+  if (clubsOnly && pathname !== "/student" && pathname !== "/student/" && pathname !== "/student/insights" && pathname !== "/student/clubs") {
     return <RoleGuard allow="student"><Navigate to="/student" /></RoleGuard>;
   }
 

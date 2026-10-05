@@ -91,7 +91,8 @@ import { loadSeasons } from "@/lib/flash-challenges-store";
 import { loadClubs, type Club } from "@/lib/clubs-store";
 import { isBooked } from "@/lib/club-bookings-store";
 import { ClubReservationModal } from "@/components/verbo/ClubReservationModal";
-import { InsightsDashboard } from "@/components/verbo/InsightsDashboard";
+import { ClubsDashboard } from "@/components/verbo/InsightsDashboard";
+import { visibleClubTypes } from "@/lib/club-access";
 import { EVENT_KIND_META, CALENDAR_STATUS_META, calendarEventTheme } from "@/lib/calendar-events";
 import { RatingModal } from "@/components/verbo/RatingModal";
 import { ReportConductModal } from "@/components/verbo/ReportConductModal";
@@ -122,7 +123,7 @@ export const Route = createFileRoute("/student/")({
 
 function StudentLanding() {
   const { user } = useAuth();
-  if (user?.product_type === "insights") return <InsightsDashboard name={user.name.split(" ")[0]} studentId={user.id} />;
+  if (user?.product_type === "insights") return <ClubsDashboard name={user.name.split(" ")[0]} studentId={user.id} allowedTypes={visibleClubTypes(user)} />;
   return <StudentDashboard />;
 }
 
