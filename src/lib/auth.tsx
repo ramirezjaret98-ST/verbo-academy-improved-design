@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
-import { USERS, userById, type User, type Role } from "./mock-data";
+import { USERS, registerAuthenticatedStudent, userById, type User, type Role } from "./mock-data";
 import { isMemberBlockedInDatabase } from "./groups-store";
 import { hydrateAdminRoles, isUserDeactivated } from "./admin-roles";
 import { supabase } from "@/integrations/supabase/client";
@@ -250,6 +250,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
       authIdRef.current = sessionUser.id;
+      registerAuthenticatedStudent(built);
       setUser(built);
     };
 
@@ -399,6 +400,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (logoutTimer.current) clearTimeout(logoutTimer.current);
       setIsLoggingOut(false);
       authIdRef.current = data.user.id;
+      registerAuthenticatedStudent(built);
       setUser(built);
       return { ok: true, role: built.role, must_change_password: !!built.must_change_password };
     } catch (err) {

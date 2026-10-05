@@ -445,6 +445,21 @@ export function userById(id: string) {
   return USERS.find((u) => u.id === id);
 }
 
+/** Keep the authenticated student's DB-backed profile available to legacy
+ * stores that still resolve commercial access through userById(). */
+let authenticatedStudentId: string | null = null;
+export function registerAuthenticatedStudent(profile: User): void {
+  if (profile.role !== "student") return;
+  authenticatedStudentId = profile.id;
+  const existing = userById(profile.id);
+  if (existing) Object.assign(existing, profile);
+  else USERS.push(profile);
+}
+
+export function isAuthenticatedStudent(id: string): boolean {
+  return id === authenticatedStudentId;
+}
+
 export function studentsOfTeacher(teacherId: string) {
   const ids = assignedStudentIdsFor(teacherId);
   return USERS.filter((u) => ids.includes(u.id));

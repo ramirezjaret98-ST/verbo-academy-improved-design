@@ -745,7 +745,7 @@ function studentNotifications(studentId: string): Notification[] {
         ? "If you reserve a place, please join us or cancel in time so we can prepare for the group."
         : "Your teacher marked you absent from a reserved Insight. Please cancel in time when you cannot attend.",
       createdAt: report.submitted_at,
-      to: uu?.product_type === "insights" ? "/student/insights" : "/student/sessions",
+      to: uu?.product_type === "insights" ? "/student/clubs" : "/student/sessions",
       read: false,
     });
   }
@@ -905,7 +905,7 @@ function studentNotifications(studentId: string): Notification[] {
   const SEVEN_DAYS = 7 * 24 * 3600 * 1000;
   for (const c of loadClubs()) {
     if (c.status !== "upcoming") continue;
-    if (uu?.product_type === "insights" && c.type !== "insight") continue;
+    if (uu?.product_type === "insights" && (c.type === "book" ? (uu.addon_bookclubs_per_month ?? 0) <= 0 : (uu.addon_insights_per_month ?? 0) <= 0)) continue;
     const createdIso = c.created_at ?? c.date;
     if (now - +new Date(createdIso) > SEVEN_DAYS) continue;
     const kind: AccessKind = c.type === "book" ? "book" : "insight";
@@ -916,7 +916,7 @@ function studentNotifications(studentId: string): Notification[] {
       title: `New Club open: ${c.title}`,
       body: fmtDate(c.date),
       createdAt: createdIso,
-      to: uu?.product_type === "insights" ? "/student/insights" : "/student/sessions",
+      to: uu?.product_type === "insights" ? "/student/clubs" : "/student/sessions",
       read: false,
     });
   }
