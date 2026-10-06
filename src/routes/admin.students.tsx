@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   USERS, SESSIONS, userById, type User,
 } from "@/lib/mock-data";
-import { assignedTeacherIdFor, hydrateAssignments, setAssignment, subscribeAssignments } from "@/lib/assignments-store";
+import { assignedTeacherIdFor, hydrateAssignments, removeAssignment, setAssignment, subscribeAssignments } from "@/lib/assignments-store";
 import {
   PRODUCTS, FOCUSES, ACCESS_PLANS, ACCESS_PLAN_IDS, RESCHEDULE_PRESETS,
   SESSIONS_PER_LEVEL, MAX_INSIGHT_STRIKES, MAX_BOOKCLUB_STRIKES,
@@ -319,10 +319,28 @@ function Page() {
     window.dispatchEvent(new CustomEvent(STUDENTS_EVENT));
     forceTick((n) => n + 1);
     if (teacherId) setAssignment(u.id, teacherId);
+    else if (teacherId === "") removeAssignment(u.id);
     setFormFor(null);
     // keep detail modal in sync
     setDetail((d) => (d && d.id === u.id ? u : d));
     notifySuccess(`${u.name} updated.`);
+  };
+
+  // Detail-modal actions (notes, status, strikes, password flags) remain
+  // narrow profile patches. They never edit login identity or resubmit the
+  // entire registration form.
+  const handleDetailUpdate = (u: User, teacherId?: string) => {
+    const current = USERS.find((existing) => existing.id === u.id);
+    if (!current) return;
+    const changed = Object.fromEntries(
+      STUDENT_PROFILE_FIELD_KEYS.filter((key) => u[key] !== current[key])
+        .map((key) => [key, u[key] ?? null]),
+    ) as Partial<StudentProfileFields>;
+    if (Object.keys(changed).length) patchStudentProfile(u.id, changed);
+    if (teacherId) setAssignment(u.id, teacherId);
+    else if (teacherId === "") removeAssignment(u.id);
+    setDetail((d) => (d && d.id === u.id ? u : d));
+    forceTick((n) => n + 1);
   };
 
   // Permanently erases the account (real Supabase login + every DB row that
@@ -460,7 +478,7 @@ function Page() {
           student={detail}
           teachers={teachers}
           onClose={() => setDetail(null)}
-          onUpdate={handleUpdate}
+          onUpdate={handleDetailUpdate}
           onDelete={handleDelete}
           onEdit={() => { const s = detail; setDetail(null); setFormFor(s); }}
         />
@@ -1003,7 +1021,7 @@ function StudentFormModal({
       // why this matters. onSave() itself already surfaces the error via a
       // toast (notifyError), so there's nothing further to show here beyond
       // re-enabling the form.
-      await onSave(u, isPerf ? (f.teacher_id || undefined) : undefined, false);
+      await onSave(u, isPerf ? f.teacher_id : "", false);
       const currentIds = new Set(cohortsForStudent(id).map((x) => x.cohort.id));
       for (const cid of currentIds) if (!targetIds.has(cid)) removeParticipantFromCohort(cid, id);
       for (const cid of targetIds) if (!currentIds.has(cid)) addStudentToCohort(cid, id, u.name);
@@ -1906,7 +1924,7 @@ function StudentDetailModal({
                   {teachersForProductSorted(teachers, student.product || null).map((t) => <option key={t.id} value={t.id}>{t.name} · {teacherTier(t).name}</option>)}
                 </select>
               </Field>
-              <PrimaryButton onClick={() => { onUpdate(student, teacherId || undefined); setPanel("none"); }}>Apply</PrimaryButton>
+              <PrimaryButton onClick={() => { onUpdate(student, teacherId); setPanel("none"); }}>Apply</PrimaryButton>
             </div>
           </div>
         )}
