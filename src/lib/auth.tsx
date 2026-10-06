@@ -279,10 +279,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // TOKEN_REFRESHED / USER_UPDATED don't require rebuilding the profile;
       // SIGNED_IN is handled directly by `login()` below.
     });
+    const profileChanges = supabase.channel("own-app-user-profile")
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "app_users" }, (payload) => {
+        if (payload.new.id !== authIdRef.current) return;
+        void supabase.auth.getSession().then(({ data }) => applySession(data.session?.user));
+      })
+      .subscribe();
 
     return () => {
       cancelled = true;
       subscription.subscription.unsubscribe();
+      void supabase.removeChannel(profileChanges);
     };
   }, []);
 

@@ -65,6 +65,7 @@ if (typeof window !== "undefined") {
   supabase.channel("challenge-leaderboard-real-data")
     .on("postgres_changes", { event: "*", schema: "public", table: "challenge_submissions" }, () => { void refreshChallengeLeaderboard(); })
     .on("postgres_changes", { event: "*", schema: "public", table: "leaderboard_identities" }, () => { void refreshChallengeLeaderboard(); })
+    .on("postgres_changes", { event: "UPDATE", schema: "public", table: "app_users" }, () => { void refreshChallengeLeaderboard(); })
     .subscribe();
 }
 

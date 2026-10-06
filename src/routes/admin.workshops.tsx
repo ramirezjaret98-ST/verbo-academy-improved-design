@@ -14,7 +14,7 @@ import { USERS } from "@/lib/mock-data";
 import {
   type WorkshopCohort, type WorkshopParticipant, type WorkshopTemplate,
   type WorkshopUnit, isUnitOpenFor, loadWorkshops, newCohort, newTemplate,
-  newUnit, persistWorkshops, subscribeWorkshops,
+  newUnit, persistWorkshops, subscribeWorkshops, workshopParticipantName,
 } from "@/lib/workshops-store";
 import {
   type ExtSession, type ExtSessionStatus,
@@ -474,7 +474,7 @@ function CohortRow({ cohort, template, units, onEdit, onDelete, onChange }: {
         <div className="mt-3 flex flex-wrap gap-1.5">
           {cohort.participants.map((p) => (
             <span key={p.id} className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-medium ${p.kind === "student" ? "bg-primary/10 text-primary" : "bg-secondary text-secondary-foreground"}`}>
-              <UserIcon className="h-3 w-3" /> {p.name}{p.kind === "standalone" && <span className="opacity-60"> (standalone)</span>}
+              <UserIcon className="h-3 w-3" /> {workshopParticipantName(p)}{p.kind === "standalone" && <span className="opacity-60"> (standalone)</span>}
             </span>
           ))}
         </div>
@@ -491,7 +491,7 @@ function CohortRow({ cohort, template, units, onEdit, onDelete, onChange }: {
                   <th className="pl-2">Unit</th>
                   <th className="px-2">Cohort default</th>
                   {cohort.participants.map((p) => (
-                    <th key={p.id} className="px-2 truncate">{p.name}</th>
+                    <th key={p.id} className="px-2 truncate">{workshopParticipantName(p)}</th>
                   ))}
                 </tr>
               </thead>
@@ -712,7 +712,7 @@ function CohortModal({ editing, onClose, onSave }: {
                 {participants.map((p) => (
                   <span key={p.id} className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium ${p.kind === "student" ? "bg-primary/10 text-primary" : "bg-secondary text-secondary-foreground"}`}>
                     <UserIcon className="h-3 w-3" />
-                    {p.name}{p.kind === "standalone" && <span className="opacity-60"> (standalone)</span>}
+                    {workshopParticipantName(p)}{p.kind === "standalone" && <span className="opacity-60"> (standalone)</span>}
                     <button onClick={() => removeParticipant(p.id)} className="ml-1 opacity-70 hover:opacity-100"><X className="h-3 w-3" /></button>
                   </span>
                 ))}

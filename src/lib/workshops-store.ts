@@ -3,6 +3,7 @@
 // assigned teacher, shared video-call link and per-unit openness. The
 // Students admin form only READS/updates cohort membership through the
 // helpers exposed here.
+import { userById } from "./mock-data";
 
 export interface WorkshopUnit {
   id: string; // WS-<templateId>-U<n>
@@ -162,4 +163,8 @@ export function removeParticipantFromCohort(cohortId: string, participantId: str
     }
   }
   if (changed) persistWorkshops(list);
+}
+
+export function workshopParticipantName(participant: WorkshopParticipant): string {
+  return participant.kind === "student" ? userById(participant.id)?.name ?? participant.name : participant.name;
 }
