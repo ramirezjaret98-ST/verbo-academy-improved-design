@@ -2736,7 +2736,7 @@ function LeaderboardSection({
   );
 
   const podium = rows.slice(0, 3);
-  const rest = rows.slice(3);
+  const rest = rows.slice(3, 5);
   // Ensure a visual "3-2-1-...” ordering: put #1 in the middle when there are 3+.
   const podiumOrdered = podium.length === 3 ? [podium[1], podium[0], podium[2]] : podium;
   const podiumRankOf = (r: typeof rows[number]) => podium.indexOf(r); // 0..2

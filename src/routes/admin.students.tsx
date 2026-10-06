@@ -48,10 +48,12 @@ import {
   patchStudentProfile,
   hydrateStudents,
   subscribeStudents,
+  STUDENT_PROFILE_FIELD_KEYS,
+  STUDENTS_EVENT,
   type StudentProfileFields,
 } from "@/lib/students-store";
 import { supabase } from "@/integrations/supabase/client";
-import { invalidateUserIdBridge } from "@/lib/user-id-bridge";
+import { invalidateUserIdBridge, legacyToUuid } from "@/lib/user-id-bridge";
 import { RotateCcw, Unlock as UnlockIcon, Lock as LockIcon, Trophy } from "lucide-react";
 import { ResetPasswordModal } from "@/components/verbo/ResetPasswordModal";
 import { useAuth } from "@/lib/auth";
@@ -237,23 +239,6 @@ function Page() {
     return list;
   }, [allStudents, searchQuery, filterCompany, filterProduct, sortBy]);
 
-  const persist = (updated: User) => {
-    const idx = USERS.findIndex((u) => u.id === updated.id);
-    if (idx >= 0) USERS[idx] = updated; else USERS.push(updated);
-    // keep registered list fresh if this is a locally-created student
-    const registered = readRegisteredStudents();
-    const rIdx = registered.findIndex((u) => u.id === updated.id);
-    if (rIdx >= 0) { registered[rIdx] = updated; writeRegisteredStudents(registered); }
-    // patchStudentProfile owns the Supabase write for the DB-backed profile
-    // fields (with a localStorage-override fallback for locally-registered
-    // students without a real app_users row). It only ever sends the in-scope
-    // student profile columns, so the extra keys still present on `rest`
-    // (password, challenge state, …) never reach the DB.
-    const { id, name, role, ...rest } = updated;
-    patchStudentProfile(updated.id, rest as Partial<StudentProfileFields>);
-    forceTick((n) => n + 1);
-  };
-
   // 2026-08-29: rewritten to create the REAL Supabase Auth account FIRST and
   // only write the optimistic USERS/localStorage bookkeeping (and close the
   // modal) once that's confirmed. This used to be the other way around —
@@ -301,15 +286,42 @@ function Page() {
     notifySuccess(`${u.name} created successfully.`);
   };
 
-  const handleUpdate = (u: User, teacherId?: string) => {
-    persist(u);
+  const handleUpdate = async (u: User, teacherId?: string) => {
+    const studentId = await legacyToUuid(u.id);
+    if (!studentId) throw new Error("Student account could not be identified");
+    const profile = Object.fromEntries(
+      STUDENT_PROFILE_FIELD_KEYS.filter((key) => u[key] !== undefined).map((key) => [key, u[key]]),
+    );
+    // The form intentionally clears these fields when changing product or
+    // removing a value. Send NULL rather than silently leaving the old value.
+    for (const key of [
+      "phone", "company", "member_since", "product", "focus", "access_plan",
+      "current_roadmap_level", "current_level", "sessions_per_week", "session_duration",
+      "reschedule_policy", "reschedule_custom_hours", "reschedule_custom_pct",
+      "payment_day", "cycle_start", "custom_price", "video_call_link",
+    ] as const) {
+      profile[key] = u[key] ?? null;
+    }
+    const { data, error } = await supabase.functions.invoke("admin-update-student", {
+      body: { studentId, name: u.name, email: u.email, profile },
+    });
+    const resultError = (data as { error?: string } | null)?.error;
+    if (error || resultError) {
+      const failure = new Error(resultError ?? error?.message ?? "Student update failed");
+      notifyError(failure, { context: `Updating ${u.name}` });
+      throw failure;
+    }
+    const idx = USERS.findIndex((existing) => existing.id === u.id);
+    if (idx >= 0) USERS[idx] = u; else USERS.push(u);
+    const registered = readRegisteredStudents();
+    const rIdx = registered.findIndex((existing) => existing.id === u.id);
+    if (rIdx >= 0) { registered[rIdx] = u; writeRegisteredStudents(registered); }
+    window.dispatchEvent(new CustomEvent(STUDENTS_EVENT));
+    forceTick((n) => n + 1);
     if (teacherId) setAssignment(u.id, teacherId);
     setFormFor(null);
     // keep detail modal in sync
     setDetail((d) => (d && d.id === u.id ? u : d));
-    // persist()'s DB write happens in the background (patchStudentProfile) —
-    // if it fails, notify.ts's error toast fires from there. This confirms
-    // the common case instead of just silently closing the modal.
     notifySuccess(`${u.name} updated.`);
   };
 
@@ -980,12 +992,9 @@ function StudentFormModal({
       addon_workshops_enabled: f.product_type === "workshops" ? true : (isPerf && f.addon_workshops_enabled),
     };
 
-    // Sync cohort memberships against workshops store (source of truth).
+    // Sync cohort memberships only after the account/profile save succeeds.
     const wantsCohorts = u.product_type === "workshops" || (u.product_type === "performance" && u.addon_workshops_enabled);
     const targetIds = new Set(wantsCohorts ? f.selected_cohort_ids : []);
-    const currentIds = new Set(cohortsForStudent(id).map((x) => x.cohort.id));
-    for (const cid of currentIds) if (!targetIds.has(cid)) removeParticipantFromCohort(cid, id);
-    for (const cid of targetIds) if (!currentIds.has(cid)) addStudentToCohort(cid, id, u.name);
 
     try {
       // Awaited so a failure (e.g. admin-create-user rejecting a duplicate
@@ -995,9 +1004,12 @@ function StudentFormModal({
       // toast (notifyError), so there's nothing further to show here beyond
       // re-enabling the form.
       await onSave(u, isPerf ? (f.teacher_id || undefined) : undefined, false);
-    } catch {
-      // Swallow — the toast already told the admin what went wrong. Falls
-      // through to the finally below so the button un-freezes.
+      const currentIds = new Set(cohortsForStudent(id).map((x) => x.cohort.id));
+      for (const cid of currentIds) if (!targetIds.has(cid)) removeParticipantFromCohort(cid, id);
+      for (const cid of targetIds) if (!currentIds.has(cid)) addStudentToCohort(cid, id, u.name);
+      setSaveError(null);
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : "The student was not saved. Try again.");
     } finally {
       if (mountedRef.current) setSaving(false);
     }
@@ -1426,6 +1438,7 @@ function StudentFormModal({
         )}
       </div>
 
+      {saveError && <p role="alert" className="px-6 text-sm text-destructive">{saveError}</p>}
       <AccentModalFooter>
         <GhostButton onClick={onClose} disabled={saving}>Cancel</GhostButton>
         <PrimaryButton

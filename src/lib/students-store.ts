@@ -93,7 +93,7 @@ export interface StudentProfileFields {
  *  `app_users` UPDATE (extra keys a caller may sneak in via a cast, e.g.
  *  `password` or Challenges state, are filtered out so PostgREST never sees an
  *  unknown column). */
-const STUDENT_PROFILE_FIELD_KEYS: (keyof StudentProfileFields)[] = [
+export const STUDENT_PROFILE_FIELD_KEYS: (keyof StudentProfileFields)[] = [
   "must_change_password",
   "current_level",
   "attendance_percentage",
@@ -280,13 +280,13 @@ export function hydrateStudents() {
           };
           USERS.push(u);
         }
+        if (typeof row.name === "string") u.name = row.name;
+        if (typeof row.email === "string") u.email = row.email;
         for (const key of STUDENT_PROFILE_FIELD_KEYS) {
-          const value = row[key];
-          // Only assign non-null/known DB values so a column this row's source
-          // doesn't return (RPC) or hasn't been backfilled yet doesn't clobber
-          // a mock demo default.
-          if (value !== null && value !== undefined) {
-            (u as unknown as Record<string, unknown>)[key] = value;
+          // A NULL from a real row means the field was cleared in Admin.
+          // Only omit columns absent from the narrower teacher RPC.
+          if (key in row) {
+            (u as unknown as Record<string, unknown>)[key] = row[key] ?? undefined;
           }
         }
         if (row.access_plan) u.hired_plan = row.access_plan as typeof u.hired_plan;

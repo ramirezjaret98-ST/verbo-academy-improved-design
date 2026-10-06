@@ -9,6 +9,7 @@ import {
   subscribeWorkshops,
   type WorkshopTemplate,
   type WorkshopCohort,
+  workshopParticipantName,
 } from "@/lib/workshops-store";
 
 export const Route = createFileRoute("/teacher/workshops")({ component: Page });
@@ -102,7 +103,7 @@ function CohortCard({ template, cohort }: { template: WorkshopTemplate; cohort: 
                   key={p.id}
                   className="flex items-center justify-between gap-3 rounded-lg border border-border bg-background px-3 py-2"
                 >
-                  <span className="text-sm text-foreground">{p.name}</span>
+                  <span className="text-sm text-foreground">{workshopParticipantName(p)}</span>
                   <Pill tone={p.kind === "student" ? "default" : "muted"}>
                     {p.kind === "student" ? "Student" : "Standalone"}
                   </Pill>
