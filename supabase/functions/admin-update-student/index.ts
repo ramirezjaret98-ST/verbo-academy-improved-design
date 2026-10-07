@@ -132,6 +132,7 @@ Deno.serve(async (req: Request) => {
     const insightBonus = clubPackage.insightBonus;
     const bookBonus = clubPackage.bookBonus;
     if (previous.product_type !== "insights" || !previous.club_package_id
+      || !previous.club_package_expires_on || previous.club_package_expires_on <= today
       || !Number.isSafeInteger(insightBonus) || !Number.isSafeInteger(bookBonus)
       || (insightBonus as number) < previous.club_insight_bonus
       || (bookBonus as number) < previous.club_book_bonus
