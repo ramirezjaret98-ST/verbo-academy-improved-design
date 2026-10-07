@@ -207,6 +207,16 @@ export type Database = {
       }
       app_users: {
         Row: {
+          club_package_id: string | null
+          club_package_months: number | null
+          club_package_started_on: string | null
+          club_package_expires_on: string | null
+          club_insight_base: number
+          club_book_base: number
+          club_insight_bonus: number
+          club_book_bonus: number
+          club_package_changed_by: string | null
+          club_package_change_reason: string | null
           access_plan: Database["public"]["Enums"]["access_plan"] | null
           addon_bookclubs_per_month: number | null
           addon_insights_per_month: number | null
@@ -282,6 +292,16 @@ export type Database = {
           video_call_link: string | null
         }
         Insert: {
+          club_package_id?: string | null
+          club_package_months?: number | null
+          club_package_started_on?: string | null
+          club_package_expires_on?: string | null
+          club_insight_base?: number
+          club_book_base?: number
+          club_insight_bonus?: number
+          club_book_bonus?: number
+          club_package_changed_by?: string | null
+          club_package_change_reason?: string | null
           access_plan?: Database["public"]["Enums"]["access_plan"] | null
           addon_bookclubs_per_month?: number | null
           addon_insights_per_month?: number | null
@@ -359,6 +379,16 @@ export type Database = {
           video_call_link?: string | null
         }
         Update: {
+          club_package_id?: string | null
+          club_package_months?: number | null
+          club_package_started_on?: string | null
+          club_package_expires_on?: string | null
+          club_insight_base?: number
+          club_book_base?: number
+          club_insight_bonus?: number
+          club_book_bonus?: number
+          club_package_changed_by?: string | null
+          club_package_change_reason?: string | null
           access_plan?: Database["public"]["Enums"]["access_plan"] | null
           addon_bookclubs_per_month?: number | null
           addon_insights_per_month?: number | null
@@ -824,6 +854,7 @@ export type Database = {
       }
       club_bookings: {
         Row: {
+          club_package_id: string | null
           booked_at: string
           club_id: number
           club_type: Database["public"]["Enums"]["club_type"]
@@ -831,6 +862,7 @@ export type Database = {
           student_id: string
         }
         Insert: {
+          club_package_id?: string | null
           booked_at?: string
           club_id: number
           club_type: Database["public"]["Enums"]["club_type"]
@@ -838,6 +870,7 @@ export type Database = {
           student_id: string
         }
         Update: {
+          club_package_id?: string | null
           booked_at?: string
           club_id?: number
           club_type?: Database["public"]["Enums"]["club_type"]

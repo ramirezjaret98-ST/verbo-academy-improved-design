@@ -15,7 +15,8 @@ import {
 } from "@/lib/student-model";
 import { teachersForProduct, teachersForProductSorted, hydrateTeachers } from "@/lib/teacher-model";
 import { teacherTier } from "@/lib/teacher-tiers";
-import { PLAN_DEFAULTS } from "@/lib/club-bookings-store";
+import { PLAN_DEFAULTS, resolvedRemainingSeats } from "@/lib/club-bookings-store";
+import { mexicoDate } from "@/lib/club-package";
 import { waLink } from "@/lib/phone-utils";
 import { notifySuccess, notifyError } from "@/lib/notify";
 import { SendContractModal } from "@/components/verbo/SendContractModal";
@@ -124,6 +125,23 @@ const PRODUCT_TYPE_OPTIONS: {
   { id: "workshops", name: "Focus Workshops", blurb: "Short-form workshops only. No live 1:1 sessions.", icon: Layers },
   { id: "insights", name: "Clubs", blurb: "Insights, Book Clubs, or both. No live 1:1 sessions or workshops.", icon: Lightbulb },
 ];
+
+type ClubPackageCommand =
+  | { mode: "new"; months: 1 | 3 | 6; insights: boolean; books: boolean; insightBonus: number; bookBonus: number; reason: string }
+  | { mode: "adjust"; insightBonus: number; bookBonus: number; reason: string }
+  | { mode: "restore"; expiresOn: string; reason: string };
+
+function applyClubPackageProfile(user: User, row: Record<string, unknown> | undefined) {
+  if (!row) return;
+  for (const key of [
+    "product_type", "addon_insights_per_month", "addon_bookclubs_per_month",
+    "club_package_id", "club_package_months", "club_package_started_on",
+    "club_package_expires_on", "club_insight_base", "club_book_base",
+    "club_insight_bonus", "club_book_bonus",
+  ]) {
+    if (key in row) (user as unknown as Record<string, unknown>)[key] = row[key] ?? undefined;
+  }
+}
 
 function initials(name: string) {
   return name.split(" ").map((p) => p[0]).slice(0, 2).join("").toUpperCase();
@@ -253,11 +271,12 @@ function Page() {
   // failure here leaves NOTHING behind — no local entry, nothing in the
   // Students list — and the modal stays open with the error shown so the
   // admin can fix and retry immediately instead of the ghost slipping past.
-  const handleRegister = async (u: User, teacherId?: string, sendWelcomeEmail?: boolean) => {
+  const handleRegister = async (u: User, teacherId?: string, sendWelcomeEmail?: boolean, clubPackage?: ClubPackageCommand) => {
     const { data, error } = await supabase.functions.invoke("admin-create-user", {
       body: {
         legacyId: u.id, email: u.email, password: u.password, name: u.name, role: "student",
         sendWelcomeEmail: false,
+        ...(clubPackage?.mode === "new" ? { clubPackage } : {}),
       },
     });
     const invokeError = (data as { error?: string } | null)?.error;
@@ -269,6 +288,7 @@ function Page() {
       throw error ?? new Error(invokeError ?? "Failed to create account");
     }
     invalidateUserIdBridge();
+    applyClubPackageProfile(u, (data as { profile?: Record<string, unknown> } | null)?.profile);
 
     USERS.push(u);
     const registered = readRegisteredStudents();
@@ -286,7 +306,7 @@ function Page() {
     notifySuccess(`${u.name} created successfully.`);
   };
 
-  const handleUpdate = async (u: User, teacherId?: string) => {
+  const handleUpdate = async (u: User, teacherId?: string, _sendWelcomeEmail?: boolean, clubPackage?: ClubPackageCommand) => {
     const studentId = await legacyToUuid(u.id);
     if (!studentId) throw new Error("Student account could not be identified");
     const profile = Object.fromEntries(
@@ -303,7 +323,7 @@ function Page() {
       profile[key] = u[key] ?? null;
     }
     const { data, error } = await supabase.functions.invoke("admin-update-student", {
-      body: { studentId, name: u.name, email: u.email, profile },
+      body: { studentId, name: u.name, email: u.email, profile, ...(clubPackage ? { clubPackage } : {}) },
     });
     const resultError = (data as { error?: string } | null)?.error;
     if (error || resultError) {
@@ -311,6 +331,7 @@ function Page() {
       notifyError(failure, { context: `Updating ${u.name}` });
       throw failure;
     }
+    applyClubPackageProfile(u, (data as { profile?: Record<string, unknown> } | null)?.profile);
     const idx = USERS.findIndex((existing) => existing.id === u.id);
     if (idx >= 0) USERS[idx] = u; else USERS.push(u);
     const registered = readRegisteredStudents();
@@ -749,6 +770,14 @@ type FormState = {
   addon_spotlight_per_month: number;
   addon_workshops_enabled: boolean;
   selected_cohort_ids: string[];
+  club_mode: "keep" | "new" | "adjust" | "restore";
+  club_months: 1 | 3 | 6;
+  club_insights: boolean;
+  club_books: boolean;
+  club_insight_bonus: number;
+  club_book_bonus: number;
+  club_change_reason: string;
+  club_restore_until: string;
 };
 
 function StudentFormModal({
@@ -757,9 +786,10 @@ function StudentFormModal({
   initial: User | null;
   teachers: User[];
   onClose: () => void;
-  onSave: (u: User, teacherId?: string, sendWelcomeEmail?: boolean) => void | Promise<void>;
+  onSave: (u: User, teacherId?: string, sendWelcomeEmail?: boolean, clubPackage?: ClubPackageCommand) => void | Promise<void>;
 }) {
   const editing = !!initial;
+  const { user: admin } = useAuth();
   const existingTeacher = initial ? assignedTeacherIdFor(initial.id) ?? "" : "";
 
   const [f, setF] = useState<FormState>(() => ({
@@ -794,6 +824,14 @@ function StudentFormModal({
     addon_spotlight_per_month: initial?.addon_spotlight_per_month ?? 0,
     addon_workshops_enabled: initial?.addon_workshops_enabled ?? false,
     selected_cohort_ids: initial ? cohortsForStudent(initial.id).map((x) => x.cohort.id) : [],
+    club_mode: initial?.club_package_id ? "keep" : "new",
+    club_months: (initial?.club_package_months as 1 | 3 | 6) ?? 1,
+    club_insights: (initial?.club_insight_base ?? 0) > 0 || (!initial?.club_package_id && (initial?.addon_insights_per_month ?? 0) > 0),
+    club_books: (initial?.club_book_base ?? 0) > 0 || (!initial?.club_package_id && (initial?.addon_bookclubs_per_month ?? 0) > 0),
+    club_insight_bonus: initial?.club_insight_bonus ?? 0,
+    club_book_bonus: initial?.club_book_bonus ?? 0,
+    club_change_reason: "",
+    club_restore_until: "",
   }));
 
   const [emailTouched, setEmailTouched] = useState(false);
@@ -910,11 +948,21 @@ function StudentFormModal({
 
   const baseValid = f.name.trim() && isValidEmail(f.email);
   const emailFormatError = (emailTouched || attemptedSave) && f.email.trim() && !isValidEmail(f.email);
+  const clubPackageValid = (f.club_mode === "keep" || f.club_mode === "restore" || f.club_insights || f.club_books)
+    && Number.isInteger(f.club_insight_bonus) && f.club_insight_bonus >= 0
+    && Number.isInteger(f.club_book_bonus) && f.club_book_bonus >= 0
+    && (f.club_insights || f.club_insight_bonus === 0)
+    && (f.club_books || f.club_book_bonus === 0)
+    && (f.club_mode !== "adjust" || f.club_insight_bonus > (initial?.club_insight_bonus ?? 0) || f.club_book_bonus > (initial?.club_book_bonus ?? 0))
+    && (f.club_mode === "keep"
+      || (f.club_mode === "new" && f.club_insight_bonus === 0 && f.club_book_bonus === 0 && !editing)
+      || f.club_change_reason.trim().length >= 8)
+    && (f.club_mode !== "restore" || (getAdminType(admin) === "super_admin" && /^\d{4}-\d{2}-\d{2}$/.test(f.club_restore_until)));
   const isValid = f.product_type === "performance"
     ? (baseValid && f.product && f.video_call_link.trim() && (!isEnterprise || f.company.trim()))
     : f.product_type === "workshops"
       ? baseValid // participants can be added later, but a cohort selection is recommended
-      : (baseValid && (f.addon_insights_per_month > 0 || f.addon_bookclubs_per_month > 0)); // clubs standalone
+      : (baseValid && clubPackageValid); // clubs standalone
 
   const pickProductType = (pt: FormState["product_type"]) => {
     setF((prev) => {
@@ -939,10 +987,11 @@ function StudentFormModal({
         custom_price: "",
         video_call_link: "",
         teacher_id: "",
-        addon_insights_per_month: pt === "insights"
-          ? (prev.addon_insights_per_month || prev.addon_bookclubs_per_month ? prev.addon_insights_per_month : 1)
-          : 0,
-        addon_bookclubs_per_month: pt === "insights" ? prev.addon_bookclubs_per_month : 0,
+        addon_insights_per_month: pt === "insights" ? 1 : 0,
+        addon_bookclubs_per_month: 0,
+        club_mode: pt === "insights" && !initial?.club_package_id ? "new" : prev.club_mode,
+        club_insights: pt === "insights" ? true : false,
+        club_books: false,
         addon_spotlight_per_month: 0,
         addon_workshops_enabled: pt === "workshops",
       };
@@ -1004,10 +1053,18 @@ function StudentFormModal({
       insights_strikes: initial?.insights_strikes ?? 0,
       admin_notes: initial?.admin_notes,
       next_payment: initial?.next_payment,
-      addon_insights_per_month: Number(f.addon_insights_per_month) || 0,
-      addon_bookclubs_per_month: f.product_type !== "workshops" ? (Number(f.addon_bookclubs_per_month) || 0) : 0,
+      addon_insights_per_month: f.product_type === "insights" ? (f.club_insights ? 1 : 0) : (Number(f.addon_insights_per_month) || 0),
+      addon_bookclubs_per_month: f.product_type === "insights" ? (f.club_books ? 1 : 0) : f.product_type !== "workshops" ? (Number(f.addon_bookclubs_per_month) || 0) : 0,
       addon_spotlight_per_month: isPerf ? (Number(f.addon_spotlight_per_month) || 0) : 0,
       addon_workshops_enabled: f.product_type === "workshops" ? true : (isPerf && f.addon_workshops_enabled),
+      club_package_id: initial?.club_package_id,
+      club_package_months: initial?.club_package_months,
+      club_package_started_on: initial?.club_package_started_on,
+      club_package_expires_on: initial?.club_package_expires_on,
+      club_insight_base: initial?.club_insight_base,
+      club_book_base: initial?.club_book_base,
+      club_insight_bonus: initial?.club_insight_bonus,
+      club_book_bonus: initial?.club_book_bonus,
     };
 
     // Sync cohort memberships only after the account/profile save succeeds.
@@ -1021,7 +1078,16 @@ function StudentFormModal({
       // why this matters. onSave() itself already surfaces the error via a
       // toast (notifyError), so there's nothing further to show here beyond
       // re-enabling the form.
-      await onSave(u, isPerf ? f.teacher_id : "", false);
+      const clubPackage: ClubPackageCommand | undefined = f.product_type !== "insights" || f.club_mode === "keep"
+        ? undefined
+        : f.club_mode === "restore"
+          ? { mode: "restore", expiresOn: f.club_restore_until, reason: f.club_change_reason.trim() }
+          : f.club_mode === "adjust"
+            ? { mode: "adjust", insightBonus: f.club_insight_bonus, bookBonus: f.club_book_bonus, reason: f.club_change_reason.trim() }
+            : { mode: "new", months: f.club_months, insights: f.club_insights, books: f.club_books,
+                insightBonus: f.club_insight_bonus, bookBonus: f.club_book_bonus,
+                reason: f.club_change_reason.trim() || (editing ? "Renewal after expiry" : "New contract") };
+      await onSave(u, isPerf ? f.teacher_id : "", false, clubPackage);
       const currentIds = new Set(cohortsForStudent(id).map((x) => x.cohort.id));
       for (const cid of currentIds) if (!targetIds.has(cid)) removeParticipantFromCohort(cid, id);
       for (const cid of targetIds) if (!currentIds.has(cid)) addStudentToCohort(cid, id, u.name);
@@ -1126,14 +1192,53 @@ function StudentFormModal({
             {/* BRANCH: CLUBS — standalone; `insights` is the legacy DB key. */}
             {f.product_type === "insights" && (
               <Step n={2} title="Clubs Access">
-                <p className="mb-3 text-[11px] text-muted-foreground">Choose the collections this person has contracted. Set 0 for a collection they cannot access.</p>
-                <Field label="Insights (per month)" icon={<Lightbulb className="h-3.5 w-3.5" />}>
-                  <input type="number" min={0} value={f.addon_insights_per_month} onChange={(e) => setAddon("insights", Number(e.target.value))} className={inputCls} />
-                </Field>
-                <Field label="Book Clubs (per month)" icon={<Users className="h-3.5 w-3.5" />}>
-                  <input type="number" min={0} value={f.addon_bookclubs_per_month} onChange={(e) => setAddon("bookclubs", Number(e.target.value))} className={inputCls} />
-                </Field>
-                {attemptedSave && f.addon_insights_per_month <= 0 && f.addon_bookclubs_per_month <= 0 && <p className="text-xs text-destructive">Choose at least one club collection.</p>}
+                {initial?.club_package_id && (
+                  <div className="mb-4 rounded-xl bg-secondary/60 p-3 text-xs">
+                    <strong>Current package:</strong> {initial.club_package_months} month{initial.club_package_months === 1 ? "" : "s"} ·
+                    {initial.club_insight_base ? ` ${initial.club_insight_base} Insights + ${initial.club_insight_bonus ?? 0} extras` : ""}
+                    {initial.club_book_base ? ` ${initial.club_book_base} Book Clubs + ${initial.club_book_bonus ?? 0} extras` : ""}
+                    <br />Access until {initial.club_package_expires_on} (exclusive).
+                  </div>
+                )}
+                {editing && initial?.club_package_id && (
+                  <Field label="Package action" icon={<Repeat className="h-3.5 w-3.5" />}>
+                    <select value={f.club_mode} onChange={(e) => set("club_mode", e.target.value as FormState["club_mode"])} className={inputCls}>
+                      <option value="keep">Keep current package</option>
+                      <option value="adjust">Add negotiated extras</option>
+                      {initial.club_package_expires_on && initial.club_package_expires_on <= mexicoDate() && <option value="new">Start a new contracted package</option>}
+                      {getAdminType(admin) === "super_admin" && initial.club_package_expires_on && initial.club_package_expires_on <= mexicoDate() && <option value="restore">Restore expired access</option>}
+                    </select>
+                  </Field>
+                )}
+                {f.club_mode === "new" && <>
+                  <p className="mb-3 text-[11px] text-muted-foreground">Credits are assigned once for the full package. They do not reset each month. Access lasts twice the contracted term.</p>
+                  <Field label="Contracted term" icon={<CalendarDays className="h-3.5 w-3.5" />}>
+                    <select value={f.club_months} onChange={(e) => set("club_months", Number(e.target.value) as 1 | 3 | 6)} className={inputCls}>
+                      <option value={1}>1 month · 4 per collection · 2 months to use</option>
+                      <option value={3}>3 months · 12 per collection · 6 months to use</option>
+                      <option value={6}>6 months · 24 per collection · 12 months to use</option>
+                    </select>
+                  </Field>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                    <label className="flex items-center gap-2 rounded-lg border border-border p-3 text-sm"><input type="checkbox" checked={f.club_insights} onChange={(e) => setF((prev) => ({ ...prev, club_insights: e.target.checked, club_insight_bonus: e.target.checked ? prev.club_insight_bonus : 0 }))} /> Insights</label>
+                    <label className="flex items-center gap-2 rounded-lg border border-border p-3 text-sm"><input type="checkbox" checked={f.club_books} onChange={(e) => setF((prev) => ({ ...prev, club_books: e.target.checked, club_book_bonus: e.target.checked ? prev.club_book_bonus : 0 }))} /> Book Clubs</label>
+                  </div>
+                </>}
+                {(f.club_mode === "new" || f.club_mode === "adjust") && <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  {f.club_insights && <Field label="Extra Insights" icon={<Lightbulb className="h-3.5 w-3.5" />}>
+                    <input type="number" min={f.club_mode === "adjust" ? initial?.club_insight_bonus ?? 0 : 0} step={1} value={f.club_insight_bonus} onChange={(e) => set("club_insight_bonus", Number(e.target.value))} className={inputCls} />
+                  </Field>}
+                  {f.club_books && <Field label="Extra Book Clubs" icon={<Users className="h-3.5 w-3.5" />}>
+                    <input type="number" min={f.club_mode === "adjust" ? initial?.club_book_bonus ?? 0 : 0} step={1} value={f.club_book_bonus} onChange={(e) => set("club_book_bonus", Number(e.target.value))} className={inputCls} />
+                  </Field>}
+                </div>}
+                {f.club_mode === "restore" && <Field label="Restore access until (exclusive)" icon={<CalendarDays className="h-3.5 w-3.5" />}>
+                  <input type="date" min={mexicoDate()} value={f.club_restore_until} onChange={(e) => set("club_restore_until", e.target.value)} className={inputCls} />
+                </Field>}
+                {f.club_mode !== "keep" && <Field label="Reason for extras or exception" icon={<Pencil className="h-3.5 w-3.5" />}>
+                  <input type="text" value={f.club_change_reason} onChange={(e) => set("club_change_reason", e.target.value)} placeholder={f.club_mode === "new" ? "Required only when granting extras" : "Required for audit"} className={inputCls} />
+                </Field>}
+                {attemptedSave && !clubPackageValid && <p className="text-xs text-destructive">Select a collection and enter valid extras, dates, and a reason when required.</p>}
               </Step>
             )}
 
@@ -1772,8 +1877,14 @@ function StudentDetailModal({
                         const ins = student.addon_insights_per_month ?? 0;
                         const bc = student.addon_bookclubs_per_month ?? 0;
                         const sp = student.addon_spotlight_per_month ?? 0;
-                        if (ins > 0) tags.push(<Tag key="ins" className="bg-primary/10 text-primary">Insights · {ins}/month</Tag>);
-                        if (bc > 0) tags.push(<Tag key="bc" className="bg-accent/10 text-accent">Book Clubs · {bc}/month</Tag>);
+                        if (student.product_type === "insights") {
+                          if ((student.club_insight_base ?? 0) > 0) tags.push(<Tag key="ins" className="bg-primary/10 text-primary">Insights · {resolvedRemainingSeats(student.id, "insight")} of {(student.club_insight_base ?? 0) + (student.club_insight_bonus ?? 0)} left</Tag>);
+                          if ((student.club_book_base ?? 0) > 0) tags.push(<Tag key="bc" className="bg-accent/10 text-accent">Book Clubs · {resolvedRemainingSeats(student.id, "book")} of {(student.club_book_base ?? 0) + (student.club_book_bonus ?? 0)} left</Tag>);
+                          if (student.club_package_expires_on) tags.push(<Tag key="expiry" className="bg-secondary text-secondary-foreground">Access until {student.club_package_expires_on}</Tag>);
+                        } else {
+                          if (ins > 0) tags.push(<Tag key="ins" className="bg-primary/10 text-primary">Insights · {ins}/month</Tag>);
+                          if (bc > 0) tags.push(<Tag key="bc" className="bg-accent/10 text-accent">Book Clubs · {bc}/month</Tag>);
+                        }
                         if (sp > 0) tags.push(<Tag key="sp" className="bg-secondary text-secondary-foreground">Spotlight · {sp}/month</Tag>);
                         if (student.addon_workshops_enabled) tags.push(<Tag key="ws" className="bg-muted text-muted-foreground">Workshops</Tag>);
                         return tags.length > 0

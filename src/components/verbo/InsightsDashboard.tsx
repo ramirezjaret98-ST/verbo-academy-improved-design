@@ -4,6 +4,8 @@ import { ArrowRight, CalendarDays, ChevronLeft, ChevronRight, Pause, Play, Spark
 import { Card, PrimaryButton } from "@/components/verbo/ui";
 import { loadClubs, subscribeClubs, type Club, type ClubType } from "@/lib/clubs-store";
 import { bookingsForStudent, isBooked, resolvedMonthlyCap, resolvedRemainingSeats, subscribeBookings } from "@/lib/club-bookings-store";
+import { isStandaloneClubCustomer, packageTotal } from "@/lib/club-package";
+import { userById } from "@/lib/mock-data";
 import { ClubReservationModal } from "@/components/verbo/ClubReservationModal";
 
 function dateLabel(iso: string) {
@@ -43,6 +45,10 @@ export function ClubsDashboard({ name, studentId, preview = false, onExplore, al
   const month = new Date().getMonth();
   const year = new Date().getFullYear();
   const reservedThisMonth = bookings.filter((b) => { const d = new Date(b.booked_at); return d.getMonth() === month && d.getFullYear() === year; }).length;
+  const student = studentId ? userById(studentId) : undefined;
+  const standalone = isStandaloneClubCustomer(student);
+  const reservedInPackage = bookings.filter((booking) => booking.club_package_id === student?.club_package_id
+    && loadClubs().find((club) => club.id === booking.club_id)?.status !== "cancelled").length;
 
   useEffect(() => {
     if (paused || hovered || discover.length < 2) return;
@@ -63,13 +69,13 @@ export function ClubsDashboard({ name, studentId, preview = false, onExplore, al
           <div className="mt-6">{explore}</div>
         </div>
         <div className="rounded-2xl border border-white/20 bg-white/10 p-5 backdrop-blur-sm">
-          <div className="text-xs font-semibold uppercase tracking-widest text-white/70">This month</div>
+          <div className="text-xs font-semibold uppercase tracking-widest text-white/70">{standalone ? "Your package" : "This month"}</div>
           {preview ? <div className="mt-2 text-3xl font-semibold">— <span className="text-base font-normal text-white/70">preview</span></div> : allowedTypes.map((type) => {
-            const cap = studentId ? resolvedMonthlyCap(studentId, type) : 0;
+            const cap = standalone ? packageTotal(student, type) : studentId ? resolvedMonthlyCap(studentId, type) : 0;
             const remaining = studentId ? resolvedRemainingSeats(studentId, type) : 0;
             return <div key={type} className="mt-2 text-sm text-white/90"><strong className="mr-2 text-2xl tabular-nums">{remaining === Infinity ? "∞" : remaining}</strong>{type === "book" ? "Book Clubs" : "Insights"} left{cap === Infinity ? "" : ` of ${cap}`}</div>;
           })}
-          <p className="mt-2 text-xs text-white/70">{preview ? "Quota and reservations appear for each real student." : `${reservedThisMonth} reserved this month`}</p>
+          <p className="mt-2 text-xs text-white/70">{preview ? "Quota and reservations appear for each real student." : standalone ? `${reservedInPackage} reserved in this package · Access until ${student?.club_package_expires_on ?? "—"}` : `${reservedThisMonth} reserved this month`}</p>
         </div>
       </div>
     </section>
