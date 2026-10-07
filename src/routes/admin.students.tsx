@@ -1202,9 +1202,13 @@ function StudentFormModal({
                 )}
                 {editing && initial?.club_package_id && (
                   <Field label="Package action" icon={<Repeat className="h-3.5 w-3.5" />}>
-                    <select value={f.club_mode} onChange={(e) => set("club_mode", e.target.value as FormState["club_mode"])} className={inputCls}>
+                    <select value={f.club_mode} onChange={(e) => setF((prev) => ({
+                      ...prev,
+                      club_mode: e.target.value as FormState["club_mode"],
+                      ...(e.target.value === "new" ? { club_insight_bonus: 0, club_book_bonus: 0, club_change_reason: "" } : {}),
+                    }))} className={inputCls}>
                       <option value="keep">Keep current package</option>
-                      <option value="adjust">Add negotiated extras</option>
+                      {initial.club_package_expires_on && initial.club_package_expires_on > mexicoDate() && <option value="adjust">Add negotiated extras</option>}
                       {initial.club_package_expires_on && initial.club_package_expires_on <= mexicoDate() && <option value="new">Start a new contracted package</option>}
                       {getAdminType(admin) === "super_admin" && initial.club_package_expires_on && initial.club_package_expires_on <= mexicoDate() && <option value="restore">Restore expired access</option>}
                     </select>
@@ -1235,6 +1239,7 @@ function StudentFormModal({
                 {f.club_mode === "restore" && <Field label="Restore access until (exclusive)" icon={<CalendarDays className="h-3.5 w-3.5" />}>
                   <input type="date" min={mexicoDate()} value={f.club_restore_until} onChange={(e) => set("club_restore_until", e.target.value)} className={inputCls} />
                 </Field>}
+                {f.club_mode === "restore" && <p className="mt-2 text-xs text-muted-foreground">Restoration extends access to unused credits; it does not add new credits.</p>}
                 {f.club_mode !== "keep" && <Field label="Reason for extras or exception" icon={<Pencil className="h-3.5 w-3.5" />}>
                   <input type="text" value={f.club_change_reason} onChange={(e) => set("club_change_reason", e.target.value)} placeholder={f.club_mode === "new" ? "Required only when granting extras" : "Required for audit"} className={inputCls} />
                 </Field>}
