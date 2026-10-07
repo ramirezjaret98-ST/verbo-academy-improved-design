@@ -7,6 +7,44 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+type ClubPackageInput = {
+  months: 1 | 3 | 6;
+  insights: boolean;
+  books: boolean;
+  insightBonus: number;
+  bookBonus: number;
+  reason?: string;
+};
+
+function validClubPackage(value: unknown): value is ClubPackageInput {
+  if (!value || typeof value !== "object") return false;
+  const p = value as Record<string, unknown>;
+  return [1, 3, 6].includes(p.months as number)
+    && typeof p.insights === "boolean" && typeof p.books === "boolean"
+    && (p.insights || p.books)
+    && Number.isSafeInteger(p.insightBonus) && Number.isSafeInteger(p.bookBonus)
+    && (p.insightBonus as number) >= 0 && (p.bookBonus as number) >= 0
+    && (p.insightBonus as number) <= 2147483647 && (p.bookBonus as number) <= 2147483647
+    && (p.insights || p.insightBonus === 0) && (p.books || p.bookBonus === 0)
+    && (p.reason === undefined || typeof p.reason === "string")
+    && (!(p.insightBonus || p.bookBonus) || (typeof p.reason === "string" && p.reason.trim().length >= 8));
+}
+
+function mexicoDate(): string {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Mexico_City", year: "numeric", month: "2-digit", day: "2-digit",
+  }).formatToParts(new Date());
+  const get = (type: string) => parts.find((part) => part.type === type)?.value ?? "";
+  return `${get("year")}-${get("month")}-${get("day")}`;
+}
+
+function addMonthsClamped(date: string, months: number): string {
+  const [year, month, day] = date.split("-").map(Number);
+  const first = new Date(Date.UTC(year, month - 1 + months, 1));
+  const last = new Date(Date.UTC(first.getUTCFullYear(), first.getUTCMonth() + 1, 0)).getUTCDate();
+  return `${first.getUTCFullYear()}-${String(first.getUTCMonth() + 1).padStart(2, "0")}-${String(Math.min(day, last)).padStart(2, "0")}`;
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: corsHeaders });
@@ -33,14 +71,14 @@ Deno.serve(async (req: Request) => {
   const admin = createClient(url, serviceKey);
   const { data: callerRow, error: callerRowErr } = await admin
     .from("app_users")
-    .select("role, admin_type")
+    .select("role, admin_type, admin_disabled")
     .eq("id", callerAuth.user.id)
     .maybeSingle();
-  if (callerRowErr || !callerRow || callerRow.role !== "admin") {
+  if (callerRowErr || !callerRow || callerRow.role !== "admin" || callerRow.admin_disabled) {
     return new Response(JSON.stringify({ error: "Forbidden: admin only" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 
-  let body: { legacyId?: string; email?: string; password?: string; name?: string; role?: string; adminType?: string; sendWelcomeEmail?: boolean };
+  let body: { legacyId?: string; email?: string; password?: string; name?: string; role?: string; adminType?: string; sendWelcomeEmail?: boolean; clubPackage?: unknown };
   try {
     body = await req.json();
   } catch {
@@ -61,6 +99,9 @@ Deno.serve(async (req: Request) => {
     if (!validAdminTypes.includes(adminType ?? "")) {
       return new Response(JSON.stringify({ error: "adminType ('super_admin'|'coordinator_ops'|'coordinator_fin') is required when role is 'admin'" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
+  }
+  if (body.clubPackage !== undefined && (role !== "student" || !validClubPackage(body.clubPackage))) {
+    return new Response(JSON.stringify({ error: "Invalid Clubs package" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 
   // Keep the registration year for invitations sent after a year change.
@@ -84,16 +125,37 @@ Deno.serve(async (req: Request) => {
     return new Response(JSON.stringify({ error: createErr?.message ?? "Failed to create auth user" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 
-  const { error: updateErr } = await admin
+  const clubPackage = body.clubPackage as ClubPackageInput | undefined;
+  const startedOn = clubPackage ? mexicoDate() : null;
+  const { data: savedProfile, error: updateErr } = await admin
     .from("app_users")
     .update({
       legacy_id: legacyId,
       must_change_password: true,
       ...(role === "student" ? { welcome_pending: true, welcome_password_year: passwordYear } : {}),
       ...(role === "admin" ? { admin_type: adminType } : {}),
+      ...(clubPackage && startedOn ? {
+        product_type: "insights",
+        addon_insights_per_month: clubPackage.insights ? 1 : 0,
+        addon_bookclubs_per_month: clubPackage.books ? 1 : 0,
+        club_package_id: crypto.randomUUID(),
+        club_package_months: clubPackage.months,
+        club_package_started_on: startedOn,
+        club_package_expires_on: addMonthsClamped(startedOn, 2 * clubPackage.months),
+        club_insight_base: clubPackage.insights ? 4 * clubPackage.months : 0,
+        club_book_base: clubPackage.books ? 4 * clubPackage.months : 0,
+        club_insight_bonus: clubPackage.insightBonus,
+        club_book_bonus: clubPackage.bookBonus,
+        club_package_changed_by: callerAuth.user.id,
+        club_package_change_reason: clubPackage.reason?.trim() || "New contract",
+      } : {}),
     })
-    .eq("id", created.user.id);
+    .eq("id", created.user.id).select("*").single();
   if (updateErr) {
+    if (clubPackage) {
+      const { error: rollbackError } = await admin.auth.admin.deleteUser(created.user.id);
+      if (!rollbackError) return new Response(JSON.stringify({ error: `Clubs package could not be created: ${updateErr.message}` }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
     // Auth user exists but the app_users patch failed — surface this clearly
     // rather than leaving a silent half-created account with no legacy_id.
     return new Response(JSON.stringify({ error: `Auth account created but failed to link legacy_id: ${updateErr.message}`, authUserId: created.user.id }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -101,5 +163,5 @@ Deno.serve(async (req: Request) => {
 
   // Welcome is sent only by the separate explicit admin action.
 
-  return new Response(JSON.stringify({ id: created.user.id, legacyId }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+  return new Response(JSON.stringify({ id: created.user.id, legacyId, profile: clubPackage ? savedProfile : undefined }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 });

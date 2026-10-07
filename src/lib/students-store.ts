@@ -282,7 +282,12 @@ export function hydrateStudents() {
         }
         if (typeof row.name === "string") u.name = row.name;
         if (typeof row.email === "string") u.email = row.email;
-        for (const key of STUDENT_PROFILE_FIELD_KEYS) {
+        for (const key of [
+          ...STUDENT_PROFILE_FIELD_KEYS,
+          "club_package_id", "club_package_months", "club_package_started_on",
+          "club_package_expires_on", "club_insight_base", "club_book_base",
+          "club_insight_bonus", "club_book_bonus",
+        ]) {
           // A NULL from a real row means the field was cleared in Admin.
           // Only omit columns absent from the narrower teacher RPC.
           if (key in row) {

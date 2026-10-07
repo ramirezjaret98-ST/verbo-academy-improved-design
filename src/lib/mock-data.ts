@@ -146,6 +146,15 @@ export interface User {
   // Add-on caps (monthly). Zero / undefined means no access.
   addon_insights_per_month?: number;
   addon_bookclubs_per_month?: number;
+  /** Standalone Clubs use a fixed package pool; Performance keeps monthly caps. */
+  club_package_id?: string;
+  club_package_months?: number;
+  club_package_started_on?: string;
+  club_package_expires_on?: string;
+  club_insight_base?: number;
+  club_book_base?: number;
+  club_insight_bonus?: number;
+  club_book_bonus?: number;
   addon_spotlight_per_month?: number;
   // Toggle that gates the workshops cohort picker in the Register form.
   // Cohort memberships themselves live in the workshops store (source of

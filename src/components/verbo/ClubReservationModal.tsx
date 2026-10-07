@@ -6,7 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { AlertTriangle, CheckCircle2, Users, CalendarClock, Clock, FileText, Video, X } from "lucide-react";
 import { toast } from "sonner";
-import type { Club } from "@/lib/clubs-store";
+import { loadClubs, type Club } from "@/lib/clubs-store";
 import { userById } from "@/lib/mock-data";
 import {
   isBooked,
@@ -17,7 +17,9 @@ import {
   reserveSeat,
   cancelSeat,
   useBookings,
+  bookingsForStudent,
 } from "@/lib/club-bookings-store";
+import { isStandaloneClubCustomer, packageTotal } from "@/lib/club-package";
 import { AccentModalHeader, InfoStatRow, PrimaryButton } from "@/components/verbo/ui";
 import { getInsightReport, getClubAttendanceForStudent, subscribeClubReports } from "@/lib/club-reports-store";
 import { openClubMaterial } from "@/lib/club-media";
@@ -58,6 +60,12 @@ export function ClubReservationModal({
   const report = booked && club.type === "insight" ? getInsightReport(club.id) : undefined;
   const used = bookingsThisMonth(studentId, club.type);
   const cap = monthlyCap(studentId, club.type);
+  const student = userById(studentId);
+  const standalone = isStandaloneClubCustomer(student);
+  const packageUsed = standalone ? bookingsForStudent(studentId).filter((booking) =>
+    booking.club_package_id === student?.club_package_id && booking.club_type === club.type
+    && loadClubs().find((item) => item.id === booking.club_id)?.status !== "cancelled").length : 0;
+  const packageCap = packageTotal(student, club.type);
   const isCore = userById(studentId)?.access_plan === "Core";
   const isSignature = userById(studentId)?.access_plan === "Signature";
   const capDisplay = isSignature || !isFinite(cap) ? "∞" : String(cap);
@@ -239,7 +247,9 @@ export function ClubReservationModal({
         <div className="mt-4 rounded-lg bg-amber-50 px-3 py-2.5 text-[11.5px] leading-relaxed text-amber-900 ring-1 ring-amber-200">
           <div>Reservations close 24h before start.</div>
           {preview ? <div className="mt-0.5">Admin preview: reservation controls and personal quota are hidden.</div> : <div className="mt-0.5">
-            {isCore && cap === 0
+            {standalone
+              ? <>You've reserved <strong>{packageUsed} of {packageCap}</strong> {isBook ? "Book Clubs" : "Insights"} in this package. Access expires {student?.club_package_expires_on ?? "—"}.</>
+              : isCore && cap === 0
               ? <>Core courtesy access applies while your credit is available.</>
               : isSignature || !isFinite(cap)
               ? <>You have <strong>unlimited</strong> {isBook ? "Book Clubs" : "Insights"} this month.</>

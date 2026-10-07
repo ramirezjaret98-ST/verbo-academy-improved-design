@@ -22,6 +22,7 @@ import { userById } from "./mock-data";
 import type { AccessPlanId } from "./student-model";
 import { hasCreditUsed as freemiumUsed, markCreditUsed as markFreemiumUsed } from "./core-freemium-store";
 import { spotlightRequestsThisMonth } from "./student-requests-store";
+import { isStandaloneClubCustomer, packageCoversDate, packageTotal } from "./club-package";
 
 
 /** Per-plan monthly seat defaults across the three consumable event types.
@@ -47,6 +48,7 @@ export interface ClubBooking {
   club_id: string;
   club_type: ClubType;
   booked_at: string; // ISO
+  club_package_id?: string;
 }
 
 export const CLUB_BOOKINGS_EVENT = "verbo:club-bookings-updated";
@@ -76,6 +78,7 @@ function mapRow(row: Row): ClubBooking {
     club_id: String(row.club_id),
     club_type: row.club_type,
     booked_at: row.booked_at,
+    club_package_id: row.club_package_id ?? undefined,
   };
 }
 
@@ -180,6 +183,8 @@ function manualCap(studentId: string, kind: AccessKind): number | undefined {
  *  2. Otherwise fall back to PLAN_DEFAULTS[access_plan][kind].
  *  Returns Infinity for Signature-with-no-override (unlimited). */
 export function resolvedMonthlyCap(studentId: string, kind: AccessKind): number {
+  const user = userById(studentId);
+  if (isStandaloneClubCustomer(user)) return kind === "spotlight" ? 0 : packageTotal(user, kind);
   const m = manualCap(studentId, kind);
   if (m !== undefined) return m;
   const plan = userById(studentId)?.access_plan as AccessPlanId | undefined;
@@ -214,6 +219,15 @@ export function totalBookingsForStudent(studentId: string, type: ClubType): numb
  *  - Elite: cap × months_since_cycle_start − total_historical (accumulable).
  *  - Others: cap − bookings_this_month (non-accumulable, monthly reset). */
 export function resolvedRemainingSeats(studentId: string, kind: AccessKind): number {
+  const user = userById(studentId);
+  if (isStandaloneClubCustomer(user)) {
+    if (kind === "spotlight" || !packageCoversDate(user)) return 0;
+    const total = packageTotal(user, kind);
+    const used = loadBookings().filter((booking) => booking.student_id === studentId
+      && booking.club_package_id === user?.club_package_id && booking.club_type === kind
+      && loadClubs().find((club) => club.id === booking.club_id)?.status !== "cancelled").length;
+    return Math.max(0, total - used);
+  }
   const cap = resolvedMonthlyCap(studentId, kind);
   // Core plan: courtesy freemium credit — while it's unclaimed, treat as 1
   // available seat so the reservation/request flow isn't blocked by the
@@ -255,6 +269,9 @@ export function reserveBlockedReason(
   if (hrs < RESERVATION_CUTOFF_HOURS) return "Reservations close 24h before start.";
   if ((club.spots_taken ?? 0) >= club.spots_total) return "This session is full.";
   const kind: AccessKind = club.type === "book" ? "book" : "insight";
+  if (isStandaloneClubCustomer(userById(studentId)) && !packageCoversDate(userById(studentId), club.date)) {
+    return "Your Clubs package does not cover this session date.";
+  }
   const remaining = resolvedRemainingSeats(studentId, kind);
   if (remaining <= 0) {
     const cap = resolvedMonthlyCap(studentId, kind);

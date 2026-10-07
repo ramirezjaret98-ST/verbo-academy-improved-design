@@ -62,6 +62,7 @@ import { BADGES_EVENT as CHALLENGE_BADGES_EVENT } from "./badges-store";
 import { BADGES_EVENT as PROFILE_BADGES_EVENT } from "./profile-badges-store";
 import { SEASONS_EVENT, loadFlashChallenges, FLASH_EVENT } from "./flash-challenges-store";
 import { activePlanForStudent, PAYMENT_PLANS_EVENT } from "./payment-plans";
+import { packageCoversDate } from "./club-package";
 
 
 
@@ -906,6 +907,7 @@ function studentNotifications(studentId: string): Notification[] {
   for (const c of loadClubs()) {
     if (c.status !== "upcoming") continue;
     if (uu?.product_type === "insights" && (c.type === "book" ? (uu.addon_bookclubs_per_month ?? 0) <= 0 : (uu.addon_insights_per_month ?? 0) <= 0)) continue;
+    if (uu?.product_type === "insights" && !packageCoversDate(uu, c.date)) continue;
     const createdIso = c.created_at ?? c.date;
     if (now - +new Date(createdIso) > SEVEN_DAYS) continue;
     const kind: AccessKind = c.type === "book" ? "book" : "insight";
