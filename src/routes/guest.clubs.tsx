@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ArrowRight, BookOpen, CalendarDays, Clock3, LockKeyhole, Sparkles } from "lucide-react";
 import { Logo } from "@/components/verbo/Logo";
 import { guestRequest, type GuestClub } from "@/lib/guest-clubs-api";
+import "./guest.clubs.css";
 
 export const Route = createFileRoute("/guest/clubs")({
   head: () => ({ meta: [{ title: "Explora Verbo Clubs" }, { name: "robots", content: "noindex,nofollow" }] }),
@@ -14,6 +15,22 @@ const formatDate = (value: string) => new Intl.DateTimeFormat("es-MX", {
 }).format(new Date(value));
 const formatTime = (value: string) => new Intl.DateTimeFormat("es-MX", {
   timeZone: "America/Mexico_City", hour: "numeric", minute: "2-digit",
+}).format(new Date(value));
+const monthParts = new Intl.DateTimeFormat("es-MX", {
+  timeZone: "America/Mexico_City", year: "numeric", month: "2-digit",
+});
+const monthKey = (value: string) => {
+  const parts = monthParts.formatToParts(new Date(value));
+  return [parts.find(part => part.type === "year")?.value, parts.find(part => part.type === "month")?.value].join("-");
+};
+const formatMonth = (value: string) => {
+  const label = new Intl.DateTimeFormat("es-MX", {
+    timeZone: "America/Mexico_City", month: "long", year: "numeric",
+  }).format(new Date(value));
+  return label.charAt(0).toUpperCase() + label.slice(1);
+};
+const formatCardDate = (value: string) => new Intl.DateTimeFormat("es-MX", {
+  timeZone: "America/Mexico_City", weekday: "short", day: "numeric", month: "short",
 }).format(new Date(value));
 
 function GuestClubsPage() {
@@ -35,6 +52,14 @@ function GuestClubsPage() {
   }, []);
 
   const visible = useMemo(() => clubs.filter(club => collection === "all" || club.type === collection), [clubs, collection]);
+  const months = useMemo(() => {
+    const grouped = new Map<string, GuestClub[]>();
+    [...visible].sort((a, b) => +new Date(a.date) - +new Date(b.date)).forEach(club => {
+      const key = monthKey(club.date);
+      grouped.set(key, [...(grouped.get(key) || []), club]);
+    });
+    return [...grouped.values()];
+  }, [visible]);
   const reserve = async () => {
     if (!selected || booking) return;
     setBooking(true); setError("");
@@ -77,29 +102,48 @@ function GuestClubsPage() {
       </div>
       {loading ? <p className="py-16 text-center">Cargando próximos clubes…</p> : visible.length === 0 ?
         <p className="rounded-2xl border border-[#dae4e5] bg-white p-10 text-center">Por ahora no hay próximos clubes en esta colección.</p> :
-        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">{visible.map(club =>
-          <article key={club.id} className="overflow-hidden rounded-2xl border border-[#dce5e8] bg-white shadow-sm">
-            <div className="relative h-48 overflow-hidden bg-[#0b3d59]">
-              {club.cover_image ? <img src={club.cover_image} alt="" className="h-full w-full object-cover"
-                style={{ objectPosition: `${club.cover_position_x ?? 50}% ${club.cover_position_y ?? 50}%`, transform: `scale(${club.cover_scale ?? 1})` }} />
-                : <div className="flex h-full items-center justify-center text-white/70">{club.type === "book" ? <BookOpen size={54} /> : <Sparkles size={54} />}</div>}
-              <span className="absolute bottom-3 left-4 rounded-full bg-white/95 px-3 py-1 text-xs font-bold">{club.type === "book" ? "BOOK CLUB" : "INSIGHT"}</span>
-            </div>
-            <div className="p-5">
-              <h2 className="text-xl font-semibold">{club.title}</h2>
-              {club.subtitle && <p className="mt-1 text-sm text-[#657b86]">{club.subtitle}</p>}
-              <div className="mt-4 space-y-1 text-sm text-[#365568]">
-                <p className="flex items-center gap-2"><CalendarDays size={16} /> {formatDate(club.date)}</p>
-                <p className="flex items-center gap-2"><Clock3 size={16} /> {formatTime(club.date)} · Ciudad de México</p>
+        <div className="space-y-12">{months.map(monthClubs =>
+          <section key={monthKey(monthClubs[0].date)} aria-label={formatMonth(monthClubs[0].date)}>
+            <div className="mb-6 flex flex-wrap items-end justify-between gap-2 border-b border-[#cbdadd] pb-3">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#ce6a1c]">Próximos encuentros</p>
+                <h2 className="mt-1 text-2xl font-semibold tracking-tight sm:text-3xl">{formatMonth(monthClubs[0].date)}</h2>
               </div>
-              {club.description && <p className="mt-4 line-clamp-3 text-sm leading-relaxed text-[#526b79]">{club.description}</p>}
-              <button type="button" disabled={!club.guestSeatAvailable || Boolean(confirmationEmail)}
-                onClick={() => { setSelected(club); setCode(""); setError(""); }}
-                className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-[#f58a18] px-4 py-3 font-semibold text-[#01304a] transition hover:bg-[#e97908] disabled:cursor-not-allowed disabled:bg-[#e4e9e9] disabled:text-[#637985]">
-                {club.guestSeatAvailable ? <>Reservar con mi cortesía <ArrowRight size={17} /></> : "Cortesía no disponible"}
-              </button>
+              <p className="text-sm font-medium text-[#607785]">{monthClubs.length} {monthClubs.length === 1 ? "encuentro" : "encuentros"}</p>
             </div>
-          </article>)}</div>}
+            <div className="guest-month-grid">{monthClubs.map(club =>
+              <article key={club.id} className={club.type === "insight" ? "guest-club-card guest-club-card--insight" : "guest-club-card guest-club-card--book"}>
+                <div className="relative h-52 overflow-hidden bg-[#0b2f42]">
+                  {club.cover_image ? <div className="guest-club-cover-zoom">
+                    <img src={club.cover_image} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover"
+                      style={{ objectPosition: `${club.cover_position_x ?? 50}% ${club.cover_position_y ?? 50}%`, transform: `scale(${club.cover_scale ?? 1})` }} />
+                  </div> : <div className="flex h-full items-center justify-center text-white/70">{club.type === "book" ? <BookOpen size={54} /> : <Sparkles size={54} />}</div>}
+                  {club.type === "insight" && <div className="guest-insight-cover-copy">
+                    <span>{club.title}</span>
+                  </div>}
+                  <span className="absolute bottom-3 left-4 z-10 rounded-full bg-white/95 px-3 py-1 text-xs font-bold text-[#01304a] shadow-sm">{club.type === "book" ? "BOOK CLUB" : "INSIGHT"}</span>
+                </div>
+                <div className="flex flex-1 flex-col p-5">
+                  <h3 className="text-xl font-semibold leading-tight">{club.title}</h3>
+                  {club.subtitle && <p className="mt-1 text-sm leading-snug text-[#657b86]">{club.subtitle}</p>}
+                  <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2">
+                    <time dateTime={club.date} className={club.type === "insight" ? "guest-date-pill guest-date-pill--insight" : "guest-date-pill guest-date-pill--book"}>
+                      <CalendarDays size={14} aria-hidden="true" /> {formatCardDate(club.date)}
+                    </time>
+                    <span className="inline-flex items-center gap-1.5 text-sm font-medium text-[#365568]"><Clock3 size={15} aria-hidden="true" /> {formatTime(club.date)}</span>
+                  </div>
+                  <p className="mt-2 text-xs text-[#69808b]">Hora de Ciudad de México</p>
+                  {club.description && <p className="mt-4 line-clamp-3 text-sm leading-relaxed text-[#526b79]">{club.description}</p>}
+                  <div className="mt-auto pt-6">
+                    <button type="button" disabled={!club.guestSeatAvailable || Boolean(confirmationEmail)}
+                      onClick={() => { setSelected(club); setCode(""); setError(""); }}
+                      className="guest-club-reserve flex items-center justify-center gap-2 rounded-xl px-4 py-3.5 font-semibold">
+                      {club.guestSeatAvailable ? <>Reservar con mi cortesía <ArrowRight size={17} aria-hidden="true" /></> : "Cortesía no disponible"}
+                    </button>
+                  </div>
+                </div>
+              </article>)}</div>
+          </section>)}</div>}
       <p className="mt-10 flex items-center gap-2 text-sm text-[#647985]"><LockKeyhole size={15} /> La reservación requiere el código personal enviado por Verbo.</p>
     </div>
     {selected && <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#001d2e]/70 p-4" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setSelected(null); }}>
