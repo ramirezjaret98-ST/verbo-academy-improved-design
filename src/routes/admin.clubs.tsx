@@ -14,6 +14,7 @@ import { uploadClubFile, removeUploadedClubFiles, validateClubFile, type Uploade
 import { InsightsDashboard } from "@/components/verbo/InsightsDashboard";
 import { ClubReservationModal } from "@/components/verbo/ClubReservationModal";
 import { ClubCatalog } from "@/components/verbo/ClubCatalog";
+import { GuestCourtesiesPanel } from "@/components/verbo/GuestCourtesiesPanel";
 import { loadAdminCatalogRequests, updateSuggestionStatus, type ClubSuggestion, type ClubRepeatRequest } from "@/lib/club-catalog-store";
 import { CalendarView as StudentCalendarView } from "@/components/verbo/CalendarView";
 import type { CalendarEvent } from "@/lib/calendar-events";
@@ -163,6 +164,7 @@ function Page() {
           <Plus className="h-4 w-4" /> Create New Club Event
         </PrimaryButton></div>
       </div>
+      <GuestCourtesiesPanel />
       <ReleaseRequestsPanel requests={requests} clubs={clubs} />
 
       {/* View switcher */}

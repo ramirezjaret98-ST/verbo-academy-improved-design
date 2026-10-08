@@ -1,1 +1,7 @@
 project_id = "tudkeownvrohnijulsvk"
+
+[functions.club-guest]
+verify_jwt = false
+
+[functions.club-guest-admin]
+verify_jwt = true

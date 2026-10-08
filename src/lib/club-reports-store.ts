@@ -150,7 +150,8 @@ export async function saveClubReport(report: ClubReport): Promise<boolean> {
     const isClub = report.event_type === "book" || report.event_type === "insight";
     if (!Number.isInteger(numericEventId)) return false;
     if (isClub) {
-      const entries = await Promise.all(Object.entries(report.attendance).map(async ([legacyId, attendance]) => [await legacyToUuid(legacyId), attendance] as const));
+      const entries = await Promise.all(Object.entries(report.attendance).map(async ([legacyId, attendance]) =>
+        [legacyId.startsWith("guest:") ? legacyId : await legacyToUuid(legacyId), attendance] as const));
       if (entries.some(([id]) => !id)) return false;
       const attendance = Object.fromEntries(entries) as Record<string, ClubAttendance>;
       const { error } = await supabase.rpc("submit_club_report", {
