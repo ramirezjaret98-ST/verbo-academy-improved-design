@@ -45,6 +45,8 @@ import { Route as AdminVipRouteImport } from './routes/admin.vip'
 import { Route as AdminWorkshopsRouteImport } from './routes/admin.workshops'
 import { Route as FacturacionTokenRouteImport } from './routes/facturacion.$token'
 import { Route as FirmarContratoTokenRouteImport } from './routes/firmar-contrato.$token'
+import { Route as GuestClubsRouteImport } from './routes/guest.clubs'
+import { Route as GuestMyClubRouteImport } from './routes/guest.my-club'
 import { Route as StudentIndexRouteImport } from './routes/student.index'
 import { Route as StudentAccessLevelsRouteImport } from './routes/student.access-levels'
 import { Route as StudentChallengesRouteImport } from './routes/student.challenges'
@@ -252,6 +254,16 @@ const FirmarContratoTokenRoute = FirmarContratoTokenRouteImport.update({
   path: '/firmar-contrato/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
+const GuestClubsRoute = GuestClubsRouteImport.update({
+  id: '/guest/clubs',
+  path: '/guest/clubs',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GuestMyClubRoute = GuestMyClubRouteImport.update({
+  id: '/guest/my-club',
+  path: '/guest/my-club',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const StudentIndexRoute = StudentIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -415,6 +427,8 @@ export interface FileRoutesByFullPath {
   '/admin/workshops': typeof AdminWorkshopsRoute
   '/facturacion/$token': typeof FacturacionTokenRoute
   '/firmar-contrato/$token': typeof FirmarContratoTokenRoute
+  '/guest/clubs': typeof GuestClubsRoute
+  '/guest/my-club': typeof GuestMyClubRoute
   '/student/access-levels': typeof StudentAccessLevelsRoute
   '/student/challenges': typeof StudentChallengesRoute
   '/student/clubs': typeof StudentClubsRoute
@@ -475,6 +489,8 @@ export interface FileRoutesByTo {
   '/admin/workshops': typeof AdminWorkshopsRoute
   '/facturacion/$token': typeof FacturacionTokenRoute
   '/firmar-contrato/$token': typeof FirmarContratoTokenRoute
+  '/guest/clubs': typeof GuestClubsRoute
+  '/guest/my-club': typeof GuestMyClubRoute
   '/student/access-levels': typeof StudentAccessLevelsRoute
   '/student/challenges': typeof StudentChallengesRoute
   '/student/clubs': typeof StudentClubsRoute
@@ -539,6 +555,8 @@ export interface FileRoutesById {
   '/admin/workshops': typeof AdminWorkshopsRoute
   '/facturacion/$token': typeof FacturacionTokenRoute
   '/firmar-contrato/$token': typeof FirmarContratoTokenRoute
+  '/guest/clubs': typeof GuestClubsRoute
+  '/guest/my-club': typeof GuestMyClubRoute
   '/student/access-levels': typeof StudentAccessLevelsRoute
   '/student/challenges': typeof StudentChallengesRoute
   '/student/clubs': typeof StudentClubsRoute
@@ -604,6 +622,8 @@ export interface FileRouteTypes {
     | '/admin/workshops'
     | '/facturacion/$token'
     | '/firmar-contrato/$token'
+    | '/guest/clubs'
+    | '/guest/my-club'
     | '/student/access-levels'
     | '/student/challenges'
     | '/student/clubs'
@@ -664,6 +684,8 @@ export interface FileRouteTypes {
     | '/admin/workshops'
     | '/facturacion/$token'
     | '/firmar-contrato/$token'
+    | '/guest/clubs'
+    | '/guest/my-club'
     | '/student/access-levels'
     | '/student/challenges'
     | '/student/clubs'
@@ -727,6 +749,8 @@ export interface FileRouteTypes {
     | '/admin/workshops'
     | '/facturacion/$token'
     | '/firmar-contrato/$token'
+    | '/guest/clubs'
+    | '/guest/my-club'
     | '/student/access-levels'
     | '/student/challenges'
     | '/student/clubs'
@@ -769,6 +793,8 @@ export interface RootRouteChildren {
   TermsRoute: typeof TermsRoute
   FacturacionTokenRoute: typeof FacturacionTokenRoute
   FirmarContratoTokenRoute: typeof FirmarContratoTokenRoute
+  GuestClubsRoute: typeof GuestClubsRoute
+  GuestMyClubRoute: typeof GuestMyClubRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -1023,6 +1049,20 @@ declare module '@tanstack/react-router' {
       path: '/firmar-contrato/$token'
       fullPath: '/firmar-contrato/$token'
       preLoaderRoute: typeof FirmarContratoTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/guest/clubs': {
+      id: '/guest/clubs'
+      path: '/guest/clubs'
+      fullPath: '/guest/clubs'
+      preLoaderRoute: typeof GuestClubsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/guest/my-club': {
+      id: '/guest/my-club'
+      path: '/guest/my-club'
+      fullPath: '/guest/my-club'
+      preLoaderRoute: typeof GuestMyClubRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/student/': {
@@ -1339,6 +1379,8 @@ const rootRouteChildren: RootRouteChildren = {
   TermsRoute: TermsRoute,
   FacturacionTokenRoute: FacturacionTokenRoute,
   FirmarContratoTokenRoute: FirmarContratoTokenRoute,
+  GuestClubsRoute: GuestClubsRoute,
+  GuestMyClubRoute: GuestMyClubRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
