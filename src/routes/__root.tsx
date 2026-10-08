@@ -4,6 +4,7 @@ import {
   Outlet,
   createRootRouteWithContext,
   useRouter,
+  useRouterState,
   HeadContent,
   Scripts,
   Link,
@@ -63,17 +64,22 @@ function RootShell({ children }: { children: React.ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  const isGuestRoute = useRouterState({ select: state => state.location.pathname.startsWith("/guest/") });
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <DeviceGate>
-          <PasswordChangeGate>
-            <Outlet />
-          </PasswordChangeGate>
-        </DeviceGate>
-        <ContactVerbotModal />
-        <Toaster />
-      </AuthProvider>
+      {isGuestRoute ? (
+        <Outlet />
+      ) : (
+        <AuthProvider>
+          <DeviceGate>
+            <PasswordChangeGate>
+              <Outlet />
+            </PasswordChangeGate>
+          </DeviceGate>
+          <ContactVerbotModal />
+          <Toaster />
+        </AuthProvider>
+      )}
     </QueryClientProvider>
   );
 }
