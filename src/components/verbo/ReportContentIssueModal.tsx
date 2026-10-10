@@ -28,8 +28,10 @@ export function ReportContentIssueModal({ studentId, entityType, entityId, entit
   const [detail, setDetail] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [sending, setSending] = useState(false);
 
   const handleClose = () => {
+    if (sending) return;
     setIssueType("");
     setDetail("");
     setSubmitted(false);
@@ -37,14 +39,22 @@ export function ReportContentIssueModal({ studentId, entityType, entityId, entit
     onClose();
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
+    if (sending) return;
     if (!issueType) {
       setError("Please select what went wrong.");
       return;
     }
     setError(null);
-    addContentIssueReport({ studentId, entityType, entityId, entityTitle, issueType, detail });
-    setSubmitted(true);
+    setSending(true);
+    try {
+      await addContentIssueReport({ studentId, entityType, entityId, entityTitle, issueType, detail });
+      setSubmitted(true);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not send the report. Please try again.");
+    } finally {
+      setSending(false);
+    }
   };
 
   if (!open) return null;
@@ -66,7 +76,7 @@ export function ReportContentIssueModal({ studentId, entityType, entityId, entit
           {submitted ? (
             <div className="space-y-3">
               <p className="vc-rise text-sm text-foreground" style={{ animationDelay: "0.25s" }}>
-                Thanks — we've logged this and our team will take a look.
+                Thanks — we've logged this. Follow its status in My Reports.
               </p>
               <div className="flex justify-end pt-2">
                 <PrimaryButton onClick={handleClose} style={{ backgroundColor: NAVY, color: "#fff" }}>
@@ -117,10 +127,10 @@ export function ReportContentIssueModal({ studentId, entityType, entityId, entit
                 <GhostButton onClick={handleClose}>Cancel</GhostButton>
                 <PrimaryButton
                   onClick={handleSubmit}
-                  disabled={!issueType}
+                  disabled={!issueType || sending}
                   style={{ backgroundColor: NAVY, color: "#fff" }}
                 >
-                  Send report
+                  {sending ? "Sending…" : "Send report"}
                 </PrimaryButton>
               </div>
             </div>

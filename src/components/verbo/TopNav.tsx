@@ -7,8 +7,9 @@ import { createPortal } from "react-dom";
 import { StaffProfileModal } from "./StaffProfileModal";
 import { useAvatar } from "@/lib/avatar-store";
 import { initialsOf } from "@/lib/utils";
-import { hasSeenTour, markTourSeen } from "@/lib/tour-seen-store";
+import { markTourSeen } from "@/lib/tour-seen-store";
 import { DASHBOARD_TOUR_ID } from "./DashboardWelcomeTour";
+import { supabase } from "@/integrations/supabase/client";
 import { NotificationsBell } from "./NotificationsBell";
 import { ContactVerbotButton } from "./ContactVerbotModal";
 import type { User } from "@/lib/mock-data";
@@ -215,14 +216,12 @@ function NavGroupDropdown({ group, pathname, isDark, registerRef }: { group: Nav
   );
 }
 
+const profilePromptClaims = new Map<string, Promise<boolean>>();
+
 export function TopNav({ items, variant = "light" }: { items: NavEntry[]; variant?: "light" | "dark" }) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [profileOpen, setProfileOpen] = useState(false);
-  // First-login moment: instead of the old auto-tour, a first-time student
-  // gets nudged straight into their profile modal to complete it. Reuses
-  // DASHBOARD_TOUR_ID's "seen" bookkeeping so an existing student who already
-  // passed the old tour is never re-prompted, and this only ever fires once.
   const [profileFirstLoginPrompt, setProfileFirstLoginPrompt] = useState(false);
   const isStudent = user?.role === "student";
   const isAdmin = user?.role === "admin";
@@ -268,23 +267,34 @@ export function TopNav({ items, variant = "light" }: { items: NavEntry[]; varian
     };
   }, [items, pathname]);
 
-  // First-time student: nudge them into completing their profile instead of
-  // the old auto-tour. Fires once, the very first time they land anywhere
-  // under /student.
   useEffect(() => {
     if (!isStudent || !user?.id) return;
-    if (hasSeenTour(user.id, DASHBOARD_TOUR_ID)) return;
-    const t = window.setTimeout(() => {
+    const studentId = user.id;
+    let active = true;
+    let claim = profilePromptClaims.get(studentId);
+    if (!claim) {
+      claim = Promise.resolve(supabase.rpc("claim_student_profile_prompt" as never)).then(({ data, error }) => {
+        if (error) throw error;
+        return data === true;
+      });
+      profilePromptClaims.set(studentId, claim);
+    }
+    void claim.then((firstLogin) => {
+      if (profilePromptClaims.get(studentId) === claim) profilePromptClaims.delete(studentId);
+      if (!active || !firstLogin) return;
+      markTourSeen(studentId, DASHBOARD_TOUR_ID);
       setProfileFirstLoginPrompt(true);
       setProfileOpen(true);
-    }, 500);
-    return () => window.clearTimeout(t);
+    }).catch((error) => {
+      profilePromptClaims.delete(studentId);
+      console.error("[TopNav] profile prompt claim failed", error);
+    });
+    return () => { active = false; };
   }, [isStudent, user?.id]);
 
   const handleProfileOpenChange = (v: boolean) => {
     setProfileOpen(v);
-    if (!v && profileFirstLoginPrompt && user?.id) {
-      markTourSeen(user.id, DASHBOARD_TOUR_ID);
+    if (!v && profileFirstLoginPrompt) {
       setProfileFirstLoginPrompt(false);
     }
   };

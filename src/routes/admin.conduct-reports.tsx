@@ -1,13 +1,14 @@
 // Admin > Conduct Reports.
 // Read-only list of misconduct reports submitted by students against teachers
 // or other students. Reporter identity is always visible to Admin — the
-// anonymity is only towards the reported person. No resolve/discard workflow
-// yet by design.
+// anonymity is only towards the reported person. Admin records a response
+// that the reporter can read in My Reports.
 import { createFileRoute } from "@tanstack/react-router";
-import { useSyncExternalStore } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { ShieldAlert, Check, X } from "lucide-react";
 import { Card, Pill } from "@/components/verbo/ui";
 import { USERS, userById } from "@/lib/mock-data";
+import { notifyError, notifySuccess } from "@/lib/notify";
 import {
   loadConductReports,
   subscribeConductReports,
@@ -41,6 +42,8 @@ const STATUS_LABEL: Record<ConductReportStatus, string> = {
 };
 
 function Page() {
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState<string | null>(null);
   const reports = useSyncExternalStore(
     subscribeConductReports,
     loadConductReports,
@@ -50,6 +53,16 @@ function Page() {
   const sorted = [...reports].sort(
     (a, b) => +new Date(b.created_at) - +new Date(a.created_at),
   );
+  const setStatus = async (report: ConductReport, status: "reviewed" | "dismissed") => {
+    const note = (drafts[report.id] ?? report.resolution_note ?? "").trim();
+    if (!note) { notifyError("Add an outcome note before closing the report."); return; }
+    setSaving(report.id);
+    try {
+      await updateConductReport(report.id, { status, resolution_note: note });
+      notifySuccess("Report updated.");
+    } catch (error) { notifyError(error, { context: "Updating conduct report" }); }
+    finally { setSaving(null); }
+  };
 
   return (
     <div className="space-y-8">
@@ -106,6 +119,12 @@ function Page() {
                     <p className="max-w-md whitespace-pre-wrap text-sm leading-relaxed">
                       {r.text}
                     </p>
+                    <label className="mt-2 block text-xs text-muted-foreground">Outcome for reporter
+                      <textarea value={drafts[r.id] ?? r.resolution_note ?? ""}
+                        onChange={(event) => setDrafts((current) => ({ ...current, [r.id]: event.target.value }))}
+                        rows={2} className="mt-1 w-full rounded-md border border-border bg-background p-2 text-sm text-foreground"
+                        placeholder="What action was taken? Avoid private details." />
+                    </label>
                   </td>
                   <td className="px-6 py-4">
                     <Pill tone={STATUS_TONE[r.status]}>{STATUS_LABEL[r.status]}</Pill>
@@ -119,8 +138,8 @@ function Page() {
                     <div className="flex justify-end gap-1">
                       <button
                         type="button"
-                        onClick={() => updateConductReport(r.id, { status: "reviewed" })}
-                        disabled={r.status === "reviewed"}
+                        onClick={() => void setStatus(r, "reviewed")}
+                        disabled={saving === r.id}
                         aria-label="Mark as reviewed"
                         title="Mark as reviewed"
                         className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-success/10 hover:text-success disabled:cursor-not-allowed disabled:opacity-40"
@@ -129,8 +148,8 @@ function Page() {
                       </button>
                       <button
                         type="button"
-                        onClick={() => updateConductReport(r.id, { status: "dismissed" })}
-                        disabled={r.status === "dismissed"}
+                        onClick={() => void setStatus(r, "dismissed")}
+                        disabled={saving === r.id}
                         aria-label="Dismiss"
                         title="Dismiss"
                         className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive disabled:cursor-not-allowed disabled:opacity-40"

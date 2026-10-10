@@ -16,7 +16,7 @@ import planIconAsset from "@/assets/plan.svg";
 import completeIconAsset from "@/assets/complete.svg";
 
 import { CalendarClock, ClipboardCheck, FileEdit, X, Lock, Plus, Trash2, Download, CheckCircle2, Mic, PenLine, Ear, BookOpen, ChevronRight, Video, Star, AlertTriangle, AlertCircle, Trophy, CalendarDays, Users, Wallet, Sparkles as SparklesIcon, GraduationCap, type LucideIcon } from "lucide-react";
-import { savePerformance, type PerformanceRating } from "@/lib/performance-store";
+import { type PerformanceRating } from "@/lib/performance-store";
 import { MACRO_SKILLS as SHARED_MACRO_SKILLS, skillKey as sharedSkillKey, type BaseKey as SharedBaseKey } from "@/lib/skills-taxonomy";
 import { submitSessionReport, updateSession, loadSessions, subscribeSessions, notifySessionEvent, logSessionConnect, SUB_STATUS_META, isJustificationWindowOpen, type ExtSession, type AttendanceSubStatus } from "@/lib/sessions-store";
 import { PlanModal } from "@/components/verbo/PlanModal";
@@ -25,7 +25,6 @@ import { downloadSessionReportPdf, sessionReportPdfBlob, sessionReportFileName }
 import { downloadCollaborationPdf, downloadKpiSummaryPdf } from "@/lib/simple-docs-pdf";
 import { uploadContentFile } from "@/lib/content-uploads";
 import { legacyToUuid } from "@/lib/user-id-bridge";
-import { supabase } from "@/integrations/supabase/client";
 
 import { subscribeCourses, computeCurrentProgress } from "@/lib/product-courses-store";
 import { loadLessonPlans, saveLessonPlan, subscribeLessonPlans, getLessonPlan, type LessonPlan } from "@/lib/lesson-plans-store";
@@ -87,8 +86,13 @@ type DashboardPanel = "attention" | "plan" | "complete";
 type LocalSession = ExtSession & { _noReport?: boolean };
 
 function TeacherDashboard() {
-  const hydrated = useHydrated();
   const { user } = useAuth();
+  if (!user) return null;
+  return <TeacherDashboardContent key={user.id} user={user} />;
+}
+
+function TeacherDashboardContent({ user }: { user: NonNullable<ReturnType<typeof useAuth>["user"]> }) {
+  const hydrated = useHydrated();
 
   const { report: reportId } = useSearch({ from: "/teacher/" });
   const navigate = useNavigate();
@@ -185,7 +189,6 @@ function TeacherDashboard() {
     );
   }, [now]);
 
-  if (!user) return null;
   const students = studentsOfTeacher(user.id);
   const mySessions = sessions.filter((s) => s.teacher_id === user.id);
   const upcoming = mySessions.filter((s) => s.status === "scheduled").sort((a, b) => +new Date(a.date_time) - +new Date(b.date_time));
@@ -539,7 +542,7 @@ function TeacherDashboard() {
     .sort((a, b) => +new Date(b.submitted_at) - +new Date(a.submitted_at))
     .slice(0, 6);
 
-  const handleSubmit = (
+  const handleSubmit = async (
     sessionId: string,
     attendance: "present" | "delayed" | "absent",
     perf: PerformanceRating,
@@ -548,15 +551,10 @@ function TeacherDashboard() {
     subStatus?: AttendanceSubStatus | null,
     reportComments?: string,
     notes?: string,
-  ) => {
-    if (!user) return;
+  ): Promise<boolean> => {
+    if (!user) return false;
     const session = sessions.find((s) => s.id === sessionId);
-    setSessions((prev) => prev.map((s) => {
-      if (s.id !== sessionId) return s;
-      const status: SessionStatus = attendance === "absent" ? "absent" : "completed";
-      return { ...s, status, _noReport: false };
-    }));
-    submitSessionReport({
+    const saved = await submitSessionReport({
       sessionId,
       teacherId: user.id,
       studentId: session?.student_id ?? "",
@@ -564,9 +562,12 @@ function TeacherDashboard() {
       absentCause,
       subStatus: subStatus ?? null,
       subskills,
+      performance: perf,
       reportComments,
       notes,
     });
+    if (!saved) return false;
+    setSessions((prev) => prev.map((s) => s.id === sessionId ? { ...s, status: saved.status as SessionStatus, _noReport: false } : s));
     const plan = getLessonPlan(sessionId);
     if (plan?.vip_unit_id) {
       if (attendance !== "absent") markVipUnitDone(plan.vip_unit_id, sessionId);
@@ -576,19 +577,16 @@ function TeacherDashboard() {
       if (attendance !== "absent") markTailoredUnitDone(plan.tailored_unit_id, sessionId);
       else clearTailoredUnitDoneForSession(sessionId);
     }
-    if (attendance !== "absent") savePerformance(sessionId, session?.student_id ?? "", user.id, perf);
-    setEditing(null);
     notifySuccess("Session report submitted.");
+    return true;
   };
 
-  const handleSavePlan = (plan: LessonPlan) => {
-    saveLessonPlan(plan);
-    // Promote the shared session record to Ready so both the teacher and
-    // student calendars reflect the plan being locked in.
-    updateSession(plan.session_id, { status: "ready" as any });
+  const handleSavePlan = async (plan: LessonPlan): Promise<boolean> => {
+    if (!await saveLessonPlan(plan)) return false;
     setPlans((prev) => ({ ...prev, [plan.session_id]: plan }));
     setPlanning(null);
     notifySuccess("Lesson plan saved.");
+    return true;
   };
 
   return (
@@ -643,7 +641,7 @@ function TeacherDashboard() {
             </div>
           </HeroStatCard>
         </Link>
-        <Link to="/teacher/calendar" className="verbo-td-in verbo-td-press block cursor-pointer" style={{ animationDelay: "45ms" }}>
+        <Link to="/teacher/calendar" search={{ highlight: undefined }} className="verbo-td-in verbo-td-press block cursor-pointer" style={{ animationDelay: "45ms" }}>
           <HeroStatCard className="!items-start border border-border bg-card">
             <div className="absolute right-4 top-4 flex items-center justify-center sm:right-6 sm:top-6">
               <img src={upcomingIconAsset} alt="" className="h-10 w-10 sm:h-[52px] sm:w-[52px]" />
@@ -1416,7 +1414,7 @@ export function ReportModal({ session, perf, subskills, onClose, onSubmit }: {
   perf: PerformanceRating;
   subskills: Record<string, number>;
   onClose: () => void;
-  onSubmit: (id: string, attendance: Attendance, perf: PerformanceRating, subskills: Record<string, number>, absentCause?: "student" | "teacher", subStatus?: AttendanceSubStatus | null, reportComments?: string, notes?: string) => void;
+  onSubmit: (id: string, attendance: Attendance, perf: PerformanceRating, subskills: Record<string, number>, absentCause?: "student" | "teacher", subStatus?: AttendanceSubStatus | null, reportComments?: string, notes?: string) => Promise<boolean>;
 }) {
   const student = userById(session.student_id);
   const [attendance, setAttendance] = useState<Attendance>("present");
@@ -1429,6 +1427,8 @@ export function ReportModal({ session, perf, subskills, onClose, onSubmit }: {
   const [studentNote, setStudentNote] = useState("");
   const [entries, setEntries] = useState<Entry[]>(() => Array.from({ length: MIN_ENTRIES }, makeEntry));
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitFailed, setSubmitFailed] = useState(false);
   const justificationOpen = isJustificationWindowOpen(session.date_time);
 
   const bgFor = (opt: Attendance) => opt === "present" ? "#22c55e" : opt === "absent" ? "#ef4444" : "#f38934";
@@ -1445,10 +1445,17 @@ export function ReportModal({ session, perf, subskills, onClose, onSubmit }: {
     setEntries((p) => p.map((e) => (e.id === id ? { ...e, ...patch } : e)));
   const removeEntry = (id: string) => setEntries((p) => p.filter((e) => e.id !== id));
 
-  const handleSubmit = () => {
-    if (!canSubmit) return;
+  const handleSubmit = async () => {
+    if (!canSubmit || submitting) return;
+    setSubmitting(true);
+    setSubmitFailed(false);
+    let saved = false;
+    try {
+      saved = await onSubmit(session.id, attendance, perf, subskills, isAbsent ? absentCause : undefined, isAbsent ? absentSub : null, isAbsent ? undefined : (studentNote.trim() || undefined), notes.trim());
+    } catch (error) { console.error("[ReportModal] report submit failed", error); }
+    setSubmitting(false);
+    if (!saved) { setSubmitFailed(true); return; }
     setSubmitted(true);
-    onSubmit(session.id, attendance, perf, subskills, isAbsent ? absentCause : undefined, isAbsent ? absentSub : null, isAbsent ? undefined : (studentNote.trim() || undefined), notes.trim());
 
     // Generate the same branded report as a PDF and store it so the student
     // can download their own copy later (the "Download PDF" button below
@@ -1470,15 +1477,11 @@ export function ReportModal({ session, perf, subskills, onClose, onSubmit }: {
         const reportFolder = studentUuid ? `session-reports/${studentUuid}` : "session-reports";
         const result = await uploadContentFile(file, reportFolder);
         if (result.ok) {
-          // Awaited (not the fire-and-forget updateSession() path) so the
-          // notify-session-event call right below is guaranteed to see
-          // report_pdf_url already persisted — it re-reads the session row
-          // server-side to build the email, so a race here would mean the
-          // student's "your report is ready" email ships without the PDF
-          // link. updateSession() still runs too, for the optimistic
-          // local-cache update every other consumer of this store expects.
-          updateSession(session.id, { report_pdf_url: result.url });
-          await supabase.from("sessions").update({ report_pdf_url: result.url }).eq("id", Number(session.id));
+          // Persist the PDF URL before queuing the student notification.
+          // The notification worker reads the saved session row.
+          if (!await updateSession(session.id, { report_pdf_url: result.url })) {
+            console.error("[ReportModal] PDF uploaded but URL was not saved on the session");
+          }
         } else {
           console.error("[ReportModal] failed to store session report PDF", result.error);
         }
@@ -1690,6 +1693,7 @@ export function ReportModal({ session, perf, subskills, onClose, onSubmit }: {
               </>
             )}
 
+            {submitFailed && <p role="alert" className="mt-4 text-xs text-destructive">The report was not saved. Your draft is still here; please try again.</p>}
             <div className="mt-6 flex items-center justify-between gap-2">
               <p className="text-xs text-muted-foreground">
                 {isAbsent
@@ -1702,7 +1706,7 @@ export function ReportModal({ session, perf, subskills, onClose, onSubmit }: {
               </p>
               <div className="flex gap-2">
                 <GhostButton onClick={onClose}>Cancel</GhostButton>
-                <PrimaryButton onClick={handleSubmit} disabled={!canSubmit}>Submit report</PrimaryButton>
+                <PrimaryButton onClick={handleSubmit} disabled={!canSubmit || submitting}>{submitting ? "Saving…" : "Submit report"}</PrimaryButton>
               </div>
             </div>
           </>

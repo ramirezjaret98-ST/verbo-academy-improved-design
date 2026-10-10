@@ -5,7 +5,7 @@ import { userById } from "@/lib/mock-data";
 
 interface Props {
   session: Session;
-  onSubmit: (rating: number, note: string) => void;
+  onSubmit: (rating: number, note: string) => Promise<boolean>;
   onClose: () => void;
 }
 
@@ -13,6 +13,8 @@ export function RatingModal({ session, onSubmit, onClose }: Props) {
   const [rating, setRating] = useState(0);
   const [hover, setHover] = useState(0);
   const [note, setNote] = useState("");
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState(false);
   const teacher = userById(session.teacher_id);
 
   return (
@@ -70,12 +72,19 @@ export function RatingModal({ session, onSubmit, onClose }: Props) {
           className="mt-6 w-full resize-none rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
         />
 
+        {error && <p role="alert" className="mt-3 text-xs text-destructive">Feedback was not saved. Please try again.</p>}
         <button
-          disabled={!rating || (rating <= 3 && !note.trim())}
-          onClick={() => onSubmit(rating, note)}
+          disabled={sending || !rating || (rating <= 3 && !note.trim())}
+          onClick={async () => {
+            setSending(true);
+            setError(false);
+            try { if (!await onSubmit(rating, note)) setError(true); }
+            catch { setError(true); }
+            finally { setSending(false); }
+          }}
           className="verbo-press mt-6 w-full rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-accent-foreground shadow-soft transition-all hover:bg-[#d9731f] disabled:cursor-not-allowed disabled:opacity-40"
         >
-          Submit feedback
+          {sending ? "Saving…" : "Submit feedback"}
         </button>
         <button
           onClick={onClose}

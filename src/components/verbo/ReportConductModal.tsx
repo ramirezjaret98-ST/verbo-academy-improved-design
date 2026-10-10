@@ -39,6 +39,7 @@ export function ReportConductModal({ studentId, open, onClose, watermarkImageUrl
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
+  const [sending, setSending] = useState(false);
   const [confirmUnlocked, setConfirmUnlocked] = useState(false);
 
   useEffect(() => {
@@ -85,6 +86,7 @@ export function ReportConductModal({ studentId, open, onClose, watermarkImageUrl
   };
 
   const handleClose = () => {
+    if (sending) return;
     reset();
     onClose();
   };
@@ -101,16 +103,25 @@ export function ReportConductModal({ studentId, open, onClose, watermarkImageUrl
     setConfirming(true);
   };
 
-  const handleConfirmSend = () => {
-    addConductReport({
-      reporterId: studentId,
-      targetType,
-      targetId,
-      category: category as ConductCategory,
-      text,
-    });
-    setConfirming(false);
-    setSubmitted(true);
+  const handleConfirmSend = async () => {
+    if (sending) return;
+    setSending(true);
+    try {
+      await addConductReport({
+        reporterId: studentId,
+        targetType,
+        targetId,
+        category: category as ConductCategory,
+        text,
+      });
+      setConfirming(false);
+      setSubmitted(true);
+    } catch (cause) {
+      setConfirming(false);
+      setError(cause instanceof Error ? cause.message : "Could not send the report. Please try again.");
+    } finally {
+      setSending(false);
+    }
   };
 
   const options = targetType === "teacher" ? teacherOptions : studentOptions;
@@ -137,7 +148,7 @@ export function ReportConductModal({ studentId, open, onClose, watermarkImageUrl
               {submitted ? (
                 <div className="space-y-3">
                   <p className="vc-rise text-sm text-foreground" style={{ animationDelay: "0.25s" }}>
-                    Thank you. Your report has been sent to the Verbo team for review.
+                    Thank you. Your report has been sent to the Verbo team. Follow its status in My Reports.
                   </p>
                   <p className="vc-rise text-xs text-muted-foreground" style={{ animationDelay: "0.3s" }}>
                     Remember: the reported person will never see your name.
@@ -252,7 +263,7 @@ export function ReportConductModal({ studentId, open, onClose, watermarkImageUrl
         </div>
       )}
 
-      <Dialog open={confirming} onOpenChange={(o) => !o && setConfirming(false)}>
+      <Dialog open={confirming} onOpenChange={(o) => !o && !sending && setConfirming(false)}>
         <DialogContent className="max-w-md">
           <DialogHeader className="-mx-6 -mt-6 space-y-0 bg-destructive px-6 py-4 text-destructive-foreground sm:rounded-t-lg">
             <DialogTitle className="flex items-center gap-2 text-destructive-foreground">
@@ -271,9 +282,9 @@ export function ReportConductModal({ studentId, open, onClose, watermarkImageUrl
             </p>
           </div>
           <DialogFooter className="gap-2">
-            <GhostButton onClick={() => setConfirming(false)}>Cancel</GhostButton>
-            <PrimaryButton onClick={handleConfirmSend} disabled={!confirmUnlocked}>
-              {confirmUnlocked ? "Confirm and send" : "Please read carefully…"}
+            <GhostButton onClick={() => setConfirming(false)} disabled={sending}>Cancel</GhostButton>
+            <PrimaryButton onClick={handleConfirmSend} disabled={!confirmUnlocked || sending}>
+              {sending ? "Sending…" : confirmUnlocked ? "Confirm and send" : "Please read carefully…"}
             </PrimaryButton>
           </DialogFooter>
         </DialogContent>

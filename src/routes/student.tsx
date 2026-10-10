@@ -32,11 +32,13 @@ function StudentLayout() {
     items = [
       { to: "/student", label: "Dashboard" },
       { to: "/student/clubs", label: "Clubs" },
+      { to: "/student/reports", label: "My Reports" },
     ];
   } else if (productType === "workshops") {
     items = [
       { to: "/student", label: "Dashboard" },
       { to: "/student/my-workshop", label: "My Workshop" },
+      { to: "/student/reports", label: "My Reports" },
     ];
   } else {
     // performance
@@ -48,10 +50,11 @@ function StudentLayout() {
         : { to: "/student/courses", label: "Learning Path" },
       { to: "/student/resources", label: "Resources" },
       { to: "/student/challenges", label: "Challenges" },
+      { to: "/student/reports", label: "My Reports" },
     ];
   }
 
-  if (clubsOnly && pathname !== "/student" && pathname !== "/student/" && pathname !== "/student/insights" && pathname !== "/student/clubs") {
+  if (clubsOnly && pathname !== "/student" && pathname !== "/student/" && pathname !== "/student/insights" && pathname !== "/student/clubs" && pathname !== "/student/reports") {
     return <RoleGuard allow="student"><Navigate to="/student" /></RoleGuard>;
   }
 

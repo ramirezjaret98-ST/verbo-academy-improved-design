@@ -256,6 +256,11 @@ const ATTENDANCE_SCORES: Record<string, number> = {
 
 function StudentDashboard() {
   const { user } = useAuth();
+  if (!user) return null;
+  return <StudentDashboardContent key={user.id} user={user} />;
+}
+
+function StudentDashboardContent({ user }: { user: NonNullable<ReturnType<typeof useAuth>["user"]> }) {
   const navigate = useNavigate();
 
   const sessions = useSyncExternalStore(
@@ -352,8 +357,6 @@ function StudentDashboard() {
   useEffect(() => subscribeCourses(() => setCoursesRev((r) => r + 1)), []);
   useEffect(() => subscribeVipUnits(() => setCoursesRev((r) => r + 1)), []);
   useEffect(() => subscribeVipUnitCompletion(() => setCoursesRev((r) => r + 1)), []);
-
-  if (!user) return null;
 
   const mySessions = sessions.filter((s) => s.student_id === user.id);
   const upcoming = mySessions
@@ -461,18 +464,24 @@ function StudentDashboard() {
   }, [history]);
 
 
-  // Rating popup logic (untouched)
+  // Dismissal is local to this student; actual ratings are server-owned.
   const [ratingSession, setRatingSession] = useState<ExtSession | null>(null);
   const [handled, setHandled] = useState<Set<string>>(() => {
     if (typeof window === "undefined") return new Set();
     try {
-      const raw = localStorage.getItem("verbo:rated-sessions");
+      const raw = localStorage.getItem(`verbo:rated-sessions:${user?.id ?? "guest"}`);
       return new Set(raw ? (JSON.parse(raw) as string[]) : []);
     } catch { return new Set(); }
   });
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(`verbo:rated-sessions:${user?.id ?? "guest"}`);
+      setHandled(new Set(raw ? JSON.parse(raw) as string[] : []));
+    } catch { setHandled(new Set()); }
+  }, [user?.id]);
   const persistHandled = (next: Set<string>) => {
     setHandled(next);
-    try { localStorage.setItem("verbo:rated-sessions", JSON.stringify([...next])); } catch { /* noop */ }
+    try { localStorage.setItem(`verbo:rated-sessions:${user?.id ?? "guest"}`, JSON.stringify([...next])); } catch { /* noop */ }
   };
 
   useEffect(() => {
@@ -480,6 +489,8 @@ function StudentDashboard() {
       const now = Date.now();
       for (const s of upcoming) {
         if (handled.has(s.id)) continue;
+        if (s.group_id || s.workshop_cohort_id || s.workshop_template_id) continue;
+        if (typeof s.student_rating === "number") continue;
         const start = +new Date(s.date_time);
         const end = start + s.duration_minutes * 60_000;
         const triggerAt = end - 10 * 60_000;
@@ -498,6 +509,7 @@ function StudentDashboard() {
       const RATING_LOOKBACK_MS = 7 * 24 * 60 * 60_000;
       const recentUnrated = history.find((s) => {
         if (handled.has(s.id)) return false;
+        if (s.group_id || s.workshop_cohort_id || s.workshop_template_id) return false;
         if (s.status !== "completed") return false;
         if (typeof s.student_rating === "number") return false;
         const end = +new Date(s.date_time) + s.duration_minutes * 60_000;
@@ -510,11 +522,12 @@ function StudentDashboard() {
     return () => clearInterval(id);
   }, [upcoming, history, handled]);
 
-  const handleSubmit = (rating: number, note: string) => {
-    if (!ratingSession) return;
-    submitStudentRating(ratingSession.id, rating, note ? note : undefined);
+  const handleSubmit = async (rating: number, note: string): Promise<boolean> => {
+    if (!ratingSession) return false;
+    if (!await submitStudentRating(ratingSession.id, rating, note ? note : undefined)) return false;
     persistHandled(new Set(handled).add(ratingSession.id));
     setRatingSession(null);
+    return true;
   };
 
   const handleClose = () => {
@@ -1248,7 +1261,7 @@ function StudentDashboard() {
                 type="button"
                 className="mt-4 inline-flex w-full items-center justify-center gap-2 whitespace-nowrap rounded-full bg-white px-4 py-2.5 text-sm font-semibold transition-transform duration-200 active:scale-[0.97]"
                 style={{ color: "var(--violet-900)" }}
-                onClick={() => navigate({ to: "/student/sessions", search: { focus: "clubs" } })}
+                onClick={() => navigate({ to: "/student/sessions", search: { focus: "clubs", prep: undefined, highlight: undefined } })}
               >
                 <Sparkles className="h-3.5 w-3.5" /> View Active Clubs
               </button>

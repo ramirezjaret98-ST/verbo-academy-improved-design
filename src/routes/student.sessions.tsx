@@ -403,7 +403,7 @@ function Page() {
             onClose={() => {
               setPrepModalSessionId(null);
               // Drop ?prep= from the URL so a refresh/back doesn't reopen it.
-              if (prepParam) navigate({ to: "/student/sessions", search: { focus: focusParam }, replace: true });
+              if (prepParam) navigate({ to: "/student/sessions", search: { focus: focusParam, prep: undefined, highlight: undefined }, replace: true });
             }}
           />
         );

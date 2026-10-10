@@ -106,7 +106,7 @@ function RedirectToChangePassword() {
 }
 
 /** Global error boundary for the whole app. */
-function RootErrorBoundary({ error, reset }: { error: Error; reset: () => void }) {
+function RootErrorBoundary({ error, reset }: { error: unknown; reset: () => void }) {
   console.error(error);
   const router = useRouter();
   return <GeneralErrorScreen onRefresh={() => { router.invalidate(); reset(); }} />;

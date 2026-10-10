@@ -27,7 +27,6 @@ import { hydrateUserIdBridge, legacyToUuid, uuidToLegacySync } from "@/lib/user-
 import { setCoverageNote } from "./coverage-notes-store";
 import { saveSubskillEvaluation } from "./performance-store";
 import { decrementGroupRemaining, activeMembersOf } from "./groups-store";
-import { adjustRemainingSessions } from "./students-store";
 import { STATUS_PALETTE, statusTextColor } from "./status-palette";
 import { notifyError } from "@/lib/notify";
 
@@ -782,11 +781,18 @@ export async function convertOwnSessionToSpotlight(
  *  below flip `review_status` to "pending" so the session enters the
  *  Flagged Reviews queue in Admin > Teachers. Higher ratings leave
  *  `review_status` untouched. */
-export function submitStudentRating(sessionId: string, rating: number, comment?: string) {
-  const patch: Partial<ExtSession> = { student_rating: rating };
-  if (comment !== undefined) patch.student_comment = comment;
-  if (rating <= 3) patch.review_status = "pending";
-  updateSession(sessionId, patch);
+export async function submitStudentRating(sessionId: string, rating: number, comment?: string): Promise<boolean> {
+  const numericId = Number(sessionId);
+  if (!Number.isFinite(numericId)) return false;
+  const { error } = await supabase.rpc("student_rate_session" as never, {
+    p_session_id: numericId, p_rating: rating, p_comment: comment?.trim() || null,
+  } as never);
+  if (error) {
+    notifyError(error, { context: "Submitting session feedback" });
+    return false;
+  }
+  invalidateAndRehydrate();
+  return true;
 }
 
 /** Records the exact moment a student or teacher first clicks their own
@@ -841,7 +847,7 @@ export function logSessionConnect(sessionId: string, role: "student" | "teacher"
  *
  *  Not handled here on purpose: PDF generation and email dispatch.
  */
-export function submitSessionReport(input: {
+export async function submitSessionReport(input: {
   sessionId: string;
   teacherId: string;
   studentId: string;
@@ -849,41 +855,40 @@ export function submitSessionReport(input: {
   absentCause?: "student" | "teacher";
   subStatus?: AttendanceSubStatus | null;
   subskills: Record<string, number>;
+  performance: { fluency: number; vocabulary: number; confidence: number; grammar: number };
+  excludeFromPay?: boolean;
   reportComments?: string;
   /** Required "Class notes" write-up from the report form. Previously this
    *  was only ever baked into the generated PDF and never persisted to a
    *  queryable column — Admin had no way to see it without opening the PDF.
    *  Now saved to `sessions.notes` alongside everything else. */
   notes?: string;
-}): ExtSession | null {
+}): Promise<ExtSession | null> {
   const prev = sessionsCache.find((s) => s.id === input.sessionId);
   if (!prev) return null;
   const status: ExtSessionStatus = input.attendance === "absent" ? "absent" : "completed";
-  const patch: Partial<ExtSession> = {
-    status,
-    absent_cause: status === "absent" ? (input.absentCause ?? "student") : undefined,
-    attendance_delayed: input.attendance === "delayed",
-    attendance_sub_status: status === "absent" && input.subStatus ? input.subStatus : undefined,
-    report_submitted_at: new Date().toISOString(),
-    report_locked: true,
-    report_comments: input.reportComments?.trim() ? input.reportComments.trim() : prev.report_comments,
-    notes: input.notes?.trim() ? input.notes.trim() : prev.notes,
-  };
-  updateSession(input.sessionId, patch);
-
-  if (status !== "absent" && Object.keys(input.subskills).length > 0) {
-    saveSubskillEvaluation(input.sessionId, input.studentId, input.teacherId, input.subskills);
+  const numericId = Number(input.sessionId);
+  if (!Number.isFinite(numericId)) return null;
+  const { data, error } = await supabase.rpc("submit_one_on_one_session_report" as never, {
+    p_session_id: numericId,
+    p_attendance: input.attendance,
+    p_absent_cause: status === "absent" ? input.absentCause ?? "student" : null,
+    p_sub_status: status === "absent" ? input.subStatus ?? null : null,
+    p_subskills: input.subskills,
+    p_performance: status === "absent" ? null : input.performance,
+    p_report_comments: input.reportComments?.trim() || null,
+    p_notes: input.notes?.trim() || null,
+    p_exclude_pay: input.excludeFromPay ?? false,
+  } as never);
+  if (error || !data) {
+    notifyError(error ?? "Report was not saved", { context: "Submitting session report" });
+    return null;
   }
-  setCoverageNote(input.teacherId, input.studentId, "");
-
-  // Decrement remaining_sessions for 1:1 individual sessions when the class
-  // actually occurred. Mirrors the group-side rule in submitGroupSessionReport.
-  const isOneOnOne = !prev.origin && !prev.group_id && !prev.workshop_cohort_id && !prev.workshop_template_id;
-  const classOccurred = !(status === "absent" && input.absentCause === "teacher");
-  if (isOneOnOne && classOccurred) {
-    adjustRemainingSessions(input.studentId, -1);
-  }
-  return { ...prev, ...patch };
+  const saved = { ...prev, ...mapSessionRow(data as SessionRow, [], []) };
+  setSessionEntry(input.sessionId, saved);
+  notify();
+  invalidateAndRehydrate();
+  return saved;
 }
 
 // -----------------------------------------------------------------------------
@@ -992,41 +997,31 @@ export function evaluateGroupUnanimity(
 /** Applies a per-member cancel or reschedule to a group session and evaluates
  *  strict unanimity. Returns the outcome so the caller can toast / trigger a
  *  group-level Reschedule Request when unanimity flips top-level state. */
-export function applyGroupMemberCancellation(
+export async function applyGroupMemberCancellation(
   sessionId: string,
   studentId: string,
-  memberStatus: "cancelled" | "pending_reschedule",
-): { outcome: GroupUnanimityOutcome; topStatus: ExtSessionStatus } {
+  memberStatus: "absent" | "cancelled" | "pending_reschedule",
+  proposedDatetime?: string,
+  lastReportSummary?: string,
+): Promise<{ outcome: GroupUnanimityOutcome; topStatus: ExtSessionStatus } | null> {
   const sess = sessionsCache.find((s) => s.id === sessionId);
-  if (!sess || !sess.group_id) {
-    updateSession(sessionId, { status: memberStatus });
-    return { outcome: { kind: "none" }, topStatus: memberStatus };
-  }
-
-  const nextMemberStatuses: Record<string, ExtSessionStatus> = {
-    ...(sess.member_statuses ?? {}),
-    [studentId]: memberStatus,
-  };
-  const outcome = evaluateGroupUnanimity(sess, nextMemberStatuses);
-  const patch: Partial<ExtSession> = { member_statuses: nextMemberStatuses };
-  if (outcome.kind === "unanimous_cancel") patch.status = "cancelled";
-  else if (outcome.kind === "unanimous_reschedule") patch.status = "pending_reschedule";
-  updateSession(sessionId, patch);
-  // 2026-08-20 fix: group cancellations went through this function (via
-  // updateSession) instead of studentSetSessionStatus, so they never fired
-  // the teacher/admin alert + student confirmation email that 1:1
-  // cancellations already get — a real gap flagged in
-  // fix_logs_notificaciones_cancelacion_2026-08-14. Only fires once the
-  // group actually flips to cancelled/pending_reschedule (unanimity
-  // reached), same as when a real "cancelled"/"pending_reschedule" status
-  // lands on a 1:1 session.
+  if (!sess?.group_id || !studentId) return null;
   const numericId = Number(sessionId);
-  if (Number.isFinite(numericId) && (patch.status === "cancelled" || patch.status === "pending_reschedule")) {
-    notifySessionEvent(numericId, patch.status);
-  }
+  if (!Number.isFinite(numericId)) return null;
+  const { data, error } = await supabase.rpc("student_group_session_action" as never, {
+    p_session_id: numericId, p_status: memberStatus,
+    p_proposed_datetime: proposedDatetime ?? null,
+    p_last_report_summary: lastReportSummary ?? null,
+  } as never);
+  if (error) { notifyError(error, { context: "Updating group session" }); return null; }
+  const outcome = data as string | null;
+  const kind = outcome === "unanimous_cancel" || outcome === "unanimous_reschedule" ? outcome : "none";
+  const topStatus: ExtSessionStatus = kind === "unanimous_cancel" ? "cancelled" : kind === "unanimous_reschedule" ? "pending_reschedule" : sess.status;
+  invalidateAndRehydrate();
+  if (kind === "unanimous_cancel") notifySessionEvent(numericId, "cancelled");
+  if (kind === "unanimous_reschedule") notifySessionEvent(numericId, "pending_reschedule");
   return {
-    outcome,
-    topStatus: (patch.status ?? sess.status) as ExtSessionStatus,
+    outcome: { kind }, topStatus,
   };
 }
 

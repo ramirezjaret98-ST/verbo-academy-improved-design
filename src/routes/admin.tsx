@@ -45,6 +45,7 @@ const NAV_GROUPS: NavGroup[] = [
   ]},
   { label: "Financial", items: [
     { to: "/admin/financial/money-lab", label: "The Money Lab" },
+    { to: "/admin/financial/issues", label: "Financial Issues" },
   ]},
   { label: "Administration", items: [
     { to: "/admin/users", label: "User Management" },

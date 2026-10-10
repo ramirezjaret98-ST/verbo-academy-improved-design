@@ -17,7 +17,7 @@ import { effectiveHourlyRate, teacherTier } from "@/lib/teacher-tiers";
 import {
   computeTeacherKpis, ratingBand, getBonusThreshold,
 } from "@/lib/teacher-kpis";
-import { addFinancialIssue } from "@/lib/financial-issues-store";
+import { addFinancialIssue, useFinancialIssues } from "@/lib/financial-issues-store";
 import { notifySuccess, notifyError } from "@/lib/notify";
 import { SectionTitle, Pill, AccentModal, AccentModalFooter } from "@/components/verbo/ui";
 import { BonusBadge } from "@/components/verbo/BonusBadge";
@@ -95,6 +95,7 @@ const FIN = {
 // --- page -------------------------------------------------------------------
 function MyBalancePage() {
   const { user } = useAuth();
+  const financialIssues = useFinancialIssues();
   const [tick, force] = useState(0);
   const bump = () => force((n) => n + 1);
   const [viewMonth, setViewMonth] = useState<Date>(() => firstOfMonth(new Date()));
@@ -585,6 +586,13 @@ function MyBalancePage() {
 
       {/* Report an Issue */}
       <div className="flex flex-col items-end gap-1 pt-1">
+        {financialIssues.filter((issue) => issue.teacher_id === teacher?.id).map((issue) => (
+          <div key={issue.id} className="w-full rounded-xl border border-border bg-card p-3 text-xs text-foreground">
+            <div className="font-semibold">Your report · {issue.status}</div>
+            <p className="mt-1 whitespace-pre-wrap">{issue.text}</p>
+            {issue.resolution_note && <p className="mt-2 text-muted-foreground">Admin response: {issue.resolution_note}</p>}
+          </div>
+        ))}
         {reportSent && <span className="text-xs font-medium text-success">Issue reported to Admin.</span>}
         <button
           type="button"
@@ -598,22 +606,17 @@ function MyBalancePage() {
       {reportOpen && teacher && (
         <FinancialIssueModal
           onClose={() => setReportOpen(false)}
-          onSubmit={(text) => {
-            // 2026-09-08: this used to set `reportSent` (and close the modal)
-            // optimistically no matter what — a failed send showed BOTH a
-            // native window.alert() AND the "Issue reported to Admin." success
-            // line at the same time. Now the success state only flips on an
-            // actual round-trip, and failure gets the same notifyError()
-            // treatment as the rest of the app instead of a browser alert().
-            addFinancialIssue({ teacherId: teacher.id, text })
-              .then(() => {
-                notifySuccess("Issue reported to Admin.");
-                setReportSent(true);
-              })
-              .catch((err) => {
-                notifyError(err, { context: "Reporting financial issue" });
-              });
-            setReportOpen(false);
+          onSubmit={async (text) => {
+            try {
+              await addFinancialIssue({ teacherId: teacher.id, text });
+              notifySuccess("Issue reported to Admin.");
+              setReportSent(true);
+              setReportOpen(false);
+              return true;
+            } catch (error) {
+              notifyError(error, { context: "Reporting financial issue" });
+              return false;
+            }
           }}
         />
       )}
@@ -671,8 +674,10 @@ function CompositeGauge({ value }: { value: number }) {
 }
 
 // --- Financial issue modal --------------------------------------------------
-function FinancialIssueModal({ onClose, onSubmit }: { onClose: () => void; onSubmit: (text: string) => void }) {
+function FinancialIssueModal({ onClose, onSubmit }: { onClose: () => void; onSubmit: (text: string) => Promise<boolean> }) {
   const [text, setText] = useState("");
+  const [sending, setSending] = useState(false);
+  const [failed, setFailed] = useState(false);
   const trimmed = text.trim();
   return (
     <AccentModal
@@ -701,14 +706,21 @@ function FinancialIssueModal({ onClose, onSubmit }: { onClose: () => void; onSub
         </label>
       </div>
       <AccentModalFooter accent="#dc0000">
+        {failed && <span role="alert" className="text-xs text-destructive">Report was not sent. Please try again.</span>}
         <button type="button" onClick={onClose} className="rounded-lg border border-border bg-background px-4 py-2 text-sm text-foreground hover:bg-secondary">Cancel</button>
         <button
           type="button"
-          disabled={!trimmed}
-          onClick={() => onSubmit(trimmed)}
+          disabled={!trimmed || sending}
+          onClick={async () => {
+            setSending(true);
+            setFailed(false);
+            try { if (!await onSubmit(trimmed)) setFailed(true); }
+            catch { setFailed(true); }
+            finally { setSending(false); }
+          }}
           className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-accent-foreground shadow-sm transition-opacity hover:opacity-90 disabled:opacity-40"
         >
-          Send to Admin
+          {sending ? "Sending…" : "Send to Admin"}
         </button>
       </AccentModalFooter>
     </AccentModal>

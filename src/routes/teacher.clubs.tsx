@@ -236,7 +236,7 @@ function Page() {
           onClaim={async (id) => {
             const claimed = await claimStudentRequest(id, user.id);
             if (!claimed) return;
-            else toast.success("Request claimed and added to your calendar");
+            notifySuccess("Request claimed and added to your calendar");
             setStudentReqs(loadStudentRequests());
           }}
         />
