@@ -13,7 +13,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { registerRehydrate } from "@/lib/auth-rehydrate";
 import type { Database } from "@/integrations/supabase/types";
 import { hydrateUserIdBridge, legacyToUuid, uuidToLegacySync } from "@/lib/user-id-bridge";
-import { notifyError } from "@/lib/notify";
 
 export type ConductTargetType = "teacher" | "student";
 export type ConductCategory =
@@ -41,6 +40,7 @@ export interface ConductReport {
   created_at: string; // ISO
   status: ConductReportStatus;
   reviewed_at?: string; // ISO — when status moved to reviewed or dismissed
+  resolution_note?: string;
 }
 
 export const CONDUCT_REPORTS_EVENT = "verbo:conduct-reports-updated";
@@ -50,6 +50,8 @@ type Row = Database["public"]["Tables"]["conduct_reports"]["Row"];
 let cache: ConductReport[] = [];
 let hydrated = false;
 let hydratePromise: Promise<void> | null = null;
+let hydrateGeneration = 0;
+let refreshQueued = false;
 const listeners = new Set<() => void>();
 
 function notify() {
@@ -68,31 +70,37 @@ function mapRow(row: Row): ConductReport {
     created_at: row.created_at,
     status: row.status,
     reviewed_at: row.reviewed_at ?? undefined,
+    resolution_note: row.resolution_note ?? undefined,
   };
 }
 
 async function hydrate(): Promise<void> {
   if (hydrated) return;
   if (hydratePromise) return hydratePromise;
+  const generation = hydrateGeneration;
   hydratePromise = (async () => {
     await hydrateUserIdBridge();
     const { data, error } = await supabase.from("conduct_reports").select("*");
     if (error) {
       console.error("[conduct-reports-store] failed to load", error);
-      hydrated = true;
       return;
     }
+    if (generation !== hydrateGeneration) return;
     cache = (data ?? []).map(mapRow);
     hydrated = true;
-  })();
-  await hydratePromise;
-  hydratePromise = null;
-  notify();
+    notify();
+  })().finally(() => {
+    hydratePromise = null;
+    if (refreshQueued) { refreshQueued = false; void hydrate(); }
+  });
+  return hydratePromise;
 }
 
-function invalidateAndRehydrate() {
+function invalidateAndRehydrate(reason?: "auth" | "refresh") {
+  hydrateGeneration++;
   hydrated = false;
-  hydratePromise = null;
+  if (reason === "auth") { cache = []; notify(); }
+  if (hydratePromise) { refreshQueued = true; return; }
   void hydrate();
 }
 
@@ -101,43 +109,24 @@ if (typeof window !== "undefined") {
   supabase
     .channel("conduct-reports-changes")
     .on("postgres_changes", { event: "*", schema: "public", table: "conduct_reports" }, () => {
-      hydrated = false;
-      void hydrate();
+      invalidateAndRehydrate("refresh");
     })
     .subscribe();
   registerRehydrate(invalidateAndRehydrate);}
 
-export function addConductReport(input: {
+export async function addConductReport(input: {
   reporterId: string;
   targetType: ConductTargetType;
   targetId: string;
   category: ConductCategory;
   text: string;
-}): ConductReport {
-  const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-  const report: ConductReport = {
-    id: tempId,
-    reporter_id: input.reporterId,
-    target_type: input.targetType,
-    target_id: input.targetId,
-    category: input.category,
-    text: input.text.trim(),
-    created_at: new Date().toISOString(),
-    status: "pending",
-  };
-  cache = [report, ...cache];
-  notify();
-
-  void (async () => {
+}): Promise<ConductReport> {
     const [reporterUuid, targetUuid] = await Promise.all([
       legacyToUuid(input.reporterId),
       legacyToUuid(input.targetId),
     ]);
     if (!reporterUuid || !targetUuid) {
-      cache = cache.filter((r) => r.id !== tempId);
-      notify();
-      notifyError("Couldn't identify the reporter or the person being reported", { context: "Sending conduct report" });
-      return;
+      throw new Error("Couldn't identify the reporter or the person being reported");
     }
     const { data, error } = await supabase
       .from("conduct_reports")
@@ -146,26 +135,18 @@ export function addConductReport(input: {
         target_type: input.targetType,
         target_id: targetUuid,
         category: input.category,
-        text: report.text,
+        text: input.text.trim(),
       })
       .select("*")
       .single();
     if (error || !data) {
       console.error("[conduct-reports-store] failed to save report", error);
-      cache = cache.filter((r) => r.id !== tempId);
-      notify();
-      // 2026-09-08: this used to fail completely silently — the modal already
-      // showed "submitted" (see ReportConductModal.tsx's optimistic
-      // setSubmitted(true)) and the report just vanished from the cache with
-      // nothing telling the student it never actually reached Admin.
-      notifyError(error, { context: "Sending conduct report" });
-      return;
+      throw error ?? new Error("Conduct report was not saved");
     }
-    cache = cache.map((r) => (r.id === tempId ? mapRow(data) : r));
+    const saved = mapRow(data);
+    cache = [saved, ...cache.filter((r) => r.id !== saved.id)];
     notify();
-  })();
-
-  return report;
+    return saved;
 }
 
 export function loadConductReports(): ConductReport[] {
@@ -173,36 +154,26 @@ export function loadConductReports(): ConductReport[] {
   return cache;
 }
 
-export function updateConductReport(
+export async function updateConductReport(
   id: string,
-  patch: Partial<Pick<ConductReport, "status">>,
-): ConductReport | null {
+  patch: Pick<ConductReport, "status"> & { resolution_note?: string },
+): Promise<ConductReport> {
   const idx = cache.findIndex((r) => r.id === id);
-  if (idx < 0) return null;
-  const prev = cache[idx];
-  const next: ConductReport = { ...prev, ...patch };
-  if (patch.status && patch.status !== "pending") {
-    next.reviewed_at = new Date().toISOString();
-  }
-  cache = cache.map((r) => (r.id === id ? next : r));
-  notify();
-
+  if (idx < 0) throw new Error("Report unavailable");
+  const next: ConductReport = { ...cache[idx], ...patch };
   const numericId = Number(id);
   if (Number.isFinite(numericId)) {
-    void (async () => {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from("conduct_reports")
-        .update({ status: next.status, reviewed_at: next.reviewed_at ?? null })
-        .eq("id", numericId);
-      if (error) {
-        console.error("[conduct-reports-store] failed to update report", error);
-        cache = cache.map((r) => (r.id === id ? prev : r));
-        notify();
-        notifyError(error, { context: "Updating conduct report status" });
-      }
-    })();
+        .update({ status: next.status, resolution_note: patch.resolution_note?.trim() || null })
+        .eq("id", numericId).select("*").single();
+      if (error || !data) throw error ?? new Error("Conduct report was not updated");
+      const saved = mapRow(data);
+      cache = cache.map((r) => (r.id === id ? saved : r));
+      notify();
+      return saved;
   }
-  return next;
+  throw new Error("Invalid report ID");
 }
 
 export function subscribeConductReports(cb: () => void): () => void {

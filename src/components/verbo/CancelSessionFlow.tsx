@@ -1,5 +1,5 @@
 import { academyToday, academyTime } from "@/lib/academy-time";
-import { rescheduleSlots, requestSessionReschedule } from "@/lib/student-requests-store";
+import { rescheduleSlots, requestSessionReschedule, refreshStudentRequests } from "@/lib/student-requests-store";
 // Shared "Can't Attend" / Reschedule flow.
 //
 // Extracted from student.sessions.tsx so the Student Dashboard and Live
@@ -15,15 +15,12 @@ import { useAuth } from "@/lib/auth";
 import { USERS, userById } from "@/lib/mock-data";
 import {
   applyGroupMemberCancellation,
-  updateSession,
   studentSetSessionStatus,
   loadSessions,
   lastCoveredSummaryFor,
   type ExtSession,
-  type ExtSessionStatus,
 } from "@/lib/sessions-store";
 import {
-  addStudentRequest,
   parseReschedulePolicy,
   reschedulesUsedThisMonth,
   rescheduleQuota,
@@ -63,8 +60,7 @@ export function CantAttendRouter({
   // unless the whole roster is out). For 1:1, top-level flips to Absent.
   const confirmAbsent = async () => {
     if (isGroup) {
-      const nextMemberStatuses = { ...(session.member_statuses ?? {}), [user.id]: "absent" as ExtSessionStatus };
-      if (!await updateSession(session.id, { member_statuses: nextMemberStatuses })) return;
+      if (!await applyGroupMemberCancellation(session.id, user.id, "absent")) return;
       toast("You've been marked Absent. The session continues for the other members.");
     } else {
       if (!await studentSetSessionStatus(session.id, "absent")) return;
@@ -74,7 +70,8 @@ export function CantAttendRouter({
   };
   const confirmCancelNoReschedule = async () => {
     if (isGroup) {
-      const res = applyGroupMemberCancellation(session.id, user.id, "cancelled");
+      const res = await applyGroupMemberCancellation(session.id, user.id, "cancelled");
+      if (!res) return;
       toast(
         res.outcome.kind === "unanimous_cancel"
           ? "All members cancelled — the group session has been cancelled."
@@ -333,17 +330,12 @@ export function RescheduleRequestModal({ session, onClose }: { session: ExtSessi
     }
     const stillOk = qualifiedIds.some((tid) => isTeacherAvailableAt(tid, slotISO, durationMin));
     if (!stillOk) { setError("That slot is no longer available. Please pick another."); return; }
-    addStudentRequest({
-      kind: "reschedule",
-      student_id: actingStudentId,
-      assigned_teacher_id: session.teacher_id,
-      origin_session_id: session.id,
-      proposed_datetime: slotISO,
-      duration_minutes: durationMin,
-      last_report_summary: lastCoveredSummaryFor(loadSessions(), actingStudentId),
-    });
     if (isGroup) {
-      const res = applyGroupMemberCancellation(session.id, actingStudentId, "pending_reschedule");
+      setBusy(true);
+      const res = await applyGroupMemberCancellation(session.id, actingStudentId, "pending_reschedule", slotISO, lastCoveredSummaryFor(loadSessions(), actingStudentId));
+      if (!res) { setBusy(false); setError("Your request was not saved. Please try again."); return; }
+      await refreshStudentRequests();
+      setBusy(false);
       toast.success(
         res.outcome.kind === "unanimous_reschedule"
           ? "All members requested a reschedule — the group session will be moved."

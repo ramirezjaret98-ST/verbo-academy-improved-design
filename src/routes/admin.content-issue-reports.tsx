@@ -3,10 +3,11 @@
 // or from a challenge. Most recent first. Admins can mark each one as resolved
 // or dismissed.
 import { createFileRoute } from "@tanstack/react-router";
-import { useSyncExternalStore } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { LifeBuoy, Check, X } from "lucide-react";
 import { Card, Pill } from "@/components/verbo/ui";
 import { USERS, userById } from "@/lib/mock-data";
+import { notifyError, notifySuccess } from "@/lib/notify";
 import {
   loadContentIssueReports,
   subscribeContentIssueReports,
@@ -52,6 +53,8 @@ const STATUS_LABEL: Record<ContentIssueReportStatus, string> = {
 };
 
 function Page() {
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState<string | null>(null);
   const reports = useSyncExternalStore(
     subscribeContentIssueReports,
     loadContentIssueReports,
@@ -61,6 +64,16 @@ function Page() {
   const sorted = [...reports].sort(
     (a, b) => +new Date(b.createdAt) - +new Date(a.createdAt),
   );
+  const setStatus = async (report: ContentIssueReport, status: "resolved" | "dismissed") => {
+    const note = (drafts[report.id] ?? report.resolution_note ?? "").trim();
+    if (!note) { notifyError("Add a resolution note before closing the report."); return; }
+    setSaving(report.id);
+    try {
+      await updateContentIssueReport(report.id, { status, resolution_note: note });
+      notifySuccess("Report updated.");
+    } catch (error) { notifyError(error, { context: "Updating technical issue" }); }
+    finally { setSaving(null); }
+  };
 
 
   return (
@@ -118,6 +131,12 @@ function Page() {
                     <p className="max-w-md whitespace-pre-wrap text-sm leading-relaxed">
                       {r.detail || <span className="text-muted-foreground">No extra details.</span>}
                     </p>
+                    <label className="mt-2 block text-xs text-muted-foreground">Resolution for student
+                      <textarea value={drafts[r.id] ?? r.resolution_note ?? ""}
+                        onChange={(event) => setDrafts((current) => ({ ...current, [r.id]: event.target.value }))}
+                        rows={2} className="mt-1 w-full rounded-md border border-border bg-background p-2 text-sm text-foreground"
+                        placeholder="What was checked or fixed?" />
+                    </label>
                   </td>
                   <td className="px-6 py-4">
                     <Pill tone={STATUS_TONE[r.status]}>{STATUS_LABEL[r.status]}</Pill>
@@ -131,8 +150,8 @@ function Page() {
                     <div className="flex justify-end gap-1">
                       <button
                         type="button"
-                        onClick={() => updateContentIssueReport(r.id, { status: "resolved" })}
-                        disabled={r.status === "resolved"}
+                        onClick={() => void setStatus(r, "resolved")}
+                        disabled={saving === r.id}
                         aria-label="Mark as resolved"
                         title="Mark as resolved"
                         className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-success/10 hover:text-success disabled:cursor-not-allowed disabled:opacity-40"
@@ -141,8 +160,8 @@ function Page() {
                       </button>
                       <button
                         type="button"
-                        onClick={() => updateContentIssueReport(r.id, { status: "dismissed" })}
-                        disabled={r.status === "dismissed"}
+                        onClick={() => void setStatus(r, "dismissed")}
+                        disabled={saving === r.id}
                         aria-label="Dismiss"
                         title="Dismiss"
                         className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive disabled:cursor-not-allowed disabled:opacity-40"

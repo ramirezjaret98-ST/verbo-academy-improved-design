@@ -56,6 +56,7 @@ import { Route as StudentInsightsRouteImport } from './routes/student.insights'
 import { Route as StudentMyCourseRouteImport } from './routes/student.my-course'
 import { Route as StudentMyWorkshopRouteImport } from './routes/student.my-workshop'
 import { Route as StudentPerformanceRouteImport } from './routes/student.performance'
+import { Route as StudentReportsRouteImport } from './routes/student.reports'
 import { Route as StudentResourcesRouteImport } from './routes/student.resources'
 import { Route as StudentSessionsRouteImport } from './routes/student.sessions'
 import { Route as TeacherIndexRouteImport } from './routes/teacher.index'
@@ -71,6 +72,7 @@ import { Route as TeacherStudentsRouteImport } from './routes/teacher.students'
 import { Route as TeacherTailoredContentRouteImport } from './routes/teacher.tailored-content'
 import { Route as TeacherVipRouteImport } from './routes/teacher.vip'
 import { Route as TeacherWorkshopsRouteImport } from './routes/teacher.workshops'
+import { Route as AdminFinancialIssuesRouteImport } from './routes/admin.financial.issues'
 import { Route as AdminFinancialMoneyLabRouteImport } from './routes/admin.financial.money-lab'
 
 const IndexRoute = IndexRouteImport.update({
@@ -309,6 +311,11 @@ const StudentPerformanceRoute = StudentPerformanceRouteImport.update({
   path: '/performance',
   getParentRoute: () => StudentRoute,
 } as any)
+const StudentReportsRoute = StudentReportsRouteImport.update({
+  id: '/reports',
+  path: '/reports',
+  getParentRoute: () => StudentRoute,
+} as any)
 const StudentResourcesRoute = StudentResourcesRouteImport.update({
   id: '/resources',
   path: '/resources',
@@ -385,6 +392,11 @@ const TeacherWorkshopsRoute = TeacherWorkshopsRouteImport.update({
   path: '/workshops',
   getParentRoute: () => TeacherRoute,
 } as any)
+const AdminFinancialIssuesRoute = AdminFinancialIssuesRouteImport.update({
+  id: '/financial/issues',
+  path: '/financial/issues',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminFinancialMoneyLabRoute = AdminFinancialMoneyLabRouteImport.update({
   id: '/financial/money-lab',
   path: '/financial/money-lab',
@@ -437,6 +449,7 @@ export interface FileRoutesByFullPath {
   '/student/my-course': typeof StudentMyCourseRoute
   '/student/my-workshop': typeof StudentMyWorkshopRoute
   '/student/performance': typeof StudentPerformanceRoute
+  '/student/reports': typeof StudentReportsRoute
   '/student/resources': typeof StudentResourcesRoute
   '/student/sessions': typeof StudentSessionsRoute
   '/teacher/availability': typeof TeacherAvailabilityRoute
@@ -454,6 +467,7 @@ export interface FileRoutesByFullPath {
   '/admin/': typeof AdminIndexRoute
   '/student/': typeof StudentIndexRoute
   '/teacher/': typeof TeacherIndexRoute
+  '/admin/financial/issues': typeof AdminFinancialIssuesRoute
   '/admin/financial/money-lab': typeof AdminFinancialMoneyLabRoute
 }
 export interface FileRoutesByTo {
@@ -499,6 +513,7 @@ export interface FileRoutesByTo {
   '/student/my-course': typeof StudentMyCourseRoute
   '/student/my-workshop': typeof StudentMyWorkshopRoute
   '/student/performance': typeof StudentPerformanceRoute
+  '/student/reports': typeof StudentReportsRoute
   '/student/resources': typeof StudentResourcesRoute
   '/student/sessions': typeof StudentSessionsRoute
   '/teacher/availability': typeof TeacherAvailabilityRoute
@@ -516,6 +531,7 @@ export interface FileRoutesByTo {
   '/admin': typeof AdminIndexRoute
   '/student': typeof StudentIndexRoute
   '/teacher': typeof TeacherIndexRoute
+  '/admin/financial/issues': typeof AdminFinancialIssuesRoute
   '/admin/financial/money-lab': typeof AdminFinancialMoneyLabRoute
 }
 export interface FileRoutesById {
@@ -565,6 +581,7 @@ export interface FileRoutesById {
   '/student/my-course': typeof StudentMyCourseRoute
   '/student/my-workshop': typeof StudentMyWorkshopRoute
   '/student/performance': typeof StudentPerformanceRoute
+  '/student/reports': typeof StudentReportsRoute
   '/student/resources': typeof StudentResourcesRoute
   '/student/sessions': typeof StudentSessionsRoute
   '/teacher/availability': typeof TeacherAvailabilityRoute
@@ -582,6 +599,7 @@ export interface FileRoutesById {
   '/admin/': typeof AdminIndexRoute
   '/student/': typeof StudentIndexRoute
   '/teacher/': typeof TeacherIndexRoute
+  '/admin/financial/issues': typeof AdminFinancialIssuesRoute
   '/admin/financial/money-lab': typeof AdminFinancialMoneyLabRoute
 }
 export interface FileRouteTypes {
@@ -632,6 +650,7 @@ export interface FileRouteTypes {
     | '/student/my-course'
     | '/student/my-workshop'
     | '/student/performance'
+    | '/student/reports'
     | '/student/resources'
     | '/student/sessions'
     | '/teacher/availability'
@@ -649,6 +668,7 @@ export interface FileRouteTypes {
     | '/admin/'
     | '/student/'
     | '/teacher/'
+    | '/admin/financial/issues'
     | '/admin/financial/money-lab'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -694,6 +714,7 @@ export interface FileRouteTypes {
     | '/student/my-course'
     | '/student/my-workshop'
     | '/student/performance'
+    | '/student/reports'
     | '/student/resources'
     | '/student/sessions'
     | '/teacher/availability'
@@ -711,6 +732,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/student'
     | '/teacher'
+    | '/admin/financial/issues'
     | '/admin/financial/money-lab'
   id:
     | '__root__'
@@ -759,6 +781,7 @@ export interface FileRouteTypes {
     | '/student/my-course'
     | '/student/my-workshop'
     | '/student/performance'
+    | '/student/reports'
     | '/student/resources'
     | '/student/sessions'
     | '/teacher/availability'
@@ -776,6 +799,7 @@ export interface FileRouteTypes {
     | '/admin/'
     | '/student/'
     | '/teacher/'
+    | '/admin/financial/issues'
     | '/admin/financial/money-lab'
   fileRoutesById: FileRoutesById
 }
@@ -1128,6 +1152,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof StudentPerformanceRouteImport
       parentRoute: typeof StudentRoute
     }
+    '/student/reports': {
+      id: '/student/reports'
+      path: '/reports'
+      fullPath: '/student/reports'
+      preLoaderRoute: typeof StudentReportsRouteImport
+      parentRoute: typeof StudentRoute
+    }
     '/student/resources': {
       id: '/student/resources'
       path: '/resources'
@@ -1233,6 +1264,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TeacherWorkshopsRouteImport
       parentRoute: typeof TeacherRoute
     }
+    '/admin/financial/issues': {
+      id: '/admin/financial/issues'
+      path: '/financial/issues'
+      fullPath: '/admin/financial/issues'
+      preLoaderRoute: typeof AdminFinancialIssuesRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/financial/money-lab': {
       id: '/admin/financial/money-lab'
       path: '/financial/money-lab'
@@ -1267,6 +1305,7 @@ interface AdminRouteChildren {
   AdminVipRoute: typeof AdminVipRoute
   AdminWorkshopsRoute: typeof AdminWorkshopsRoute
   AdminIndexRoute: typeof AdminIndexRoute
+  AdminFinancialIssuesRoute: typeof AdminFinancialIssuesRoute
   AdminFinancialMoneyLabRoute: typeof AdminFinancialMoneyLabRoute
 }
 
@@ -1294,6 +1333,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminVipRoute: AdminVipRoute,
   AdminWorkshopsRoute: AdminWorkshopsRoute,
   AdminIndexRoute: AdminIndexRoute,
+  AdminFinancialIssuesRoute: AdminFinancialIssuesRoute,
   AdminFinancialMoneyLabRoute: AdminFinancialMoneyLabRoute,
 }
 
@@ -1308,6 +1348,7 @@ interface StudentRouteChildren {
   StudentMyCourseRoute: typeof StudentMyCourseRoute
   StudentMyWorkshopRoute: typeof StudentMyWorkshopRoute
   StudentPerformanceRoute: typeof StudentPerformanceRoute
+  StudentReportsRoute: typeof StudentReportsRoute
   StudentResourcesRoute: typeof StudentResourcesRoute
   StudentSessionsRoute: typeof StudentSessionsRoute
   StudentIndexRoute: typeof StudentIndexRoute
@@ -1322,6 +1363,7 @@ const StudentRouteChildren: StudentRouteChildren = {
   StudentMyCourseRoute: StudentMyCourseRoute,
   StudentMyWorkshopRoute: StudentMyWorkshopRoute,
   StudentPerformanceRoute: StudentPerformanceRoute,
+  StudentReportsRoute: StudentReportsRoute,
   StudentResourcesRoute: StudentResourcesRoute,
   StudentSessionsRoute: StudentSessionsRoute,
   StudentIndexRoute: StudentIndexRoute,

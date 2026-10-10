@@ -1,6 +1,6 @@
 // Free-text issue reports a teacher files from Teacher > Financial.
 // Consumed by notifications-store to surface an admin notification in the
-// bell (no separate inbox page — reuses /admin/financial).
+// bell and the Admin financial issues queue.
 //
 // Backed by Supabase (`public.financial_issues`). Reads are served from an
 // in-memory cache kept in sync via Postgres Realtime, so
@@ -28,6 +28,9 @@ export interface FinancialIssue {
   teacher_id: string; // legacy id, e.g. "u2"
   text: string;
   created_at: string; // ISO
+  status: "pending" | "resolved" | "dismissed";
+  resolution_note?: string;
+  resolved_at?: string;
 }
 
 export const FIN_ISSUES_EVENT = "verbo:financial-issues-updated";
@@ -40,12 +43,17 @@ function fromRow(row: FinancialIssueRow): FinancialIssue {
     teacher_id: uuidToLegacySync(row.teacher_id),
     text: row.text,
     created_at: row.created_at,
+    status: row.status as FinancialIssue["status"],
+    resolution_note: row.resolution_note ?? undefined,
+    resolved_at: row.resolved_at ?? undefined,
   };
 }
 
 let cache: FinancialIssue[] = [];
 let hydrated = false;
 let hydratePromise: Promise<void> | null = null;
+let hydrateGeneration = 0;
+let refreshQueued = false;
 const listeners = new Set<() => void>();
 
 function notify() {
@@ -58,6 +66,7 @@ function notify() {
 async function hydrate(): Promise<void> {
   if (hydrated) return;
   if (hydratePromise) return hydratePromise;
+  const generation = hydrateGeneration;
   hydratePromise = (async () => {
     await hydrateUserIdBridge();
     const { data, error } = await supabase
@@ -70,19 +79,24 @@ async function hydrate(): Promise<void> {
       // rows rather than erroring. A real error here means something else
       // (network, auth) went wrong.
       console.error("[financial-issues-store] failed to load financial issues", error);
-      hydratePromise = null;
       return;
     }
+    if (generation !== hydrateGeneration) return;
     cache = (data ?? []).map(fromRow);
     hydrated = true;
     notify();
-  })();
+  })().finally(() => {
+    hydratePromise = null;
+    if (refreshQueued) { refreshQueued = false; void hydrate(); }
+  });
   return hydratePromise;
 }
 
-function invalidateAndRehydrate() {
+function invalidateAndRehydrate(reason?: "auth" | "refresh") {
+  hydrateGeneration++;
   hydrated = false;
-  hydratePromise = null;
+  if (reason === "auth") { cache = []; notify(); }
+  if (hydratePromise) { refreshQueued = true; return; }
   void hydrate();
 }
 
@@ -96,9 +110,7 @@ function ensureRealtime() {
       "postgres_changes",
       { event: "*", schema: "public", table: "financial_issues" },
       () => {
-        hydrated = false;
-        hydratePromise = null;
-        void hydrate();
+        invalidateAndRehydrate("refresh");
       },
     )
     .subscribe();
@@ -136,6 +148,19 @@ export async function addFinancialIssue(input: { teacherId: string; text: string
   cache = [issue, ...cache];
   notify();
   return issue;
+}
+
+export async function updateFinancialIssue(id: string, status: "resolved" | "dismissed", resolutionNote: string): Promise<FinancialIssue> {
+  const numericId = Number(id);
+  if (!Number.isFinite(numericId) || !resolutionNote.trim()) throw new Error("A resolution note is required");
+  const { data, error } = await supabase.from("financial_issues")
+    .update({ status, resolution_note: resolutionNote.trim() })
+    .eq("id", numericId).select("*").single();
+  if (error || !data) throw error ?? new Error("Financial issue was not updated");
+  const saved = fromRow(data);
+  cache = cache.map((issue) => issue.id === id ? saved : issue);
+  notify();
+  return saved;
 }
 
 function subscribe(cb: () => void): () => void {

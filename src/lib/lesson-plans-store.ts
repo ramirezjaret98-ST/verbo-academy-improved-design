@@ -12,13 +12,11 @@
 // is resolved from the referenced unit's `kind` via
 // `findCustomUnitById()` in custom-units-store.ts (already migrated).
 //
-// Same pattern as every store migrated in previous lotes: one global
-// in-memory cache, hydrated once and kept fresh via Postgres Realtime;
-// `saveLessonPlan` stays optimistic and synchronous in its public signature.
+// Saved plans are confirmed by the server before callers close the editor.
 import { supabase } from "@/integrations/supabase/client";
 import { registerRehydrate } from "@/lib/auth-rehydrate";
 import type { Database } from "@/integrations/supabase/types";
-import { loadSessions, notifySessionEvent } from "./sessions-store";
+import { loadSessions, notifySessionEvent, refreshSessions } from "./sessions-store";
 import { activeMembersOf } from "./groups-store";
 import { setUnitAccess } from "./activities-store";
 import { findCustomUnitById, hydrateCustomUnits } from "./custom-units-store";
@@ -204,27 +202,22 @@ export async function refreshLessonPlans(): Promise<void> {
   await hydrate();
 }
 
-export function saveLessonPlan(plan: LessonPlan) {
-  const prev = plansCache;
+export async function saveLessonPlan(plan: LessonPlan): Promise<boolean> {
   // 2026-08-20: capture whether a plan already existed for this session
   // BEFORE the cache is replaced below, so the "tu clase está lista" email
   // only fires the first time a plan is saved — not on every later edit
   // (e.g. Admin editing level/unit/comments from the Calendar shortcut, see
   // fix_planeacion_admin_whatsapp_reagendado_bulk_schedule_2026-08-19).
-  const isFirstSave = !prev.some((p) => p.session_id === plan.session_id);
-  plansCache = [...plansCache.filter((p) => p.session_id !== plan.session_id), plan];
-  notify();
-
-  void (async () => {
     const numericSessionId = Number(plan.session_id);
     const customUnitId = plan.vip_unit_id
       ? Number(plan.vip_unit_id)
       : plan.tailored_unit_id
         ? Number(plan.tailored_unit_id)
         : null;
-    const { error } = await supabase.from("lesson_plans").upsert(
-      {
-        session_id: numericSessionId,
+    if (!Number.isFinite(numericSessionId)) return false;
+    const { data, error } = await supabase.rpc("save_lesson_plan_and_ready" as never, {
+      p_session_id: numericSessionId,
+      p_plan: {
         title: plan.title,
         type: plan.type,
         level_id: plan.level_id ?? null,
@@ -233,24 +226,21 @@ export function saveLessonPlan(plan: LessonPlan) {
         focus_subskills: plan.focus_subskills ?? [],
         comments: plan.comments,
         planning_status: plan.planning_status,
-        saved_at: plan.saved_at,
       },
-      { onConflict: "session_id" },
-    );
+    } as never);
     if (error) {
       console.error("[lesson-plans-store] failed to save plan", error);
-      plansCache = prev;
-      notify();
-      // This is the "Complete Your Sessions" save — until now a failure here
-      // was invisible: the modal had already closed looking successful.
       notifyError(error, { context: "Saving lesson plan" });
-      return;
+      return false;
     }
+    plansCache = [...plansCache.filter((p) => p.session_id !== plan.session_id), plan];
+    notify();
+    await refreshSessions();
     autoUnlockPlannedUnit(plan);
-    if (isFirstSave && Number.isFinite(numericSessionId)) {
+    if (data === true) {
       notifySessionEvent(numericSessionId, "lesson_plan_ready");
     }
-  })();
+    return true;
 }
 
 /** When a plan targets a syllabus unit (Syllabus content / Evaluation), that

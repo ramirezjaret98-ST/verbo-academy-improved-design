@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { CalendarDays, X, Video, FileText, CalendarClock, RefreshCcw, ClipboardList, NotebookPen, Pencil, UserCheck } from "lucide-react";
 import { USERS, userById, type Session } from "@/lib/mock-data";
 import { subscribeStudents } from "@/lib/students-store";
-import { subscribeTeachers, setSessionExcludedFromPay } from "@/lib/teacher-model";
+import { subscribeTeachers } from "@/lib/teacher-model";
 import { notifySuccess } from "@/lib/notify";
 import { Card, GhostButton, PrimaryButton } from "@/components/verbo/ui";
 import { CalendarView } from "@/components/verbo/CalendarView";
@@ -24,7 +24,7 @@ import { RescheduleModal } from "@/components/verbo/RescheduleModal";
 import { PlanModal } from "@/components/verbo/PlanModal";
 import { CandidatesModal } from "@/components/verbo/CandidatesModal";
 import { getLessonPlan, saveLessonPlan } from "@/lib/lesson-plans-store";
-import { savePerformance, type PerformanceRating } from "@/lib/performance-store";
+import { type PerformanceRating } from "@/lib/performance-store";
 import { markVipUnitDone, clearVipUnitDoneForSession } from "@/lib/vip-courses-store";
 import { markTailoredUnitDone, clearTailoredUnitDoneForSession } from "@/lib/tailored-content-store";
 // Reusing the teacher's own two-step report flow (skill evaluation + the
@@ -270,7 +270,7 @@ export function EventDetailsModal({
   // Jaret asked for (a switch, or "whichever is easier"): automatic, no
   // extra toggle to forget. Reuses the existing excluded_from_pay mechanism
   // built 2026-08-19 for Admin > Teachers' manual pay review, unchanged.
-  const handleAdminReportSubmit = (
+  const handleAdminReportSubmit = async (
     sessionId: string,
     attendance: "present" | "delayed" | "absent",
     perf: PerformanceRating,
@@ -279,9 +279,9 @@ export function EventDetailsModal({
     subStatus?: import("@/lib/sessions-store").AttendanceSubStatus | null,
     reportComments?: string,
     notes?: string,
-  ) => {
-    if (!s) return;
-    submitSessionReport({
+  ): Promise<boolean> => {
+    if (!s) return false;
+    const saved = await submitSessionReport({
       sessionId,
       teacherId: s.teacher_id,
       studentId: s.student_id,
@@ -289,9 +289,12 @@ export function EventDetailsModal({
       absentCause,
       subStatus: subStatus ?? null,
       subskills,
+      performance: perf,
+      excludeFromPay: true,
       reportComments,
       notes,
     });
+    if (!saved) return false;
     // Named distinctly from the outer `plan` (this modal's own lesson-plan
     // lookup for the "Edit lesson plan" button) — same session, same lookup,
     // just re-fetched here so this handler doesn't depend on outer scope.
@@ -304,11 +307,8 @@ export function EventDetailsModal({
       if (attendance !== "absent") markTailoredUnitDone(sessionPlan.tailored_unit_id, sessionId);
       else clearTailoredUnitDoneForSession(sessionId);
     }
-    if (attendance !== "absent") savePerformance(sessionId, s.student_id, s.teacher_id, perf);
-    void setSessionExcludedFromPay(Number(sessionId), true);
-    setAdminReportDraft(null);
     notifySuccess(`Session report submitted — won't count toward ${teacherName ?? "the teacher"}'s pay.`);
-    onClose();
+    return true;
   };
 
   // 2026-08-19: "command center" shortcuts — Jaret wants to reschedule /
@@ -676,14 +676,12 @@ export function EventDetailsModal({
           session={s}
           existing={plan}
           onClose={() => setPlanningOpen(false)}
-          onSave={(p) => {
-            saveLessonPlan(p);
-            if (UPCOMING_STATUSES.has(s.status as ExtSessionStatus)) {
-              updateSession(s.id, { status: "ready" });
-            }
+          onSave={async (p) => {
+            if (!await saveLessonPlan(p)) return false;
             setPlanningOpen(false);
             notifySuccess("Lesson plan saved.");
             onClose();
+            return true;
           }}
         />
       )}

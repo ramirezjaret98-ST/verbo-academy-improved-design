@@ -207,6 +207,7 @@ export type Database = {
       }
       app_users: {
         Row: {
+          profile_prompt_seen_at: string | null
           club_package_id: string | null
           club_package_months: number | null
           club_package_started_on: string | null
@@ -292,6 +293,7 @@ export type Database = {
           video_call_link: string | null
         }
         Insert: {
+          profile_prompt_seen_at?: string | null
           club_package_id?: string | null
           club_package_months?: number | null
           club_package_started_on?: string | null
@@ -379,6 +381,7 @@ export type Database = {
           video_call_link?: string | null
         }
         Update: {
+          profile_prompt_seen_at?: string | null
           club_package_id?: string | null
           club_package_months?: number | null
           club_package_started_on?: string | null
@@ -1163,6 +1166,8 @@ export type Database = {
       }
       conduct_reports: {
         Row: {
+          resolution_note: string | null
+          reviewed_by: string | null
           category: string
           created_at: string
           id: number
@@ -1174,6 +1179,8 @@ export type Database = {
           text: string
         }
         Insert: {
+          resolution_note?: string | null
+          reviewed_by?: string | null
           category: string
           created_at?: string
           id?: never
@@ -1185,6 +1192,8 @@ export type Database = {
           text: string
         }
         Update: {
+          resolution_note?: string | null
+          reviewed_by?: string | null
           category?: string
           created_at?: string
           id?: never
@@ -1214,6 +1223,8 @@ export type Database = {
       }
       content_issue_reports: {
         Row: {
+          resolution_note: string | null
+          resolved_by: string | null
           created_at: string
           detail: string | null
           entity_id: string
@@ -1226,6 +1237,8 @@ export type Database = {
           student_id: string
         }
         Insert: {
+          resolution_note?: string | null
+          resolved_by?: string | null
           created_at?: string
           detail?: string | null
           entity_id: string
@@ -1238,6 +1251,8 @@ export type Database = {
           student_id: string
         }
         Update: {
+          resolution_note?: string | null
+          resolved_by?: string | null
           created_at?: string
           detail?: string | null
           entity_id?: string
@@ -1557,18 +1572,30 @@ export type Database = {
       }
       financial_issues: {
         Row: {
+          status: string
+          resolution_note: string | null
+          resolved_at: string | null
+          resolved_by: string | null
           created_at: string
           id: number
           teacher_id: string
           text: string
         }
         Insert: {
+          status?: string
+          resolution_note?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
           created_at?: string
           id?: never
           teacher_id: string
           text: string
         }
         Update: {
+          status?: string
+          resolution_note?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
           created_at?: string
           id?: never
           teacher_id?: string

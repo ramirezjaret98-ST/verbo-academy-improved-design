@@ -654,6 +654,7 @@ function adminNotifications(): Notification[] {
 
   // ---- Conduct reports filed by students --------------------------------
   for (const r of loadConductReports()) {
+    if (r.status !== "pending") continue;
     const reporter = USERS.find((u) => u.id === r.reporter_id);
     const target = USERS.find((u) => u.id === r.target_id);
     out.push({
@@ -669,6 +670,7 @@ function adminNotifications(): Notification[] {
 
   // ---- Technical content issues reported by students ---------------------
   for (const r of loadContentIssueReports()) {
+    if (r.status !== "pending") continue;
     const st = USERS.find((u) => u.id === r.studentId);
     out.push({
       id: `content-issue:${r.id}`,
@@ -683,6 +685,7 @@ function adminNotifications(): Notification[] {
 
   // ---- Financial issues reported by teachers ----------------------------
   for (const i of loadFinancialIssues()) {
+    if (i.status !== "pending") continue;
     const t = USERS.find((u) => u.id === i.teacher_id);
     out.push({
       id: `fin-issue:${i.id}`,
@@ -690,7 +693,7 @@ function adminNotifications(): Notification[] {
       title: "New financial issue reported",
       body: `${t?.name ?? "Teacher"}${i.text ? ` — ${i.text.slice(0, 80)}` : ""}`,
       createdAt: i.created_at,
-      to: "/admin/financial",
+      to: "/admin/financial/issues",
       read: false,
     });
   }

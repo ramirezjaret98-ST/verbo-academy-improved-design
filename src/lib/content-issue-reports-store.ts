@@ -10,13 +10,10 @@
 // sync via Postgres Realtime (like `holidays-store.ts`) — no per-user Map
 // needed, Postgres already scopes the result set per session.
 //
-// Writes stay synchronous-looking (optimistic cache update, background
-// persist, rollback on error) so existing call sites don't need to change.
 import { supabase } from "@/integrations/supabase/client";
 import { registerRehydrate } from "@/lib/auth-rehydrate";
 import type { Database } from "@/integrations/supabase/types";
 import { hydrateUserIdBridge, legacyToUuid, uuidToLegacySync } from "@/lib/user-id-bridge";
-import { notifyError } from "@/lib/notify";
 
 export const UNIT_ISSUE_TYPES = [
   "PDF won't download",
@@ -54,6 +51,7 @@ export interface ContentIssueReport {
   createdAt: string; // ISO
   status: ContentIssueReportStatus;
   resolved_at?: string; // ISO — set when status leaves "pending"
+  resolution_note?: string;
 }
 
 export const CONTENT_ISSUE_EVENT = "verbo:content-issue-reports-updated";
@@ -63,6 +61,8 @@ type Row = Database["public"]["Tables"]["content_issue_reports"]["Row"];
 let cache: ContentIssueReport[] = [];
 let hydrated = false;
 let hydratePromise: Promise<void> | null = null;
+let hydrateGeneration = 0;
+let refreshQueued = false;
 const listeners = new Set<() => void>();
 
 function notify() {
@@ -82,6 +82,7 @@ function mapRow(row: Row): ContentIssueReport {
     createdAt: row.created_at,
     status: row.status,
     resolved_at: row.resolved_at ?? undefined,
+    resolution_note: row.resolution_note ?? undefined,
   };
 }
 
@@ -92,25 +93,30 @@ function sortDesc(list: ContentIssueReport[]): ContentIssueReport[] {
 async function hydrate(): Promise<void> {
   if (hydrated) return;
   if (hydratePromise) return hydratePromise;
+  const generation = hydrateGeneration;
   hydratePromise = (async () => {
     await hydrateUserIdBridge();
     const { data, error } = await supabase.from("content_issue_reports").select("*");
     if (error) {
       console.error("[content-issue-reports-store] failed to load", error);
-      hydrated = true;
       return;
     }
+    if (generation !== hydrateGeneration) return;
     cache = sortDesc((data ?? []).map(mapRow));
     hydrated = true;
-  })();
-  await hydratePromise;
-  hydratePromise = null;
-  notify();
+    notify();
+  })().finally(() => {
+    hydratePromise = null;
+    if (refreshQueued) { refreshQueued = false; void hydrate(); }
+  });
+  return hydratePromise;
 }
 
-function invalidateAndRehydrate() {
+function invalidateAndRehydrate(reason?: "auth" | "refresh") {
+  hydrateGeneration++;
   hydrated = false;
-  hydratePromise = null;
+  if (reason === "auth") { cache = []; notify(); }
+  if (hydratePromise) { refreshQueued = true; return; }
   void hydrate();
 }
 
@@ -119,42 +125,22 @@ if (typeof window !== "undefined") {
   supabase
     .channel("content-issue-reports-changes")
     .on("postgres_changes", { event: "*", schema: "public", table: "content_issue_reports" }, () => {
-      hydrated = false;
-      void hydrate();
+      invalidateAndRehydrate("refresh");
     })
     .subscribe();
   registerRehydrate(invalidateAndRehydrate);}
 
-export function addContentIssueReport(input: {
+export async function addContentIssueReport(input: {
   studentId: string;
   entityType: ContentIssueEntityType;
   entityId: string;
   entityTitle: string;
   issueType: ContentIssueType;
   detail?: string;
-}): ContentIssueReport {
-  const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-  const report: ContentIssueReport = {
-    id: tempId,
-    studentId: input.studentId,
-    entityType: input.entityType,
-    entityId: input.entityId,
-    entityTitle: input.entityTitle,
-    issueType: input.issueType,
-    detail: (input.detail ?? "").trim(),
-    createdAt: new Date().toISOString(),
-    status: "pending",
-  };
-  cache = [report, ...cache];
-  notify();
-
-  void (async () => {
+}): Promise<ContentIssueReport> {
     const uuid = await legacyToUuid(input.studentId);
     if (!uuid) {
-      cache = cache.filter((r) => r.id !== tempId);
-      notify();
-      notifyError("Couldn't identify the reporting student", { context: "Sending technical issue report" });
-      return;
+      throw new Error("Couldn't identify the reporting student");
     }
     const { data, error } = await supabase
       .from("content_issue_reports")
@@ -164,25 +150,18 @@ export function addContentIssueReport(input: {
         entity_id: input.entityId,
         entity_title: input.entityTitle,
         issue_type: input.issueType,
-        detail: report.detail || null,
+        detail: input.detail?.trim() || null,
       })
       .select("*")
       .single();
     if (error || !data) {
       console.error("[content-issue-reports-store] failed to save report", error);
-      cache = cache.filter((r) => r.id !== tempId);
-      notify();
-      // 2026-09-08: previously silent — the reporting UI closes/confirms
-      // optimistically, so without this the student had no way to know a
-      // "PDF won't download" report (etc.) never actually reached Admin.
-      notifyError(error, { context: "Sending technical issue report" });
-      return;
+      throw error ?? new Error("Technical issue was not saved");
     }
-    cache = sortDesc(cache.map((r) => (r.id === tempId ? mapRow(data) : r)));
+    const saved = mapRow(data);
+    cache = sortDesc([saved, ...cache.filter((r) => r.id !== saved.id)]);
     notify();
-  })();
-
-  return report;
+    return saved;
 }
 
 export function loadContentIssueReports(): ContentIssueReport[] {
@@ -190,36 +169,26 @@ export function loadContentIssueReports(): ContentIssueReport[] {
   return cache;
 }
 
-export function updateContentIssueReport(
+export async function updateContentIssueReport(
   id: string,
-  patch: Partial<Pick<ContentIssueReport, "status">>,
-): ContentIssueReport | null {
+  patch: Pick<ContentIssueReport, "status"> & { resolution_note?: string },
+): Promise<ContentIssueReport> {
   const idx = cache.findIndex((r) => r.id === id);
-  if (idx < 0) return null;
-  const prev = cache[idx];
-  const next: ContentIssueReport = { ...prev, ...patch };
-  if (patch.status && patch.status !== "pending") {
-    next.resolved_at = new Date().toISOString();
-  }
-  cache = cache.map((r) => (r.id === id ? next : r));
-  notify();
-
+  if (idx < 0) throw new Error("Report unavailable");
+  const next: ContentIssueReport = { ...cache[idx], ...patch };
   const numericId = Number(id);
   if (Number.isFinite(numericId)) {
-    void (async () => {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from("content_issue_reports")
-        .update({ status: next.status, resolved_at: next.resolved_at ?? null })
-        .eq("id", numericId);
-      if (error) {
-        console.error("[content-issue-reports-store] failed to update report", error);
-        cache = cache.map((r) => (r.id === id ? prev : r));
-        notify();
-        notifyError(error, { context: "Updating technical issue status" });
-      }
-    })();
+        .update({ status: next.status, resolution_note: patch.resolution_note?.trim() || null })
+        .eq("id", numericId).select("*").single();
+      if (error || !data) throw error ?? new Error("Technical issue was not updated");
+      const saved = mapRow(data);
+      cache = cache.map((r) => (r.id === id ? saved : r));
+      notify();
+      return saved;
   }
-  return next;
+  throw new Error("Invalid report ID");
 }
 
 export function contentIssuesForUnit(unitId: string): ContentIssueReport[] {

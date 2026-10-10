@@ -10,7 +10,7 @@ import {
   loadLessonPlans, saveLessonPlan, subscribeLessonPlans, type LessonPlan,
 } from "@/lib/lesson-plans-store";
 import {
-  loadSessions, subscribeSessions, updateSession, type ExtSession,
+  loadSessions, subscribeSessions, type ExtSession,
 } from "@/lib/sessions-store";
 import { PlanModal } from "@/components/verbo/PlanModal";
 import { ReorderLessonPlansModal } from "@/components/verbo/ReorderLessonPlansModal";
@@ -171,12 +171,12 @@ function Page() {
     setPlanning(s);
   };
 
-  const handleSavePlan = (plan: LessonPlan) => {
-    saveLessonPlan(plan);
-    updateSession(plan.session_id, { status: "ready" });
+  const handleSavePlan = async (plan: LessonPlan): Promise<boolean> => {
+    if (!await saveLessonPlan(plan)) return false;
     setPlans((prev) => ({ ...prev, [plan.session_id]: plan }));
     setPlanning(null);
     toast.success("Lesson plan saved.");
+    return true;
   };
 
   const goReport = (sessionId: string) => {

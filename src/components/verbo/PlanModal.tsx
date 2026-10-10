@@ -28,7 +28,7 @@ export function PlanModal({
   session: ExtSession;
   existing?: LessonPlan;
   onClose: () => void;
-  onSave: (plan: LessonPlan) => void;
+  onSave: (plan: LessonPlan) => Promise<boolean>;
   onReorder?: () => void;
 }) {
   const student = userById(session.student_id);
@@ -65,6 +65,8 @@ export function PlanModal({
   // No cap on how many: Jaret's call (2026-09-16) was "sin límite".
   const [focusSubskills, setFocusSubskills] = useState<string[]>(existing?.focus_subskills ?? []);
   const [expandedMacro, setExpandedMacro] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saveFailed, setSaveFailed] = useState(false);
 
   const toggleFocusSubskill = (macroKey: string, subName: string) => {
     const key = skillKey(macroKey as any, subName);
@@ -106,13 +108,17 @@ export function PlanModal({
   }, [levelId, showLevelUnit]); // eslint-disable-line react-hooks/exhaustive-deps
 
 
-  const submit = () => {
+  const submit = async () => {
+    if (saving) return;
     if (!title.trim()) { alert("Please enter a session title."); return; }
     if (!type) { alert("Please pick a Session Type."); return; }
     if (showLevelUnit && (!levelId || !unitId)) { alert("Please select a level and unit."); return; }
     const gap = +new Date(session.date_time) - Date.now();
     const planning_status: LessonPlan["planning_status"] = gap < 5 * 24 * 3_600_000 ? "late" : "on-time";
-    onSave({
+    setSaving(true);
+    setSaveFailed(false);
+    try {
+      if (!await onSave({
       session_id: session.id,
       title: title.trim(),
       type: type as LessonSessionType,
@@ -124,7 +130,9 @@ export function PlanModal({
       comments: comments.trim(),
       planning_status,
       saved_at: new Date().toISOString(),
-    });
+      })) setSaveFailed(true);
+    } catch { setSaveFailed(true); }
+    finally { setSaving(false); }
   };
 
   const inputCls = "mt-1.5 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring";
@@ -328,6 +336,7 @@ export function PlanModal({
         </div>
 
         <AccentModalFooter>
+          {saveFailed && <span role="alert" className="text-xs text-destructive">The plan was not saved. Please try again.</span>}
           {existing && onReorder && +new Date(session.date_time) > Date.now() &&
             ["scheduled", "ready", "rescheduled", "rearranged", "delayed"].includes(session.status) &&
             !session.report_locked && !session.report_submitted_at && (
@@ -336,10 +345,11 @@ export function PlanModal({
           <GhostButton onClick={onClose} className="cursor-pointer">Cancel</GhostButton>
           <button
             onClick={submit}
+            disabled={saving}
             className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold text-white shadow-sm transition-opacity hover:opacity-90"
             style={{ backgroundColor: "#f38934" }}
           >
-            Save Lesson Plan
+            {saving ? "Saving…" : "Save Lesson Plan"}
           </button>
         </AccentModalFooter>
       </div>
