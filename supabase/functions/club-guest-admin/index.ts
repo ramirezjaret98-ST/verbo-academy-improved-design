@@ -31,9 +31,25 @@ async function sendEmail(to: string, subject: string, html: string, idempotencyK
   } catch { return false; }
 }
 function emailFrame(content: string) {
-  return `<div style="font-family:Arial,sans-serif;max-width:560px;margin:auto;color:#01304a">
-    <p style="color:#f58a18;font-weight:bold">VERBO CLUBS</p>${content}</div>`;
+  return `<!doctype html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+  <body style="margin:0;padding:0;background:#f2f5f6;color:#01304a;font-family:Arial,Helvetica,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f2f5f6;"><tr><td align="center" style="padding:28px 12px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;background:#ffffff;border:1px solid #dce5e8;border-radius:20px;overflow:hidden;">
+      <tr><td style="height:5px;background:#f58a18;font-size:0;line-height:0;">&nbsp;</td></tr>
+      <tr><td style="background:#01304a;padding:25px 30px;">
+        <table role="presentation" cellpadding="0" cellspacing="0"><tr>
+          <td><img src="https://raw.githubusercontent.com/ramirezjaret98-ST/verbo-academy-improved-design/main/src/assets/verbo-logo.png" width="44" height="44" alt="Verbo" style="display:block;border:0;border-radius:10px;"></td>
+          <td style="padding-left:13px;color:#ffffff;font-size:18px;font-weight:700;letter-spacing:.02em;">VERBO <span style="color:#f58a18;">CLUBS</span><br><span style="font-size:10px;font-weight:600;letter-spacing:.16em;color:#b9ced8;">LANGUAGE SOLUTIONS</span></td>
+        </tr></table>
+      </td></tr>
+      <tr><td style="padding:34px 30px 12px;">${content}</td></tr>
+      <tr><td style="padding:16px 30px 28px;border-top:1px solid #e5ecee;color:#607785;font-size:12px;line-height:1.6;">Verbo Language Solutions · Una invitación personal para conversar en inglés.</td></tr>
+    </table>
+  </td></tr></table></body></html>`;
 }
+const emailButton = (href: string, label: string) => `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:26px 0;"><tr><td style="border-radius:12px;background:#f58a18;">
+  <a href="${href}" style="display:inline-block;padding:15px 24px;color:#01304a;font-size:15px;font-weight:700;text-decoration:none;">${label}</a>
+  </td></tr></table>`;
 
 Deno.serve(async req => {
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
@@ -80,12 +96,17 @@ Deno.serve(async req => {
     }).select("id").single();
     if (error || !invitation) return response({ error: "Could not create courtesy" }, 503);
     const formattedCode = code.match(/.{1,4}/g)!.join("-");
-    const html = emailFrame(`<h1>Una conversación para ti</h1>
-      <p>Hola ${escapeHtml(name)}, Verbo te invita a explorar nuestros próximos Insights y Book Clubs y reservar un encuentro.</p>
-      <p>Tu código personal es <strong style="font-size:22px;letter-spacing:2px">${formattedCode}</strong>.</p>
-      <p><a href="${APP_URL}/guest/clubs" style="display:inline-block;background:#f58a18;color:#01304a;padding:13px 20px;border-radius:8px;text-decoration:none;font-weight:bold">Explorar Clubs</a></p>
-      <p>La invitación vence el ${escapeHtml(mxDate(expiresAt))}. Solo permite una reserva; una vez reservada, no se recupera si cancelas.</p>
-      <p>Este correo es personal. Si no esperabas la invitación, puedes ignorarlo.</p>`);
+    const html = emailFrame(`<p style="margin:0 0 10px;color:#c76a1f;font-size:11px;font-weight:700;letter-spacing:.18em;">TU INVITACIÓN PERSONAL</p>
+      <h1 style="margin:0 0 16px;color:#01304a;font-size:28px;line-height:1.18;">Hay un lugar para ti en Verbo Clubs</h1>
+      <p style="margin:0 0 22px;color:#365568;font-size:15px;line-height:1.65;">Hola ${escapeHtml(name)}. Elige un Insight o Book Club que te interese y reserva tu lugar con este código:</p>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f8f8;border:1px solid #dce5e8;border-radius:14px;"><tr><td style="padding:20px 22px;">
+        <p style="margin:0 0 7px;color:#607785;font-size:11px;font-weight:700;letter-spacing:.14em;">CÓDIGO DE CORTESÍA</p>
+        <p style="margin:0;color:#01304a;font-family:Consolas,Monaco,monospace;font-size:24px;font-weight:700;letter-spacing:2px;">${formattedCode}</p>
+      </td></tr></table>
+      <p style="margin:22px 0 0;color:#365568;font-size:15px;line-height:1.7;"><strong>¿Cómo reservar?</strong><br>1. Abre el catálogo con el botón de abajo.<br>2. Elige un Club y pulsa «Reservar con mi cortesía».<br>3. Introduce el código y confirma. Te enviaremos otro correo con el botón «Ver mi club».</p>
+      ${emailButton(`${APP_URL}/guest/clubs`, "Explorar Clubs")}
+      <p style="margin:0 0 12px;color:#365568;font-size:14px;line-height:1.65;"><strong>Vence:</strong> ${escapeHtml(mxDate(expiresAt))} (Ciudad de México).</p>
+      <p style="margin:0 0 16px;color:#607785;font-size:13px;line-height:1.6;">El código permite una sola reserva y se consume al confirmar, incluso si después cancelas. Este correo es personal; si no esperabas la invitación, puedes ignorarlo.</p>`);
     const sent = await sendEmail(email, "Tu cortesía para un Verbo Club", html, `guest-invitation-${invitation.id}`);
     if (!sent) {
       await admin.rpc("revoke_guest_invitation", { p_invitation_id: invitation.id });
@@ -117,10 +138,13 @@ Deno.serve(async req => {
       .update({ access_hash: newHash }).eq("id", booking.id).eq("access_hash", booking.access_hash)
       .is("confirmation_sent_at", null).select("id").maybeSingle();
     if (updateError || !rotated) return response({ error: "The access was already updated. Refresh the list." }, 409);
-    const html = emailFrame(`<h1>Tu acceso a ${escapeHtml(club.title)}</h1>
-      <p>Hola ${escapeHtml(invitation.guest_name)}, tu reserva está confirmada para el ${escapeHtml(mxDate(club.date))} (Ciudad de México).</p>
-      <p><a href="${APP_URL}/guest/my-club#access=${access}" style="display:inline-block;background:#f58a18;color:#01304a;padding:13px 20px;border-radius:8px;text-decoration:none;font-weight:bold">Ver mi club</a></p>
-      <p>Este enlace es personal. Desde la página verás el material y, diez minutos antes, el acceso a la reunión.</p>`);
+    const html = emailFrame(`<p style="margin:0 0 10px;color:#c76a1f;font-size:11px;font-weight:700;letter-spacing:.18em;">TU RESERVA ESTÁ CONFIRMADA</p>
+      <h1 style="margin:0 0 16px;color:#01304a;font-size:28px;line-height:1.18;">Tu lugar en ${escapeHtml(club.title)}</h1>
+      <p style="margin:0 0 22px;color:#365568;font-size:15px;line-height:1.65;">Hola ${escapeHtml(invitation.guest_name)}. Tu lugar está reservado. Guarda este correo para volver a tu página personal cuando lo necesites.</p>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f8f8;border:1px solid #dce5e8;border-radius:14px;"><tr><td style="padding:19px 22px;color:#01304a;font-size:15px;line-height:1.7;"><strong>Encuentro:</strong> ${escapeHtml(club.title)}<br><strong>Fecha:</strong> ${escapeHtml(mxDate(club.date))} (Ciudad de México)</td></tr></table>
+      ${emailButton(`${APP_URL}/guest/my-club#access=${access}`, "Ver mi club")}
+      <p style="margin:0 0 16px;color:#365568;font-size:14px;line-height:1.65;">En tu página encontrarás los detalles del encuentro y el material si Verbo lo ha publicado. El botón de reunión aparecerá diez minutos antes de comenzar.</p>
+      <p style="margin:0 0 16px;color:#607785;font-size:13px;line-height:1.6;">Este enlace es personal. No lo compartas.</p>`);
     const sent = await sendEmail(invitation.email, `Tu acceso a ${club.title}`, html, `guest-confirmation-resend-${booking.id}-${newHash.slice(0, 16)}`);
     if (!sent) {
       const { data: restored, error: restoreError } = await admin.from("club_guest_bookings")

@@ -1,8 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { BookOpen, CalendarDays, Clock3, ExternalLink, FileDown, Video } from "lucide-react";
+import { BookOpen, CalendarDays, Clock3, ExternalLink, FileDown, TriangleAlert, Video } from "lucide-react";
 import { Logo } from "@/components/verbo/Logo";
+import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { guestRequest, type GuestDetail } from "@/lib/guest-clubs-api";
+import "./guest.clubs.css";
 
 export const Route = createFileRoute("/guest/my-club")({
   head: () => ({ meta: [{ title: "Mi Verbo Club" }, { name: "robots", content: "noindex,nofollow" }] }),
@@ -22,6 +24,8 @@ function MyGuestClubPage() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [cancelError, setCancelError] = useState("");
 
   useEffect(() => {
     const candidate = new URLSearchParams(window.location.hash.replace(/^#/, "")).get("access") || "";
@@ -67,14 +71,14 @@ function MyGuestClubPage() {
 
   const cancel = async () => {
     if (!accessToken || !detail?.cancellationAvailable || busy) return;
-    if (!window.confirm("¿Cancelar tu lugar? Tu código de cortesía no se recuperará.")) return;
-    setBusy(true); setError("");
+    setBusy(true); setCancelError("");
     try {
       await guestRequest<{ cancelled: true }>({ action: "cancel", accessToken });
       setDetail(current => current ? { ...current, bookingStatus: "cancelled", materialAvailable: false,
         meetingAvailable: false, cancellationAvailable: false } : null);
+      setCancelOpen(false);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "No pudimos cancelar tu lugar.");
+      setCancelError(cause instanceof Error ? cause.message : "No pudimos cancelar tu lugar.");
     } finally { setBusy(false); }
   };
 
@@ -93,7 +97,7 @@ function MyGuestClubPage() {
           <div className="p-6 sm:p-8">
             <span className="rounded-full bg-[#e9f1f2] px-3 py-1 text-xs font-bold">{detail.club.type === "book" ? "BOOK CLUB" : "INSIGHT"}</span>
             <h2 className="mt-4 text-3xl font-semibold">{detail.club.title}</h2>
-            <p className="mt-2 text-[#526b79]">Hola {detail.guestName}. {detail.bookingStatus === "booked" && detail.club.status !== "cancelled" ? "Tu lugar está confirmado." : "Este lugar ya no está activo."}</p>
+            <p className="mt-2 text-[#526b79]">Hola {detail.guestName}. {detail.bookingStatus === "booked" && detail.club.status !== "cancelled" ? "Tu lugar está confirmado." : detail.bookingStatus === "cancelled" ? "Tu reserva fue cancelada. El código de cortesía no puede volver a usarse." : "Este lugar ya no está activo."}</p>
             <div className="mt-6 flex flex-wrap gap-x-8 gap-y-3 text-sm font-medium">
               <p className="flex items-center gap-2"><CalendarDays size={18} /> {formatDate(detail.club.date)}</p>
               <p className="flex items-center gap-2"><Clock3 size={18} /> {formatTime(detail.club.date)} · Ciudad de México</p>
@@ -124,9 +128,28 @@ function MyGuestClubPage() {
         </div>}
         {detail.cancellationAvailable && <div className="mt-8 border-t border-[#dce5e8] pt-6 text-sm text-[#526b79]">
           <p>Si no puedes asistir, puedes liberar el lugar hasta 24 horas antes. La cortesía no se recupera.</p>
-          <button type="button" onClick={() => void cancel()} disabled={busy} className="mt-3 font-semibold text-red-700 underline underline-offset-4">Cancelar mi lugar</button>
+          <button type="button" onClick={() => { setCancelError(""); setCancelOpen(true); }} disabled={busy} className="mt-3 font-semibold text-red-700 underline underline-offset-4">Cancelar mi lugar</button>
         </div>}
       </>}
     </div>
+    <AlertDialog open={cancelOpen} onOpenChange={open => { if (!busy) { setCancelOpen(open); if (!open) setCancelError(""); } }}>
+      <AlertDialogContent className="guest-feedback-dialog guest-feedback-dialog--danger max-w-[min(92vw,34rem)] gap-0 overflow-hidden rounded-[1.5rem] border border-[#efc6bf] bg-white p-0 text-[#01304a]">
+        <div className="guest-feedback-top guest-feedback-top--danger px-7 pb-7 pt-9 sm:px-9">
+          <span className="guest-feedback-icon guest-feedback-icon--danger"><TriangleAlert size={30} aria-hidden="true" /></span>
+          <p className="mt-6 text-xs font-bold uppercase tracking-[0.2em] text-[#b23e34]">Antes de cancelar</p>
+          <AlertDialogTitle className="mt-2 text-2xl font-semibold leading-tight sm:text-3xl">¿Cancelar tu lugar?</AlertDialogTitle>
+          <AlertDialogDescription className="mt-3 text-sm leading-relaxed text-[#526b79]">
+            Liberarás tu asiento en <strong className="text-[#01304a]">{detail?.club.title}</strong>, pero tu código de cortesía ya fue utilizado y <strong className="text-[#9d3028]">no podrás reservar otro Club con él</strong>.
+          </AlertDialogDescription>
+        </div>
+        <div className="space-y-3 px-7 pb-8 pt-6 sm:px-9">
+          {cancelError && <p className="rounded-xl border border-[#e9b9b1] bg-[#fff3f0] p-3 text-sm text-[#9d3028]" role="alert">{cancelError}</p>}
+          <button type="button" onClick={() => void cancel()} disabled={busy} className="guest-danger-action w-full rounded-xl px-5 py-3.5 font-semibold text-white disabled:opacity-60">
+            {busy ? "Cancelando…" : "Sí, cancelar mi lugar"}
+          </button>
+          <AlertDialogCancel disabled={busy} className="m-0 w-full rounded-xl border border-[#dce5e8] bg-white px-5 py-3.5 font-semibold text-[#01304a] shadow-none hover:bg-[#f2f7f7]">No, conservar mi lugar</AlertDialogCancel>
+        </div>
+      </AlertDialogContent>
+    </AlertDialog>
   </main>;
 }

@@ -105,6 +105,64 @@
   box-shadow: none;
 }
 
+.guest-feedback-dialog {
+  box-shadow: 0 30px 80px rgba(1, 35, 54, 0.27), 0 0 0 1px rgba(255, 255, 255, 0.7);
+}
+
+.guest-feedback-top--success {
+  background: radial-gradient(circle at 90% 8%, rgba(245, 138, 24, 0.13), transparent 43%), #fff;
+  border-bottom: 1px solid #e1e9e9;
+}
+
+.guest-feedback-top--danger {
+  background: radial-gradient(circle at 90% 8%, rgba(199, 58, 49, 0.13), transparent 43%), #fff;
+  border-bottom: 1px solid #f2d4cf;
+}
+
+.guest-feedback-icon {
+  display: inline-flex;
+  width: 3.6rem;
+  height: 3.6rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 1.1rem;
+  animation: guest-feedback-arrive 420ms cubic-bezier(0.18, 0.85, 0.25, 1.2) both;
+}
+
+.guest-feedback-icon--success {
+  color: #9d4e17;
+  background: #fff0d9;
+  box-shadow: 0 0 0 7px rgba(245, 138, 24, 0.1);
+}
+
+.guest-feedback-icon--danger {
+  color: #b02f28;
+  background: #ffebe8;
+  box-shadow: 0 0 0 7px rgba(199, 58, 49, 0.1);
+}
+
+.guest-danger-action {
+  background: linear-gradient(120deg, #a72c27, #c64639);
+  box-shadow: 0 8px 20px rgba(180, 53, 43, 0.22);
+  transition: transform 180ms ease, box-shadow 180ms ease, filter 180ms ease;
+}
+
+.guest-danger-action:not(:disabled):hover {
+  transform: translateY(-1px);
+  filter: brightness(1.04);
+  box-shadow: 0 11px 24px rgba(180, 53, 43, 0.32);
+}
+
+.guest-danger-action:focus-visible {
+  outline: 3px solid #01304a;
+  outline-offset: 3px;
+}
+
+@keyframes guest-feedback-arrive {
+  from { opacity: 0; transform: translateY(7px) scale(0.82); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
 @media (max-width: 1000px) {
   .guest-club-card { flex-basis: calc((100% - 1.5rem) / 2); }
 }
@@ -117,11 +175,14 @@
 @media (prefers-reduced-motion: reduce) {
   .guest-club-card,
   .guest-club-cover-zoom,
-  .guest-club-reserve { transition: none; }
+  .guest-club-reserve,
+  .guest-danger-action { transition: none; }
+  .guest-feedback-icon { animation: none; }
   .guest-club-card:hover,
   .guest-club-card:focus-within,
   .guest-club-card:hover .guest-club-cover-zoom,
   .guest-club-card:focus-within .guest-club-cover-zoom,
   .guest-club-reserve:not(:disabled):hover,
-  .guest-club-reserve:not(:disabled):focus-visible { transform: none; }
+  .guest-club-reserve:not(:disabled):focus-visible,
+  .guest-danger-action:not(:disabled):hover { transform: none; }
 }
