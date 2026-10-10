@@ -32,6 +32,26 @@ const escapeHtml = (value: string) => value.replace(/[&<>"']/g, ch =>
 const mxDate = (value: string) => new Intl.DateTimeFormat("es-MX", {
   timeZone: "America/Mexico_City", dateStyle: "full", timeStyle: "short",
 }).format(new Date(value));
+function emailFrame(content: string) {
+  return `<!doctype html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+  <body style="margin:0;padding:0;background:#f2f5f6;color:#01304a;font-family:Arial,Helvetica,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f2f5f6;"><tr><td align="center" style="padding:28px 12px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;background:#ffffff;border:1px solid #dce5e8;border-radius:20px;overflow:hidden;">
+      <tr><td style="height:5px;background:#f58a18;font-size:0;line-height:0;">&nbsp;</td></tr>
+      <tr><td style="background:#01304a;padding:25px 30px;">
+        <table role="presentation" cellpadding="0" cellspacing="0"><tr>
+          <td><img src="https://raw.githubusercontent.com/ramirezjaret98-ST/verbo-academy-improved-design/main/src/assets/verbo-logo.png" width="44" height="44" alt="Verbo" style="display:block;border:0;border-radius:10px;"></td>
+          <td style="padding-left:13px;color:#ffffff;font-size:18px;font-weight:700;letter-spacing:.02em;">VERBO <span style="color:#f58a18;">CLUBS</span><br><span style="font-size:10px;font-weight:600;letter-spacing:.16em;color:#b9ced8;">LANGUAGE SOLUTIONS</span></td>
+        </tr></table>
+      </td></tr>
+      <tr><td style="padding:34px 30px 12px;">${content}</td></tr>
+      <tr><td style="padding:16px 30px 28px;border-top:1px solid #e5ecee;color:#607785;font-size:12px;line-height:1.6;">Verbo Language Solutions · Una invitación personal para conversar en inglés.</td></tr>
+    </table>
+  </td></tr></table></body></html>`;
+}
+const emailButton = (href: string, label: string) => `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:26px 0;"><tr><td style="border-radius:12px;background:#f58a18;">
+  <a href="${href}" style="display:inline-block;padding:15px 24px;color:#01304a;font-size:15px;font-weight:700;text-decoration:none;">${label}</a>
+  </td></tr></table>`;
 
 async function sendConfirmation(data: { booking_id: string; email: string; guest_name: string;
   club_title: string; club_date: string; club_type: string }, accessToken: string): Promise<boolean> {
@@ -39,14 +59,13 @@ async function sendConfirmation(data: { booking_id: string; email: string; guest
   if (!apiKey) return false;
   const from = Deno.env.get("RESEND_FROM_EMAIL") || "Verbo Academy <onboarding@resend.dev>";
   const accessUrl = `${APP_URL}/guest/my-club#access=${accessToken}`;
-  const html = `<div style="font-family:Arial,sans-serif;max-width:560px;margin:auto;color:#01304a">
-    <p style="color:#f58a18;font-weight:bold">VERBO CLUBS</p>
-    <h1>Tu lugar está confirmado</h1>
-    <p>Hola ${escapeHtml(data.guest_name)}, reservaste un lugar en <strong>${escapeHtml(data.club_title)}</strong>.</p>
-    <p><strong>Fecha y hora:</strong> ${escapeHtml(mxDate(data.club_date))} (Ciudad de México).</p>
-    <p>Desde tu página podrás abrir el material y, diez minutos antes de comenzar, entrar a la reunión.</p>
-    <p><a href="${accessUrl}" style="display:inline-block;background:#f58a18;color:#01304a;padding:13px 20px;border-radius:8px;text-decoration:none;font-weight:bold">Ver mi club</a></p>
-    <p>Este enlace es personal. No lo compartas.</p></div>`;
+  const html = emailFrame(`<p style="margin:0 0 10px;color:#c76a1f;font-size:11px;font-weight:700;letter-spacing:.18em;">TU RESERVA ESTÁ CONFIRMADA</p>
+    <h1 style="margin:0 0 16px;color:#01304a;font-size:28px;line-height:1.18;">Tu lugar en ${escapeHtml(data.club_title)}</h1>
+    <p style="margin:0 0 22px;color:#365568;font-size:15px;line-height:1.65;">Hola ${escapeHtml(data.guest_name)}. Tu lugar está reservado. Guarda este correo para volver a tu página personal cuando lo necesites.</p>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f8f8;border:1px solid #dce5e8;border-radius:14px;"><tr><td style="padding:19px 22px;color:#01304a;font-size:15px;line-height:1.7;"><strong>Encuentro:</strong> ${escapeHtml(data.club_title)}<br><strong>Fecha:</strong> ${escapeHtml(mxDate(data.club_date))} (Ciudad de México)</td></tr></table>
+    ${emailButton(accessUrl, "Ver mi club")}
+    <p style="margin:0 0 16px;color:#365568;font-size:14px;line-height:1.65;">En tu página encontrarás los detalles del encuentro y el material si Verbo lo ha publicado. El botón de reunión aparecerá diez minutos antes de comenzar.</p>
+    <p style="margin:0 0 16px;color:#607785;font-size:13px;line-height:1.6;">Este enlace es personal. No lo compartas.</p>`);
   try {
     const response = await fetch("https://api.resend.com/emails", {
       method: "POST",

@@ -1,7 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowRight, BookOpen, CalendarDays, Clock3, LockKeyhole, Sparkles } from "lucide-react";
+import { ArrowRight, BookOpen, CalendarDays, CircleCheck, Clock3, LockKeyhole, Mail, Sparkles, TriangleAlert } from "lucide-react";
 import { Logo } from "@/components/verbo/Logo";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { guestRequest, type GuestClub } from "@/lib/guest-clubs-api";
 import "./guest.clubs.css";
 
@@ -41,6 +42,8 @@ function GuestClubsPage() {
   const [code, setCode] = useState("");
   const [booking, setBooking] = useState(false);
   const [confirmationEmail, setConfirmationEmail] = useState<string | null>(null);
+  const [confirmedClub, setConfirmedClub] = useState<GuestClub | null>(null);
+  const [successOpen, setSuccessOpen] = useState(false);
   const [emailSent, setEmailSent] = useState(true);
   const [collection, setCollection] = useState<"all" | "insight" | "book">("all");
 
@@ -68,8 +71,10 @@ function GuestClubsPage() {
         action: "book", code, clubId: selected.id,
       });
       setConfirmationEmail(result.email);
+      setConfirmedClub(selected);
       setEmailSent(result.emailSent);
       setSelected(null);
+      setSuccessOpen(true);
       setClubs(current => current.map(club => club.id === selected.id ? { ...club, guestSeatAvailable: false } : club));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "No pudimos reservar tu lugar.");
@@ -89,10 +94,9 @@ function GuestClubsPage() {
         <h1 className="text-4xl font-semibold tracking-tight sm:text-5xl">Explora Verbo Clubs</h1>
         <p className="mt-4 text-base leading-relaxed text-[#476171]">Elige el tema que te mueva. Tu invitación te permite reservar un encuentro; puedes seguir explorando los demás cuando quieras.</p>
       </div>
-      {confirmationEmail && <section className="mb-8 rounded-2xl border border-[#91cba2] bg-[#effaf1] p-6" role="status">
-        <h2 className="text-xl font-semibold">Tu lugar está confirmado</h2>
-        <p className="mt-2">{emailSent ? `Enviamos los detalles y tu acceso a ${confirmationEmail}.` : `Reservamos tu lugar, pero el correo a ${confirmationEmail} no pudo enviarse. Contacta a Verbo para que te reenvíe el acceso.`}</p>
-        <p className="mt-2 text-sm">Tu código ya fue utilizado y no permite otra reserva.</p>
+      {confirmationEmail && !successOpen && <section className="mb-8 rounded-2xl border border-[#91cba2] bg-[#effaf1] p-5" role="status">
+        <p className="font-semibold">Tu lugar en {confirmedClub?.title} está reservado.</p>
+        <p className="mt-1 text-sm">{emailSent ? `Revisa ${confirmationEmail} para abrir «Ver mi club».` : `No pudimos enviar el acceso a ${confirmationEmail}. Contacta a Verbo para recibirlo.`}</p>
       </section>}
       {error && <p className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800" role="alert">{error}</p>}
       <div className="mb-7 flex flex-wrap gap-2" role="group" aria-label="Filtrar clubes">
@@ -162,5 +166,29 @@ function GuestClubsPage() {
         </div>
       </section>
     </div>}
+    <Dialog open={successOpen} onOpenChange={setSuccessOpen}>
+      <DialogContent className="guest-feedback-dialog max-w-[min(92vw,34rem)] gap-0 overflow-hidden rounded-[1.5rem] border border-[#dce5e8] bg-white p-0 text-[#01304a]">
+        <div className="guest-feedback-top guest-feedback-top--success px-7 pb-7 pt-9 sm:px-9">
+          <span className="guest-feedback-icon guest-feedback-icon--success"><CircleCheck size={30} aria-hidden="true" /></span>
+          <p className="mt-6 text-xs font-bold uppercase tracking-[0.2em] text-[#b35415]">Reserva confirmada</p>
+          <DialogTitle className="mt-2 text-2xl font-semibold leading-tight sm:text-3xl">Tu lugar está agendado</DialogTitle>
+          <DialogDescription className="mt-3 text-sm leading-relaxed text-[#526b79]">
+            {confirmedClub?.title && <><strong className="text-[#01304a]">{confirmedClub.title}</strong><br /></>}
+            {confirmedClub && <>{formatDate(confirmedClub.date)} · {formatTime(confirmedClub.date)} (Ciudad de México)</>}
+          </DialogDescription>
+        </div>
+        <div className="px-7 pb-8 pt-6 sm:px-9">
+          {emailSent ? <div className="flex gap-4 rounded-2xl bg-[#f2f7f7] p-4">
+            <Mail className="mt-0.5 shrink-0 text-[#b35415]" size={22} aria-hidden="true" />
+            <p className="text-sm leading-relaxed">Revisa <strong>{confirmationEmail}</strong>. Ahí encontrarás los detalles y el botón <strong>«Ver mi club»</strong> para volver cuando lo necesites.</p>
+          </div> : <div className="flex gap-4 rounded-2xl border border-[#f3c5bd] bg-[#fff1ed] p-4">
+            <TriangleAlert className="mt-0.5 shrink-0 text-[#ad3e2b]" size={22} aria-hidden="true" />
+            <p className="text-sm leading-relaxed">Tu lugar quedó reservado, pero el correo a <strong>{confirmationEmail}</strong> no pudo enviarse. Contacta a Verbo para que te reenvíe el acceso.</p>
+          </div>}
+          <p className="mt-4 text-xs leading-relaxed text-[#607785]">Tu código ya se utilizó y no permite otra reserva.</p>
+          <button type="button" onClick={() => setSuccessOpen(false)} className="mt-6 w-full rounded-xl bg-[#01304a] px-5 py-3.5 font-semibold text-white transition hover:bg-[#0b4562] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#f58a18]">Entendido</button>
+        </div>
+      </DialogContent>
+    </Dialog>
   </main>;
 }
