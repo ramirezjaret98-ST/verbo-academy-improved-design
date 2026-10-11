@@ -4,10 +4,12 @@
 // anonymity is only towards the reported person. Admin records a response
 // that the reporter can read in My Reports.
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { ShieldAlert, Check, X } from "lucide-react";
 import { Card, Pill } from "@/components/verbo/ui";
 import { USERS, userById } from "@/lib/mock-data";
+import { hydrateStudents, subscribeStudents } from "@/lib/students-store";
+import { hydrateTeachers, subscribeTeachers } from "@/lib/teacher-model";
 import { notifyError, notifySuccess } from "@/lib/notify";
 import {
   loadConductReports,
@@ -44,6 +46,15 @@ const STATUS_LABEL: Record<ConductReportStatus, string> = {
 function Page() {
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState<string | null>(null);
+  const [, refreshNames] = useState(0);
+  useEffect(() => {
+    const refresh = () => refreshNames((value) => value + 1);
+    const unsubscribeStudents = subscribeStudents(refresh);
+    const unsubscribeTeachers = subscribeTeachers(refresh);
+    hydrateStudents();
+    hydrateTeachers();
+    return () => { unsubscribeStudents(); unsubscribeTeachers(); };
+  }, []);
   const reports = useSyncExternalStore(
     subscribeConductReports,
     loadConductReports,

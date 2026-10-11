@@ -1,7 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, Pill } from "@/components/verbo/ui";
 import { userById } from "@/lib/mock-data";
+import { hydrateTeachers, subscribeTeachers } from "@/lib/teacher-model";
 import { useFinancialIssues, updateFinancialIssue } from "@/lib/financial-issues-store";
 import { notifyError, notifySuccess } from "@/lib/notify";
 
@@ -11,6 +12,12 @@ function FinancialIssuesPage() {
   const reports = useFinancialIssues();
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState<string | null>(null);
+  const [, refreshNames] = useState(0);
+  useEffect(() => {
+    const unsubscribe = subscribeTeachers(() => refreshNames((value) => value + 1));
+    hydrateTeachers();
+    return unsubscribe;
+  }, []);
 
   const close = async (id: string, status: "resolved" | "dismissed", currentNote?: string) => {
     const note = (drafts[id] ?? currentNote ?? "").trim();

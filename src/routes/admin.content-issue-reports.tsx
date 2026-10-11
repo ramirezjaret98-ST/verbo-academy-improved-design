@@ -3,10 +3,11 @@
 // or from a challenge. Most recent first. Admins can mark each one as resolved
 // or dismissed.
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { LifeBuoy, Check, X } from "lucide-react";
 import { Card, Pill } from "@/components/verbo/ui";
 import { USERS, userById } from "@/lib/mock-data";
+import { hydrateStudents, subscribeStudents } from "@/lib/students-store";
 import { notifyError, notifySuccess } from "@/lib/notify";
 import {
   loadContentIssueReports,
@@ -55,6 +56,12 @@ const STATUS_LABEL: Record<ContentIssueReportStatus, string> = {
 function Page() {
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState<string | null>(null);
+  const [, refreshNames] = useState(0);
+  useEffect(() => {
+    const unsubscribe = subscribeStudents(() => refreshNames((value) => value + 1));
+    hydrateStudents();
+    return unsubscribe;
+  }, []);
   const reports = useSyncExternalStore(
     subscribeContentIssueReports,
     loadContentIssueReports,
