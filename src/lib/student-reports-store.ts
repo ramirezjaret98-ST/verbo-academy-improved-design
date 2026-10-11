@@ -1,5 +1,6 @@
 // Free-text reports a teacher writes about a specific student.
-// Persisted only — no notifications or admin inbox are wired yet.
+// Admin sees pending reports in notifications and can close them from the
+// student's report history.
 //
 // Backed by Supabase (`public.student_reports`). RLS: a teacher can insert
 // and see only the reports they wrote (`teacher_id = auth.uid()`); admins see
@@ -7,13 +8,10 @@
 // for the calling session, so we use a single global cache hydrated once +
 // kept in sync via Postgres Realtime.
 //
-// TODO: conectar destino del reporte (canal de chat interno o
-// notificación por WhatsApp — decisión pendiente).
 import { supabase } from "@/integrations/supabase/client";
 import { registerRehydrate } from "@/lib/auth-rehydrate";
 import type { Database } from "@/integrations/supabase/types";
 import { hydrateUserIdBridge, legacyToUuid, uuidToLegacySync } from "@/lib/user-id-bridge";
-import { notifyError } from "@/lib/notify";
 
 export interface StudentReport {
   id: string;
@@ -21,6 +19,9 @@ export interface StudentReport {
   teacher_id: string;
   created_at: string; // ISO
   text: string;
+  status: "pending" | "resolved" | "dismissed";
+  resolution_note?: string;
+  resolved_at?: string;
 }
 
 export const REPORTS_EVENT = "verbo:student-reports-updated";
@@ -30,6 +31,8 @@ type Row = Database["public"]["Tables"]["student_reports"]["Row"];
 let cache: StudentReport[] = [];
 let hydrated = false;
 let hydratePromise: Promise<void> | null = null;
+let hydrateGeneration = 0;
+let refreshQueued = false;
 const listeners = new Set<() => void>();
 
 function notify() {
@@ -44,31 +47,43 @@ function mapRow(row: Row): StudentReport {
     teacher_id: uuidToLegacySync(row.teacher_id),
     created_at: row.created_at,
     text: row.text,
+    status: row.status as StudentReport["status"],
+    resolution_note: row.resolution_note ?? undefined,
+    resolved_at: row.resolved_at ?? undefined,
   };
 }
 
 async function hydrate(): Promise<void> {
   if (hydrated) return;
   if (hydratePromise) return hydratePromise;
+  const generation = hydrateGeneration;
   hydratePromise = (async () => {
     await hydrateUserIdBridge();
     const { data, error } = await supabase.from("student_reports").select("*");
     if (error) {
       console.error("[student-reports-store] failed to load", error);
-      hydrated = true;
       return;
     }
+    if (generation !== hydrateGeneration) return;
     cache = (data ?? []).map(mapRow);
     hydrated = true;
-  })();
-  await hydratePromise;
-  hydratePromise = null;
-  notify();
+    notify();
+  })().catch((error) => {
+    if (generation === hydrateGeneration) {
+      console.error("[student-reports-store] failed to load", error);
+    }
+  }).finally(() => {
+    hydratePromise = null;
+    if (refreshQueued) { refreshQueued = false; void hydrate(); }
+  });
+  return hydratePromise;
 }
 
-function invalidateAndRehydrate() {
+function invalidateAndRehydrate(reason?: "auth" | "refresh") {
+  hydrateGeneration++;
   hydrated = false;
-  hydratePromise = null;
+  if (reason === "auth") { cache = []; notify(); }
+  if (hydratePromise) { refreshQueued = true; return; }
   void hydrate();
 }
 
@@ -77,51 +92,46 @@ if (typeof window !== "undefined") {
   supabase
     .channel("student-reports-changes")
     .on("postgres_changes", { event: "*", schema: "public", table: "student_reports" }, () => {
-      hydrated = false;
-      void hydrate();
+      invalidateAndRehydrate("refresh");
     })
     .subscribe();
   registerRehydrate(invalidateAndRehydrate);}
 
-export function addStudentReport(input: { studentId: string; teacherId: string; text: string }): StudentReport {
-  const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-  const report: StudentReport = {
-    id: tempId,
-    student_id: input.studentId,
-    teacher_id: input.teacherId,
-    created_at: new Date().toISOString(),
-    text: input.text.trim(),
-  };
-  cache = [report, ...cache];
-  notify();
-
-  void (async () => {
-    const [studentUuid, teacherUuid] = await Promise.all([
-      legacyToUuid(input.studentId),
-      legacyToUuid(input.teacherId),
-    ]);
-    if (!studentUuid || !teacherUuid) {
-      cache = cache.filter((r) => r.id !== tempId);
-      notify();
-      notifyError("Couldn't identify the student or teacher", { context: "Saving student report" });
-      return;
-    }
-    const { data, error } = await supabase
-      .from("student_reports")
-      .insert({ student_id: studentUuid, teacher_id: teacherUuid, text: report.text })
-      .select("*")
-      .single();
-    if (error || !data) {
-      console.error("[student-reports-store] failed to save report", error);
-      cache = cache.filter((r) => r.id !== tempId);
-      notify();
-      notifyError(error, { context: "Saving student report" });
-      return;
-    }
-    cache = cache.map((r) => (r.id === tempId ? mapRow(data) : r));
+export async function addStudentReport(input: { studentId: string; teacherId: string; text: string }): Promise<StudentReport> {
+  const generation = hydrateGeneration;
+  const [studentUuid, teacherUuid] = await Promise.all([
+    legacyToUuid(input.studentId),
+    legacyToUuid(input.teacherId),
+  ]);
+  if (!studentUuid || !teacherUuid) throw new Error("Couldn't identify the student or teacher");
+  const { data, error } = await supabase
+    .from("student_reports")
+    .insert({ student_id: studentUuid, teacher_id: teacherUuid, text: input.text.trim() })
+    .select("*")
+    .single();
+  if (error || !data) throw error ?? new Error("Report was not saved");
+  const report = mapRow(data);
+  if (generation === hydrateGeneration) {
+    cache = [report, ...cache.filter((r) => r.id !== report.id)];
     notify();
-  })();
+  }
+  return report;
+}
 
+export async function closeStudentReport(
+  id: string, status: "resolved" | "dismissed", resolutionNote: string,
+): Promise<StudentReport> {
+  if (!resolutionNote.trim()) throw new Error("A follow-up note is required");
+  const generation = hydrateGeneration;
+  const { data, error } = await supabase.rpc("close_student_report" as never, {
+    p_report_id: Number(id), p_status: status, p_resolution_note: resolutionNote.trim(),
+  } as never);
+  if (error || !data) throw error ?? new Error("Report was not updated");
+  const report = mapRow(data as Row);
+  if (generation === hydrateGeneration) {
+    cache = cache.map((r) => r.id === id ? report : r);
+    notify();
+  }
   return report;
 }
 

@@ -19,6 +19,7 @@ import {
   getCoverageNote, setCoverageNote, subscribeCoverageNotes,
 } from "@/lib/coverage-notes-store";
 import { addStudentReport } from "@/lib/student-reports-store";
+import { notifyError } from "@/lib/notify";
 import {
   PerformanceAnalyticsModal, useComputedMacros,
 } from "@/components/verbo/PerformanceAnalytics";
@@ -75,18 +76,13 @@ function Page() {
   const curriculumLevelName = (s: User): string | null =>
     computeCurrentProgress(s.id, s.product, s.contracted_levels ?? [], tickVal)?.levelName ?? null;
 
-  if (!user) return null;
-
   // Only students assigned to the current teacher — never all platform users.
-  const assignedIds = assignedStudentIdsFor(user.id);
+  const assignedIds = user ? assignedStudentIdsFor(user.id) : [];
   const myStudents = USERS.filter((u) => u.role === "student" && assignedIds.includes(u.id));
 
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return q ? myStudents.filter((s) => s.name.toLowerCase().includes(q)) : myStudents;
-  }, [myStudents, search]);
-
-  const grouped = useMemo(() => {
+  const q = search.trim().toLowerCase();
+  const filtered = q ? myStudents.filter((s) => s.name.toLowerCase().includes(q)) : myStudents;
+  const grouped = (() => {
     if (groupBy === "none") return [{ label: "", items: filtered }];
     const map = new Map<string, User[]>();
     for (const s of filtered) {
@@ -101,7 +97,9 @@ function Page() {
     return Array.from(map.entries())
       .sort((a, b) => a[0].localeCompare(b[0]))
       .map(([label, items]) => ({ label, items }));
-  }, [filtered, groupBy]);
+  })();
+
+  if (!user) return null;
 
   return (
     <div className="space-y-6">
@@ -801,12 +799,20 @@ function ReportModal({
 }) {
   const [text, setText] = useState("");
   const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
 
-  const handleSave = () => {
-    if (!text.trim()) return;
-    addStudentReport({ studentId: student.id, teacherId, text });
-    setSaved(true);
-    setTimeout(() => { onClose(); }, 900);
+  const handleSave = async () => {
+    if (!text.trim() || saving) return;
+    setSaving(true);
+    try {
+      await addStudentReport({ studentId: student.id, teacherId, text });
+      setSaved(true);
+      setTimeout(() => { onClose(); }, 900);
+    } catch (error) {
+      notifyError(error, { context: "Saving student report" });
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -845,10 +851,10 @@ function ReportModal({
         </button>
         <button
           onClick={handleSave}
-          disabled={!text.trim() || saved}
+          disabled={!text.trim() || saving || saved}
           className="inline-flex items-center gap-1.5 rounded-lg bg-destructive px-3 py-1.5 text-xs font-semibold text-destructive-foreground shadow-sm transition-opacity hover:opacity-90 disabled:opacity-50"
         >
-          <Flag className="h-3.5 w-3.5" /> Save report
+          <Flag className="h-3.5 w-3.5" /> {saving ? "Saving…" : "Save report"}
         </button>
       </AccentModalFooter>
     </AccentModal>

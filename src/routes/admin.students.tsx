@@ -61,7 +61,7 @@ import { useAuth } from "@/lib/auth";
 import { getAdminType } from "@/lib/admin-roles";
 import { DeferredWelcome } from "@/components/verbo/DeferredWelcome";
 import { loadCourses, subscribeCourses, type CourseLevel } from "@/lib/product-courses-store";
-import { reportsForStudent, subscribeStudentReports } from "@/lib/student-reports-store";
+import { closeStudentReport, reportsForStudent, subscribeStudentReports } from "@/lib/student-reports-store";
 import { deleteUserAccount } from "@/lib/user-deletion";
 import {
   isMilestoneUnit, getUnitAccessOverride, setUnitAccess,
@@ -80,9 +80,10 @@ import {
 
 export const Route = createFileRoute("/admin/students")({
   component: Page,
-  validateSearch: (s: Record<string, unknown>): { new?: boolean; student?: string } => ({
+  validateSearch: (s: Record<string, unknown>): { new?: boolean; student?: string; tab?: "reports" } => ({
     new: s.new === true || s.new === "true" || s.new === "1",
     student: typeof s.student === "string" ? s.student : undefined,
+    tab: s.tab === "reports" ? "reports" : undefined,
   }),
 });
 
@@ -163,10 +164,11 @@ function computeNextPayment(u: User): Date | null {
 // PAGE
 // ===========================================================================
 function Page() {
-  const { new: openNew, student: focusStudent } = Route.useSearch();
+  const { new: openNew, student: focusStudent, tab: focusTab } = Route.useSearch();
   const navigate = Route.useNavigate();
   const [, forceTick] = useState(0);
   const [detail, setDetail] = useState<User | null>(null);
+  const [detailTab, setDetailTab] = useState<Tab>("overview");
   const [formFor, setFormFor] = useState<User | "new" | null>(null);
 
   useEffect(() => {
@@ -196,11 +198,14 @@ function Page() {
       navigate({ search: {}, replace: true });
     } else if (focusStudent) {
       const s = USERS.find((u) => u.id === focusStudent && u.role === "student");
-      if (s) setDetail(s);
+      if (s) {
+        setDetailTab(focusTab === "reports" ? "reports" : "overview");
+        setDetail(s);
+      }
       navigate({ search: {}, replace: true });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [openNew, focusStudent]);
+  }, [openNew, focusStudent, focusTab]);
 
   const allStudents = USERS.filter((u) => u.role === "student");
   // Group members also appear here as their own cards (read/manage individually);
@@ -481,7 +486,7 @@ function Page() {
 
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
         {filteredStudents.map((s, i) => (
-          <StudentCard key={s.id} student={s} index={i} onOpen={() => setDetail(s)} />
+          <StudentCard key={s.id} student={s} index={i} onOpen={() => { setDetailTab("overview"); setDetail(s); }} />
         ))}
       </div>
 
@@ -497,6 +502,7 @@ function Page() {
       {detail && (
         <StudentDetailModal
           student={detail}
+          initialTab={detailTab}
           teachers={teachers}
           onClose={() => setDetail(null)}
           onUpdate={handleDetailUpdate}
@@ -1596,16 +1602,17 @@ function StudentFormModal({
 type Tab = "overview" | "performance" | "progress" | "badges" | "reports" | "notes";
 
 function StudentDetailModal({
-  student, teachers, onClose, onUpdate, onDelete, onEdit,
+  student, initialTab, teachers, onClose, onUpdate, onDelete, onEdit,
 }: {
   student: User;
+  initialTab: Tab;
   teachers: User[];
   onClose: () => void;
   onUpdate: (u: User, teacherId?: string) => void;
   onDelete: (u: User) => Promise<{ ok: boolean; error?: string }>;
   onEdit: () => void;
 }) {
-  const [tab, setTab] = useState<Tab>("overview");
+  const [tab, setTab] = useState<Tab>(initialTab);
   const [, forceTick] = useState(0);
   const [notes, setNotes] = useState(student.admin_notes ?? "");
   const [showLink, setShowLink] = useState(false);
@@ -2555,11 +2562,26 @@ function BadgesOverridePanel({ student }: { student: User }) {
   );
 }
 
-// ---- Reports tab (read-only teacher reports for this student) ----
+// ---- Reports tab: Admin follow-up for teacher reports about this student ----
 function ReportsTab({ student }: { student: User }) {
   const [, forceTick] = useState(0);
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const [savingId, setSavingId] = useState<string | null>(null);
   useEffect(() => subscribeStudentReports(() => forceTick((n) => n + 1)), []);
   const reports = reportsForStudent(student.id);
+  const closeReport = async (id: string, status: "resolved" | "dismissed") => {
+    const note = (drafts[id] ?? "").trim();
+    if (!note) { notifyError("Add a follow-up note before closing the report"); return; }
+    setSavingId(id);
+    try {
+      await closeStudentReport(id, status, note);
+      notifySuccess(status === "resolved" ? "Report resolved." : "Report dismissed.");
+    } catch (error) {
+      notifyError(error, { context: "Closing student report" });
+    } finally {
+      setSavingId(null);
+    }
+  };
   if (reports.length === 0) {
     return <p className="text-sm text-muted-foreground">No reports yet.</p>;
   }
@@ -2574,6 +2596,39 @@ function ReportsTab({ student }: { student: User }) {
               <div className="text-xs text-muted-foreground">{new Date(r.created_at).toLocaleString()}</div>
             </div>
             <p className="whitespace-pre-wrap text-sm text-foreground">{r.text}</p>
+            <div className="mt-3 rounded-lg bg-muted p-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                {r.status === "pending" ? "Pending follow-up" : r.status === "resolved" ? "Resolved" : "Dismissed"}
+              </p>
+              {r.status === "pending" ? (
+                <>
+                  <label className="mt-2 block text-xs text-muted-foreground">
+                    Follow-up and outcome
+                    <textarea
+                      value={drafts[r.id] ?? ""}
+                      onChange={(event) => setDrafts((current) => ({ ...current, [r.id]: event.target.value }))}
+                      rows={2}
+                      placeholder="Record what was reviewed and the action taken."
+                      className="mt-1 w-full rounded-md border border-border bg-background p-2 text-sm text-foreground"
+                    />
+                  </label>
+                  <div className="mt-2 flex gap-2">
+                    <button type="button" disabled={savingId === r.id || !(drafts[r.id] ?? "").trim()}
+                      onClick={() => void closeReport(r.id, "resolved")}
+                      className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-50">
+                      Resolve
+                    </button>
+                    <button type="button" disabled={savingId === r.id || !(drafts[r.id] ?? "").trim()}
+                      onClick={() => void closeReport(r.id, "dismissed")}
+                      className="rounded-md border border-border px-3 py-1.5 text-xs font-medium disabled:opacity-50">
+                      Dismiss
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <p className="mt-1 whitespace-pre-wrap text-sm text-foreground">{r.resolution_note}</p>
+              )}
+            </div>
           </div>
         );
       })}

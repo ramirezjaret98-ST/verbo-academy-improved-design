@@ -3229,6 +3229,10 @@ export type Database = {
         Row: {
           created_at: string
           id: number
+          resolution_note: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          status: string
           student_id: string
           teacher_id: string
           text: string
@@ -3236,6 +3240,10 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: never
+          resolution_note?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string
           student_id: string
           teacher_id: string
           text: string
@@ -3243,6 +3251,10 @@ export type Database = {
         Update: {
           created_at?: string
           id?: never
+          resolution_note?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string
           student_id?: string
           teacher_id?: string
           text?: string

@@ -639,6 +639,7 @@ function adminNotifications(): Notification[] {
 
   // ---- Student reports filed by teachers --------------------------------
   for (const r of loadStudentReports()) {
+    if (r.status !== "pending") continue;
     const t = USERS.find((u) => u.id === r.teacher_id);
     const st = USERS.find((u) => u.id === r.student_id);
     out.push({
@@ -647,7 +648,7 @@ function adminNotifications(): Notification[] {
       title: "New student report filed",
       body: `${t?.name ?? "Teacher"} → ${st?.name ?? "Student"}`,
       createdAt: r.created_at,
-      to: `/admin/students?student=${r.student_id}`,
+      to: `/admin/students?student=${r.student_id}&tab=reports`,
       read: false,
     });
   }
