@@ -73,27 +73,47 @@ export function ClubReportModal({
     setAttendance((prev) => ({ ...prev, [name]: value }));
 
   const submit = async () => {
+    if (busy) return;
     if (!guestRoster || Object.keys(attendance).length !== attendees.length) {
       notifyError("Mark every student's and guest's attendance before submitting.", { context: "Submitting club report" });
       return;
     }
-    setBusy(true);
-    const saved = await saveClubReport({
-      event_id: event.id,
-      event_type: event.type,
-      teacher_id: teacherId,
-      attendance,
-      comments: comments.trim(),
-      submitted_at: new Date().toISOString(),
-    });
-    setBusy(false);
-    if (!saved) { notifyError("Couldn't save the report or attendance. Check the reservations and try again.", { context: "Submitting club report" }); return; }
-    if (event.type === "spotlight") {
-      updateSession(event.id, { status: "completed" });
+    if (event.type === "spotlight" && attendees.length !== 1) {
+      notifyError("Spotlight attendance requires exactly one enrolled student. Contact Admin to review this session.", { context: "Submitting Spotlight report" });
+      return;
     }
-    notifySuccess("Report and attendance saved.");
-    onSubmitted?.();
-    onClose();
+    setBusy(true);
+    try {
+      if (event.type === "spotlight") {
+        const status = attendance[attendees[0].id] === "present" ? "completed" : "absent";
+        const updated = await updateSession(event.id, { status });
+        if (!updated) {
+          notifyError("Spotlight attendance could not be updated. Check the session and retry.", { context: "Submitting Spotlight report" });
+          return;
+        }
+      }
+      const saved = await saveClubReport({
+        event_id: event.id,
+        event_type: event.type,
+        teacher_id: teacherId,
+        attendance,
+        comments: comments.trim(),
+        submitted_at: new Date().toISOString(),
+      });
+      if (!saved) {
+        notifyError(event.type === "spotlight"
+          ? "Spotlight attendance was updated, but the report could not be saved. Retry from this form."
+          : "Couldn't save the report or attendance. Check the reservations and try again.", { context: "Submitting club report" });
+        return;
+      }
+      notifySuccess("Report and attendance saved.");
+      onSubmitted?.();
+      onClose();
+    } catch (error) {
+      notifyError(error, { context: "Submitting club report" });
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
