@@ -34,8 +34,9 @@ import {
 } from "lucide-react";
 import { loadCourses, subscribeCourses, computeCurrentProgress, type CourseLevel } from "@/lib/product-courses-store";
 import {
-  isMilestoneUnit, getUnitAccessOverride, setUnitAccess,
+  isMilestoneUnit, getUnitAccessOverride, setUnitAccess, loadActivities, subscribeActivities,
 } from "@/lib/activities-store";
+import { loadRecordSubmissions, signedRecordUrl, type RecordSubmission } from "@/lib/record-submissions";
 
 export const Route = createFileRoute("/teacher/students")({ component: Page });
 
@@ -682,6 +683,7 @@ function StudentDetailModal({
             <div className="mt-3">
               <TeacherUnitAccessPanel student={s} teacherId={teacherId} />
             </div>
+            <RecordSubmissionsPanel studentId={s.id} />
           </section>
         )}
 
@@ -896,6 +898,53 @@ function MiniStat({
 // UNIT ACCESS PANEL — teacher-side unlock/lock for a student's Learning Path.
 // Mirrors the Admin > Students Course Progress tab, but authored by the teacher.
 // ============================================================================
+function RecordSubmissionsPanel({ studentId }: { studentId: string }) {
+  const [submissions, setSubmissions] = useState<RecordSubmission[]>([]);
+  const [signedUrls, setSignedUrls] = useState<Record<string, string>>({});
+  const [error, setError] = useState("");
+  const [, refreshActivities] = useState(0);
+
+  useEffect(() => {
+    let live = true;
+    const unsubscribe = subscribeActivities(() => refreshActivities((n) => n + 1));
+    void loadRecordSubmissions(studentId)
+      .then((rows) => { if (live) setSubmissions(rows); })
+      .catch(() => { if (live) setError("Recordings couldn't be loaded right now."); });
+    return () => { live = false; unsubscribe(); };
+  }, [studentId]);
+
+  const openAudio = async (submission: RecordSubmission) => {
+    try {
+      const url = await signedRecordUrl(submission.audio_path);
+      setSignedUrls((current) => ({ ...current, [submission.id]: url }));
+    } catch { setError("That recording couldn't be opened right now."); }
+  };
+
+  return (
+    <div className="mt-6 rounded-xl border border-border bg-background p-4">
+      <div className="text-sm font-semibold text-foreground">Record Yourself submissions</div>
+      <p className="mt-1 text-xs text-muted-foreground">These are speaking practice, not pronunciation grades. Students can continue without waiting for a review. Listen when it helps your teaching.</p>
+      {submissions.length === 0 && !error && <p className="mt-3 text-xs text-muted-foreground">No recordings submitted yet.</p>}
+      <div className="mt-3 space-y-3">
+        {submissions.map((submission) => (
+          <div key={submission.id} className="rounded-lg border border-border bg-card p-3">
+            <div className="flex items-start justify-between gap-3">
+              <div className="text-xs font-semibold text-foreground">
+                {loadActivities().find((activity) => Number(activity.id) === submission.activity_id)?.name ?? "Speaking practice"}
+                <span className="ml-2 font-normal text-muted-foreground">{new Date(submission.created_at).toLocaleString()}</span>
+              </div>
+              <button type="button" onClick={() => { void openAudio(submission); }} className="shrink-0 text-xs font-semibold text-accent hover:underline">Listen</button>
+            </div>
+            <p className="mt-2 text-xs text-muted-foreground">Student reflection: {submission.reflection}</p>
+            {signedUrls[submission.id] && <audio controls src={signedUrls[submission.id]} className="mt-3 w-full" />}
+          </div>
+        ))}
+      </div>
+      {error && <p role="alert" className="mt-3 text-xs text-destructive">{error}</p>}
+    </div>
+  );
+}
+
 function TeacherUnitAccessPanel({ student, teacherId }: { student: User; teacherId: string }) {
   const [rev, setRev] = useState(0);
   const [courses, setCourses] = useState(() => loadCourses());

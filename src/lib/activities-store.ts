@@ -844,6 +844,17 @@ export function recordActivityScore(studentId: string, activityId: string, score
 
   return next;
 }
+/** The database trigger persists this flag after a recording submission. This
+ *  updates the current screen only; zero is deliberate because audio is not graded. */
+export function markRecordPracticeCompleted(studentId: string, activityId: string): void {
+  const k = scopedKey(studentId, activityId);
+  const current = scoresCache[k] ?? { best: 0, attempts: 0, lastAt: "", attempted: false };
+  scoresCache = {
+    ...scoresCache,
+    [k]: { ...current, best: 0, attempts: current.attempts + 1, lastAt: new Date().toISOString(), attempted: true },
+  };
+  notify();
+}
 export function bestScoreFor(studentId: string, activityId: string): number {
   return scoresCache[scopedKey(studentId, activityId)]?.best ?? 0;
 }
@@ -1010,8 +1021,7 @@ export function unitPassed(studentId: string, unitId: string): boolean {
     return !!completionsCache[scopedKey(studentId, unitId)];
   }
   for (const [, arr] of byCat) {
-    const avg = arr.reduce((s, a) => s + (scoresCache[scopedKey(studentId, a.id)]?.best ?? 0), 0) / arr.length;
-    if (avg < 60) return false;
+    if (!categoryPracticeResult(studentId, arr).passed) return false;
   }
   return true;
 }
@@ -1030,14 +1040,13 @@ export function unitPassedByActivities(studentId: string, unitId: string): boole
   }
   if (byCat.size === 0) return false;
   for (const [, arr] of byCat) {
-    const avg = arr.reduce((s, a) => s + (scoresCache[scopedKey(studentId, a.id)]?.best ?? 0), 0) / arr.length;
-    if (avg < 60) return false;
+    if (!categoryPracticeResult(studentId, arr).passed) return false;
   }
   return true;
 }
 
 export function unitCategoryProgress(studentId: string, unitId: string): {
-  category: string; passed: boolean; best: number; mandatory: boolean;
+  category: string; passed: boolean; best: number; mandatory: boolean; hasGraded: boolean; hasRecording: boolean; recordingComplete: boolean;
 }[] {
   const list = activitiesForUnit(unitId);
   const byCat = new Map<string, Activity[]>();
@@ -1048,13 +1057,26 @@ export function unitCategoryProgress(studentId: string, unitId: string): {
     byCat.set(cat, arr);
   }
   return Array.from(byCat.entries()).map(([category, arr]) => {
-    // Average across every activity in the category (unanswered = 0), not the
-    // max of any single one — otherwise one lucky answer paints the whole
-    // category (and the unit's overall score) as 100/100.
-    const best = Math.round(arr.reduce((s, a) => s + (scoresCache[scopedKey(studentId, a.id)]?.best ?? 0), 0) / arr.length);
+    const result = categoryPracticeResult(studentId, arr);
     const mandatory = isMandatoryCategory(category);
-    return { category, best, mandatory, passed: mandatory ? best >= 60 : true };
+    return { category, ...result, mandatory, passed: mandatory ? result.passed : true };
   });
+}
+
+function categoryPracticeResult(studentId: string, activities: Activity[]) {
+  const graded = activities.filter((a) => a.type !== "record");
+  const recordings = activities.filter((a) => a.type === "record");
+  const best = graded.length
+    ? Math.round(graded.reduce((sum, a) => sum + (scoresCache[scopedKey(studentId, a.id)]?.best ?? 0), 0) / graded.length)
+    : 0;
+  const recordingComplete = recordings.every((a) => wasAttempted(studentId, a.id));
+  return {
+    best,
+    hasGraded: graded.length > 0,
+    hasRecording: recordings.length > 0,
+    recordingComplete,
+    passed: recordingComplete && (graded.length === 0 || best >= 60),
+  };
 }
 
 export function renameUnitReferences(oldUnitId: string, newUnitId: string) {

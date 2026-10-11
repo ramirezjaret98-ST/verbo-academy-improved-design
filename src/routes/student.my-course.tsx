@@ -332,9 +332,10 @@ export function CustomUnitDetail({
   const catProgress = unitCategoryProgress(studentId, unit.id);
   const activitiesPassed = unitPassed(studentId, unit.id);
   const mandatoryRows = catProgress.filter((r) => r.mandatory);
-  const hasScore = mandatoryRows.some((r) => r.best > 0);
+  const gradedRows = mandatoryRows.filter((r) => r.hasGraded);
+  const hasScore = gradedRows.some((r) => r.best > 0);
   const overallScore = hasScore
-    ? Math.round(mandatoryRows.reduce((s, r) => s + r.best, 0) / Math.max(1, mandatoryRows.length))
+    ? Math.round(gradedRows.reduce((s, r) => s + r.best, 0) / gradedRows.length)
     : null;
 
   if (!unlocked) {
@@ -398,12 +399,13 @@ export function CustomUnitDetail({
             <div className="mt-4 flex items-start justify-between gap-2">
               {MANDATORY_CATEGORIES.filter((c) => catProgress.some((r) => r.category === c)).map((c, i) => {
                 const row = catProgress.find((r) => r.category === c);
-                const best = row?.best ?? 0;
+                const best = row?.hasGraded ? row.best : row?.recordingComplete ? 100 : 0;
                 const color = CATEGORY_RING_COLORS[i % CATEGORY_RING_COLORS.length];
                 return (
                   <div key={c} className="flex flex-1 flex-col items-center gap-1.5 text-center">
-                    <StatRing value={best} size={56} stroke={6} label={row ? String(best) : "—"} progressColor={color} textColor={color} />
+                    <StatRing value={best} size={56} stroke={6} label={row ? (row.hasGraded ? String(best) : row.recordingComplete ? "✓" : "—") : "—"} progressColor={color} textColor={color} />
                     <span className="text-[11px] font-medium leading-tight text-muted-foreground">{categoryLabel(c)}</span>
+                    {row?.hasRecording && <span className="text-[10px] text-muted-foreground">{row.recordingComplete ? "Recording submitted" : "Recording pending"}</span>}
                   </div>
                 );
               })}
@@ -430,7 +432,7 @@ export function CustomUnitDetail({
               "No activities yet"
             ) : (
               <>
-                <Sparkles className="h-4 w-4" /> {hasScore ? "Continue activities" : "Start activities"} <ArrowRight className="h-4 w-4" />
+                <Sparkles className="h-4 w-4" /> {hasScore || mandatoryRows.some((row) => row.recordingComplete) ? "Continue activities" : "Start activities"} <ArrowRight className="h-4 w-4" />
               </>
             )}
           </button>

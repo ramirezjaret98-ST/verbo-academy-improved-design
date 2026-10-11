@@ -103,6 +103,7 @@ import {
   levelIsComplete,
   loadActivityScores,
   incrementAttempts,
+  markRecordPracticeCompleted,
   recordActivityScore,
   resetUnitActivityAttempts,
   setUnitCompleted,
@@ -127,6 +128,7 @@ import {
 import { courseMetaFor, subscribeCourseMeta } from "@/lib/custom-course-meta-store";
 import { loadSessions, subscribeSessions } from "@/lib/sessions-store";
 import { resolveCustomUnitUnlock } from "@/lib/custom-units-store";
+import { loadRecordSubmissions, signedRecordUrl, submitRecordPractice, MAX_RECORD_BYTES } from "@/lib/record-submissions";
 import { CourseCardHero, CustomUnitsList, CustomUnitDetail } from "./student.my-course";
 
 
@@ -1237,10 +1239,11 @@ export function UnitDetail({
   // Overall unit score = average of the best score of the mandatory categories
   // that actually apply to this unit. No attempts yet → neutral state.
   const mandatoryRows = catProgress.filter((r) => r.mandatory);
-  const attemptedRows = mandatoryRows.filter((r) => r.best > 0);
+  const gradedRows = mandatoryRows.filter((r) => r.hasGraded);
+  const attemptedRows = gradedRows.filter((r) => r.best > 0);
   const hasScore = attemptedRows.length > 0;
   const overallScore = hasScore
-    ? Math.round(mandatoryRows.reduce((s, r) => s + r.best, 0) / mandatoryRows.length)
+    ? Math.round(gradedRows.reduce((s, r) => s + r.best, 0) / gradedRows.length)
     : null;
   const scoreShell =
     overallScore === null
@@ -1263,7 +1266,7 @@ export function UnitDetail({
     ? "review"
     : passed
     ? "review"
-    : hasScore
+    : hasScore || mandatoryRows.some((r) => r.recordingComplete)
     ? "continue"
     : "start";
   const actionLabel =
@@ -1312,7 +1315,7 @@ export function UnitDetail({
               </div>
               <h1 className="mt-1 font-display text-2xl font-bold tracking-tight text-foreground">{unit.title}</h1>
               <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
-                {unit.video_url ? "Watch the video, review" : "Review"} the PDF guide, then complete Vocabulary, Grammar and Practice with a score of at least 60 in each to pass this unit.
+                {unit.video_url ? "Watch the video, review" : "Review"} the PDF guide, then complete scored activities with at least 60 in each required category. Recording activities count when submitted; they are not pronunciation grades.
               </p>
             </div>
             <div className="flex shrink-0 flex-col items-end gap-2">
@@ -1334,6 +1337,9 @@ export function UnitDetail({
             </span>
             {overallScore !== null && <span className="pb-1 text-lg font-semibold opacity-80">%</span>}
           </div>
+          {mandatoryRows.some((row) => row.hasRecording && !row.recordingComplete) && (
+            <p className="mt-2 text-[11px] font-medium opacity-85">Recording practice still pending</p>
+          )}
         </div>
       </div>
 
@@ -1395,7 +1401,7 @@ export function UnitDetail({
             <div className="mt-4 flex items-start justify-between gap-2">
               {MANDATORY_CATEGORIES.map((c, i) => {
                 const row = catProgress.find((r) => r.category === c);
-                const best = row?.best ?? 0;
+                const best = row?.hasGraded ? row.best : row?.recordingComplete ? 100 : 0;
                 const color = CATEGORY_RING_COLORS[i % CATEGORY_RING_COLORS.length];
                 return (
                   <div key={c} className="flex flex-1 flex-col items-center gap-1.5 text-center">
@@ -1403,11 +1409,12 @@ export function UnitDetail({
                       value={best}
                       size={62}
                       stroke={6}
-                      label={row ? String(best) : "—"}
+                      label={row ? (row.hasGraded ? String(best) : row.recordingComplete ? "✓" : "—") : "—"}
                       progressColor={color}
                       textColor={color}
                     />
                     <span className="text-[11px] font-medium leading-tight text-muted-foreground">{categoryLabel(c)}</span>
+                    {row?.hasRecording && <span className="text-[10px] text-muted-foreground">{row.recordingComplete ? "Recording submitted" : "Recording pending"}</span>}
                   </div>
                 );
               })}
@@ -1580,7 +1587,7 @@ export function ActivityRunner({
   const list = activities.filter((a) => (a.category ?? "uncategorized") === activeCat);
   const [index, setIndex] = useState(0);
   const [draft, setDraft] = useState<Record<string, string>>({});
-  const [feedback, setFeedback] = useState<null | { ok: boolean; score: number }>(null);
+  const [feedback, setFeedback] = useState<null | { ok: boolean; score: number; recording?: boolean }>(null);
   const [attemptBlocked, setAttemptBlocked] = useState(false);
 
   useEffect(() => { setIndex(0); setFeedback(null); setAttemptBlocked(false); }, [activeCat]);
@@ -1592,6 +1599,7 @@ export function ActivityRunner({
 
   const check = () => {
     if (!current) return;
+    if (current.type === "record") return;
     // Milestone units get exactly one attempt per activity (skipped in preview mode).
     if (!readOnly && !previewMode && isMilestoneUnit(unit.id) && attemptsFor(studentId, current.id) >= 1) {
       setAttemptBlocked(true);
@@ -1606,6 +1614,14 @@ export function ActivityRunner({
     // Auto-complete unit when the mandatory rule is satisfied.
     if (!readOnly && !previewMode && unitPassed(studentId, unit.id)) setUnitCompleted(studentId, unit.id, true);
     setFeedback({ ok, score });
+  };
+
+  const recordingSubmitted = () => {
+    if (!current || current.type !== "record") return;
+    markRecordPracticeCompleted(studentId, current.id);
+    incrementAttempts(studentId, unit.id);
+    if (unitPassed(studentId, unit.id)) setUnitCompleted(studentId, unit.id, true);
+    setFeedback({ ok: true, score: 0, recording: true });
   };
 
   /** Clears the unit attempt counter and every `attempted` flag so the student
@@ -1659,11 +1675,10 @@ export function ActivityRunner({
             const catActivities = activities.filter((a) => (a.category ?? "uncategorized") === c);
             // Average across every activity in the category (unanswered = 0) —
             // getting one exercise right must not paint the whole category 100/100.
-            const best = catActivities.length
-              ? Math.round(catActivities.reduce((s, a) => s + bestScoreFor(studentId, a.id), 0) / catActivities.length)
-              : 0;
+            const progress = unitCategoryProgress(studentId, unit.id).find((row) => row.category === c);
+            const best = progress?.best ?? 0;
             const catAttempted = catActivities.some((a) => wasAttempted(studentId, a.id));
-            const ok = mandatory && best >= 60;
+            const ok = mandatory && !!progress?.passed;
             return (
               <button
                 key={c}
@@ -1687,7 +1702,9 @@ export function ActivityRunner({
                         : "bg-muted text-muted-foreground"
                     }`}
                   >
-                    {catAttempted && !ok ? `Answered · ${best}/100` : `${best}/100`}
+                    {progress?.hasRecording && !progress.hasGraded
+                      ? progress.recordingComplete ? "Submitted" : "Pending"
+                      : catAttempted && !ok ? `In progress · ${best}/100` : `${best}/100`}
                   </span>
 
                 ) : (
@@ -1718,12 +1735,11 @@ export function ActivityRunner({
               </h3>
               {readOnly ? (
                 <div className="mt-2 rounded-lg bg-secondary/50 p-2 text-[11px] text-muted-foreground">
-                  Best score: <span className="font-semibold text-foreground">{bestScoreFor(studentId, current.id)}/100</span> — review only.
+                  {current.type === "record" ? "Recording practice — review only." : <>Best score: <span className="font-semibold text-foreground">{bestScoreFor(studentId, current.id)}/100</span> — review only.</>}
                 </div>
               ) : alreadyAttempted && !feedback ? (
                 <div className="mt-2 rounded-lg bg-secondary/50 p-2 text-[11px] text-muted-foreground">
-                  Already answered — best score:{" "}
-                  <span className="font-semibold text-foreground">{bestScoreFor(studentId, current.id)}/100</span>. Restart the unit to try again.
+                  {current.type === "record" ? "Recording submitted. Restart the unit to submit a new practice recording." : <>Already answered — best score: <span className="font-semibold text-foreground">{bestScoreFor(studentId, current.id)}/100</span>. Restart the unit to try again.</>}
                 </div>
               ) : null}
               {current.hint?.trim() && (
@@ -1733,7 +1749,7 @@ export function ActivityRunner({
                 </div>
               )}
               <div key={`${current.id}-${feedback ? (feedback.ok ? "ok" : "ko") : "idle"}`} className={`mt-6 ${feedback && !feedback.ok ? "verbo-shake" : ""}`}>
-                <ExerciseBody activity={current} value={draft[current.id] ?? ""} onChange={(v) => setDraft((d) => ({ ...d, [current.id]: v }))} disabled={readOnly || alreadyAttempted} />
+                <ExerciseBody activity={current} value={draft[current.id] ?? ""} onChange={(v) => setDraft((d) => ({ ...d, [current.id]: v }))} disabled={readOnly || alreadyAttempted} studentId={studentId} previewMode={previewMode} onRecordSubmitted={recordingSubmitted} />
               </div>
 
             </div>
@@ -1767,13 +1783,13 @@ export function ActivityRunner({
                     Restart unit activities
                   </button>
                 )}
-                <button
-                  onClick={readOnly || alreadyAttempted ? next : check}
-                  disabled={!readOnly && !alreadyAttempted && !(draft[current.id] ?? "").trim() && current.type !== "record"}
+                {current.type === "record" && !readOnly && !alreadyAttempted && !previewMode ? null : <button
+                  onClick={readOnly || alreadyAttempted || (previewMode && current.type === "record") ? next : check}
+                  disabled={!readOnly && !alreadyAttempted && current.type !== "record" && !(draft[current.id] ?? "").trim()}
                   className="inline-flex items-center justify-center gap-2 rounded-xl bg-accent px-6 py-3 text-sm font-semibold text-accent-foreground shadow-[0_8px_24px_-6px_rgba(243,137,52,0.5)] transition-all hover:bg-[#d9731f] disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none"
                 >
-                  {readOnly || alreadyAttempted ? "Next" : "Check Answer"}
-                </button>
+                  {readOnly || alreadyAttempted || (previewMode && current.type === "record") ? "Next" : "Check Answer"}
+                </button>}
               </div>
 
             ) : (
@@ -1783,8 +1799,8 @@ export function ActivityRunner({
                     {feedback.ok ? <CheckCircle2 className="h-5 w-5" /> : <X className="h-5 w-5" />}
                   </span>
                   <div>
-                    <div className="text-sm font-semibold">{feedback.ok ? "Correct!" : "Not quite"}</div>
-                    <div className="text-xs opacity-80">{feedback.ok ? "Nice work — moving on." : (current.feedback?.trim() || "Try again next round — your best score is kept.")}</div>
+                    <div className="text-sm font-semibold">{feedback.recording ? "Practice submitted" : feedback.ok ? "Correct!" : "Not quite"}</div>
+                    <div className="text-xs opacity-80">{feedback.recording ? "Your recording is saved. You can keep going without waiting for a teacher to review it." : feedback.ok ? "Nice work — moving on." : (current.feedback?.trim() || "Try again next round — your best score is kept.")}</div>
                   </div>
                 </div>
                 <button
@@ -1805,7 +1821,7 @@ export function ActivityRunner({
 /* -------------------------------------------------------------------------- */
 /* Exercise bodies + evaluators (preserved from previous implementation)       */
 /* -------------------------------------------------------------------------- */
-function ExerciseBody({ activity, value, onChange, disabled }: { activity: Activity; value: string; onChange: (v: string) => void; disabled?: boolean }) {
+function ExerciseBody({ activity, value, onChange, disabled, studentId, previewMode, onRecordSubmitted }: { activity: Activity; value: string; onChange: (v: string) => void; disabled?: boolean; studentId: string; previewMode: boolean; onRecordSubmitted: () => void }) {
   const inputCls = "h-11 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground shadow-sm focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30 disabled:opacity-60";
 
   if (activity.type === "fill_gaps" || activity.type === "read_complete") {
@@ -1852,7 +1868,7 @@ function ExerciseBody({ activity, value, onChange, disabled }: { activity: Activ
   }
 
   if (activity.type === "record") {
-    return <RecordExercise sentence={activity.answer ?? ""} value={value} onChange={onChange} disabled={disabled} />;
+    return <RecordExercise sentence={activity.answer ?? ""} activityId={activity.id} studentId={studentId} disabled={disabled} previewMode={previewMode} onSubmitted={onRecordSubmitted} />;
   }
 
   return null;
@@ -1906,23 +1922,126 @@ function MatchExercise({ items, value, onChange, disabled }: { items: { text: st
   );
 }
 
-function RecordExercise({ sentence, value, onChange, disabled }: { sentence: string; value: string; onChange: (v: string) => void; disabled?: boolean }) {
+function RecordExercise({ sentence, activityId, studentId, disabled, previewMode, onSubmitted }: {
+  sentence: string; activityId: string; studentId: string; disabled?: boolean; previewMode: boolean; onSubmitted: () => void;
+}) {
   const [recording, setRecording] = useState(false);
   const [elapsed, setElapsed] = useState(0);
+  const [audio, setAudio] = useState<Blob | null>(null);
+  const [durationSeconds, setDurationSeconds] = useState(0);
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [reflection, setReflection] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [requesting, setRequesting] = useState(false);
+  const [error, setError] = useState("");
+  const [previous, setPrevious] = useState<{ url: string; reflection: string } | null>(null);
+  const recorder = useRef<MediaRecorder | null>(null);
+  const stream = useRef<MediaStream | null>(null);
+  const chunks = useRef<Blob[]>([]);
+  const startedAt = useRef(0);
   const timer = useRef<number | null>(null);
+  const limit = useRef<number | null>(null);
+  const alive = useRef(true);
 
-  useEffect(() => () => { if (timer.current) window.clearInterval(timer.current); }, []);
+  useEffect(() => {
+    if (!disabled || previewMode) return;
+    let live = true;
+    void (async () => {
+      try {
+        const rows = await loadRecordSubmissions(studentId, activityId);
+        if (!rows[0]) return;
+        const url = await signedRecordUrl(rows[0].audio_path);
+        if (live) setPrevious({ url, reflection: rows[0].reflection });
+      } catch { if (live) setError("Your previous recording couldn't be opened right now."); }
+    })();
+    return () => { live = false; };
+  }, [activityId, studentId, disabled, previewMode]);
 
-  const start = () => {
-    alert("Microphone access requested — recording will begin.");
-    setRecording(true);
-    setElapsed(0);
-    timer.current = window.setInterval(() => setElapsed((s) => s + 1), 1000);
-  };
+  useEffect(() => {
+    if (!audio) { setAudioUrl(null); return; }
+    const url = URL.createObjectURL(audio);
+    setAudioUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [audio]);
+
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+      if (timer.current !== null) window.clearInterval(timer.current);
+      if (limit.current !== null) window.clearTimeout(limit.current);
+      if (recorder.current?.state === "recording") {
+        recorder.current.onstop = null;
+        recorder.current.stop();
+      }
+      stream.current?.getTracks().forEach((track) => track.stop());
+    };
+  }, []);
+
   const stop = () => {
+    if (recorder.current?.state === "recording") recorder.current.stop();
+    if (timer.current !== null) window.clearInterval(timer.current);
+    if (limit.current !== null) window.clearTimeout(limit.current);
+    stream.current?.getTracks().forEach((track) => track.stop());
     setRecording(false);
-    if (timer.current) window.clearInterval(timer.current);
-    onChange("recorded");
+  };
+
+  const start = async () => {
+    if (requesting) return;
+    setError("");
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
+      setError("This browser can't record audio here. Try an updated browser with microphone access.");
+      return;
+    }
+    setRequesting(true);
+    try {
+      const microphone = await navigator.mediaDevices.getUserMedia({ audio: true });
+      if (!alive.current) { microphone.getTracks().forEach((track) => track.stop()); return; }
+      stream.current = microphone;
+      const mimeType = ["audio/webm;codecs=opus", "audio/mp4", "audio/ogg;codecs=opus", "audio/webm"]
+        .find((type) => MediaRecorder.isTypeSupported(type));
+      if (!mimeType) throw new Error("unsupported");
+      const next = new MediaRecorder(microphone, { mimeType });
+      recorder.current = next;
+      chunks.current = [];
+      setAudio(null);
+      setElapsed(0);
+      next.ondataavailable = (event) => { if (event.data.size) chunks.current.push(event.data); };
+      next.onstop = () => {
+        setRecording(false);
+        if (timer.current !== null) window.clearInterval(timer.current);
+        if (limit.current !== null) window.clearTimeout(limit.current);
+        microphoneCleanup();
+        const seconds = Math.ceil((Date.now() - startedAt.current) / 1000);
+        const blob = new Blob(chunks.current, { type: mimeType });
+        setDurationSeconds(seconds);
+        if (seconds < 2 || !blob.size) setError("Record at least 2 seconds, then try again.");
+        else if (blob.size > MAX_RECORD_BYTES) setError("That recording is over 10 MB. Please try a shorter one.");
+        else setAudio(blob);
+      };
+      startedAt.current = Date.now();
+      next.start();
+      setRecording(true);
+      timer.current = window.setInterval(() => setElapsed(Math.floor((Date.now() - startedAt.current) / 1000)), 1000);
+      limit.current = window.setTimeout(stop, 90_000);
+    } catch {
+      microphoneCleanup();
+      if (alive.current) setError("Microphone access failed. Check your browser permission and try again.");
+    } finally { if (alive.current) setRequesting(false); }
+  };
+
+  const microphoneCleanup = () => stream.current?.getTracks().forEach((track) => track.stop());
+
+  const submit = async () => {
+    if (!audio || saving) return;
+    setSaving(true);
+    setError("");
+    try {
+      await submitRecordPractice({ studentId, activityId, audio, durationSeconds, reflection });
+      onSubmitted();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Your recording wasn't saved. Please try again.");
+    } finally { setSaving(false); }
   };
 
   return (
@@ -1931,23 +2050,32 @@ function RecordExercise({ sentence, value, onChange, disabled }: { sentence: str
         <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Say this out loud</span>
         <div className="mt-2 font-medium">"{sentence}"</div>
       </div>
-      <div className="flex items-center justify-center gap-4 rounded-xl border border-border bg-background p-6">
-        <button
-          onClick={recording ? stop : start}
-          disabled={disabled}
-          className={`flex h-16 w-16 items-center justify-center rounded-full text-white shadow-lg transition-transform hover:scale-105 disabled:opacity-60 ${recording ? "animate-pulse bg-rose-600" : "bg-accent"}`}
-        >
-          <Mic className="h-6 w-6" />
-        </button>
-        <div className="flex items-end gap-1">
-          {Array.from({ length: 14 }).map((_, i) => (
-            <span key={i} className={`w-1.5 rounded-full ${recording ? "bg-accent" : value ? "bg-emerald-500" : "bg-border"}`} style={{ height: `${8 + ((i * 7 + elapsed * 3) % 28)}px` }} />
-          ))}
+      {disabled ? (
+        <div className="space-y-3 rounded-xl border border-border bg-background p-5">
+          <p className="text-sm font-medium">Recording practice</p>
+          {previous ? <><audio controls src={previous.url} className="w-full" /><p className="text-sm text-muted-foreground">Your reflection: {previous.reflection}</p></> : <p className="text-xs text-muted-foreground">No submitted audio is available for this activity.</p>}
         </div>
-        <div className="text-sm font-medium text-foreground">
-          {recording ? `Recording… ${elapsed}s` : value ? "Recorded ✓" : "Tap to record"}
-        </div>
-      </div>
+      ) : (
+        <>
+          <div className="flex items-center gap-4 rounded-xl border border-border bg-background p-5">
+            <button type="button" onClick={recording ? stop : () => { void start(); }} disabled={saving || requesting} aria-label={recording ? "Stop recording" : "Start recording"}
+              className={`flex h-16 w-16 shrink-0 items-center justify-center rounded-full text-white shadow-lg disabled:opacity-60 ${recording ? "animate-pulse bg-rose-600" : "bg-accent"}`}>
+              <Mic className="h-6 w-6" />
+            </button>
+            <div className="text-sm text-foreground">{requesting ? "Waiting for microphone access…" : recording ? `Recording… ${elapsed}s / 90s. Tap to stop.` : audio ? "Recording ready. Listen before submitting or record again." : "Tap to record. You can try again before submitting."}</div>
+          </div>
+          {audioUrl && <audio controls src={audioUrl} className="w-full" />}
+          {audio && <label className="block text-sm font-medium text-foreground">What would you improve in your next attempt?
+            <textarea value={reflection} onChange={(event) => setReflection(event.target.value)} maxLength={1000} rows={3}
+              className="mt-2 w-full rounded-lg border border-border bg-background p-3 text-sm" placeholder="For example: I want to speak more clearly and pause less." />
+          </label>}
+          {audio && <p className="text-xs text-muted-foreground">This is speaking practice, not an automatic pronunciation grade. You can continue once it is saved.</p>}
+          {previewMode ? <p className="text-xs text-muted-foreground">Preview only — this recording will not be saved.</p> : audio &&
+            <button type="button" onClick={() => { void submit(); }} disabled={saving || reflection.trim().length < 10}
+              className="rounded-xl bg-accent px-5 py-3 text-sm font-semibold text-accent-foreground disabled:opacity-50">{saving ? "Saving recording…" : "Submit recording"}</button>}
+        </>
+      )}
+      {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
     </div>
   );
 }
@@ -1956,7 +2084,7 @@ function evaluate(activity: Activity, value: string): boolean {
   const norm = (s: string) => s.trim().toLowerCase();
   if (activity.type === "fill_gaps" || activity.type === "read_complete") return norm(value) === norm(activity.answer ?? "");
   if (activity.type === "read_select" || activity.type === "listen_select") return Number(value) === activity.correctIndex;
-  if (activity.type === "record") return value === "recorded" || !!value;
+  if (activity.type === "record") return false;
   if (activity.type === "drag_drop" || activity.type === "match") {
     try {
       const map = JSON.parse(value || "{}") as Record<string, string>;
