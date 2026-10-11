@@ -2755,6 +2755,51 @@ export type Database = {
         }
         Relationships: []
       }
+      record_submissions: {
+        Row: {
+          id: string
+          student_id: string
+          activity_id: number
+          audio_path: string
+          reflection: string
+          duration_seconds: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          student_id: string
+          activity_id: number
+          audio_path: string
+          reflection: string
+          duration_seconds: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          student_id?: string
+          activity_id?: number
+          audio_path?: string
+          reflection?: string
+          duration_seconds?: number
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "record_submissions_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "app_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "record_submissions_activity_id_fkey"
+            columns: ["activity_id"]
+            isOneToOne: false
+            referencedRelation: "activities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       report_admin_edits: {
         Row: {
           actor_id: string
