@@ -225,8 +225,8 @@ function mapSessionRow(row: SessionRow, members: MemberStatusRow[], edits: Admin
 async function hydrate(): Promise<void> {
   if (hydrated) return;
   if (hydratePromise) return hydratePromise;
+  const requestGeneration = hydrateGeneration;
   hydratePromise = (async () => {
-    const requestGeneration = hydrateGeneration;
     await hydrateUserIdBridge();
     const [sessionsRes, membersRes, editsRes] = await withTimeout(Promise.all([
       supabase.from("sessions").select("*"),
@@ -260,7 +260,11 @@ async function hydrate(): Promise<void> {
     hydrated = true;
     toast.dismiss("sessions-refresh");
     notify();
-  })().catch(() => { toast.warning("Couldn't refresh sessions. Showing the last saved calendar; reconnect and try again.", {id:"sessions-refresh"}); }).finally(() => {
+  })().catch(() => {
+    if (requestGeneration === hydrateGeneration) {
+      toast.warning("Couldn't refresh sessions. Showing the last saved calendar; reconnect and try again.", {id:"sessions-refresh"});
+    }
+  }).finally(() => {
     hydratePromise = null;
     if (refreshQueued) { refreshQueued = false; void hydrate(); }
   });

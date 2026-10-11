@@ -218,7 +218,9 @@ export function NotificationsBell({ variant = "light" }: { variant?: "light" | "
 
   const isDark = variant === "dark";
   const visible = notifications.slice(0, MAX_VISIBLE);
-  const hasUnread = unreadCount > 0;
+  // The read map loads after the account changes. Until then the derived
+  // notifications are not evidence that this user has unread items.
+  const hasUnread = isNotificationReadStateLoaded(user.id) && unreadCount > 0;
 
   const onClickItem = (n: Notification) => {
     if (!n.read) markNotificationRead(user.id, n.id);
