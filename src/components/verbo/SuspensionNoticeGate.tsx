@@ -57,7 +57,7 @@ function SuspensionScreen({ access, onExit }: { access: SuspensionAccess; onExit
     const timer = setInterval(tick, 100);
     return () => clearInterval(timer);
   }, [stage]);
-  const act = async (action: NoticeAction, next?: () => void) => {
+  const act = async (action: NoticeAction, next?: () => void, onFailure?: () => void) => {
     if (operation.current) return;
     operation.current = true;
     setBusy(true);
@@ -68,6 +68,7 @@ function SuspensionScreen({ access, onExit }: { access: SuspensionAccess; onExit
       next?.();
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo guardar el registro.");
+      onFailure?.();
     } finally {
       operation.current = false;
       setBusy(false);
@@ -85,7 +86,7 @@ function SuspensionScreen({ access, onExit }: { access: SuspensionAccess; onExit
         setRemaining(5);
         setStage("warning");
       });
-    } else if (stage === "warning" && remaining === 0) void act("closed", exit);
+    } else if (stage === "warning" && remaining === 0) void act("closed", exit, exit);
   };
   const button =
     "rounded-xl px-5 py-3 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50";
@@ -196,7 +197,7 @@ function SuspensionScreen({ access, onExit }: { access: SuspensionAccess; onExit
                     disabled={busy || !notice.first_shown_at}
                     onClick={() => {
                       window.open("https://wa.link/zomggz", "_blank", "noopener,noreferrer");
-                      void act("contact_opened", exit);
+                      void act("contact_opened", exit, exit);
                     }}
                     className={`${button} bg-[#f38934] text-white`}
                   >
@@ -204,7 +205,7 @@ function SuspensionScreen({ access, onExit }: { access: SuspensionAccess; onExit
                   </button>
                   <button
                     disabled={busy}
-                    onClick={() => void act("returned_to_login", exit)}
+                    onClick={() => void act("returned_to_login", exit, exit)}
                     className={`${button} border border-slate-300 text-[#01304a]`}
                   >
                     Volver al inicio de sesión
