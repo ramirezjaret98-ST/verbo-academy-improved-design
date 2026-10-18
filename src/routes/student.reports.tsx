@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useSyncExternalStore } from "react";
 import { Card, Pill } from "@/components/verbo/ui";
 import { useAuth } from "@/lib/auth";
+import { SuspensionHistory } from "@/components/verbo/SuspensionHistory";
 import { userById } from "@/lib/mock-data";
 import { loadContentIssueReports, subscribeContentIssueReports, type ContentIssueReport } from "@/lib/content-issue-reports-store";
 import { loadConductReports, subscribeConductReports, type ConductReport } from "@/lib/conduct-reports-store";
@@ -23,6 +24,7 @@ function MyReportsPage() {
       <h1 className="text-2xl font-semibold text-foreground">My Reports</h1>
       <p className="mt-2 text-sm text-muted-foreground">Follow the technical and conduct issues you sent to Verbo.</p>
     </header>
+    {user && <SuspensionHistory studentId={user.id} />}
     {content.length === 0 && conduct.length === 0 && <Card><p className="text-sm text-muted-foreground">You have not sent a report yet.</p></Card>}
     {content.map((report) => <Card key={`technical-${report.id}`} className="space-y-2">
       <div className="flex flex-wrap items-center justify-between gap-2">

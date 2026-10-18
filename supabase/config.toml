@@ -1,5 +1,10 @@
 project_id = "tudkeownvrohnijulsvk"
 
+# Issues access only after getUser validates a JWT. Subsequent actions use
+# a hashed, expiring, notice-only capability; worker uses a private job token.
+[functions.suspension-notices]
+verify_jwt = false
+
 [functions.club-guest]
 verify_jwt = false
 
