@@ -1,13 +1,16 @@
-import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { USERS, registerAuthenticatedStudent, userById, type User, type Role } from "./mock-data";
 import { isMemberBlockedInDatabase } from "./groups-store";
 import { hydrateAdminRoles, isUserDeactivated } from "./admin-roles";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 import { withTimeout } from "@/lib/net-utils";
+import { issueSuspensionAccess, type SuspensionAccess } from "@/lib/suspension-notices";
 
 interface AuthCtx {
   user: User | null;
+  suspensionAccess: SuspensionAccess | null;
+  clearSuspension: () => void;
   /** False until the stored session has been restored on the client. */
   ready: boolean;
   /** True during an intentional sign-out, from the moment `logout()` is called
@@ -218,10 +221,11 @@ export function getCurrentRole(): Role | null {
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUserState] = useState<User | null>(null);
-  const setUser = (u: User | null) => {
+  const [suspensionAccess, setSuspensionAccess] = useState<SuspensionAccess | null>(null);
+  const setUser = useCallback((u: User | null) => {
     cachedRole = u?.role ?? null;
     setUserState(u);
-  };
+  }, []);
   const [ready, setReady] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const logoutTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -229,6 +233,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Kept separately from `user.id` (which stays the legacy demo id) so
   // profile writes (`updateProfile`) hit the right `app_users` row.
   const authIdRef = useRef<string | null>(null);
+  const captureSuspension = useCallback(async () => {
+    authIdRef.current = null;
+    setUser(null);
+    try {
+      setSuspensionAccess(await issueSuspensionAccess());
+    } finally {
+      await withTimeout(supabase.auth.signOut(), 10000, "suspended sign out");
+    }
+  }, [setUser]);
   useEffect(() => () => { if (logoutTimer.current) clearTimeout(logoutTimer.current); }, []);
 
   useEffect(() => {
@@ -251,6 +264,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const groupBlocked = built.role === "student" && await withTimeout(
         isMemberBlockedInDatabase(sessionUser.id), 10000, "group membership lookup",
       );
+      if (built.role === "student" && (built.status === "suspended" || groupBlocked)) {
+        await captureSuspension();
+        return;
+      }
       if (groupBlocked || built.admin_disabled === true || isUserDeactivated(built.id)) {
         authIdRef.current = null;
         setUser(null);
@@ -299,7 +316,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       subscription.subscription.unsubscribe();
       void supabase.removeChannel(profileChanges);
     };
-  }, []);
+  }, [captureSuspension, setUser]);
 
   const login: AuthCtx["login"] = async (email, password, _remember, captchaToken) => {
     // NOTE: Supabase's client (src/integrations/supabase/client.ts) always
@@ -394,12 +411,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             : "Invalid credentials. Contact your administrator.",
         };
       }
-      // Group members in Pending Removal or Archived status lose platform access.
-      if (built.role === "student" && await withTimeout(
+      const groupBlocked = built.role === "student" && await withTimeout(
         isMemberBlockedInDatabase(data.user.id), 10000, "group membership lookup",
-      )) {
-        await supabase.auth.signOut();
-        return { ok: false, error: "Access revoked. Contact your administrator." };
+      );
+      if (built.role === "student" && (built.status === "suspended" || groupBlocked)) {
+        await captureSuspension();
+        return { ok: false, error: "Tu acceso a Academy está suspendido." };
       }
       if (built.admin_disabled === true || isUserDeactivated(built.id)) {
         await supabase.auth.signOut();
@@ -432,6 +449,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    *  while the app navigates away; the flag lowers on the next tick pair, or
    *  immediately on a new login. */
   const logout = () => {
+    setSuspensionAccess(null);
     if (logoutTimer.current) clearTimeout(logoutTimer.current);
     setIsLoggingOut(true);
     authIdRef.current = null;
@@ -496,7 +514,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { ok: true };
   };
 
-  return <Ctx.Provider value={{ user, ready, isLoggingOut, login, logout, updateProfile }}>{children}</Ctx.Provider>;
+  return <Ctx.Provider value={{ user, suspensionAccess, clearSuspension: () => setSuspensionAccess(null), ready, isLoggingOut, login, logout, updateProfile }}>{children}</Ctx.Provider>;
 }
 
 export function useAuth() {

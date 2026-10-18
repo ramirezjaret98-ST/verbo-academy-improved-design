@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { SuspensionHistory } from "@/components/verbo/SuspensionHistory";
 import {
   USERS, SESSIONS, userById, type User,
 } from "@/lib/mock-data";
@@ -1599,7 +1600,7 @@ function StudentFormModal({
 // ===========================================================================
 // DETAIL MODAL (tabs + actions)
 // ===========================================================================
-type Tab = "overview" | "performance" | "progress" | "badges" | "reports" | "notes";
+type Tab = "overview" | "performance" | "progress" | "badges" | "reports" | "notes" | "notices";
 
 function StudentDetailModal({
   student, initialTab, teachers, onClose, onUpdate, onDelete, onEdit,
@@ -1725,7 +1726,7 @@ function StudentDetailModal({
 
         {/* Tabs */}
         <div className="verbo-scroll-hidden flex shrink-0 gap-1 overflow-x-auto border-b border-border bg-card px-3 pt-2 sm:px-5">
-          {([["overview", "Overview"], ["performance", "Performance & Attendance"], ["progress", "Course Progress"], ["badges", "Badges"], ["reports", "Reports"], ["notes", "Admin Notes"]] as [Tab, string][]).map(([id, label]) => (
+          {([["overview", "Overview"], ["performance", "Performance & Attendance"], ["progress", "Course Progress"], ["badges", "Badges"], ["reports", "Reports"], ["notices", "Avisos y acuses"], ["notes", "Admin Notes"]] as [Tab, string][]).map(([id, label]) => (
             <button
               key={id}
               onClick={() => setTab(id)}
@@ -2019,6 +2020,7 @@ function StudentDetailModal({
           {tab === "badges" && <BadgesOverridePanel student={student} />}
 
           {tab === "reports" && <ReportsTab student={student} />}
+          {tab === "notices" && <SuspensionHistory studentId={student.id} />}
 
           {tab === "notes" && (
             <div>

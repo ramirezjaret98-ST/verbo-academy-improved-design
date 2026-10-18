@@ -14,6 +14,7 @@ import appCss from "../styles.css?url";
 import { AuthProvider, useAuth as useAuthCtx } from "@/lib/auth";
 import { Toaster } from "@/components/ui/sonner";
 import { ContactVerbotModal } from "@/components/verbo/ContactVerbotModal";
+import { SuspensionNoticeGate } from "@/components/verbo/SuspensionNoticeGate";
 import { useIsMobile } from "@/hooks/use-mobile";
 import {
   NotFoundScreen,
@@ -72,9 +73,11 @@ function RootComponent() {
       ) : (
         <AuthProvider>
           <DeviceGate>
+            <SuspensionNoticeGate>
             <PasswordChangeGate>
               <Outlet />
             </PasswordChangeGate>
+            </SuspensionNoticeGate>
           </DeviceGate>
           <ContactVerbotModal />
           <Toaster />
