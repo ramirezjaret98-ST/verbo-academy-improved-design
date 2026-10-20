@@ -5,7 +5,7 @@ import { USERS, userById } from "@/lib/mock-data";
 import { assignedTeacherIdFor } from "@/lib/assignments-store";
 import { notifySuccess } from "@/lib/notify";
 import {
-  loadSessions,
+  loadAllSessions,
   createSession,
   updateSession,
   updateSessionsBulk,
@@ -56,13 +56,13 @@ function Page() {
   const [, forceTick] = useState(0);
   const students = USERS.filter((u) => u.role === "student");
   const teachers = USERS.filter((u) => u.role === "teacher");
-  const [sessions, setSessions] = useState<ExtSession[]>(() => loadSessions());
+  const [sessions, setSessions] = useState<ExtSession[]>(() => loadAllSessions());
 
   useEffect(() => {
     hydrateStudents();
     forceTick((n) => n + 1);
   }, []);
-  useEffect(() => subscribeSessions(() => setSessions(loadSessions())), []);
+  useEffect(() => subscribeSessions(() => setSessions(loadAllSessions())), []);
   useEffect(() => subscribeStudents(() => forceTick((n) => n + 1)), []);
 
   // Replaces the old localStorage-era "compute the full array, replace the
@@ -143,7 +143,7 @@ function Page() {
             const scheduled = sessions.filter((x) => {
               const belongs = x.student_id === s.id
                 || (!!x.member_statuses && Object.prototype.hasOwnProperty.call(x.member_statuses, s.id));
-              if (!belongs) return false;
+              if (!belongs || x.schedule_hold) return false;
               // For group sessions look at THIS student's per-member status
               // when it exists; fall back to the top-level status otherwise.
               const status = x.member_statuses?.[s.id] ?? x.status;
@@ -179,6 +179,9 @@ function Page() {
                 <div className="flex items-start justify-between">
                   <div>
                     <div className="text-base font-semibold text-foreground">{s.name}</div>
+                    {sessions.some((x) => (x.student_id === s.id || !!x.member_statuses?.[s.id]) && x.schedule_hold === "needs_schedule") && (
+                      <div className="mt-1 text-xs font-medium text-amber-700">Classes need a new time</div>
+                    )}
                     <div className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
                       <Building2 className="h-3.5 w-3.5" />
                       {s.company ?? "—"}
@@ -359,7 +362,7 @@ function BulkScheduler({
         (x) =>
           x.teacher_id === teacherId &&
           x.student_id !== studentId &&
-          isBlocking(x.status) &&
+          !x.schedule_hold && isBlocking(x.status) &&
           new Date(x.date_time).getTime() === slot.date.getTime(),
       );
       if (clash) { conflicts.push(slot.date); return; }
@@ -526,9 +529,8 @@ function StudentSessionsModal({
   const studentSessions = useMemo(
     () =>
       sessions
-        .filter((s) => s.student_id === studentId)
-        .sort((a, b) => +new Date(a.date_time) - +new Date(b.date_time))
-        .slice(0, 10),
+        .filter((s) => s.student_id === studentId || !!s.member_statuses?.[studentId])
+        .sort((a, b) => Number(!!b.schedule_hold) - Number(!!a.schedule_hold) || +new Date(a.date_time) - +new Date(b.date_time)),
     [sessions, studentId],
   );
 
@@ -731,7 +733,12 @@ function SessionRow({
         <td className="px-4 py-3 text-muted-foreground">{teacher?.name}</td>
         <td className="px-4 py-3">
           <div className="flex items-center gap-1.5">
-            {renderStatus(session.status)}
+            {session.schedule_hold ? (
+              <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-[11px] font-medium text-amber-900"
+                title="This class does not occupy a time slot or appear on calendars. Assign a new time after reactivation if needed.">
+                {session.schedule_hold === "suspended" ? "Suspended · slot released" : "Needs a new time"}
+              </span>
+            ) : renderStatus(session.status)}
             {session.status === "absent" && (
               <span className="text-[10px] font-medium text-muted-foreground">
                 {(session.absent_cause ?? "student") === "teacher" ? "· Teacher" : "· Student"}

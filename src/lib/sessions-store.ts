@@ -123,6 +123,8 @@ export interface ExtSession {
   student_connected_at?: string;
   teacher_connected_at?: string;
   student_reschedule_used?: boolean;
+  /** Server-owned hold: retained for Admin, excluded from operational schedules. */
+  schedule_hold?: "suspended" | "needs_schedule";
 }
 
 export const SESSIONS_EVENT = "verbo:sessions-updated";
@@ -134,6 +136,7 @@ type MemberStatusRow = Database["public"]["Tables"]["session_member_statuses"]["
 type AdminEditRow = Database["public"]["Tables"]["report_admin_edits"]["Row"];
 
 let sessionsCache: ExtSession[] = [];
+let operationalCache: ExtSession[] = [];
 let hydrated = false;
 let hydratePromise: Promise<void> | null = null;
 let hydrateGeneration = 0;
@@ -142,6 +145,7 @@ const listeners = new Set<() => void>();
 const SSR_SNAPSHOT: ExtSession[] = [];
 
 function notify() {
+  operationalCache = sessionsCache.filter((s) => !s.schedule_hold);
   listeners.forEach((cb) => cb());
   if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent(SESSIONS_EVENT));
 }
@@ -190,6 +194,7 @@ function mapSessionRow(row: SessionRow, members: MemberStatusRow[], edits: Admin
     duration_minutes: row.duration_minutes,
     teams_link: row.teams_link,
     status: row.status,
+    schedule_hold: row.schedule_hold === "suspended" || row.schedule_hold === "needs_schedule" ? row.schedule_hold : undefined,
     student_reschedule_used: (row as SessionRow & {student_reschedule_used?: boolean}).student_reschedule_used ?? false,
     absent_cause: (row.absent_cause as "student" | "teacher" | null) ?? undefined,
     report_pdf_url: row.report_pdf_url ?? undefined,
@@ -308,6 +313,12 @@ if (typeof window !== "undefined") {
 
 export function loadSessions(): ExtSession[] {
   if (!hydrated) void hydrate();
+  return operationalCache;
+}
+
+/** Administration retains held classes so a new time can be assigned. */
+export function loadAllSessions(): ExtSession[] {
+  if (!hydrated) void hydrate();
   return sessionsCache;
 }
 
@@ -337,7 +348,7 @@ export async function updateSessionsBulk(updates: Array<{ session: ExtSession; p
 
 export function getSessionsSnapshot(): ExtSession[] {
   if (!hydrated) void hydrate();
-  return sessionsCache;
+  return operationalCache;
 }
 
 export function getServerSessionsSnapshot(): ExtSession[] {
