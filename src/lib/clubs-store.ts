@@ -16,10 +16,11 @@ import type { Database } from "@/integrations/supabase/types";
 import { hydrateUserIdBridge, legacyToUuid, uuidToLegacySync } from "@/lib/user-id-bridge";
 import { USERS } from "./mock-data";
 import { notifyError } from "@/lib/notify";
+import { clubTimeStatus, type ClubTimeStatus } from "./club-lifecycle";
 
 export type ClubType = "insight" | "book";
 export type ClubTitleFont = "sans" | "serif" | "display";
-export type TimeStatus = "upcoming" | "live" | "completed" | "cancelled";
+export type TimeStatus = ClubTimeStatus;
 export type AssignmentStatus = "created" | "assigned";
 
 export interface Club {
@@ -122,7 +123,7 @@ function mapClubRow(row: ClubRow): Club {
     duration_minutes: row.duration_minutes,
     spots_taken: row.spots_taken,
     spots_total: row.spots_total,
-    status: row.status,
+    status: clubTimeStatus(row),
     teacher_payment: row.teacher_payment ?? undefined,
     claimed_at: row.claimed_at ?? undefined,
     created_at: row.created_at,
@@ -204,6 +205,16 @@ function refreshRequests() {
 }
 
 if (typeof window !== "undefined") {
+  window.setInterval(() => {
+    let changed = false;
+    clubsCache = clubsCache.map((club) => {
+      const status = clubTimeStatus(club);
+      if (status === club.status) return club;
+      changed = true;
+      return { ...club, status };
+    });
+    if (changed) notifyClubs();
+  }, 30_000);
   void hydrateClubs();
   registerRehydrate((reason) => {
     if (reason === "auth") {
@@ -262,7 +273,7 @@ export function clubTeacherName(id?: string): string | null {
 // ordered by the nearest date first — early-warning list for the admin.
 export function upcomingCreatedClubs(clubs: Club[] = clubsCache): Club[] {
   return clubs
-    .filter((c) => !c.teacher_id && c.status !== "completed" && c.status !== "cancelled")
+    .filter((c) => !c.teacher_id && c.status === "upcoming")
     .sort((a, b) => +new Date(a.date) - +new Date(b.date));
 }
 

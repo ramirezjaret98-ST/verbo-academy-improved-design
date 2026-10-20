@@ -17,7 +17,7 @@ import {
   reserveSeat,
   cancelSeat,
   useBookings,
-  bookingsForStudent,
+  loadConsumedBookings,
 } from "@/lib/club-bookings-store";
 import { isStandaloneClubCustomer, packageTotal } from "@/lib/club-package";
 import { AccentModalHeader, InfoStatRow, PrimaryButton } from "@/components/verbo/ui";
@@ -26,7 +26,7 @@ import { openClubMaterial } from "@/lib/club-media";
 
 function fmtLong(iso: string) {
   return new Date(iso).toLocaleString(undefined, {
-    weekday: "long", month: "long", day: "numeric",
+    timeZone: "America/Mexico_City", weekday: "long", month: "long", day: "numeric",
     hour: "2-digit", minute: "2-digit",
   });
 }
@@ -62,7 +62,7 @@ export function ClubReservationModal({
   const cap = monthlyCap(studentId, club.type);
   const student = userById(studentId);
   const standalone = isStandaloneClubCustomer(student);
-  const packageUsed = standalone ? bookingsForStudent(studentId).filter((booking) =>
+  const packageUsed = standalone ? loadConsumedBookings().filter((booking) => booking.student_id === studentId &&
     booking.club_package_id === student?.club_package_id && booking.club_type === club.type
     && loadClubs().find((item) => item.id === booking.club_id)?.status !== "cancelled").length : 0;
   const packageCap = packageTotal(student, club.type);
@@ -174,7 +174,7 @@ export function ClubReservationModal({
 
         <div className={club.cover_image ? "-mt-12 relative px-6 pb-7 pt-0 sm:px-9" : "p-6 sm:px-9"}>
         <div className="min-w-0">
-          {club.status === "completed" && booked && <div className={`mb-3 rounded-lg px-3 py-2 text-xs font-medium ${outcome === "present" ? "bg-green-50 text-green-800" : outcome === "absent" ? "bg-red-50 text-red-800" : "bg-secondary text-muted-foreground"}`}>{outcome === "present" ? "Completed · You attended" : outcome === "absent" ? "Absent · Your teacher recorded no attendance" : "This Insight has finished. Attendance is pending."}</div>}
+          {["completed", "absent"].includes(club.status) && booked && <div className={`mb-3 rounded-lg px-3 py-2 text-xs font-medium ${outcome === "present" ? "bg-green-50 text-green-800" : outcome === "absent" ? "bg-red-50 text-red-800" : "bg-secondary text-muted-foreground"}`}>{outcome === "present" ? "Completed · You attended" : outcome === "absent" ? "Absent · Your teacher recorded no attendance" : "This Insight has finished. Attendance is pending."}</div>}
           {booked && (
             <span className="mb-2 inline-flex items-center gap-1 rounded-full bg-success/10 px-2 py-0.5 text-[10px] font-semibold text-success">
               <CheckCircle2 className="h-3 w-3" /> You're in
@@ -189,7 +189,7 @@ export function ClubReservationModal({
           )}
           {club.instructions && <section className="mt-4 rounded-xl bg-secondary/50 p-3"><h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Instructions</h4><p className="mt-1 whitespace-pre-wrap text-sm text-foreground">{club.instructions}</p></section>}
           {club.topic_tag && <span className="mt-3 inline-block rounded-full bg-orange-50 px-3 py-1 text-xs font-medium text-orange-700">{club.topic_tag}</span>}
-          {club.status === "completed" && booked && report?.comments && <div className="mt-4 rounded-xl bg-secondary/50 p-3"><div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Teacher's group notes</div><p className="mt-1 text-sm text-foreground">{report.comments}</p></div>}
+          {["completed", "absent"].includes(club.status) && booked && report?.comments && <div className="mt-4 rounded-xl bg-secondary/50 p-3"><div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Teacher's group notes</div><p className="mt-1 text-sm text-foreground">{report.comments}</p></div>}
         </div>
 
 
@@ -266,7 +266,7 @@ export function ClubReservationModal({
         )}
 
         <div className="mt-6">
-          {preview ? <><div className="grid grid-cols-2 gap-2"><button type="button" disabled className="rounded-full bg-secondary px-4 py-2 text-sm font-medium text-muted-foreground">Reserve seat</button><button type="button" disabled className="rounded-full bg-secondary px-4 py-2 text-sm font-medium text-muted-foreground">Join the conversation</button></div><PrimaryButton className="mt-3 w-full justify-center" onClick={onClose}>Close preview</PrimaryButton></> : club.status === "completed" ? <PrimaryButton className="w-full justify-center" onClick={onClose}>Close</PrimaryButton> : booked ? (
+          {preview ? <><div className="grid grid-cols-2 gap-2"><button type="button" disabled className="rounded-full bg-secondary px-4 py-2 text-sm font-medium text-muted-foreground">Reserve seat</button><button type="button" disabled className="rounded-full bg-secondary px-4 py-2 text-sm font-medium text-muted-foreground">Join the conversation</button></div><PrimaryButton className="mt-3 w-full justify-center" onClick={onClose}>Close preview</PrimaryButton></> : ["completed", "absent", "expired", "cancelled"].includes(club.status) ? <PrimaryButton className="w-full justify-center" onClick={onClose}>Close</PrimaryButton> : booked ? (
             <>
               {connectOpen && club.link ? (
                 <PrimaryButton

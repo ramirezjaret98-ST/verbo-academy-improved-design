@@ -15,6 +15,7 @@ import { useSyncExternalStore } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 import { legacyToUuid } from "@/lib/user-id-bridge";
+import { registerRehydrate } from "@/lib/auth-rehydrate";
 
 export type FreemiumKind = "insight" | "book" | "spotlight";
 
@@ -33,6 +34,20 @@ const cache = new Map<string, FreemiumState>(); // legacy studentId -> state
 const hydratedFor = new Set<string>();
 const hydratingFor = new Map<string, Promise<void>>();
 const listeners = new Set<() => void>();
+
+if (typeof window !== "undefined") {
+  const refresh = () => {
+    const ids = [...hydratedFor];
+    hydratedFor.clear();
+    void Promise.all(ids.map(hydrateFor)).then(notify);
+  };
+  // A returned Core credit is changed by Admin, outside this student's tab.
+  window.addEventListener("verbo:club-bookings-updated", refresh);
+  registerRehydrate((reason) => {
+    if (reason === "auth") { cache.clear(); hydratedFor.clear(); notify(); }
+    else refresh();
+  });
+}
 
 const SERVER: FreemiumState = {};
 let snapshotToken: FreemiumState = SERVER;

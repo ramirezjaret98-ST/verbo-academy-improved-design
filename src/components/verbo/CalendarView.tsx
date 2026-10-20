@@ -500,7 +500,7 @@ function EventPill({
         title={
           (ev.sub_status
             ? `${SUB_STATUS_META[ev.sub_status].label} — ${ev.title}`
-            : `${showBooked ? "Reserved — " : ""}${missed ? "Missed" : ev.is_group ? "Group" : kindMeta.label} — ${ev.title}`) +
+             : `${showBooked ? "Reserved — " : ""}${missed ? "Expired" : ev.is_group ? "Group" : kindMeta.label} — ${ev.title}`) +
           (full ? " · Full" : "")
         }
       >
@@ -517,7 +517,7 @@ function EventPill({
         {attention && <span className="shrink-0 rounded bg-[#b52904] px-1 text-[9px] font-bold text-white">Changed</span>}
         <span className="truncate">
           {isClub
-            ? `${fmtTime(ev.date)} · ${ev.title}${missed ? " · Missed" : seats ? ` · ${seats}` : ""}`
+            ? `${fmtTime(ev.date)} · ${ev.title}${missed ? " · Expired" : seats ? ` · ${seats}` : ""}`
             : `${fmtTime(ev.date)} · ${ev.is_group || ev.kind === "in_person" ? ev.title : ev.title.split(" ")[0]}${cellLabelInline}`}
         </span>
         {ev.holiday_makeup && (

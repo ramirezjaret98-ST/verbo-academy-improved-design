@@ -16,6 +16,8 @@ import {
   type StudentRequest,
 } from "@/lib/student-requests-store";
 import { userById } from "@/lib/mock-data";
+import { TeacherClubDetails } from "@/components/verbo/TeacherClubDetails";
+import { CLUB_STATUS_META } from "@/lib/club-lifecycle";
 
 export const Route = createFileRoute("/teacher/clubs")({ component: Page });
 
@@ -40,7 +42,7 @@ const CLUB_IDENTITY: Record<ClubType, { label: string; Icon: typeof Sparkles; gr
 const PROPOSE_URL = "https://wa.me/522461152136?text=Hola!%20Quiero%20proponer%20una%20idea%20de%20club:%20";
 
 function fmtDate(iso: string) {
-  return new Date(iso).toLocaleString("en-US", { weekday: "short", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+  return new Date(iso).toLocaleString("en-US", { timeZone: "America/Mexico_City", weekday: "short", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) + " · CDMX";
 }
 function fmtMMSS(ms: number) {
   const s = Math.max(0, Math.ceil(ms / 1000));
@@ -63,6 +65,7 @@ function Page() {
   const [banner, setBanner] = useState<{ clubId: string; claimedAt: number } | null>(null);
   const [now, setNow] = useState(Date.now());
   const [releaseFor, setReleaseFor] = useState<Club | null>(null);
+  const [detailClub, setDetailClub] = useState<Club | null>(null);
 
   useEffect(() => {
     setClubs(loadClubs());
@@ -90,7 +93,7 @@ function Page() {
 
   const available = useMemo(
     () => clubs
-      .filter((c) => !c.teacher_id && c.status !== "completed" && c.status !== "cancelled")
+      .filter((c) => !c.teacher_id && c.status === "upcoming")
       .filter((c) => filter === "all" || c.type === filter)
       .sort((a, b) => +new Date(a.date) - +new Date(b.date)),
     [clubs, filter],
@@ -369,14 +372,15 @@ function Page() {
                     <id.Icon className="h-5 w-5" />
                   </span>
                   <div className="min-w-0">
-                    <div className="truncate text-[15px] font-semibold text-foreground">{c.title}</div>
+                    <button type="button" onClick={() => setDetailClub(c)} className="text-left text-[15px] font-semibold text-foreground hover:underline">{c.title}</button>
                     <div className="mt-0.5 text-xs text-muted-foreground">
                       <span style={{ color: id.solid }} className="font-semibold">{id.label}</span>
                       {" · "}{fmtDate(c.date)} · {c.duration_minutes} min
                     </div>
                   </div>
                 </div>
-                {pending ? (
+                <div className="flex flex-wrap items-center gap-2"><span className="rounded-full px-3 py-1 text-xs font-semibold text-white" style={{ background: CLUB_STATUS_META[c.status].color }}>{CLUB_STATUS_META[c.status].label}</span><GhostButton onClick={() => setDetailClub(c)}>View details</GhostButton></div>
+                {c.status !== "upcoming" ? null : pending ? (
                   <span className="rounded-full bg-warning/15 px-3 py-1 text-[11px] font-semibold text-warning-foreground">Release requested</span>
                 ) : withinFree ? (
                   <GhostButton disabled className="opacity-60">Within free release window</GhostButton>
@@ -389,6 +393,7 @@ function Page() {
         </div>
       )}
 
+      {detailClub && <AccentModal background={CLUB_IDENTITY[detailClub.type].grad} iconTint={CLUB_IDENTITY[detailClub.type].solid} icon={CLUB_IDENTITY[detailClub.type].Icon} eyebrow={CLUB_IDENTITY[detailClub.type].label} title={detailClub.title} onClose={() => setDetailClub(null)}><TeacherClubDetails club={clubs.find((club) => club.id === detailClub.id) ?? detailClub} /><AccentModalFooter><GhostButton onClick={() => setDetailClub(null)}>Close</GhostButton></AccentModalFooter></AccentModal>}
       {releaseFor && (
         <RequestReleaseModal
           club={releaseFor}

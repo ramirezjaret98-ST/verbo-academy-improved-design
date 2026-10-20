@@ -3,7 +3,7 @@ import { Link } from "@tanstack/react-router";
 import { ArrowRight, CalendarDays, ChevronLeft, ChevronRight, Pause, Play, Sparkles } from "lucide-react";
 import { Card, PrimaryButton } from "@/components/verbo/ui";
 import { loadClubs, subscribeClubs, type Club, type ClubType } from "@/lib/clubs-store";
-import { bookingsForStudent, isBooked, resolvedMonthlyCap, resolvedRemainingSeats, subscribeBookings } from "@/lib/club-bookings-store";
+import { loadConsumedBookings, bookingsForStudent, isBooked, resolvedMonthlyCap, resolvedRemainingSeats, subscribeBookings } from "@/lib/club-bookings-store";
 import { isStandaloneClubCustomer, packageTotal } from "@/lib/club-package";
 import { userById } from "@/lib/mock-data";
 import { ClubReservationModal } from "@/components/verbo/ClubReservationModal";
@@ -47,7 +47,7 @@ export function ClubsDashboard({ name, studentId, preview = false, onExplore, al
   const reservedThisMonth = bookings.filter((b) => { const d = new Date(b.booked_at); return d.getMonth() === month && d.getFullYear() === year; }).length;
   const student = studentId ? userById(studentId) : undefined;
   const standalone = isStandaloneClubCustomer(student);
-  const reservedInPackage = bookings.filter((booking) => booking.club_package_id === student?.club_package_id
+  const reservedInPackage = loadConsumedBookings().filter((booking) => booking.student_id === studentId && allowedTypes.includes(booking.club_type) && booking.club_package_id === student?.club_package_id
     && loadClubs().find((club) => club.id === booking.club_id)?.status !== "cancelled").length;
 
   useEffect(() => {

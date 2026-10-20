@@ -6,7 +6,7 @@ import {
   saveClubReport, type ClubAttendance, type ClubReportEventType,
 } from "@/lib/club-reports-store";
 import { updateSession } from "@/lib/sessions-store";
-import { supabase } from "@/integrations/supabase/client";
+import { loadClubRoster, type ClubAttendee } from "@/lib/club-roster";
 
 export interface ClubReportEventInput {
   id: string;
@@ -44,24 +44,21 @@ export function ClubReportModal({
   const [attendance, setAttendance] = useState<Record<string, ClubAttendance>>({});
   const [comments, setComments] = useState("");
   const [busy, setBusy] = useState(false);
-  const [guestRoster, setGuestRoster] = useState<{ booking_id: string; guest_name: string }[] | null>(event.type === "spotlight" ? [] : null);
+  const [guestRoster, setGuestRoster] = useState<ClubAttendee[] | null>(event.type === "spotlight" ? [] : null);
   const [rosterError, setRosterError] = useState("");
 
   useEffect(() => {
     if (event.type === "spotlight") return;
     let active = true;
-    void supabase.rpc("guest_club_roster" as never, { p_club_id: Number(event.id) } as never).then(({ data, error }) => {
-      if (!active) return;
-      if (error) setRosterError("Could not load the guest roster. Close and retry before submitting.");
-      else setGuestRoster((data ?? []) as { booking_id: string; guest_name: string }[]);
-    });
+    setGuestRoster(null);
+    setAttendance({});
+    void loadClubRoster(event.id).then((rows) => {
+      if (active) { setGuestRoster(rows); setRosterError(""); }
+    }).catch(() => { if (active) setRosterError("Could not load attendees. Close and retry before submitting."); });
     return () => { active = false; };
   }, [event.id, event.type]);
 
-  const attendees = [
-    ...event.enrolled_students,
-    ...(guestRoster ?? []).map(guest => ({ id: `guest:${guest.booking_id}`, name: `${guest.guest_name} · Guest` })),
-  ];
+  const attendees = event.type === "spotlight" ? event.enrolled_students : (guestRoster ?? []).map((row) => ({ id: row.attendance_id, name: `${row.name} · ${row.kind === "courtesy" ? "Courtesy" : "Student"}` }));
 
   const fmt = new Date(event.date).toLocaleString(undefined, {
     weekday: "short", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
@@ -74,7 +71,7 @@ export function ClubReportModal({
 
   const submit = async () => {
     if (busy) return;
-    if (!guestRoster || Object.keys(attendance).length !== attendees.length) {
+    if (!guestRoster || attendees.length === 0 || Object.keys(attendance).length !== attendees.length) {
       notifyError("Mark every student's and guest's attendance before submitting.", { context: "Submitting club report" });
       return;
     }
@@ -189,7 +186,7 @@ export function ClubReportModal({
           </div>
           <div className="flex justify-end gap-2">
             <GhostButton onClick={onClose}>Cancel</GhostButton>
-            <PrimaryButton onClick={submit} disabled={busy || !guestRoster || Object.keys(attendance).length !== attendees.length}>{busy ? "Saving…" : "Submit Report"}</PrimaryButton>
+            <PrimaryButton onClick={submit} disabled={busy || !guestRoster || attendees.length === 0 || Object.keys(attendance).length !== attendees.length}>{busy ? "Saving…" : "Submit Report"}</PrimaryButton>
           </div>
         </div>
       </div>

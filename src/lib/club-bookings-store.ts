@@ -49,6 +49,7 @@ export interface ClubBooking {
   club_type: ClubType;
   booked_at: string; // ISO
   club_package_id?: string;
+  removed_at?: string;
 }
 
 export const CLUB_BOOKINGS_EVENT = "verbo:club-bookings-updated";
@@ -59,6 +60,7 @@ export const RESERVATION_CUTOFF_HOURS = 24;
 type Row = Database["public"]["Tables"]["club_bookings"]["Row"];
 
 let cache: ClubBooking[] = [];
+let activeCache: ClubBooking[] = [];
 let hydrated = false;
 let hydratePromise: Promise<void> | null = null;
 let generation = 0;
@@ -67,6 +69,7 @@ const FOREGROUND_REFRESH_MS = 2 * 60 * 1000;
 const listeners = new Set<() => void>();
 
 function notify() {
+  activeCache = cache.filter((booking) => !booking.removed_at);
   listeners.forEach((cb) => cb());
   if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent(CLUB_BOOKINGS_EVENT));
 }
@@ -79,6 +82,7 @@ function mapRow(row: Row): ClubBooking {
     club_type: row.club_type,
     booked_at: row.booked_at,
     club_package_id: row.club_package_id ?? undefined,
+    removed_at: row.removed_at ?? undefined,
   };
 }
 
@@ -140,6 +144,12 @@ if (typeof window !== "undefined") {
 
 export function loadBookings(): ClubBooking[] {
   if (!hydrated) void hydrate();
+  return activeCache;
+}
+
+/** Includes seats removed by Admin without returning the consumed access. */
+export function loadConsumedBookings(): ClubBooking[] {
+  if (!hydrated) void hydrate();
   return cache;
 }
 
@@ -159,7 +169,7 @@ function monthKey(iso: string): string {
 /** Bookings the student has made *this calendar month*, split by type. */
 export function bookingsThisMonth(studentId: string, type: ClubType): number {
   const now = monthKey(new Date().toISOString());
-  return loadBookings().filter(
+  return loadConsumedBookings().filter(
     (b) => b.student_id === studentId && b.club_type === type && monthKey(b.booked_at) === now,
   ).length;
 }
@@ -211,7 +221,7 @@ function monthsElapsedSinceCycle(studentId: string): number {
 /** Total historical bookings for the student, by type — used for Elite's
  *  cumulative balance (unused seats carry forward). */
 export function totalBookingsForStudent(studentId: string, type: ClubType): number {
-  return loadBookings().filter((b) => b.student_id === studentId && b.club_type === type).length;
+  return loadConsumedBookings().filter((b) => b.student_id === studentId && b.club_type === type).length;
 }
 
 /** How many more seats the student can consume RIGHT NOW for this kind.
@@ -223,7 +233,7 @@ export function resolvedRemainingSeats(studentId: string, kind: AccessKind): num
   if (isStandaloneClubCustomer(user)) {
     if (kind === "spotlight" || !packageCoversDate(user)) return 0;
     const total = packageTotal(user, kind);
-    const used = loadBookings().filter((booking) => booking.student_id === studentId
+    const used = loadConsumedBookings().filter((booking) => booking.student_id === studentId
       && booking.club_package_id === user?.club_package_id && booking.club_type === kind
       && loadClubs().find((club) => club.id === booking.club_id)?.status !== "cancelled").length;
     return Math.max(0, total - used);
@@ -265,6 +275,7 @@ export function reserveBlockedReason(
 ): string | null {
   if (club.status === "cancelled") return "This session was cancelled.";
   if (club.status === "completed") return "This session has already taken place.";
+  if (club.status === "expired" || club.status === "absent") return "This session has ended.";
   const hrs = hoursUntil(club.date);
   if (hrs < RESERVATION_CUTOFF_HOURS) return "Reservations close 24h before start.";
   if ((club.spots_taken ?? 0) >= club.spots_total) return "This session is full.";
@@ -363,13 +374,14 @@ export async function cancelSeat(studentId: string, clubId: string): Promise<{ o
     .delete()
     .eq("student_id", studentUuid)
     .eq("club_id", numericClubId)
+    .is("removed_at", null)
     .select("id");
   if (error || !data?.length) {
     console.error("[club-bookings-store] failed to cancel seat", error);
     return { ok: false, reason: error?.message || "The reservation is no longer available. Refresh and try again." };
   }
   generation++;
-  cache = cache.filter((b) => !(b.student_id === studentId && b.club_id === clubId));
+  cache = cache.filter((b) => !(b.student_id === studentId && b.club_id === clubId && !b.removed_at));
   notify();
   // spots_taken is now decremented atomically, server-side, by the
   // `club_bookings_after_delete` trigger.
@@ -386,7 +398,7 @@ function subscribe(cb: () => void): () => void {
 }
 const SERVER: ClubBooking[] = [];
 export function useBookings(): ClubBooking[] {
-  return useSyncExternalStore(subscribe, () => cache, () => SERVER);
+  return useSyncExternalStore(subscribe, () => activeCache, () => SERVER);
 }
 export function subscribeBookings(cb: () => void): () => void {
   return subscribe(cb);

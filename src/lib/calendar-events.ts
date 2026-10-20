@@ -21,6 +21,7 @@ import { isBooked, loadBookings } from "./club-bookings-store";
 import { userById } from "./mock-data";
 import { loadExternalOccurrences, type ExternalOccurrence } from "./external-schedule-store";
 import { getClubAttendanceForStudent } from "./club-reports-store";
+import { CLUB_STATUS_META, clubTimeStatus } from "./club-lifecycle";
 import {
   STATUS_PALETTE,
   SUBSTITUTION_COLOR,
@@ -298,7 +299,7 @@ export function isPendingStatus(status?: ExtSessionStatus): boolean {
  *  muted grey as cancelled). The stored club.status is NEVER changed. */
 export function isMissedClubEvent(ev: CalendarEvent, now: Date = new Date()): boolean {
   if (ev.kind !== "insight" && ev.kind !== "book_club") return false;
-  if (ev.status === "completed" || ev.status === "cancelled") return false;
+  if (ev.status === "completed" || ev.status === "absent" || ev.status === "cancelled") return false;
   const start = new Date(ev.date).getTime();
   if (Number.isNaN(start)) return false;
   const end = start + (ev.duration_minutes ?? 0) * 60_000;
@@ -317,8 +318,15 @@ export function eventPillDisplay(
   opts?: { substitutionAware?: boolean },
 ): { color: string; borderColor?: string; short: string; cellLabel: string } {
   if (ev.kind === "in_person") return { color: "#7c3aed", short: "P", cellLabel: "Presencial" };
+  if (ev.kind === "insight" || ev.kind === "book_club") {
+    const status = clubTimeStatus({ status: (ev.club?.status ?? ev.status ?? "upcoming") as TimeStatus, date: ev.date, duration_minutes: ev.duration_minutes });
+    if (["completed", "absent", "expired", "cancelled"].includes(status) && !(ev.kind === "insight" && ev.attendance_outcome)) {
+      const meta = CLUB_STATUS_META[status];
+      return { color: meta.color, short: EVENT_KIND_META[ev.kind].short, cellLabel: meta.label };
+    }
+  }
   if (isMissedClubEvent(ev)) {
-    return { color: STATUS_PALETTE.cancelled.color, short: EVENT_KIND_META[ev.kind].short, cellLabel: "Missed" };
+    return { color: CLUB_STATUS_META.expired.color, short: EVENT_KIND_META[ev.kind].short, cellLabel: "Expired" };
   }
   if (substitutionApplies(ev, opts?.substitutionAware)) {
     return { color: SUBSTITUTION_COLOR, short: "SUB", cellLabel: "Substitution" };
@@ -354,8 +362,15 @@ export function calendarEventTheme(
   ev: CalendarEvent,
   opts?: { substitutionAware?: boolean },
 ): { background: string; solid: string; textTone: "light" | "dark" } {
+  if (ev.kind === "insight" || ev.kind === "book_club") {
+    const status = clubTimeStatus({ status: (ev.club?.status ?? ev.status ?? "upcoming") as TimeStatus, date: ev.date, duration_minutes: ev.duration_minutes });
+    if (["completed", "absent", "expired", "cancelled"].includes(status) && !(ev.kind === "insight" && ev.attendance_outcome)) {
+      const color = CLUB_STATUS_META[status].color;
+      return { background: color, solid: color, textTone: "light" };
+    }
+  }
   if (isMissedClubEvent(ev)) {
-    return { background: STATUS_PALETTE.cancelled.color, solid: STATUS_PALETTE.cancelled.color, textTone: "light" };
+    return { background: CLUB_STATUS_META.expired.color, solid: CLUB_STATUS_META.expired.color, textTone: "light" };
   }
   if (substitutionApplies(ev, opts?.substitutionAware)) {
     return { background: SUBSTITUTION_COLOR, solid: SUBSTITUTION_COLOR, textTone: "light" };
