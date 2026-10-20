@@ -2908,6 +2908,7 @@ export type Database = {
       }
       sessions: {
         Row: {
+          schedule_hold: string | null
           absent_cause: string | null
           attendance_delayed: boolean | null
           attendance_sub_status:
@@ -2948,6 +2949,7 @@ export type Database = {
           workshop_topic: string | null
         }
         Insert: {
+          schedule_hold?: string | null
           absent_cause?: string | null
           attendance_delayed?: boolean | null
           attendance_sub_status?:
@@ -2988,6 +2990,7 @@ export type Database = {
           workshop_topic?: string | null
         }
         Update: {
+          schedule_hold?: string | null
           absent_cause?: string | null
           attendance_delayed?: boolean | null
           attendance_sub_status?:
