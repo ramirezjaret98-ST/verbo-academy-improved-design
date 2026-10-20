@@ -13,6 +13,9 @@ import { notifySuccess, notifyError } from "@/lib/notify";
 import { uploadClubFile, removeUploadedClubFiles, validateClubFile, type UploadedClubMedia } from "@/lib/club-media";
 import { InsightsDashboard } from "@/components/verbo/InsightsDashboard";
 import { ClubReservationModal } from "@/components/verbo/ClubReservationModal";
+import { ClubRoster } from "@/components/verbo/ClubRoster";
+import { CLUB_STATUS_META } from "@/lib/club-lifecycle";
+import { ACADEMY_TIME_ZONE, academyDateTime, academyISO } from "@/lib/academy-time";
 import { ClubCatalog } from "@/components/verbo/ClubCatalog";
 import { GuestCourtesiesPanel } from "@/components/verbo/GuestCourtesiesPanel";
 import { loadAdminCatalogRequests, updateSuggestionStatus, type ClubSuggestion, type ClubRepeatRequest } from "@/lib/club-catalog-store";
@@ -52,14 +55,16 @@ export const Route = createFileRoute("/admin/clubs")({
 const STATUS_TONE: Record<TimeStatus, "default" | "success" | "warning" | "danger" | "muted"> = {
   upcoming: "default",
   live: "success",
-  completed: "muted",
+  completed: "success",
+  expired: "warning",
+  absent: "danger",
   cancelled: "danger",
 };
 
 
 function formatDate(iso: string) {
   const d = new Date(iso);
-  return d.toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" });
+  return d.toLocaleString("en-US", { timeZone: ACADEMY_TIME_ZONE, month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
 function formatDay(iso: string) {
@@ -67,9 +72,7 @@ function formatDay(iso: string) {
 }
 
 function toLocalDateTime(iso: string) {
-  const d = new Date(iso);
-  const local = new Date(d.getTime() - d.getTimezoneOffset() * 60_000);
-  return local.toISOString().slice(0, 16);
+  return academyDateTime(iso);
 }
 
 // Simple normalized similarity — no AI. Exact-ish match ignoring case/spacing.
@@ -279,12 +282,12 @@ function ListView({ clubs, onEdit, onDelete }: { clubs: Club[]; onEdit: (c: Club
                   </div>
                 </td>
                 <td className="px-6 py-4">
-                  <div className="font-medium text-foreground">{c.title}</div>
+                  <button type="button" onClick={() => onEdit(c)} className="text-left font-medium text-foreground hover:underline">{c.title}</button>
                   <div className="text-xs text-muted-foreground">{c.type === "insight" ? "Verbo Insight" : "Book Club"}</div>
                 </td>
                 <td className="px-6 py-4 text-muted-foreground">{tName ?? <span className="italic text-muted-foreground/70">Unassigned</span>}</td>
                 <td className="px-6 py-4 text-muted-foreground">{formatDate(c.date)}</td>
-                <td className="px-6 py-4 text-foreground">{c.spots_taken}/{c.spots_total}</td>
+                <td className="px-6 py-4 text-foreground"><button type="button" onClick={() => onEdit(c)} className="underline underline-offset-2">{c.spots_taken}/{c.spots_total}</button></td>
                 <td className="px-6 py-4">
                   <span
                     className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-medium ${assignment === "assigned" ? "" : "bg-warning text-warning-foreground"}`}
@@ -296,15 +299,9 @@ function ListView({ clubs, onEdit, onDelete }: { clubs: Club[]; onEdit: (c: Club
                 <td className="px-6 py-4">
                   <Pill
                     tone={STATUS_TONE[c.status]}
-                    style={
-                      c.status === "live"
-                        ? { background: "#5fca16", color: "#fff" }
-                        : c.status === "cancelled"
-                          ? { background: "#ef4444", color: "#fff" }
-                          : undefined
-                    }
+                    style={{ background: CLUB_STATUS_META[c.status].color, color: "#fff" }}
                   >
-                    {c.status}
+                    {CLUB_STATUS_META[c.status].label}
                   </Pill>
                 </td>
                 <td className="px-6 py-4">
@@ -565,7 +562,7 @@ export function ClubFormPanel({
     title_font: titleFont, cover_position_x: coverPositionX, cover_position_y: coverPositionY, cover_scale: coverScale,
     topic_tag: topicTag.trim() || undefined, catalog_featured: catalogFeatured, link: link.trim(),
     material: mediaMaterial, cover_image: mediaCover,
-    teacher_id: teacherId || undefined, date: new Date(date).toISOString(), duration_minutes: duration,
+    teacher_id: teacherId || undefined, date: academyISO(date), duration_minutes: duration,
     spots_total: spotsTotal,
     teacher_payment: teacherPayment.trim() === "" ? null : Math.max(0, parseFloat(teacherPayment) || 0),
   });
@@ -617,7 +614,8 @@ export function ClubFormPanel({
       maxWidth="max-w-xl"
       onClose={() => { if (!busy) onClose(); }}
     >
-      <form onSubmit={submit} className="max-h-[70vh] space-y-5 overflow-y-auto px-6 py-6">
+      {initial && <div className="px-6 pt-5"><ClubRoster clubId={initial.id} editable reported={initial.status === "completed" || initial.status === "absent"} /></div>}
+      <form onSubmit={submit} className="space-y-5 px-6 py-6">
         <ClubSectionBanner color="#01304a" textColor="#ffffff" icon={Sparkles} title="Event Details" />
 
         {/* Type toggle */}
@@ -778,12 +776,13 @@ export function ClubFormPanel({
 
         <div className="grid grid-cols-3 gap-4">
           <div className="col-span-2">
-            <Field label="Date & time">
+            <Field label="Date & time · CDMX" help="Book Clubs: Friday 8:00 PM. Insights: Wednesday 9:00 PM. All times use Mexico City.">
               <div className="relative">
                 <Calendar className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <input type="datetime-local" value={date} onChange={(e) => setDate(e.target.value)} className={`${fieldCls} pl-9`} required />
+                <input aria-label="Club date and time in CDMX" type="datetime-local" value={date} onChange={(e) => setDate(e.target.value)} className={`${fieldCls} pl-9`} required />
               </div>
             </Field>
+            <button type="button" disabled={!date} onClick={() => setDate(`${date.slice(0, 10)}T${type === "book" ? "20:00" : "21:00"}`)} className="mt-2 text-xs font-medium text-primary underline">Use usual time · {type === "book" ? "8:00 PM" : "9:00 PM"} CDMX</button>
           </div>
           <Field label="Duration (min)">
             <input type="number" min={5} step={5} value={duration} onChange={(e) => setDuration(parseInt(e.target.value) || 60)} className={fieldCls} />

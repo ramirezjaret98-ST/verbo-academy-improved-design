@@ -1,5 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
+import { TeacherClubDetails } from "@/components/verbo/TeacherClubDetails";
 import { toast } from "sonner";
 import { FileEdit, Video, Sparkles, BookOpen, Lightbulb, LogOut, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -465,10 +466,7 @@ function ClubQuickModal({ club, onClose, onCantAttend }: {
       watermark={{ type: "icon", icon: theme.icon }}
       onClose={onClose}
     >
-      <div className="px-5 py-4 text-sm text-muted-foreground">
-        {new Date(club.date).toLocaleString(undefined, { weekday: "long", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
-        {" · "}{club.spots_taken}/{club.spots_total} Seats
-      </div>
+      <TeacherClubDetails club={club} />
       <AccentModalFooter accent={theme.solid}>
         <GhostButton onClick={onCantAttend}>Can't Attend</GhostButton>
         <a

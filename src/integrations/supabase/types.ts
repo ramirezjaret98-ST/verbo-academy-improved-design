@@ -857,6 +857,7 @@ export type Database = {
       }
       club_bookings: {
         Row: {
+          removed_at: string | null
           club_package_id: string | null
           booked_at: string
           club_id: number
@@ -865,6 +866,7 @@ export type Database = {
           student_id: string
         }
         Insert: {
+          removed_at?: string | null
           club_package_id?: string | null
           booked_at?: string
           club_id: number
@@ -873,6 +875,7 @@ export type Database = {
           student_id: string
         }
         Update: {
+          removed_at?: string | null
           club_package_id?: string | null
           booked_at?: string
           club_id?: number
@@ -4511,7 +4514,7 @@ export type Database = {
         | "cancelled"
       student_status: "active" | "suspended" | "frozen"
       teacher_status: "active" | "frozen" | "removed"
-      time_status: "upcoming" | "live" | "completed" | "cancelled"
+      time_status: "upcoming" | "live" | "completed" | "cancelled" | "expired" | "absent"
       unit_access_action: "unlocked" | "locked"
       user_role: "student" | "teacher" | "admin"
       workshop_participant_kind: "student" | "standalone"
@@ -4752,7 +4755,7 @@ export const Constants = {
       ],
       student_status: ["active", "suspended", "frozen"],
       teacher_status: ["active", "frozen", "removed"],
-      time_status: ["upcoming", "live", "completed", "cancelled"],
+      time_status: ["upcoming", "live", "completed", "cancelled", "expired", "absent"],
       unit_access_action: ["unlocked", "locked"],
       user_role: ["student", "teacher", "admin"],
       workshop_participant_kind: ["student", "standalone"],
