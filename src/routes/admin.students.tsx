@@ -1624,8 +1624,8 @@ function StudentDetailModal({
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [teacherId, setTeacherId] = useState(assignedTeacherIdFor(student.id) ?? "");
-  const [freezeStart, setFreezeStart] = useState(student.freeze_start ?? "");
-  const [freezeEnd, setFreezeEnd] = useState(student.freeze_end ?? "");
+  const [freezeStart, setFreezeStart] = useState(student.freeze_start?.slice(0, 10) ?? "");
+  const [freezeEnd, setFreezeEnd] = useState(student.freeze_end?.slice(0, 10) ?? "");
   const [planModalOpen, setPlanModalOpen] = useState(false);
   // Feature A7 (2026-08-20): both Mark-as-Paid entry points (the header
   // button and the per-installment button in the Payment Plan card) now
@@ -1676,6 +1676,9 @@ function StudentDetailModal({
   }, [student.id]);
 
   const saveFreeze = () => {
+    if (!freezeStart || !freezeEnd || freezeEnd < freezeStart) {
+      alert("Choose a valid freeze start and end date."); return;
+    }
     if (freezeStart && freezeEnd) {
       const days = daysUntil(new Date(freezeEnd), new Date(freezeStart));
       if (days > 15) { alert("Freeze cannot exceed 15 days."); return; }

@@ -3488,6 +3488,36 @@ export type Database = {
           },
         ]
       }
+      teacher_external_overrides: {
+        Row: {
+          block_id: number
+          on_date: string
+          cancelled: boolean
+          replacement_date: string | null
+          start_min: number | null
+          end_min: number | null
+          updated_at: string
+        }
+        Insert: {
+          block_id: number
+          on_date: string
+          cancelled?: boolean
+          replacement_date?: string | null
+          start_min?: number | null
+          end_min?: number | null
+          updated_at?: string
+        }
+        Update: {
+          block_id?: number
+          on_date?: string
+          cancelled?: boolean
+          replacement_date?: string | null
+          start_min?: number | null
+          end_min?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       teacher_external_blocks: {
         Row: {
           id: number

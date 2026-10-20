@@ -27,6 +27,7 @@ import {
 } from "@/lib/calendar-events";
 import { SUB_STATUS_META, type ExtSessionStatus } from "@/lib/sessions-store";
 import { SUBSTITUTION_COLOR } from "@/lib/status-palette";
+import { ExternalOccurrenceEditor } from "./ExternalOccurrenceEditor";
 
 export type CalendarViewMode = "month" | "day";
 
@@ -81,6 +82,11 @@ export function CalendarView({
   attentionEventIds,
 }: CalendarViewProps) {
   const [mode, setMode] = useState<CalendarViewMode>(initialMode);
+  const [externalEvent, setExternalEvent] = useState<CalendarEvent | null>(null);
+  const openEvent = (event: CalendarEvent) => {
+    if (event.external) setExternalEvent(event);
+    else onEventClick?.(event);
+  };
   const [cursor, setCursor] = useState(() => { const d = initialDate ? new Date(initialDate) : new Date(); d.setDate(1); return d; });
   const [dayCursor, setDayCursor] = useState(() => (initialDate ? new Date(initialDate) : new Date()));
 
@@ -205,7 +211,7 @@ export function CalendarView({
         <MonthGrid
           cursor={cursor}
           eventsByDay={eventsByDay}
-          onEventClick={onEventClick}
+          onEventClick={openEvent}
           pulseKinds={pulseKinds}
           substitutionAware={substitutionAware}
           highlightEventId={highlightEventId}
@@ -217,7 +223,7 @@ export function CalendarView({
         <DayList
           day={dayCursor}
           events={eventsByDay.get(dayKey(dayCursor)) ?? []}
-          onEventClick={onEventClick}
+          onEventClick={openEvent}
           pulseKinds={pulseKinds}
           substitutionAware={substitutionAware}
           highlightEventId={highlightEventId}
@@ -229,6 +235,7 @@ export function CalendarView({
       )}
 
       {/* Canonical 7-status legend */}
+      {externalEvent?.external && <ExternalOccurrenceEditor occurrence={externalEvent.external} onClose={() => setExternalEvent(null)} />}
       <div className="rounded-2xl border border-border bg-secondary/40 px-4 py-3">
         <div className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
           Status legend
@@ -394,7 +401,7 @@ function DayList({
               borderColor: display.borderColor ?? "transparent",
             }}
           >
-            {EVENT_KIND_META[e.kind].label}
+            {e.kind === "in_person" ? "P · Presencial" : EVENT_KIND_META[e.kind].label}
           </span>
           {e.booked && (
             <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700" title="You're in">
@@ -511,7 +518,7 @@ function EventPill({
         <span className="truncate">
           {isClub
             ? `${fmtTime(ev.date)} · ${ev.title}${missed ? " · Missed" : seats ? ` · ${seats}` : ""}`
-            : `${fmtTime(ev.date)} · ${ev.is_group ? ev.title : ev.title.split(" ")[0]}${cellLabelInline}`}
+            : `${fmtTime(ev.date)} · ${ev.is_group || ev.kind === "in_person" ? ev.title : ev.title.split(" ")[0]}${cellLabelInline}`}
         </span>
         {ev.holiday_makeup && (
           <span className="ml-auto shrink-0 rounded bg-amber-100 px-1 text-[9px] font-bold leading-none text-amber-800" title="Holiday Makeup">

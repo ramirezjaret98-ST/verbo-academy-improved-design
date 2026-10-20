@@ -16,6 +16,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 import { hydrateUserIdBridge, legacyToUuid, uuidToLegacySync } from "@/lib/user-id-bridge";
 import { loadSessions } from "./sessions-store";
+import { isExternallyBlockedAt } from "./external-schedule-store";
 import { notifyError } from "@/lib/notify";
 import { registerRehydrate } from "@/lib/auth-rehydrate";
 
@@ -375,6 +376,7 @@ const JS_DAY_TO_KEY: Record<number, DayKey | null> = {
 /** Does the teacher's weekly schedule cover this date/time, and no other
  *  active session overlaps? Sundays are never available. */
 export function isTeacherAvailableAt(teacherId: string, dateISO: string, durationMin = 60, excludeSessionId?: string): boolean {
+  if (isExternallyBlockedAt(teacherId, dateISO, durationMin)) return false;
   const d = new Date(dateISO);
   const parts=new Intl.DateTimeFormat("en-US",{timeZone:"America/Mexico_City",weekday:"short",hour:"2-digit",minute:"2-digit",hourCycle:"h23"}).formatToParts(d);
   const part=(type:string)=>parts.find(p=>p.type===type)?.value ?? "";
