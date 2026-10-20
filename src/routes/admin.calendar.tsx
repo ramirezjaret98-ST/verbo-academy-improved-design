@@ -1,11 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useAuth } from "@/lib/auth";
+import { ExternalTeacherBlocks } from "@/components/verbo/ExternalTeacherBlocks";
+import { ExternalOccurrenceEditor } from "@/components/verbo/ExternalOccurrenceEditor";
 import { useEffect, useMemo, useState } from "react";
 import { CalendarDays, X, Video, FileText, CalendarClock, RefreshCcw, ClipboardList, NotebookPen, Pencil, UserCheck } from "lucide-react";
 import { USERS, userById, type Session } from "@/lib/mock-data";
 import { subscribeStudents } from "@/lib/students-store";
 import { subscribeTeachers } from "@/lib/teacher-model";
 import { notifySuccess } from "@/lib/notify";
-import { Card, GhostButton, PrimaryButton } from "@/components/verbo/ui";
+import { Card, GhostButton, PrimaryButton, AccentModal } from "@/components/verbo/ui";
 import { CalendarView } from "@/components/verbo/CalendarView";
 import { AdminScheduleAcknowledgements } from "@/components/verbo/AdminScheduleAcknowledgements";
 import {
@@ -64,6 +67,8 @@ export const Route = createFileRoute("/admin/calendar")({
 });
 
 function Page() {
+  const { user: admin } = useAuth();
+  const [managePresencial, setManagePresencial] = useState(false);
   const { studentId: studentIdParam, teacherId: teacherIdParam, highlight: highlightParam } = Route.useSearch();
   const [teacherId, setTeacherId] = useState(teacherIdParam ?? "");
   const [studentId, setStudentId] = useState(studentIdParam ?? "");
@@ -111,6 +116,14 @@ function Page() {
       </div>
 
       <AdminScheduleAcknowledgements />
+      {admin?.admin_type === "super_admin" && <div>
+        <GhostButton disabled={!teacherId} onClick={() => setManagePresencial(true)}>Administrar presenciales</GhostButton>
+        {!teacherId && <p className="mt-1 text-xs text-muted-foreground">Selecciona un profesor para editar sus horarios presenciales.</p>}
+      </div>}
+      {managePresencial && teacherId && <AccentModal background="#7c3aed" iconTint="#6d28d9"
+        eyebrow="Horarios reservados" title="Clases presenciales · P" maxWidth="max-w-3xl" onClose={() => setManagePresencial(false)}>
+        <div className="p-4"><ExternalTeacherBlocks teacherId={teacherId} /></div>
+      </AccentModal>}
 
       <Card>
         <div className="grid gap-4 md:grid-cols-2">
@@ -186,7 +199,15 @@ function Page() {
 // same RescheduleModal/PlanModal/updateSession() this page already uses)
 // for a session picked from its own "today/tomorrow" list or its embedded
 // Calendar Overview, instead of re-building a parallel modal.
-export function EventDetailsModal({
+export function EventDetailsModal(props: {
+  event: CalendarEvent; teacherIdFilter?: string; studentIdFilter?: string; onClose: () => void;
+}) {
+  return props.event.external
+    ? <ExternalOccurrenceEditor occurrence={props.event.external} onClose={props.onClose} />
+    : <AcademyEventDetailsModal {...props} />;
+}
+
+function AcademyEventDetailsModal({
   event,
   teacherIdFilter,
   studentIdFilter,

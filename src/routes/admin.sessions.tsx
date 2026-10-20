@@ -736,7 +736,7 @@ function SessionRow({
             {session.schedule_hold ? (
               <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-[11px] font-medium text-amber-900"
                 title="This class does not occupy a time slot or appear on calendars. Assign a new time after reactivation if needed.">
-                {session.schedule_hold === "suspended" ? "Suspended · slot released" : "Needs a new time"}
+                {session.schedule_hold === "suspended" ? "Suspended · slot released" : session.schedule_hold === "frozen" ? "Frozen · slot released" : "Needs a new time"}
               </span>
             ) : renderStatus(session.status)}
             {session.status === "absent" && (

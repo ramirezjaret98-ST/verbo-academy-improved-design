@@ -19,6 +19,7 @@ import { loadClubs, type Club, type ClubType, type TimeStatus } from "./clubs-st
 import { groupsByStudentId } from "./groups-store";
 import { isBooked, loadBookings } from "./club-bookings-store";
 import { userById } from "./mock-data";
+import { loadExternalOccurrences, type ExternalOccurrence } from "./external-schedule-store";
 import { getClubAttendanceForStudent } from "./club-reports-store";
 import {
   STATUS_PALETTE,
@@ -34,7 +35,8 @@ export type CalendarEventKind =
   | "workshop"     // Focus Workshop live session
   | "insight"      // Verbo Insight (club)
   | "book_club"    // Book Club (club)
-  | "spotlight";   // Spotlight Session
+  | "spotlight"    // Spotlight Session
+  | "in_person";
 
 export interface CalendarEvent {
   id: string;
@@ -71,6 +73,15 @@ export interface CalendarEvent {
   // Passthrough refs so click handlers can open the right modal / route.
   session?: ExtSession;
   club?: Club;
+  external?: ExternalOccurrence;
+}
+
+function externalEvents(teacherId?: string): CalendarEvent[] {
+  return loadExternalOccurrences(teacherId).map((o) => ({
+    id: `external:${o.blockId}:${o.originalDate}`, kind: "in_person", title: o.label,
+    subtitle: "Presencial · horario reservado", date: o.date_time,
+    duration_minutes: o.duration_minutes, external: o,
+  }));
 }
 
 
@@ -125,7 +136,7 @@ export function teacherCalendarEvents(teacherId: string, opts?: {
   studentNameOf?: (id: string) => string | undefined;
   cohortNameOf?: (id: string) => string | undefined;
 }): CalendarEvent[] {
-  const events: CalendarEvent[] = [];
+  const events: CalendarEvent[] = externalEvents(teacherId);
   const gMap = groupsByStudentId();
 
   // Sessions — classes + workshop live sessions live in the same store.
@@ -204,7 +215,7 @@ export function allCalendarEvents(): CalendarEvent[] {
 }
 
 function collectAdminEvents(teacherId: string | undefined, studentId: string | undefined): CalendarEvent[] {
-  const events: CalendarEvent[] = [];
+  const events: CalendarEvent[] = studentId ? [] : externalEvents(teacherId);
   const gMap = groupsByStudentId();
 
   for (const s of loadSessions()) {
@@ -260,6 +271,7 @@ export function isClubFull(ev: CalendarEvent): boolean {
  *  the session status; the value here is only a neutral fallback for events
  *  that arrive without a status. */
 export const EVENT_KIND_META: Record<CalendarEventKind, { label: string; color: string; borderColor?: string; short: string }> = {
+  in_person: { label: "Presencial", color: "#7c3aed", short: "P" },
   class:      { label: "Performance Session", color: STATUS_PALETTE.scheduled.color, borderColor: STATUS_PALETTE.scheduled.borderColor, short: "1:1" },
   workshop:   { label: "Workshop",       color: "#3300ff", short: "WS" },
   insight:    { label: "Insight",        color: "#01304a", short: "IN" },
@@ -304,6 +316,7 @@ export function eventPillDisplay(
   ev: CalendarEvent,
   opts?: { substitutionAware?: boolean },
 ): { color: string; borderColor?: string; short: string; cellLabel: string } {
+  if (ev.kind === "in_person") return { color: "#7c3aed", short: "P", cellLabel: "Presencial" };
   if (isMissedClubEvent(ev)) {
     return { color: STATUS_PALETTE.cancelled.color, short: EVENT_KIND_META[ev.kind].short, cellLabel: "Missed" };
   }
@@ -375,6 +388,7 @@ export function calendarEventTheme(
   }
 
   const byKind: Record<CalendarEventKind, { background: string; solid: string }> = {
+    in_person: { background: "#7c3aed", solid: "#7c3aed" },
     class:     { background: STATUS_PALETTE.scheduled.color, solid: STATUS_PALETTE.scheduled.color },
     workshop:  { background: EVENT_KIND_META.workshop.color, solid: EVENT_KIND_META.workshop.color },
     insight:   { background: "linear-gradient(135deg, #01304a 0%, #05070a 100%)", solid: "#01304a" },

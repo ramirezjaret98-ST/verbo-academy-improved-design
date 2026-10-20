@@ -29,6 +29,7 @@ import { saveSubskillEvaluation } from "./performance-store";
 import { decrementGroupRemaining, activeMembersOf } from "./groups-store";
 import { STATUS_PALETTE, statusTextColor } from "./status-palette";
 import { notifyError } from "@/lib/notify";
+import { subscribeExternalSchedule } from "./external-schedule-store";
 
 
 export type ExtSessionStatus =
@@ -124,7 +125,7 @@ export interface ExtSession {
   teacher_connected_at?: string;
   student_reschedule_used?: boolean;
   /** Server-owned hold: retained for Admin, excluded from operational schedules. */
-  schedule_hold?: "suspended" | "needs_schedule";
+  schedule_hold?: "suspended" | "frozen" | "needs_schedule";
 }
 
 export const SESSIONS_EVENT = "verbo:sessions-updated";
@@ -149,6 +150,9 @@ function notify() {
   listeners.forEach((cb) => cb());
   if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent(SESSIONS_EVENT));
 }
+
+// The same staff views render Academy sessions and in-person reservations.
+subscribeExternalSchedule(notify);
 
 function setSessionEntry(id: string, session: ExtSession | undefined, prepend?: ExtSession) {
   if (prepend) {
@@ -194,7 +198,7 @@ function mapSessionRow(row: SessionRow, members: MemberStatusRow[], edits: Admin
     duration_minutes: row.duration_minutes,
     teams_link: row.teams_link,
     status: row.status,
-    schedule_hold: row.schedule_hold === "suspended" || row.schedule_hold === "needs_schedule" ? row.schedule_hold : undefined,
+    schedule_hold: row.schedule_hold === "suspended" || row.schedule_hold === "frozen" || row.schedule_hold === "needs_schedule" ? row.schedule_hold : undefined,
     student_reschedule_used: (row as SessionRow & {student_reschedule_used?: boolean}).student_reschedule_used ?? false,
     absent_cause: (row.absent_cause as "student" | "teacher" | null) ?? undefined,
     report_pdf_url: row.report_pdf_url ?? undefined,
