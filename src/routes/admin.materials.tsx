@@ -155,6 +155,8 @@ function Page() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [type, setType] = useState<MaterialType>("pdf");
   const [title, setTitle] = useState("");
+  const [titleError, setTitleError] = useState(false);
+  const titleRef = useRef<HTMLInputElement>(null);
   const [category, setCategory] = useState(categories[0] ?? "Grammar");
   const [addingCat, setAddingCat] = useState(false);
   const [newCat, setNewCat] = useState("");
@@ -174,6 +176,7 @@ function Page() {
     setEditingId(null);
     setType("pdf");
     setTitle("");
+    setTitleError(false);
     setCategory(categories[0] ?? "Grammar");
     setAddingCat(false);
     setNewCat("");
@@ -217,7 +220,9 @@ function Page() {
     }
     try {
       const saved = await addCategory(trimmed);
-      setCategory(saved.find((category) => category.toLowerCase() === trimmed.toLowerCase()) ?? trimmed);
+      setCategory(
+        saved.find((category) => category.toLowerCase() === trimmed.toLowerCase()) ?? trimmed,
+      );
       setAddingCat(false);
       setNewCat("");
     } catch (error) {
@@ -249,7 +254,13 @@ function Page() {
   };
 
   const save = () => {
-    if (!title.trim() || !category) return;
+    if (!title.trim()) {
+      setTitleError(true);
+      titleRef.current?.focus();
+      titleRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
+    if (!category) return;
     if (resourceError) return;
     upsertMaterial({
       id: editingId ?? `m${Date.now()}`,
@@ -270,6 +281,7 @@ function Page() {
     setEditingId(m.id);
     setType(m.material_type);
     setTitle(m.title);
+    setTitleError(false);
     setCategory(m.category);
     setAddingCat(false);
     setNewCat("");
@@ -293,9 +305,12 @@ function Page() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">Material Complementario</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+          Material Complementario
+        </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Upload supplemental resources — they show up automatically on the Student & Teacher Resources pages.
+          Upload supplemental resources — they show up automatically on the Student & Teacher
+          Resources pages.
         </p>
       </div>
 
@@ -314,10 +329,17 @@ function Page() {
 
         {/* Type — big icon buttons instead of a dropdown */}
         <div>
-          <label className="text-xs font-medium text-foreground">What kind of material is this?</label>
+          <label className="text-xs font-medium text-foreground">
+            What kind of material is this?
+          </label>
           <div className="mt-2 flex flex-wrap gap-2">
             {TYPES.map((t) => (
-              <ChoiceButton key={t} active={type === t} onClick={() => setType(t)} icon={TYPE_META[t].icon}>
+              <ChoiceButton
+                key={t}
+                active={type === t}
+                onClick={() => setType(t)}
+                icon={TYPE_META[t].icon}
+              >
                 {TYPE_META[t].label}
               </ChoiceButton>
             ))}
@@ -326,13 +348,34 @@ function Page() {
 
         {/* Title */}
         <div className="mt-5">
-          <label className="text-xs font-medium text-foreground">Title</label>
+          <label
+            htmlFor="material-title"
+            className={`text-xs font-medium ${titleError ? "text-red-600" : "text-foreground"}`}
+          >
+            Title *
+          </label>
           <input
             value={title}
-            onChange={(e) => setTitle(e.target.value)}
+            ref={titleRef}
+            id="material-title"
+            aria-required="true"
+            aria-invalid={titleError}
+            aria-describedby={titleError ? "material-title-error" : undefined}
+            onChange={(e) => {
+              setTitle(e.target.value);
+              if (e.target.value.trim()) setTitleError(false);
+            }}
+            style={
+              titleError ? { borderColor: "#dc2626", outline: "2px solid #dc2626" } : undefined
+            }
             className="mt-1.5 w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
             placeholder="Resource title"
           />
+          {titleError && (
+            <p id="material-title-error" role="alert" className="mt-2 text-sm text-red-600">
+              A title is required. Enter a title before saving.
+            </p>
+          )}
         </div>
 
         {/* Category — pill buttons instead of a dropdown */}
@@ -362,7 +405,14 @@ function Page() {
                 >
                   <Check className="h-4 w-4" />
                 </button>
-                <GhostButton type="button" onClick={() => { setAddingCat(false); setNewCat(""); }} className="!px-2.5">
+                <GhostButton
+                  type="button"
+                  onClick={() => {
+                    setAddingCat(false);
+                    setNewCat("");
+                  }}
+                  className="!px-2.5"
+                >
                   <X className="h-3.5 w-3.5" />
                 </GhostButton>
               </div>
@@ -386,7 +436,11 @@ function Page() {
               Everyone
             </ChoiceButton>
             {RESTRICT_PRODUCTS.map((p) => (
-              <ChoiceButton key={p.id} active={restrictProduct === p.id} onClick={() => onProductChange(p.id)}>
+              <ChoiceButton
+                key={p.id}
+                active={restrictProduct === p.id}
+                onClick={() => onProductChange(p.id)}
+              >
                 {p.label} only
               </ChoiceButton>
             ))}
@@ -397,7 +451,11 @@ function Page() {
                 Any level
               </ChoiceButton>
               {levelsForProduct(restrictProduct).map((l) => (
-                <ChoiceButton key={l} active={restrictLevel === l} onClick={() => setRestrictLevel(l)}>
+                <ChoiceButton
+                  key={l}
+                  active={restrictLevel === l}
+                  onClick={() => setRestrictLevel(l)}
+                >
                   {l}
                 </ChoiceButton>
               ))}
@@ -428,7 +486,9 @@ function Page() {
               setResourceError(null);
             }}
           />
-          {resourceError && <p className="mt-2 text-xs font-medium text-destructive">{resourceError}</p>}
+          {resourceError && (
+            <p className="mt-2 text-xs font-medium text-destructive">{resourceError}</p>
+          )}
         </div>
 
         {/* Cover image */}
@@ -449,7 +509,11 @@ function Page() {
         </div>
 
         <div className="mt-6 flex justify-end">
-          <PrimaryButton accentColor={ACCENT} onClick={save} disabled={resourceUploading || coverUploading}>
+          <PrimaryButton
+            accentColor={ACCENT}
+            onClick={save}
+            disabled={resourceUploading || coverUploading}
+          >
             {editingId ? "Save changes" : "Save material"}
           </PrimaryButton>
         </div>
@@ -460,7 +524,9 @@ function Page() {
         <SectionTitle>All materials ({items.length})</SectionTitle>
         {items.length === 0 ? (
           <Card>
-            <p className="text-center text-sm text-muted-foreground">No materials yet — upload one above.</p>
+            <p className="text-center text-sm text-muted-foreground">
+              No materials yet — upload one above.
+            </p>
           </Card>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -470,10 +536,17 @@ function Page() {
                 <Card key={m.id} className="!p-0 overflow-hidden">
                   <div className="relative aspect-video w-full overflow-hidden border-b border-border bg-secondary/40">
                     {m.cover_image ? (
-                      <SignedImg src={m.cover_image} alt="" className="h-full w-full object-cover" />
+                      <SignedImg
+                        src={m.cover_image}
+                        alt=""
+                        className="h-full w-full object-cover"
+                      />
                     ) : (
                       <div className="flex h-full w-full items-center justify-center">
-                        <TypeIcon className="h-10 w-10 text-muted-foreground" style={{ opacity: 0.5 }} />
+                        <TypeIcon
+                          className="h-10 w-10 text-muted-foreground"
+                          style={{ opacity: 0.5 }}
+                        />
                       </div>
                     )}
                   </div>
@@ -510,10 +583,14 @@ function Page() {
 
       {confirmDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center verbo-backdrop p-4">
-          <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="w-full max-w-sm rounded-2xl border border-border bg-card p-6 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
             <h3 className="text-base font-semibold text-foreground">Delete material?</h3>
             <p className="mt-2 text-sm text-muted-foreground">
-              “{confirmDelete.title}” will be removed from the Student & Teacher panels. This cannot be undone.
+              “{confirmDelete.title}” will be removed from the Student & Teacher panels. This cannot
+              be undone.
             </p>
             <div className="mt-5 flex justify-end gap-2">
               <GhostButton onClick={() => setConfirmDelete(null)}>Cancel</GhostButton>
