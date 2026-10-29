@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { Card, GhostButton, Pill, PrimaryButton, SectionTitle } from "@/components/verbo/ui";
 import { hasUploadedFile, useCategories, type StoredMaterial } from "@/lib/materials-store";
@@ -6,8 +6,9 @@ import type { MaterialType } from "@/lib/mock-data";
 import { PremiumBadge } from "@/components/verbo/PremiumGate";
 import { useAuth } from "@/lib/auth";
 import { groupsByStudentId } from "@/lib/groups-store";
-import { SignedIframe, SignedImg, SignedVideo } from "@/components/verbo/SignedMedia";
-import { openSignedContentUrl } from "@/lib/storage-signed-url";
+import { SignedIframe, SignedVideo } from "@/components/verbo/SignedMedia";
+import { MaterialCover } from "@/components/verbo/MaterialCover";
+import { openSignedContentUrl, resolveContentUrl } from "@/lib/storage-signed-url";
 import { PracticeCategorySection } from "@/components/verbo/practice/PracticeCategorySection";
 import listeningArt from "@/assets/Listiening.svg";
 import grammarArt from "@/assets/Grammar.svg";
@@ -82,7 +83,7 @@ function letterOf(title: string): string {
 function CoverArt({ m, className = "" }: { m: StoredMaterial; className?: string }) {
   const Icon = TYPE_ICON[m.material_type];
   if (m.cover_image) {
-    return <SignedImg src={m.cover_image} alt={m.title} className={`h-full w-full object-cover ${className}`} />;
+    return <MaterialCover src={m.cover_image} alt={m.title} settings={m} />;
   }
   return (
     <div className={`relative h-full w-full bg-gradient-to-br from-secondary/60 to-secondary/20 ${className}`}>
@@ -95,8 +96,42 @@ function CoverArt({ m, className = "" }: { m: StoredMaterial; className?: string
 }
 
 
+function MaterialImagePreview({ src, title }: { src: string; title: string }) {
+  const [image, setImage] = useState<{ source: string; url: string; failed: boolean } | null>(null);
+  useEffect(() => {
+    let active = true;
+    void resolveContentUrl(src).then((url) => {
+      if (active) setImage({ source: src, url, failed: false });
+    });
+    return () => {
+      active = false;
+    };
+  }, [src]);
+  if (!image || image.source !== src) {
+    return (
+      <p role="status" className="py-10 text-center text-sm text-muted-foreground">Loading image…</p>
+    );
+  }
+  if (image.failed) {
+    return (
+      <p role="alert" className="py-10 text-center text-sm text-muted-foreground">
+        This image isn't available right now. Try again later or download it instead.
+      </p>
+    );
+  }
+  return (
+    <img
+      src={image.url}
+      alt={title}
+      className="mx-auto h-auto max-h-[60vh] max-w-full rounded-lg object-contain"
+      onError={() => setImage({ ...image, failed: true })}
+    />
+  );
+}
+
 function PreviewModal({ m, onClose }: { m: StoredMaterial; onClose: () => void }) {
-  const isPdf = m.material_type === "pdf";
+  const isPdf = ["pdf", "book", "verb-list"].includes(m.material_type);
+  const isImage = m.material_type === "image";
   const isVideo = m.material_type === "video";
   // The card already hides "Preview" when there's no uploaded file, but a
   // video can still fail to load in practice (deleted/moved Storage object,
@@ -124,6 +159,8 @@ function PreviewModal({ m, onClose }: { m: StoredMaterial; onClose: () => void }
         <div className="min-h-0 flex-1 overflow-auto bg-secondary/30 p-5">
           {isPdf ? (
             <SignedIframe title={m.title} src={m.upload_url} className="h-[60vh] w-full rounded-lg border border-border bg-background" />
+          ) : isImage ? (
+            <MaterialImagePreview key={m.upload_url} src={m.upload_url} title={m.title} />
           ) : videoAvailable ? (
             <SignedVideo
               src={m.upload_url}

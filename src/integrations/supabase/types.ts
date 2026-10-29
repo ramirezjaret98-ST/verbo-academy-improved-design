@@ -2303,6 +2303,10 @@ export type Database = {
         Row: {
           category: string
           cover_image: string | null
+          cover_fit: string
+          cover_scale: number
+          cover_position_x: number
+          cover_position_y: number
           created_at: string
           id: number
           material_type: Database["public"]["Enums"]["material_type"]
@@ -2315,6 +2319,10 @@ export type Database = {
         Insert: {
           category: string
           cover_image?: string | null
+          cover_fit?: string
+          cover_scale?: number
+          cover_position_x?: number
+          cover_position_y?: number
           created_at?: string
           id?: never
           material_type: Database["public"]["Enums"]["material_type"]
@@ -2327,6 +2335,10 @@ export type Database = {
         Update: {
           category?: string
           cover_image?: string | null
+          cover_fit?: string
+          cover_scale?: number
+          cover_position_x?: number
+          cover_position_y?: number
           created_at?: string
           id?: never
           material_type?: Database["public"]["Enums"]["material_type"]

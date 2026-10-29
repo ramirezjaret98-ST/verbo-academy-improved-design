@@ -36,6 +36,10 @@ export interface StoredMaterial {
   category: string;
   upload_url: string;
   cover_image?: string; // real Storage URL (uploaded) — empty means use type fallback
+  cover_fit?: "cover" | "contain";
+  cover_scale?: number;
+  cover_position_x?: number;
+  cover_position_y?: number;
   restrict_product?: RestrictProduct; // undefined = visible to everyone
   restrict_level?: string; // commercial level name (depends on product)
   premium?: boolean; // when true, only Advance/Elite access plans see it unlocked
@@ -159,6 +163,10 @@ function mapRow(row: MaterialRow): StoredMaterial {
     category: row.category,
     upload_url: row.upload_url,
     cover_image: row.cover_image ?? undefined,
+    cover_fit: row.cover_fit === "contain" ? "contain" : "cover",
+    cover_scale: row.cover_scale,
+    cover_position_x: row.cover_position_x,
+    cover_position_y: row.cover_position_y,
     restrict_product: (row.restrict_product as RestrictProduct | null) ?? undefined,
     restrict_level: row.restrict_level ?? undefined,
     premium: row.premium || undefined,
@@ -251,6 +259,10 @@ export function upsertMaterial(mat: StoredMaterial) {
     category: mat.category,
     upload_url: mat.upload_url || "#",
     cover_image: mat.cover_image ?? null,
+    cover_fit: mat.cover_fit ?? "cover",
+    cover_scale: mat.cover_scale ?? 1,
+    cover_position_x: mat.cover_position_x ?? 50,
+    cover_position_y: mat.cover_position_y ?? 50,
     restrict_product: mat.restrict_product ?? null,
     restrict_level: mat.restrict_level ?? null,
     premium: mat.premium ?? false,
