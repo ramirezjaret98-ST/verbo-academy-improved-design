@@ -19,6 +19,7 @@ import {
 import { Card, GhostButton, Pill, PrimaryButton, SectionTitle } from "@/components/verbo/ui";
 import { notifySuccess, notifyError } from "@/lib/notify";
 import { SignedImg } from "@/components/verbo/SignedMedia";
+import { MaterialCover, MaterialCoverEditor, type MaterialCoverSettings } from "@/components/verbo/MaterialCover";
 import {
   Pencil,
   Trash2,
@@ -121,7 +122,7 @@ function UploadZone({
         onChange={(e) => onFile(e.target.files?.[0])}
       />
       {preview ? (
-        <SignedImg src={preview} alt="preview" className="h-28 w-44 rounded-lg object-cover" />
+        <SignedImg src={preview} alt="preview" className="h-28 w-44 rounded-lg object-contain" />
       ) : (
         placeholder
       )}
@@ -161,6 +162,7 @@ function Page() {
   const [addingCat, setAddingCat] = useState(false);
   const [newCat, setNewCat] = useState("");
   const [cover, setCover] = useState<string | undefined>(undefined);
+  const [coverSettings, setCoverSettings] = useState<MaterialCoverSettings>({});
   const [restrictProduct, setRestrictProduct] = useState<RestrictProduct | "">("");
   const [restrictLevel, setRestrictLevel] = useState("");
   const [premium, setPremium] = useState(false);
@@ -181,6 +183,7 @@ function Page() {
     setAddingCat(false);
     setNewCat("");
     setCover(undefined);
+    setCoverSettings({});
     setRestrictProduct("");
     setRestrictLevel("");
     setPremium(false);
@@ -246,6 +249,7 @@ function Page() {
       return;
     }
     setCover(res.url);
+    setCoverSettings({});
   };
 
   const onProductChange = (v: RestrictProduct | "") => {
@@ -269,6 +273,7 @@ function Page() {
       category,
       upload_url: resourceFile ?? items.find((m) => m.id === editingId)?.upload_url ?? "#",
       cover_image: cover,
+      ...coverSettings,
       restrict_product: restrictProduct || undefined,
       restrict_level: restrictLevel || undefined,
       premium: premium || undefined,
@@ -286,6 +291,9 @@ function Page() {
     setAddingCat(false);
     setNewCat("");
     setCover(m.cover_image);
+    setCoverSettings({ cover_fit: m.cover_fit, cover_scale: m.cover_scale,
+      cover_position_x: m.cover_position_x, cover_position_y: m.cover_position_y });
+    setCoverError(null);
     setRestrictProduct(m.restrict_product ?? "");
     setRestrictLevel(m.restrict_level ?? "");
     setPremium(!!m.premium);
@@ -503,8 +511,9 @@ function Page() {
             preview={cover}
             placeholder={<ImageIcon className="h-8 w-8 text-muted-foreground" />}
             onFile={onCoverFile}
-            onRemove={() => setCover(undefined)}
+            onRemove={() => { setCover(undefined); setCoverSettings({}); setCoverError(null); }}
           />
+          {cover && <MaterialCoverEditor src={cover} value={coverSettings} onChange={setCoverSettings} />}
           {coverError && <p className="mt-2 text-xs font-medium text-destructive">{coverError}</p>}
         </div>
 
@@ -536,10 +545,10 @@ function Page() {
                 <Card key={m.id} className="!p-0 overflow-hidden">
                   <div className="relative aspect-video w-full overflow-hidden border-b border-border bg-secondary/40">
                     {m.cover_image ? (
-                      <SignedImg
+                      <MaterialCover
                         src={m.cover_image}
                         alt=""
-                        className="h-full w-full object-cover"
+                        settings={m}
                       />
                     ) : (
                       <div className="flex h-full w-full items-center justify-center">

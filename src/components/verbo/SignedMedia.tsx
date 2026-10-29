@@ -10,7 +10,7 @@
 // See storage-signed-url.ts for why this exists (Hallazgo 2, auditoría de
 // seguridad 2026-09-15) and what it deliberately does NOT close.
 import { useEffect, useState } from "react";
-import type { ButtonHTMLAttributes, ReactNode, VideoHTMLAttributes } from "react";
+import type { ButtonHTMLAttributes, ImgHTMLAttributes, ReactNode, VideoHTMLAttributes } from "react";
 import { openSignedContentUrl, resolveContentUrl } from "@/lib/storage-signed-url";
 
 /**
@@ -43,9 +43,11 @@ export function useSignedContentUrl(url: string | null | undefined): { url: stri
   return { url: resolved, resolving };
 }
 
-export function SignedImg({ src, alt, className }: { src: string; alt: string; className?: string }) {
+export function SignedImg({
+  src, alt, className, ...rest
+}: { src: string; alt: string } & Omit<ImgHTMLAttributes<HTMLImageElement>, "src" | "alt">) {
   const { url } = useSignedContentUrl(src);
-  return <img src={url} alt={alt} className={className} />;
+  return <img src={url} alt={alt} className={className} {...rest} />;
 }
 
 export function SignedIframe({ src, title, className }: { src: string; title: string; className?: string }) {
