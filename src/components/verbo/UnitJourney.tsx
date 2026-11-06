@@ -57,7 +57,7 @@ export function UnitJourney({
   const [phase, setPhase] = useState<SessionPhase | null>(null);
   const [materialOpen, setMaterialOpen] = useState(false);
   const [materialOpened, setMaterialOpened] = useState(false);
-  const [scoreOpen, setScoreOpen] = useState(false);
+  const [scoreOpen, setScoreOpen] = useState(true);
   const [issueOpen, setIssueOpen] = useState(false);
   const [reply, setReply] = useState(false);
   const [replay, setReplay] = useState(0);
@@ -285,9 +285,16 @@ export function UnitJourney({
             )}
           </span>
           <span className="uj-score-copy">
-            Current unit score<small>Your best results stay with you.</small>
+            <strong>Current unit score</strong>
+            <small>Your best results stay with you.</small>
+            <span className="uj-score-preview">
+              {mandatory.map((row) => categoryLabel(row.category)).join(" · ")}
+            </span>
           </span>
-          <ChevronDown size={17} />
+          <span className="uj-score-action">
+            {scoreOpen ? "Hide breakdown" : "Show breakdown"}
+            <ChevronDown size={18} />
+          </span>
         </button>
         <AnimatePresence initial={false}>
           {scoreOpen && (
@@ -314,7 +321,21 @@ export function UnitJourney({
                               : "Pending"}
                         </span>
                       </div>
-                      <div className="uj-track">
+                      <div
+                        className="uj-track"
+                        role="progressbar"
+                        aria-label={categoryLabel(row.category)}
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        aria-valuenow={best}
+                        aria-valuetext={
+                          row.hasGraded
+                            ? best + "%"
+                            : row.recordingComplete
+                              ? "Submitted"
+                              : "Pending"
+                        }
+                      >
                         <span style={{ width: best + "%" }} data-passed={row.passed} />
                       </div>
                       {row.hasRecording && (
