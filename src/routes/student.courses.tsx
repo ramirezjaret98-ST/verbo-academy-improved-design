@@ -1,4 +1,5 @@
 import { PracticeActivityRunner } from "@/components/verbo/PracticeActivityRunner";
+import { UnitJourney } from "@/components/verbo/UnitJourney";
 import { ActivityExerciseBody as ExerciseBody, evaluateActivity as evaluate } from "@/components/verbo/ActivityExerciseBody";
 
 import { createFileRoute } from "@tanstack/react-router";
@@ -94,6 +95,7 @@ import {
 import {
   type Activity,
   type ActivityCategory,
+  type SessionPhase,
   EXERCISE_LABELS,
   MANDATORY_CATEGORIES,
   activitiesForUnit,
@@ -1216,7 +1218,36 @@ export function UnitVideoPlayer({ url }: { url: string }) {
   return <video src={signedUrl} controls className="absolute inset-0 h-full w-full object-cover" />;
 }
 
-export function UnitDetail({
+type UnitDetailProps = {
+  level: CourseLevel;
+  unit: CourseUnit;
+  studentId: string;
+  readOnly: boolean;
+  previewMode?: boolean;
+  onBack: () => void;
+  onChange: () => void;
+  onOpenUnit?: (u: CourseUnit) => void;
+};
+
+export function UnitDetail(props: UnitDetailProps) {
+  const { level, unit, studentId } = props;
+  if (isMilestoneUnit(unit.id)) return <MilestoneUnitDetail {...props} />;
+  const activities = activitiesForUnit(unit.id);
+  return <UnitJourney key={studentId + ":" + unit.id} {...props}
+    previewMode={props.previewMode ?? false}
+    activities={activities}
+    categoryProgress={unitCategoryProgress(studentId, unit.id)}
+    passed={unitPassed(studentId, unit.id)}
+    unitNumber={unitNumberOf(unit.id)}
+    nextUnit={level.units.find((u) => unitNumberOf(u.id) === unitNumberOf(unit.id) + 1)}
+    video={unit.video_url ? <UnitVideoPlayer url={unit.video_url} /> : undefined}
+    renderActivities={(initialPhase, onClose) => <ActivityRunner unit={unit} activities={activities}
+      studentId={studentId} readOnly={props.readOnly} previewMode={props.previewMode}
+      initialPhase={initialPhase} onClose={onClose} />}
+  />;
+}
+
+function MilestoneUnitDetail({
   level, unit, studentId, readOnly, previewMode = false, onBack, onChange, onOpenUnit,
 }: {
   level: CourseLevel;
@@ -1567,7 +1598,7 @@ function ExerciseTypeIcon({ type, className = "" }: { type: Activity["type"]; cl
   return <Sparkles className={className} />;
 }
 
-export function ActivityRunner(props: { unit: CourseUnit; activities: Activity[]; studentId: string; readOnly: boolean; previewMode?: boolean; onClose: () => void }) {
+export function ActivityRunner(props: { unit: CourseUnit; activities: Activity[]; studentId: string; readOnly: boolean; previewMode?: boolean; initialPhase?: SessionPhase; onClose: () => void }) {
   if (isMilestoneUnit(props.unit.id)) return <LegacyActivityRunner {...props} />;
   return <PracticeActivityRunner key={`${props.studentId}:${props.unit.id}`} {...props} evaluate={evaluate} renderExercise={(activity, value, onChange, disabled, onRecorded, status) => <ExerciseBody activity={activity} value={value} onChange={onChange} disabled={disabled} studentId={props.studentId} previewMode={props.previewMode ?? false} onRecordSubmitted={onRecorded} status={status} />} />;
 }

@@ -4,6 +4,7 @@ import { Check, Lightbulb, RotateCcw, TriangleAlert } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import {
   type Activity,
+  type SessionPhase,
   categoryLabel,
   incrementAttempts,
   markRecordPracticeCompleted,
@@ -29,6 +30,7 @@ interface Props {
   studentId: string;
   readOnly: boolean;
   previewMode?: boolean;
+  initialPhase?: SessionPhase;
   onClose: () => void;
   evaluate: (activity: Activity, value: string) => boolean;
   renderExercise: (
@@ -47,12 +49,23 @@ export function PracticeActivityRunner({
   studentId,
   readOnly,
   previewMode = false,
+  initialPhase,
   onClose,
   evaluate,
   renderExercise,
 }: Props) {
   const reduce = useReducedMotion();
-  const [index, setIndex] = useState(0);
+  const [returnFocus] = useState<HTMLElement | null>(() =>
+    typeof document === "undefined" ? null : (document.activeElement as HTMLElement),
+  );
+  const [index, setIndex] = useState(() =>
+    initialPhase
+      ? Math.max(
+          0,
+          activities.findIndex((a) => (a.session_phase ?? "pre") === initialPhase),
+        )
+      : 0,
+  );
   const [responses, setResponses] = useState<Record<string, PracticeResponse>>({});
   const [tipOpen, setTipOpen] = useState(false);
   const [helpRequested, setHelpRequested] = useState(false);
@@ -91,6 +104,13 @@ export function PracticeActivityRunner({
             restored[activity.id] = saved;
         }
         setResponses(restored);
+        if (initialPhase && !review) {
+          const next = activities.findIndex(
+            (a) =>
+              (a.session_phase ?? "pre") === initialPhase && restored[a.id]?.status !== "correct",
+          );
+          if (next >= 0) setIndex(next);
+        }
       } catch {
         /* Practice still works when device storage is unavailable. */
       }
@@ -98,7 +118,7 @@ export function PracticeActivityRunner({
     hydrated.current = true;
     // A runner instance is mounted for one unit; content changes invalidate individual drafts.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [storageKey, previewMode]);
+  }, [storageKey, previewMode, initialPhase]);
 
   useEffect(() => {
     if (hydrated.current && !previewMode) {
@@ -193,7 +213,14 @@ export function PracticeActivityRunner({
         if (!open) onClose();
       }}
     >
-      <DialogContent className="ae-dialog" aria-describedby={undefined}>
+      <DialogContent
+        className="ae-dialog"
+        aria-describedby={undefined}
+        onCloseAutoFocus={(event) => {
+          event.preventDefault();
+          if (returnFocus?.isConnected) returnFocus.focus();
+        }}
+      >
         <DialogTitle className="sr-only">{unitDisplayTitle(unit)} activities</DialogTitle>
         <header className="ae-header">
           <span className="ae-brand">
