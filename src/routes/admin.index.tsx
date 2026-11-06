@@ -1,4 +1,5 @@
 import { countsInRealMetrics } from "@/lib/sales-demo";
+import { SessionControlPanel } from "@/components/verbo/SessionControlPanel";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -276,6 +277,7 @@ function Overview() {
 
   return (
     <div className="space-y-10">
+      <SessionControlPanel admin />
       {/* Header + quick actions share one calm band */}
       <header className="verbo-admin-section" style={{ "--verbo-admin-i": 0 } as React.CSSProperties}>
         <div className="flex flex-col gap-5 border-b border-border/70 pb-6 lg:flex-row lg:items-end lg:justify-between">
