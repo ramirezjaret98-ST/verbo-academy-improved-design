@@ -36,6 +36,9 @@ export interface ChallengeSubmission {
 
 
 export interface User {
+  /** Server-managed sales demonstration account. */
+  is_sales_demo?: boolean;
+  sales_demo_teacher_id?: string;
   id: string;
   name: string;
   email: string;
@@ -195,6 +198,8 @@ export interface User {
 export type SessionStatus = "scheduled" | "completed" | "absent" | "delayed";
 
 export interface Session {
+  /** Derived by the server from the student; excluded from operational metrics. */
+  is_sales_demo?: boolean;
   id: string;
   student_id: string;
   teacher_id: string;

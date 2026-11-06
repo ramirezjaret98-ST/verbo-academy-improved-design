@@ -72,6 +72,7 @@ export interface ReportAdminEdit {
 }
 
 export interface ExtSession {
+  is_sales_demo?: boolean;
   id: string;
   student_id: string;
   teacher_id: string;
@@ -199,6 +200,7 @@ function mapSessionRow(row: SessionRow, members: MemberStatusRow[], edits: Admin
     teams_link: row.teams_link,
     status: row.status,
     schedule_hold: row.schedule_hold === "suspended" || row.schedule_hold === "frozen" || row.schedule_hold === "needs_schedule" ? row.schedule_hold : undefined,
+    is_sales_demo: (row as SessionRow & { is_sales_demo?: boolean }).is_sales_demo ?? false,
     student_reschedule_used: (row as SessionRow & {student_reschedule_used?: boolean}).student_reschedule_used ?? false,
     absent_cause: (row.absent_cause as "student" | "teacher" | null) ?? undefined,
     report_pdf_url: row.report_pdf_url ?? undefined,

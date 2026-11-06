@@ -284,6 +284,7 @@ export function hydrateStudents() {
         if (typeof row.email === "string") u.email = row.email;
         for (const key of [
           ...STUDENT_PROFILE_FIELD_KEYS,
+          "is_sales_demo", "sales_demo_teacher_id",
           "club_package_id", "club_package_months", "club_package_started_on",
           "club_package_expires_on", "club_insight_base", "club_book_base",
           "club_insight_bonus", "club_book_bonus",

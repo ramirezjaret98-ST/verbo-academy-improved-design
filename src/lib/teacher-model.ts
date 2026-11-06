@@ -1,3 +1,4 @@
+import { countsInRealMetrics } from "./sales-demo";
 // ============================================================================
 // Teacher commercial/operational model — single source of truth for the
 // Admin > Teachers UI. Mirrors the shape of student-model.ts.
@@ -134,7 +135,7 @@ export function teachersForProductSorted(
 // KPI helpers
 // ----------------------------------------------------------------------------
 export function ratedSessions(teacherId: string): ExtSession[] {
-  return loadSessions().filter(
+  return loadSessions().filter(countsInRealMetrics).filter(
     (s) =>
       s.teacher_id === teacherId &&
       typeof s.student_rating === "number" &&
@@ -152,7 +153,7 @@ export function avgRating(t: User): number | null {
 }
 
 export function flaggedReviews(teacherId: string): ExtSession[] {
-  return loadSessions().filter(
+  return loadSessions().filter(countsInRealMetrics).filter(
     (s) => s.teacher_id === teacherId && typeof s.student_rating === "number" && (s.student_rating as number) <= 3,
   ).sort((a, b) => +new Date(b.date_time) - +new Date(a.date_time));
 }

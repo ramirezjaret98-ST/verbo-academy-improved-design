@@ -1,3 +1,4 @@
+import { countsInRealMetrics } from "./sales-demo";
 // ============================================================================
 // Teacher KPI model — single source of truth for the Admin > KPIs page and the
 // "Bonus Eligible" flag consumed by the Financial tab in Admin > Teachers.
@@ -74,7 +75,7 @@ export function ratingBand(rating: number | null): RatingBand {
 
 // ----- Session-derived KPIs (real signals) ----------------------------------
 function teacherSessions(teacherId: string) {
-  return loadSessions().filter((s) => s.teacher_id === teacherId);
+  return loadSessions().filter(countsInRealMetrics).filter((s) => s.teacher_id === teacherId);
 }
 
 // Denominator used by session-completion calcs. Same rules as before:

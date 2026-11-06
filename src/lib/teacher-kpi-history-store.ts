@@ -1,3 +1,4 @@
+import { countsInRealMetrics } from "./sales-demo";
 // ============================================================================
 // Teacher KPI monthly history — single source of truth for the "6-month bonus
 // streak", the sequential Reschedule/Substitute penalty state, and the
@@ -190,7 +191,7 @@ function mockRefusalsFor(teacherId: string, monthKey: string): number {
 // the historical curve stays stable.
 export function realRefusalsFor(teacherId: string, monthKey: string): number {
   try {
-    const sessions = loadSessions();
+    const sessions = loadSessions().filter(countsInRealMetrics);
     return sessions.filter((s) => {
       if (s.teacher_id !== teacherId) return false;
       if (!s.needs_substitute) return false;

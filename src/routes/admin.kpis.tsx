@@ -1,3 +1,4 @@
+import { countsInRealMetrics } from "@/lib/sales-demo";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -192,7 +193,7 @@ function Page() {
         {(
           [
             { label: "Avg rating", hint: "all teachers", value: `${overallAvg}★`, icon: Star, color: scoreScaleColor((Number(overallAvg) / 5) * 100), dynamic: true },
-            { label: "Sessions tracked", hint: "lifetime", value: loadSessions().length, icon: CalendarClock, color: "#3ebbad" },
+            { label: "Sessions tracked", hint: "lifetime", value: loadSessions().filter(countsInRealMetrics).length, icon: CalendarClock, color: "#3ebbad" },
             { label: "Teachers", hint: "active roster", value: teachers.length, icon: GraduationCap, color: "#7e22ce" },
             { label: "Avg composite", hint: "across roster", value: avgComposite, suffix: "%", icon: TrendingUp, color: scoreScaleColor(Number(avgComposite)), dynamic: true },
           ] as { label: string; hint: string; value: number | string; icon: LucideIcon; color: string; suffix?: string; dynamic?: boolean }[]

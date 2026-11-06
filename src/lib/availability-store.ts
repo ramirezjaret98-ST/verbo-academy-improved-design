@@ -16,6 +16,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 import { hydrateUserIdBridge, legacyToUuid, uuidToLegacySync } from "@/lib/user-id-bridge";
 import { loadSessions } from "./sessions-store";
+import { userById } from "./mock-data";
 import { isExternallyBlockedAt } from "./external-schedule-store";
 import { notifyError } from "@/lib/notify";
 import { registerRehydrate } from "@/lib/auth-rehydrate";
@@ -375,7 +376,10 @@ const JS_DAY_TO_KEY: Record<number, DayKey | null> = {
 
 /** Does the teacher's weekly schedule cover this date/time, and no other
  *  active session overlaps? Sundays are never available. */
-export function isTeacherAvailableAt(teacherId: string, dateISO: string, durationMin = 60, excludeSessionId?: string): boolean {
+export function isTeacherAvailableAt(teacherId: string, dateISO: string, durationMin = 60, excludeSessionId?: string, demoStudentId?: string): boolean {
+  const demoStudent = demoStudentId ? userById(demoStudentId) : undefined;
+  const demo = demoStudent?.is_sales_demo === true;
+  if (demo && (!demoStudent.sales_demo_teacher_id || uuidToLegacySync(demoStudent.sales_demo_teacher_id) !== teacherId)) return false;
   if (isExternallyBlockedAt(teacherId, dateISO, durationMin)) return false;
   const d = new Date(dateISO);
   const parts=new Intl.DateTimeFormat("en-US",{timeZone:"America/Mexico_City",weekday:"short",hour:"2-digit",minute:"2-digit",hourCycle:"h23"}).formatToParts(d);
@@ -384,7 +388,7 @@ export function isTeacherAvailableAt(teacherId: string, dateISO: string, duratio
   if (!DAY_KEYS.includes(key)) return false;
   const start = Number(part("hour"))*60+Number(part("minute"));
   const end = start + durationMin;
-  const wk = getAvailability(teacherId).weekly;
+  const wk = demo ? Object.fromEntries(DAY_KEYS.map(day => [day, [{ startMin: 540, endMin: 1260 }]])) as Weekly : getAvailability(teacherId).weekly;
   const covered = (wk[key] ?? []).some((b) => b.startMin <= start && b.endMin >= end);
   if (!covered) return false;
   // Overlap check against other active sessions of this teacher.
@@ -416,6 +420,7 @@ export function findAvailableStartSlots(input: {
   durationMin: number;     // 60 / 90 / 120 for reschedule, 60 for spotlight
   qualifiedTeacherIds: string[];
   minNoticeHours?: number; // default 24
+  demoStudentId?: string;
 }): string[] {
   const notice = input.minNoticeHours ?? 24;
   const [y, m, d] = input.dateYMD.split("-").map(Number);
@@ -432,7 +437,7 @@ export function findAvailableStartSlots(input: {
     if ((candidate.getTime() - now) / 36e5 < notice) continue;
     // Any qualified teacher available for this exact block?
     const ok = input.qualifiedTeacherIds.some((tid) =>
-      isTeacherAvailableAt(tid, iso, input.durationMin),
+      isTeacherAvailableAt(tid, iso, input.durationMin, undefined, input.demoStudentId),
     );
     if (ok) out.push(iso);
   }

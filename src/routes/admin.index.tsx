@@ -1,3 +1,4 @@
+import { countsInRealMetrics } from "@/lib/sales-demo";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -116,9 +117,9 @@ function Overview() {
     return () => { unsubClubs(); unsubStudents(); unsubTeachers(); unsubSessions(); };
   }, []);
 
-  const students = USERS.filter((u) => u.role === "student");
+  const students = USERS.filter((u) => u.role === "student" && countsInRealMetrics(u));
   const teachers = USERS.filter((u) => u.role === "teacher");
-  const scheduled = SESSIONS.filter((s) => s.status === "scheduled").length;
+  const scheduled = SESSIONS.filter(countsInRealMetrics).filter((s) => s.status === "scheduled").length;
 
   const teacherRows = useMemo(
     () => teachers.map((t) => ({ t, kpis: computeTeacherKpis(t), pending: pendingReviews(t.id).length })),
@@ -674,7 +675,7 @@ function MetricsModal({ students, teacherRows, onClose }: {
 
   // ---- Completions: real completed sessions per month via `date_time`. ------
   const completions = months.map(({ key, label }) => {
-    const value = SESSIONS.filter(
+    const value = SESSIONS.filter(countsInRealMetrics).filter(
       (s) => s.status === "completed" && monthKeyOfISO(s.date_time) === key,
     ).length;
     return { month: label, value };
@@ -682,7 +683,7 @@ function MetricsModal({ students, teacherRows, onClose }: {
 
   // ---- Hours taught: sum duration_minutes of completed sessions / 60. ------
   const hoursTaught = months.map(({ key, label }) => {
-    const mins = SESSIONS.filter(
+    const mins = SESSIONS.filter(countsInRealMetrics).filter(
       (s) => s.status === "completed" && monthKeyOfISO(s.date_time) === key,
     ).reduce((a, s) => a + (s.duration_minutes ?? 0), 0);
     return { month: label, value: Math.round(mins / 60) };

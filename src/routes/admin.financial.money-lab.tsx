@@ -1,3 +1,4 @@
+import { countsInRealMetrics } from "@/lib/sales-demo";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -102,7 +103,7 @@ function MoneyLabPage() {
     (u) => u.role === "student"
       && (u.product_type ?? "performance") === "performance"
       && (u.status ?? "active") !== "suspended"
-      && !u.exclude_from_financials,
+      && !u.exclude_from_financials && countsInRealMetrics(u),
   );
   const groups: Group[] = loadGroups();
   const groupMembers = loadGroupMembers();
@@ -378,7 +379,7 @@ function MoneyLabPage() {
   };
 
   const exportStudentsRoster = () => {
-    const students = USERS.filter((u) => u.role === "student");
+    const students = USERS.filter((u) => u.role === "student" && countsInRealMetrics(u));
     downloadJson(`verbo-students-roster-${todayStamp()}.json`, {
       generated_at: new Date().toISOString(),
       count: students.length,
@@ -431,7 +432,7 @@ function MoneyLabPage() {
   };
 
   const exportSessionsThisMonth = () => {
-    const rows = SESSIONS
+    const rows = SESSIONS.filter(countsInRealMetrics)
       .filter((s) => monthKey(new Date(s.date_time)) === mkey)
       .map((s) => ({
         id: s.id,
