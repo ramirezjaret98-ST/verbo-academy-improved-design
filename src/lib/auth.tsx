@@ -198,6 +198,8 @@ async function buildUser(authId: string, email: string, timeoutMs = 12000): Prom
       name: typedRow.name,
       email: typedRow.email,
       role: typedRow.role,
+      is_sales_demo: (typedRow as AppUserRow & { is_sales_demo?: boolean }).is_sales_demo ?? false,
+      sales_demo_teacher_id: (typedRow as AppUserRow & { sales_demo_teacher_id?: string | null }).sales_demo_teacher_id ?? undefined,
       admin_type: typedRow.admin_type ?? undefined,
       admin_disabled: typedRow.admin_disabled,
       must_change_password: typedRow.must_change_password,

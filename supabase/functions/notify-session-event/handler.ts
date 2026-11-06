@@ -233,7 +233,7 @@ export async function handleSessionNotification(req: Request, job?: any) {
 
   const { data: currentSession, error: sessionErr } = await admin
     .from("sessions")
-    .select("id, teacher_id, student_id, date_time, status, cancellation_reason, cancellation_note, report_pdf_url, group_id, updated_at")
+    .select("id, teacher_id, student_id, date_time, status, cancellation_reason, cancellation_note, report_pdf_url, group_id, updated_at, is_sales_demo")
     .eq("id", sessionId)
     .maybeSingle();
   const session = job?.session ?? currentSession;
@@ -243,6 +243,7 @@ export async function handleSessionNotification(req: Request, job?: any) {
     const { data: callerRow } = await admin.from("app_users").select("role").eq("id", callerAuth.user!.id).maybeSingle();
     const isParty = session.teacher_id === callerAuth.user!.id || session.student_id === callerAuth.user!.id;
     if (callerRow?.role !== "admin" && !isParty) return json({ error: "Forbidden" }, 403);
+    if (currentSession?.is_sales_demo) return json({ ok: true, skipped: "sales_demo" });
     if (["pending_reschedule", "reschedule_approved", "admin_rescheduled", "reschedule_declined"].includes(kind)) {
       // The database trigger already queued the committed event. Older clients
       // must not send the same email again or report success for an unsaved move.
@@ -251,6 +252,8 @@ export async function handleSessionNotification(req: Request, job?: any) {
       return error || !event ? json({ ok:false,error:"No committed schedule event" },409) : json({ok:true,queued:true,eventId:event.id});
     }
   }
+
+  if (currentSession?.is_sales_demo) return json({ ok: true, skipped: "sales_demo" });
 
   const [{ data: teacher }, { data: student }, { data: settings }] = await Promise.all([
     session.teacher_id ? admin.from("app_users").select("name, email").eq("id", session.teacher_id).maybeSingle() : Promise.resolve({ data: null }),

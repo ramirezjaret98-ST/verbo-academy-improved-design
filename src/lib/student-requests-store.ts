@@ -1,4 +1,5 @@
 import { withTimeout } from "./net-utils";
+import { userById } from "./mock-data";
 import { academyDateTime } from "./academy-time";
 // Reschedule Requests + Spotlight Requests. Individual reschedules are now
 // confirmed atomically by the server with the assigned teacher or reviewed.
@@ -415,6 +416,7 @@ export function adminAssignRequest(id: string, teacherId: string): Promise<Stude
 export function teacherRequestLoadThisMonth(teacherId: string): number {
   const now = new Date();
   return loadStudentRequests().filter((r) => {
+    if (userById(r.student_id)?.is_sales_demo) return false;
     if (r.claimed_by !== teacherId) return false;
     if (!r.claimed_at) return false;
     const d = new Date(r.claimed_at);

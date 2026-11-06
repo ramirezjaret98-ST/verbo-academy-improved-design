@@ -1792,6 +1792,7 @@ function StudentDetailModal({
                     label="Price / month"
                     value={`$${expectedAmountForStudent(student).toLocaleString()} MXN${plan ? " · payment plan" : student.custom_price != null ? " · custom" : " · plan default"}`}
                   />
+                  {student.is_sales_demo && <Info label="Sales demo" value="Sample progress · excluded from real metrics" emphasis />}
                   {student.exclude_from_financials && (
                     <Info label="Money Lab" value="Excluded — test/internal account" emphasis />
                   )}

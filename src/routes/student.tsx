@@ -65,6 +65,11 @@ function StudentLayout() {
       <div className="flex min-h-screen flex-col" style={{ backgroundColor: isClubsCatalog ? "#061c2a" : "#f4f6f8" }}>
         <main className="mx-auto w-full max-w-7xl flex-1 pt-24 pb-10">
           <div className="px-6">
+            {user?.is_sales_demo && (
+              <div role="status" className="mb-5 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-950">
+                <strong>Sales demo</strong> · Explore Academy with sample progress. This account is separate from real student metrics.
+              </div>
+            )}
             <AnnouncementBanner />
             <PageTransition>
               <Outlet />

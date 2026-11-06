@@ -79,7 +79,7 @@ import flamaNegraAsset from "@/assets/Flama_Negra.svg";
 import smokeAsset from "@/assets/smoke.svg";
 import { useAuth } from "@/lib/auth";
 import { CurriculumBreadcrumb } from "@/components/verbo/CurriculumBreadcrumb";
-import type { User } from "@/lib/mock-data";
+import { userById, type User } from "@/lib/mock-data";
 import { currentLoginStreak } from "@/lib/login-streak-store";
 import { markUnlockSeen } from "@/lib/unit-unlock-seen-store";
 import { ReportContentIssueModal } from "@/components/verbo/ReportContentIssueModal";
@@ -210,6 +210,7 @@ function computeLevelStates(
       }
       return { ...base, kind: "completed", readOnly: false };
     }
+    if (userById(studentId)?.is_sales_demo) return { ...base, kind: "current", readOnly: false };
     if (i === currentIndex) return { ...base, kind: "current", readOnly: false };
     const prev = levels[i - 1];
     return {

@@ -1,3 +1,4 @@
+import { countsInRealMetrics } from "./sales-demo";
 // 2026-08-19: extracted from admin.index.tsx (Dashboard) so the exact same
 // "needs immediate action" rules can be reused by the Tablet quick-actions
 // view (Jaret's tablet command center) without a second, drifting copy.
@@ -76,7 +77,7 @@ export function computeUrgencySignals(navigate: NavigateFn): {
   const watchOverflow: UrgencyItem[] = [];
 
   // 1 — Sessions needing a substitute (split by the 8h window).
-  for (const s of loadSessions().filter((x) => x.needs_substitute)) {
+  for (const s of loadSessions().filter(countsInRealMetrics).filter((x) => x.needs_substitute)) {
     const ms = +new Date(s.date_time) - now;
     const base = {
       id: `sub:${s.id}`,
@@ -98,7 +99,7 @@ export function computeUrgencySignals(navigate: NavigateFn): {
   // 2 — Clubs at risk: no teacher assigned (upcomingCreatedClubs) or a pending
   //     release request from the assigned teacher.
   const releaseClubIds = new Set(loadReleaseRequests().map((r) => r.club_id));
-  const allClubs = loadClubs();
+  const allClubs = loadClubs().filter(countsInRealMetrics);
   const atRiskClubs = [
     ...upcomingCreatedClubs(allClubs),
     ...allClubs.filter(

@@ -24,6 +24,7 @@ export type TimeStatus = ClubTimeStatus;
 export type AssignmentStatus = "created" | "assigned";
 
 export interface Club {
+  is_sales_demo?: boolean;
   id: string;
   type: ClubType;
   title: string;
@@ -115,6 +116,7 @@ function mapClubRow(row: ClubRow): Club {
     cover_scale: row.cover_scale,
     topic_tag: row.topic_tag ?? undefined,
     catalog_featured: row.catalog_featured,
+    is_sales_demo: (row as ClubRow & { is_sales_demo?: boolean }).is_sales_demo ?? false,
     link: row.link ?? "",
     material: row.material ?? undefined,
     cover_image: row.cover_image ?? undefined,

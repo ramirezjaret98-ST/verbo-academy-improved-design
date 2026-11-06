@@ -232,9 +232,11 @@ export function SlotPickerGrid({
   selectedISO: string;
   onSelect: (iso: string) => void;
 }) {
+  const { user } = useAuth();
+  const demoStudentId = user?.is_sales_demo ? user.id : undefined;
   const slots = useMemo(
-    () => findAvailableStartSlots({ dateYMD, durationMin, qualifiedTeacherIds }),
-    [dateYMD, durationMin, qualifiedTeacherIds],
+    () => findAvailableStartSlots({ dateYMD, durationMin, qualifiedTeacherIds, demoStudentId }),
+    [dateYMD, durationMin, qualifiedTeacherIds, demoStudentId],
   );
   if (slots.length === 0) {
     return (
