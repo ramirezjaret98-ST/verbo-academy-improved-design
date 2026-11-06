@@ -1595,7 +1595,7 @@ const VC_HEADER_KEYFRAMES = `
 
 
 /** "How to submit" block — only rendered when the admin filled in instructions. */
-function SubmissionInstructions({ text, delay, accent }: { text?: string; delay?: string; accent?: string }) {
+function SubmissionInstructions({ text, delay, accent, mission = false }: { text?: string; delay?: string; accent?: string; mission?: boolean }) {
   if (!text || !text.trim()) return null;
   const tone = accent || "hsl(var(--primary))";
   return (
@@ -1612,10 +1612,10 @@ function SubmissionInstructions({ text, delay, accent }: { text?: string; delay?
           <Upload className="h-3.5 w-3.5" />
         </span>
         <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-          How to submit
+          {mission ? "Challenge brief" : "How to submit"}
         </span>
       </div>
-      <p className="mt-3 text-[16px] font-medium leading-[1.6] tracking-[-0.01em] text-foreground">{text}</p>
+      <p className="mt-3 whitespace-pre-line text-[16px] font-medium leading-[1.6] tracking-[-0.01em] text-foreground">{text}</p>
     </div>
   );
 }
@@ -1923,9 +1923,9 @@ function ChallengeDetail({
           .vc-rise, .vc-blob, .vc-logo { animation: none !important; opacity: 1 !important; transform: none !important; }
         }
       `}</style>
-      <div className="w-full max-w-xl overflow-hidden rounded-2xl border border-border bg-card shadow-elevated" onClick={(e) => e.stopPropagation()}>
+      <div role="dialog" aria-modal="true" aria-labelledby="standard-challenge-title" className="flex max-h-[calc(100dvh-2rem)] w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-elevated" onClick={(e) => e.stopPropagation()}>
         {/* HEADER — solid category color + decorative radial blobs + watermark */}
-        <div className="relative overflow-hidden px-5 pb-4 pt-3.5 text-white" style={{ backgroundColor: theme.solid }}>
+        <div className="relative shrink-0 overflow-hidden px-5 pb-4 pt-3.5 text-white" style={{ backgroundColor: theme.solid }}>
           <span
             aria-hidden
             className="vc-blob pointer-events-none absolute -right-10 -top-16 h-40 w-40 rounded-full blur-2xl"
@@ -1973,7 +1973,7 @@ function ChallengeDetail({
           </div>
 
           <div className="relative z-10 mt-2.5">
-            <h3 className="vc-rise text-[28px] font-bold leading-[1.1] tracking-[-0.03em]" style={{ animationDelay: "0.18s" }}>
+            <h3 id="standard-challenge-title" className="vc-rise text-[28px] font-bold leading-[1.1] tracking-[-0.03em]" style={{ animationDelay: "0.18s" }}>
               {challenge.title}
             </h3>
             {challenge.skill_tags && challenge.skill_tags.length > 0 && (
@@ -2013,12 +2013,12 @@ function ChallengeDetail({
         })()}
 
 
-        <div className="relative p-6">
+        <div role="region" aria-label="Challenge details" tabIndex={0} className="relative min-h-0 overflow-y-auto overscroll-contain p-6 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary">
           <div className={locked ? "pointer-events-none select-none blur-sm" : ""}>
             <p className="vc-rise text-[17px] leading-[1.55] tracking-[-0.01em] text-foreground" style={{ animationDelay: "0.3s" }}>
               {challenge.description || "No description available."}
             </p>
-            <SubmissionInstructions text={challenge.submission_instructions} delay="0.36s" accent={theme.solid} />
+            <SubmissionInstructions text={challenge.submission_instructions} delay="0.36s" accent={theme.solid} mission />
 
             {challenge.video_url && (
               <SignedDownloadTrigger
@@ -2047,6 +2047,7 @@ function ChallengeDetail({
           )}
         </div>
 
+        <div className="shrink-0">
         <ChallengeModalFooter
           submission={submission}
           accent={theme.solid}
@@ -2071,6 +2072,7 @@ function ChallengeDetail({
             </PrimaryButton>
           )}
         </ChallengeModalFooter>
+        </div>
       </div>
 
       {user && (
