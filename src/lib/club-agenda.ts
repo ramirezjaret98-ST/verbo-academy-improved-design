@@ -39,6 +39,6 @@ export function clubAgendaState(event: CalendarEvent, now = Date.now()) {
     terminal,
     full,
     reserved: !!event.booked,
-    color: terminal ? "#64748b" : event.booked ? "#01304a" : full ? "#c2410c" : "#15803d",
+    color: terminal ? "#64748b" : event.booked ? "#01304a" : full ? "#c2410c" : "#5fca16",
   };
 }
