@@ -63,16 +63,7 @@ export function ClubAgendaCarousel({
           >
             <div className="agenda-club-cover">
               {club.cover_image ? (
-                <img
-                  src={club.cover_image}
-                  alt=""
-                  loading="lazy"
-                  style={{
-                    objectPosition: `${club.cover_position_x ?? 50}% ${club.cover_position_y ?? 50}%`,
-                    transformOrigin: `${club.cover_position_x ?? 50}% ${club.cover_position_y ?? 50}%`,
-                    transform: `scale(${club.cover_scale ?? 1})`,
-                  }}
-                />
+                <img src={club.cover_image} alt="" loading="lazy" />
               ) : (
                 <Icon size={72} aria-hidden />
               )}
