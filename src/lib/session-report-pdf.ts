@@ -1,6 +1,8 @@
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import logoUrl from "@/assets/verbo-logo.png";
+import type { SessionReportContent } from "./session-report-content";
+import { buildModernSessionReport } from "./session-report-layout";
 
 /* -------------------------------------------------------------------------- */
 /* Branded 1:1 session report (PDF) — shared by the teacher's "Download PDF"  */
@@ -45,6 +47,9 @@ export interface SessionReportSkills {
 }
 
 export interface SessionReportInput {
+  content?: SessionReportContent;
+  teacherName?: string;
+  studentNote?: string;
   studentName: string;
   dateLabel: string;
   status: string;
@@ -231,6 +236,7 @@ const SKILL_LABELS: Record<keyof SessionReportSkills, string> = {
 
 /** Builds the branded session-report PDF document (does not save/download it). */
 export async function buildSessionReportPdf(input: SessionReportInput): Promise<jsPDF> {
+  if (input.content?.version === 2) return buildModernSessionReport(input, await loadLogoDataUrl());
   const studentName = sanitizePdfText(input.studentName);
   const dateLabel = sanitizePdfText(input.dateLabel);
   const { status, skills } = input;

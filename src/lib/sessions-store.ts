@@ -1,3 +1,4 @@
+import type { SessionReportContent } from "./session-report-content";
 // Shared sessions store — backed by Supabase (`public.sessions` +
 // `public.session_member_statuses` [normalized per-member status for group
 // sessions] + `public.report_admin_edits` [append-only audit log]). Global
@@ -82,6 +83,7 @@ export interface ExtSession {
   status: ExtSessionStatus;
   absent_cause?: "student" | "teacher";
   report_pdf_url?: string;
+  report_content?: SessionReportContent;
   student_rating?: number;
   student_comment?: string;
   review_status?: "pending" | "reviewed" | "discarded";
@@ -204,6 +206,7 @@ function mapSessionRow(row: SessionRow, members: MemberStatusRow[], edits: Admin
     student_reschedule_used: (row as SessionRow & {student_reschedule_used?: boolean}).student_reschedule_used ?? false,
     absent_cause: (row.absent_cause as "student" | "teacher" | null) ?? undefined,
     report_pdf_url: row.report_pdf_url ?? undefined,
+    report_content: (row as SessionRow & { report_content?: SessionReportContent | null }).report_content ?? undefined,
     student_rating: row.student_rating ?? undefined,
     student_comment: row.student_comment ?? undefined,
     review_status: (row.review_status as ExtSession["review_status"]) ?? undefined,
@@ -878,6 +881,7 @@ export async function submitSessionReport(input: {
   subskills: Record<string, number>;
   performance: { fluency: number; vocabulary: number; confidence: number; grammar: number };
   excludeFromPay?: boolean;
+  reportContent?: SessionReportContent;
   reportComments?: string;
   /** Required "Class notes" write-up from the report form. Previously this
    *  was only ever baked into the generated PDF and never persisted to a
@@ -890,7 +894,7 @@ export async function submitSessionReport(input: {
   const status: ExtSessionStatus = input.attendance === "absent" ? "absent" : "completed";
   const numericId = Number(input.sessionId);
   if (!Number.isFinite(numericId)) return null;
-  const { data, error } = await supabase.rpc("submit_one_on_one_session_report" as never, {
+  const { data, error } = await supabase.rpc("submit_one_on_one_session_report_v2" as never, {
     p_session_id: numericId,
     p_attendance: input.attendance,
     p_absent_cause: status === "absent" ? input.absentCause ?? "student" : null,
@@ -900,6 +904,7 @@ export async function submitSessionReport(input: {
     p_report_comments: input.reportComments?.trim() || null,
     p_notes: input.notes?.trim() || null,
     p_exclude_pay: input.excludeFromPay ?? false,
+    p_report_content: input.reportContent ?? null,
   } as never);
   if (error || !data) {
     notifyError(error ?? "Report was not saved", { context: "Submitting session report" });
