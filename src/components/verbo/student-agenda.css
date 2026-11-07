@@ -1,0 +1,305 @@
+.student-agenda .agenda-event {
+  min-height: 32px;
+  gap: 6px;
+  padding: 6px 8px;
+  font-size: 11px;
+  line-height: 18px;
+  box-shadow:
+    0 3px 6px rgb(1 48 74 / 0.12),
+    inset 0 1px 0 rgb(255 255 255 / 0.22);
+}
+.student-agenda .agenda-club-event {
+  border: 0;
+  border-radius: 6px;
+  background: transparent !important;
+  color: var(--foreground) !important;
+  box-shadow: none;
+  font-weight: 600;
+}
+.student-agenda .agenda-club-event svg:first-child {
+  filter: drop-shadow(0 1px 1px rgb(1 48 74 / 0.16));
+}
+.student-agenda .agenda-club-event:hover {
+  background: color-mix(in srgb, var(--foreground) 4%, transparent) !important;
+}
+.student-agenda .agenda-club-event:focus-visible,
+.student-agenda button:focus-visible,
+.agenda-clubs button:focus-visible {
+  outline: 2px solid #f38934;
+  outline-offset: 3px;
+}
+.student-agenda .agenda-legend summary {
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted-foreground);
+}
+.student-agenda .agenda-legend summary::-webkit-details-marker {
+  display: none;
+}
+.student-agenda .agenda-legend[open] summary {
+  margin-bottom: 16px;
+}
+.student-agenda .agenda-legend[open] summary svg {
+  transform: rotate(180deg);
+}
+.student-agenda .agenda-month-scroll {
+  overflow-x: auto;
+  padding: 3px;
+}
+.student-agenda .agenda-month-scroll > div {
+  min-width: 700px;
+}
+.student-agenda .agenda-month-scroll {
+  max-width: 100%;
+}
+.agenda-clubs {
+  width: 100%;
+  min-width: 0;
+}
+.agenda-clubs-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+.agenda-clubs-heading h2 {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--foreground);
+}
+.agenda-clubs-heading button {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #c2410c;
+}
+.agenda-club-feature {
+  display: flex;
+  align-items: stretch;
+  overflow: hidden;
+  border-radius: 22px;
+  background: linear-gradient(115deg, #01304a, #024b69);
+  color: #fff;
+  box-shadow:
+    0 8px 20px rgb(1 48 74 / 0.16),
+    inset 0 1px 0 rgb(255 255 255 / 0.15);
+}
+.agenda-club-cover {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 27%;
+  min-height: 210px;
+  overflow: hidden;
+  background: #02435f;
+  color: #f38934;
+}
+.agenda-club-cover img {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.agenda-club-copy {
+  flex: 1;
+  min-width: 0;
+  padding: 26px 22px;
+}
+.agenda-club-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+.agenda-club-eyebrow svg {
+  color: #f38934;
+}
+.agenda-club-copy h3 {
+  margin-top: 10px;
+  font-size: clamp(20px, 2.4vw, 30px);
+  font-weight: 700;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+.agenda-club-description {
+  margin-top: 8px;
+  font-size: 13px;
+  color: #e2e8f0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.agenda-club-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  margin-top: 16px;
+  font-size: 11px;
+  color: #f1f5f9;
+}
+.agenda-club-meta > span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.agenda-club-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+.agenda-club-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 24px;
+}
+.agenda-reserve {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  white-space: nowrap;
+  border-radius: 999px;
+  padding: 12px 18px;
+  background: #f38934;
+  color: #17242e;
+  font-size: 12px;
+  font-weight: 700;
+  box-shadow: 0 4px 9px rgb(0 0 0 / 0.15);
+  transition:
+    transform 0.2s,
+    box-shadow 0.2s;
+}
+.agenda-reserve:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 14px rgb(0 0 0 / 0.22);
+}
+.agenda-details {
+  font-size: 12px;
+  text-decoration: underline;
+  color: white;
+}
+.agenda-carousel-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 12px;
+  font-size: 11px;
+  color: var(--muted-foreground);
+}
+.agenda-carousel-controls button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--card);
+  color: var(--foreground);
+}
+.agenda-clubs-empty {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 24px;
+  color: var(--muted-foreground);
+  font-size: 13px;
+}
+.agenda-clubs-empty button {
+  color: var(--foreground);
+  text-decoration: underline;
+}
+@media (max-width: 900px) {
+  .agenda-club-feature {
+    flex-wrap: wrap;
+  }
+  .agenda-club-cover {
+    flex-basis: 30%;
+  }
+  .agenda-club-copy {
+    flex-basis: 65%;
+  }
+  .agenda-club-actions {
+    flex-direction: row;
+    width: 100%;
+    padding: 0 22px 22px;
+    justify-content: flex-end;
+  }
+}
+@media (max-width: 540px) {
+  .agenda-clubs-heading {
+    align-items: flex-start;
+  }
+  .agenda-clubs-heading h2 {
+    font-size: 17px;
+  }
+  .agenda-clubs-heading button {
+    font-size: 11px;
+  }
+  .agenda-club-cover {
+    flex-basis: 100%;
+    min-height: 150px;
+  }
+  .agenda-club-copy {
+    padding: 20px;
+  }
+  .agenda-club-actions {
+    justify-content: flex-start;
+    padding: 0 20px 20px;
+    flex-wrap: wrap;
+  }
+}
+@media (max-width: 540px) {
+  .student-agenda > div:first-child > div:first-child,
+  .student-agenda > div:first-child > div:first-child > div {
+    flex-wrap: wrap;
+  }
+}
+.dark .student-agenda svg[data-club-state="Available"] {
+  color: #4ade80 !important;
+}
+.dark .student-agenda svg[data-club-state="Full"] {
+  color: #fb923c !important;
+}
+.dark .student-agenda svg[data-club-state="Ended"] {
+  color: #94a3b8 !important;
+}
+.dark .student-agenda > div:first-child span.rounded-full {
+  color: #f1f5f9;
+}
+@media (prefers-reduced-motion: reduce) {
+  .student-agenda .verbo-cal-pill,
+  .student-agenda .verbo-cal-in,
+  .student-agenda .verbo-focus-pulse,
+  .student-agenda button,
+  .student-agenda .group\/day,
+  .agenda-clubs button {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+  .student-agenda button:hover,
+  .student-agenda .group\/day:hover,
+  .agenda-reserve:hover {
+    transform: none !important;
+  }
+}

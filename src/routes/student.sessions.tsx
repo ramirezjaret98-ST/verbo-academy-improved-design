@@ -35,6 +35,7 @@ import {
   type ExtSession, type ExtSessionStatus,
 } from "@/lib/sessions-store";
 import { withinConnectWindow, CONNECT_HINT } from "@/lib/session-connect";
+import { ClubAgendaCarousel } from "@/components/verbo/ClubAgendaCarousel";
 import { CalendarView } from "@/components/verbo/CalendarView";
 import {
   studentCalendarEvents, CALENDAR_STATUS_META, EVENT_KIND_META, calendarEventTheme,
@@ -42,7 +43,7 @@ import {
 } from "@/lib/calendar-events";
 import { Card, PrimaryButton, GhostButton, AccentModalHeader, InfoStatRow, AnimatedNumber } from "@/components/verbo/ui";
 
-import { X, Video, AlertTriangle, Sparkles, CalendarClock, Clock, RefreshCcw, ArrowLeft, ChevronRight, Users as UsersIcon, BookOpen, Star, MessageCircle } from "lucide-react";
+import { X, Video, AlertTriangle, Sparkles, CalendarClock, Clock, ArrowLeft, ChevronRight, Users as UsersIcon, BookOpen, Star, MessageCircle } from "lucide-react";
 import spotlightArt from "@/assets/spotlight1.png";
 import nextUpArt from "@/assets/Verbot_up_next.svg";
 import { getLessonPlan } from "@/lib/lesson-plans-store";
@@ -57,9 +58,6 @@ import { tailoredUnitsForStudent } from "@/lib/tailored-content-store";
 import {
   addStudentRequest,
   convertSessionToSpotlight,
-  parseReschedulePolicy,
-  reschedulesUsedThisMonth,
-  rescheduleQuota,
   spotlightRequestsThisMonth,
 } from "@/lib/student-requests-store";
 
@@ -124,13 +122,6 @@ function buildSessionsTourSteps(closeEventModal: () => void): TourStep[] {
       eyebrow: "Up next",
       title: "This card always shows what's coming up",
       body: "Tap it any time to open the full details of your next session.",
-    },
-    {
-      id: "reschedule-policy",
-      target: '[data-tour="reschedule-policy"]',
-      eyebrow: "Reschedule policy",
-      title: "Your notice window and monthly limit",
-      body: "This is just for reference — how much notice you need to give, and how many reschedules you get per month. I'll show you where to actually use it next.",
     },
     {
       id: "cant-attend",
@@ -226,9 +217,6 @@ function Page() {
   const freemium = useCoreFreemiumGate(user);
   if (!user) return null;
 
-  const policy = parseReschedulePolicy(user);
-  const quota = rescheduleQuota(user);
-  const used = reschedulesUsedThisMonth(user.id);
   const isSignature = user.access_plan === "Signature";
   const isCore = user.access_plan === "Core";
   const spotlightCapNum = resolvedMonthlyCap(user.id, "spotlight");
@@ -342,6 +330,7 @@ function Page() {
 
       <Card>
         <CalendarView
+          studentExperience
           events={events}
           onEventClick={handleEventClick}
           availableKinds={studentKinds}
@@ -354,21 +343,8 @@ function Page() {
 
       </Card>
 
+      <ClubAgendaCarousel events={events.filter(event => studentKinds.includes(event.kind))} onOpen={handleEventClick} onExplore={() => navigate({to:"/student/clubs"})} />
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        <StatPill
-          dataTour="reschedule-policy"
-          icon={<CalendarClock className="h-4 w-4" />}
-          label="Reschedule Policy"
-          value={`${policy.noticeHours}h notice · up to ${policy.maxPct}% of monthly sessions`}
-          tone="violet"
-        />
-        <StatPill
-          icon={<RefreshCcw className="h-4 w-4" />}
-          label="Used this cycle"
-          value={`${used} of ${quota} reschedules`}
-          tone={quota > 0 && used / quota >= 0.8 ? "red" : quota > 0 && used / quota >= 0.5 ? "amber" : "green"}
-          progressPct={quota > 0 ? Math.min(100, Math.round((used / quota) * 100)) : 0}
-        />
         {spotlightVisible && (
           <StatPill
             icon={<Sparkles className="h-4 w-4" />}
