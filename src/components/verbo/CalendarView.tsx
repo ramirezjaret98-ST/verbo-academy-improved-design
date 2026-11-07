@@ -12,7 +12,7 @@
 // the Student panel can wire it later with its own event source.
 
 import { useEffect, useMemo, useRef, useState, type MutableRefObject } from "react";
-import { ChevronLeft, ChevronRight, Check } from "lucide-react";
+import { ChevronLeft, ChevronRight, ChevronDown, Check, Video, MessageCircle, BookOpen, Sparkles, Users, MapPin } from "lucide-react";
 
 import { GhostButton } from "@/components/verbo/ui";
 import {
@@ -29,9 +29,14 @@ import { SUB_STATUS_META, type ExtSessionStatus } from "@/lib/sessions-store";
 import { SUBSTITUTION_COLOR } from "@/lib/status-palette";
 import { ExternalOccurrenceEditor } from "./ExternalOccurrenceEditor";
 
+import { clubAgendaState } from "@/lib/club-agenda";
+import "./student-agenda.css";
+const EVENT_ICONS = {class:Video, insight:MessageCircle, book_club:BookOpen, spotlight:Sparkles, workshop:Users, in_person:MapPin};
+
 export type CalendarViewMode = "month" | "day";
 
 export interface CalendarViewProps {
+  studentExperience?: boolean;
   events: CalendarEvent[];
   onEventClick?: (ev: CalendarEvent) => void;
   initialMode?: CalendarViewMode;
@@ -71,6 +76,7 @@ function fmtTime(iso: string) {
 
 export function CalendarView({
   events,
+  studentExperience = false,
   onEventClick,
   initialMode = "month",
   availableKinds,
@@ -81,6 +87,8 @@ export function CalendarView({
   highlightEventId,
   attentionEventIds,
 }: CalendarViewProps) {
+  const [, refreshClock] = useState(0);
+  useEffect(() => { const timer = window.setInterval(() => refreshClock(n => n + 1), 30_000); return () => window.clearInterval(timer); }, []);
   const [mode, setMode] = useState<CalendarViewMode>(initialMode);
   const [externalEvent, setExternalEvent] = useState<CalendarEvent | null>(null);
   const openEvent = (event: CalendarEvent) => {
@@ -138,7 +146,7 @@ export function CalendarView({
   };
 
   return (
-    <div className="space-y-5">
+    <div className={`space-y-5 ${studentExperience ? "student-agenda" : ""}`}>
       {/* Header controls */}
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex items-center gap-2">
@@ -207,8 +215,10 @@ export function CalendarView({
       </div>
 
       {/* Grid */}
+      <div className={studentExperience && mode === "month" ? "agenda-month-scroll" : undefined}>
       {mode === "month" ? (
         <MonthGrid
+          studentExperience={studentExperience}
           cursor={cursor}
           eventsByDay={eventsByDay}
           onEventClick={openEvent}
@@ -221,6 +231,7 @@ export function CalendarView({
         />
       ) : (
         <DayList
+          studentExperience={studentExperience}
           day={dayCursor}
           events={eventsByDay.get(dayKey(dayCursor)) ?? []}
           onEventClick={openEvent}
@@ -234,11 +245,13 @@ export function CalendarView({
 
       )}
 
-      {/* Canonical 7-status legend */}
+      </div>
+      {/* Status reference stays available without crowding the student calendar. */}
       {externalEvent?.external && <ExternalOccurrenceEditor occurrence={externalEvent.external} onClose={() => setExternalEvent(null)} />}
-      <div className="rounded-2xl border border-border bg-secondary/40 px-4 py-3">
+      <details className="agenda-legend rounded-2xl border border-border bg-secondary/40 px-4 py-3" open={studentExperience ? undefined : true}>
+        <summary><ChevronDown className="h-4 w-4" aria-hidden />Calendar key</summary>
         <div className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-          Status legend
+          Session status
         </div>
         <div className="flex flex-wrap gap-x-5 gap-y-2 text-[11px] text-muted-foreground">
           {CANONICAL_STATUS_ORDER.map((s) => (
@@ -264,16 +277,25 @@ export function CalendarView({
             </div>
           )}
         </div>
-      </div>
+        {studentExperience && <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-border pt-3 text-xs text-muted-foreground">
+          <strong>Clubs</strong>
+          <span className="inline-flex items-center gap-1.5"><MessageCircle size={16} color="#15803d" aria-hidden /> Available</span>
+          <span className="inline-flex items-center gap-1.5"><MessageCircle size={16} color="#c2410c" aria-hidden /> Full</span>
+          <span className="inline-flex items-center gap-1.5"><MessageCircle size={16} color="#64748b" aria-hidden /> Ended</span>
+          <span className="inline-flex items-center gap-1.5"><Check size={16} color="#15803d" aria-hidden /> Reserved</span>
+          <p className="w-full">Club availability is shown by the icon. Open an event for its full status and details.</p>
+        </div>}
+      </details>
 
     </div>
   );
 }
 
 function MonthGrid({
-  cursor, eventsByDay, onEventClick, pulseKinds, substitutionAware,
+  studentExperience, cursor, eventsByDay, onEventClick, pulseKinds, substitutionAware,
   highlightEventId, highlightPulsing, highlightScrolledRef, attentionEventIds,
 }: {
+  studentExperience?: boolean;
   cursor: Date;
   eventsByDay: Map<string, CalendarEvent[]>;
   onEventClick?: (ev: CalendarEvent) => void;
@@ -321,8 +343,9 @@ function MonthGrid({
                 const highlighted = !!highlightEventId && e.id === highlightEventId;
                 return (
                   <EventPill
-                    key={e.id}
+                    key={`${e.kind}:${e.id}`}
                     index={idx}
+                    studentExperience={studentExperience}
                     ev={e}
                     onClick={() => onEventClick?.(e)}
                     pulse={(!!attentionEventIds?.has(e.id) || !!pulseKinds?.includes(e.kind) || e.status === "pending_reschedule" || (highlighted && !!highlightPulsing)) && !isClubFull(e)}
@@ -346,9 +369,10 @@ function MonthGrid({
 }
 
 function DayList({
-  day, events, onEventClick, pulseKinds, substitutionAware,
+  studentExperience, day, events, onEventClick, pulseKinds, substitutionAware,
   highlightEventId, highlightPulsing, highlightScrolledRef, attentionEventIds,
 }: {
+  studentExperience?: boolean;
   day: Date;
   events: CalendarEvent[];
   onEventClick?: (ev: CalendarEvent) => void;
@@ -373,6 +397,7 @@ function DayList({
         const attention = !!attentionEventIds?.has(e.id);
         const pulse = (attention || !!pulseKinds?.includes(e.kind) || e.status === "pending_reschedule" || (highlighted && !!highlightPulsing)) && !isClubFull(e);
         const display = eventPillDisplay(e, { substitutionAware });
+        if (studentExperience) return <div className="border-b border-border p-3 last:border-0" key={`${e.kind}:${e.id}`}><EventPill ev={e} studentExperience onClick={() => onEventClick?.(e)} pulse={!!pulse} highlighted={highlighted} scrolledRef={highlightScrolledRef} attention={attention} /></div>;
         return (
         <button
           key={e.id}
@@ -453,8 +478,9 @@ function DayList({
 }
 
 function EventPill({
-  ev, onClick, pulse = false, substitutionAware = false, index = 0, highlighted = false, scrolledRef, attention = false,
+  ev, onClick, studentExperience = false, pulse = false, substitutionAware = false, index = 0, highlighted = false, scrolledRef, attention = false,
 }: {
+  studentExperience?: boolean;
   ev: CalendarEvent;
   onClick: () => void;
   pulse?: boolean;
@@ -467,6 +493,10 @@ function EventPill({
   const display = eventPillDisplay(ev, { substitutionAware });
   const kindMeta = EVENT_KIND_META[ev.kind];
   const isClub = ev.kind === "insight" || ev.kind === "book_club";
+  const Icon = EVENT_ICONS[ev.kind];
+  const clubState = isClub ? clubAgendaState(ev) : null;
+  const simpleClub = studentExperience && isClub;
+  const accessibleLabel = `${kindMeta.label} — ${ev.title} — ${fmtTime(ev.date)} — ${clubState?.label ?? (ev.sub_status ? SUB_STATUS_META[ev.sub_status].label : ev.status ? CALENDAR_STATUS_META[ev.status as ExtSessionStatus]?.label ?? display.cellLabel : display.cellLabel)}${ev.booked ? " — Reserved" : ""}`;
   const seats = isClub && ev.spots_total != null
     ? `${ev.spots_taken ?? 0}/${ev.spots_total} Seats`
     : null;
@@ -486,18 +516,19 @@ function EventPill({
           }
         }}
         onClick={onClick}
-        className={`flex w-full items-center gap-1 truncate rounded-lg border px-1.5 py-1 text-left text-[10.5px] font-medium shadow-sm verbo-cal-pill transition-[transform,box-shadow,opacity] duration-200 ease-out hover:-translate-y-px hover:shadow-md active:scale-[0.97] cursor-pointer ${
-          showBooked ? "ring-2 ring-[#f38934] ring-offset-1 ring-offset-card" : ""
-        } ${pulse ? "verbo-focus-pulse" : highlighted ? "verbo-target-ring" : ""} ${full ? "opacity-55 grayscale-[0.4]" : ""}`}
+        aria-label={accessibleLabel}
+        className={`${studentExperience ? `agenda-event ${simpleClub ? "agenda-club-event" : ""}` : ""} flex w-full items-center gap-1 truncate rounded-lg border px-1.5 py-1 text-left text-[10.5px] font-medium shadow-sm verbo-cal-pill transition-[transform,box-shadow,opacity] duration-200 ease-out hover:-translate-y-px hover:shadow-md active:scale-[0.97] cursor-pointer ${
+          showBooked && !simpleClub ? "ring-2 ring-[#f38934] ring-offset-1 ring-offset-card" : ""
+        } ${pulse && !simpleClub ? "verbo-focus-pulse" : highlighted ? "verbo-target-ring" : ""} ${full && !simpleClub ? "opacity-55 grayscale-[0.4]" : ""}`}
         style={{
-          background: display.color,
+          background: simpleClub ? "transparent" : display.color,
           color: display.borderColor ? "#01304a" : "#ffffff",
           borderColor: display.borderColor ?? "transparent",
           animationDelay: `${index * 40}ms`,
           ...(pulse || highlighted ? { ["--verbo-focus-pulse-color" as string]: attention ? "#b52904" : display.color } : {}),
         }}
 
-        title={
+        title={studentExperience ? accessibleLabel :
           (ev.sub_status
             ? `${SUB_STATUS_META[ev.sub_status].label} — ${ev.title}`
              : `${showBooked ? "Reserved — " : ""}${missed ? "Expired" : ev.is_group ? "Group" : kindMeta.label} — ${ev.title}`) +
@@ -505,7 +536,7 @@ function EventPill({
         }
       >
 
-        {showBooked ? (
+        {studentExperience ? <Icon aria-hidden data-club-state={clubState?.label} className="h-4 w-4 shrink-0" style={simpleClub ? {color:clubState?.reserved && !clubState.terminal ? "var(--foreground)" : clubState?.color} : undefined} /> : showBooked ? (
           <span className="inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full bg-[#f38934] text-white" title="You're in">
             <Check className="h-2.5 w-2.5" strokeWidth={3} />
           </span>
@@ -515,11 +546,13 @@ function EventPill({
           </span>
         )}
         {attention && <span className="shrink-0 rounded bg-[#b52904] px-1 text-[9px] font-bold text-white">Changed</span>}
-        <span className="truncate">
-          {isClub
+        <span className="min-w-0 flex-1 truncate">
+          {simpleClub ? `${fmtTime(ev.date)} · ${ev.title}` : studentExperience && !isClub ? `${fmtTime(ev.date)} · ${ev.title}${cellLabelInline}` : isClub
             ? `${fmtTime(ev.date)} · ${ev.title}${missed ? " · Expired" : seats ? ` · ${seats}` : ""}`
             : `${fmtTime(ev.date)} · ${ev.is_group || ev.kind === "in_person" ? ev.title : ev.title.split(" ")[0]}${cellLabelInline}`}
         </span>
+        {simpleClub && ev.booked && <Check className="h-4 w-4 shrink-0 text-green-700" aria-hidden />}
+        {studentExperience && !isClub && (ev.is_group || ev.sub_status || ev.covered_by_substitute) && <span className="shrink-0 text-[9px] font-bold">{display.short}</span>}
         {ev.holiday_makeup && (
           <span className="ml-auto shrink-0 rounded bg-amber-100 px-1 text-[9px] font-bold leading-none text-amber-800" title="Holiday Makeup">
             HM
