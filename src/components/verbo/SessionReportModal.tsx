@@ -1,3 +1,4 @@
+import { SessionReportContentView } from "./SessionReportContent";
 // Read-only view of everything submitted for a session: the teacher's
 // Final Session Report (class notes, note for the student, branded PDF),
 // the student's rating of the session, and the teacher's skill rating of
@@ -86,6 +87,8 @@ export function SessionReportModal({ session, onClose }: { session: ExtSession; 
           </Field>
         </div>
 
+        {session.report_content && <SessionReportContentView content={session.report_content} skills={perf} />}
+
         {session.notes?.trim() && (
           <div>
             <div className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Class Notes</div>
@@ -130,7 +133,7 @@ export function SessionReportModal({ session, onClose }: { session: ExtSession; 
           </div>
         )}
 
-        {perf && (
+        {perf && !session.report_content && (
           <div>
             <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
               <GraduationCap className="h-3.5 w-3.5" /> Teacher's Skill Rating of the Student
@@ -144,6 +147,7 @@ export function SessionReportModal({ session, onClose }: { session: ExtSession; 
           </div>
         )}
 
+        {session.report_content && Object.keys(session.report_content.skipped).length > 0 && <details className="text-xs text-muted-foreground"><summary>Categories reviewed but not covered (staff)</summary><ul className="mt-2 space-y-1">{Object.entries(session.report_content.skipped).map(([type, reason]) => <li key={type}><strong>{type}:</strong> {reason}</li>)}</ul></details>}
         <div className="text-xs text-muted-foreground">
           Report submitted {session.report_submitted_at ? new Date(session.report_submitted_at).toLocaleString() : "—"}
         </div>

@@ -1,3 +1,4 @@
+import type { SessionReportContent } from "@/lib/session-report-content";
 import { createFileRoute } from "@tanstack/react-router";
 import { useAuth } from "@/lib/auth";
 import { ExternalTeacherBlocks } from "@/components/verbo/ExternalTeacherBlocks";
@@ -300,6 +301,7 @@ function AcademyEventDetailsModal({
     subStatus?: import("@/lib/sessions-store").AttendanceSubStatus | null,
     reportComments?: string,
     notes?: string,
+    reportContent?: SessionReportContent,
   ): Promise<boolean> => {
     if (!s) return false;
     const saved = await submitSessionReport({
@@ -314,6 +316,7 @@ function AcademyEventDetailsModal({
       excludeFromPay: true,
       reportComments,
       notes,
+      reportContent,
     });
     if (!saved) return false;
     // Named distinctly from the outer `plan` (this modal's own lesson-plan

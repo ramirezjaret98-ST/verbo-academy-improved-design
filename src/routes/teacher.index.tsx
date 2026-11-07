@@ -21,6 +21,9 @@ import { MACRO_SKILLS as SHARED_MACRO_SKILLS, skillKey as sharedSkillKey, type B
 import { submitSessionReport, updateSession, loadSessions, subscribeSessions, notifySessionEvent, logSessionConnect, SUB_STATUS_META, isJustificationWindowOpen, type ExtSession, type AttendanceSubStatus } from "@/lib/sessions-store";
 import { PlanModal } from "@/components/verbo/PlanModal";
 import { ReorderLessonPlansModal } from "@/components/verbo/ReorderLessonPlansModal";
+import { SessionReportFields, newReportEntry } from "@/components/verbo/SessionReportFields";
+import { SessionReportContentView } from "@/components/verbo/SessionReportContent";
+import { REPORT_SECTIONS, cleanReportContent, reportContentError, type SessionReportContent } from "@/lib/session-report-content";
 import { downloadSessionReportPdf, sessionReportPdfBlob, sessionReportFileName } from "@/lib/session-report-pdf";
 import { downloadCollaborationPdf, downloadKpiSummaryPdf } from "@/lib/simple-docs-pdf";
 import { uploadContentFile } from "@/lib/content-uploads";
@@ -551,6 +554,7 @@ function TeacherDashboardContent({ user }: { user: NonNullable<ReturnType<typeof
     subStatus?: AttendanceSubStatus | null,
     reportComments?: string,
     notes?: string,
+    reportContent?: SessionReportContent,
   ): Promise<boolean> => {
     if (!user) return false;
     const session = sessions.find((s) => s.id === sessionId);
@@ -565,6 +569,7 @@ function TeacherDashboardContent({ user }: { user: NonNullable<ReturnType<typeof
       performance: perf,
       reportComments,
       notes,
+      reportContent,
     });
     if (!saved) return false;
     setSessions((prev) => prev.map((s) => s.id === sessionId ? { ...s, status: saved.status as SessionStatus, _noReport: false } : s));
@@ -1385,24 +1390,6 @@ function formatCountdown(ms: number) {
   return `${h}h ${String(m).padStart(2, "0")}m`;
 }
 
-type EntryType = "New word" | "Pronunciation" | "Mistake" | "Tip" | "Other";
-interface Entry { id: string; type: EntryType; term: string; explanation: string }
-const ENTRY_TYPES: EntryType[] = ["New word", "Pronunciation", "Mistake", "Tip", "Other"];
-const MIN_ENTRIES = 6;
-const MAX_ENTRIES = 10;
-
-const ENTRY_PLACEHOLDERS: Record<EntryType, { term: string; explanation: string }> = {
-  "New word": { term: "New word…", explanation: "Definition or example of use…" },
-  "Mistake": { term: "Student's mistake…", explanation: "Correct form…" },
-  "Pronunciation": { term: "Target word/phrase…", explanation: "Phonetic guide or sound correction…" },
-  "Tip": { term: "Focus area…", explanation: "Practical advice…" },
-  "Other": { term: "Topic/Concept…", explanation: "Additional notes…" },
-};
-
-function makeEntry(): Entry {
-  return { id: Math.random().toString(36).slice(2), type: "New word", term: "", explanation: "" };
-}
-
 type Attendance = "present" | "delayed" | "absent";
 // Exported (2026-09-15) so Admin > Calendar can reuse this exact same
 // two-step report flow when a super admin has to fill a Session Report
@@ -1414,7 +1401,7 @@ export function ReportModal({ session, perf, subskills, onClose, onSubmit }: {
   perf: PerformanceRating;
   subskills: Record<string, number>;
   onClose: () => void;
-  onSubmit: (id: string, attendance: Attendance, perf: PerformanceRating, subskills: Record<string, number>, absentCause?: "student" | "teacher", subStatus?: AttendanceSubStatus | null, reportComments?: string, notes?: string) => Promise<boolean>;
+  onSubmit: (id: string, attendance: Attendance, perf: PerformanceRating, subskills: Record<string, number>, absentCause?: "student" | "teacher", subStatus?: AttendanceSubStatus | null, reportComments?: string, notes?: string, reportContent?: SessionReportContent) => Promise<boolean>;
 }) {
   const student = userById(session.student_id);
   const [attendance, setAttendance] = useState<Attendance>("present");
@@ -1425,7 +1412,9 @@ export function ReportModal({ session, perf, subskills, onClose, onSubmit }: {
   const [absentSub, setAbsentSub] = useState<AttendanceSubStatus | null>(null);
   const [notes, setNotes] = useState("");
   const [studentNote, setStudentNote] = useState("");
-  const [entries, setEntries] = useState<Entry[]>(() => Array.from({ length: MIN_ENTRIES }, makeEntry));
+  const [reportContent, setReportContent] = useState<SessionReportContent>(() => ({ version: 2, todayWin: "", nextMove: "", entries: REPORT_SECTIONS.slice(0, 4).map(section => newReportEntry(section.type)), skipped: {} }));
+  const [pdfState, setPdfState] = useState<"pending" | "saving" | "ready" | "failed">("pending");
+  const [pdfError, setPdfError] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitFailed, setSubmitFailed] = useState(false);
@@ -1433,17 +1422,41 @@ export function ReportModal({ session, perf, subskills, onClose, onSubmit }: {
 
   const bgFor = (opt: Attendance) => opt === "present" ? "#22c55e" : opt === "absent" ? "#ef4444" : "#f38934";
 
-  const filledCount = entries.filter((e) => e.term.trim().length > 0 && e.explanation.trim().length > 0).length;
   const isAbsent = attendance === "absent";
   const notesFilled = notes.trim().length > 0;
-  const canSubmit = isAbsent
-    ? notesFilled
-    : filledCount >= MIN_ENTRIES && filledCount <= MAX_ENTRIES && notesFilled;
+  const contentError = reportContentError(reportContent, isAbsent);
+  const canSubmit = notesFilled && !contentError;
+  const content = cleanReportContent(reportContent, isAbsent);
+  const reportInput = {
+    studentName: student?.name ?? "",
+    teacherName: userById(session.teacher_id)?.name ?? "",
+    dateLabel: fmt(session.date_time),
+    status: isAbsent ? "absent" : attendance === "delayed" ? "delayed" : "completed",
+    notes: notes.trim(),
+    studentNote: isAbsent ? "" : studentNote.trim(),
+    entries: content.entries,
+    content,
+    skills: isAbsent ? undefined : perf,
+  };
 
-  const addEntry = () => setEntries((p) => (p.length >= MAX_ENTRIES ? p : [...p, makeEntry()]));
-  const updateEntry = (id: string, patch: Partial<Entry>) =>
-    setEntries((p) => p.map((e) => (e.id === id ? { ...e, ...patch } : e)));
-  const removeEntry = (id: string) => setEntries((p) => p.filter((e) => e.id !== id));
+  const savePdf = async () => {
+    setPdfState("saving"); setPdfError("");
+    try {
+      const blob = await sessionReportPdfBlob(reportInput);
+      const file = new File([blob], sessionReportFileName(reportInput), { type: "application/pdf" });
+      const studentUuid = await legacyToUuid(session.student_id);
+      if (!studentUuid) throw new Error("Student identity could not be resolved.");
+      const result = await uploadContentFile(file, "session-reports/" + studentUuid);
+      if (!result.ok) throw new Error(result.error);
+      if (!await updateSession(session.id, { report_pdf_url: result.url })) throw new Error("The PDF link could not be saved.");
+      setPdfState("ready");
+      // Queue the existing notification only after the PDF link is persisted.
+      notifySessionEvent(session.id, "report_ready");
+    } catch (error) {
+      console.error("[ReportModal] PDF delivery failed", error);
+      setPdfState("failed"); setPdfError("The report is saved, but its PDF is not available to the student yet. Retry below; your report will not be submitted twice.");
+    }
+  };
 
   const handleSubmit = async () => {
     if (!canSubmit || submitting) return;
@@ -1451,51 +1464,13 @@ export function ReportModal({ session, perf, subskills, onClose, onSubmit }: {
     setSubmitFailed(false);
     let saved = false;
     try {
-      saved = await onSubmit(session.id, attendance, perf, subskills, isAbsent ? absentCause : undefined, isAbsent ? absentSub : null, isAbsent ? undefined : (studentNote.trim() || undefined), notes.trim());
+      saved = await onSubmit(session.id, attendance, perf, subskills, isAbsent ? absentCause : undefined, isAbsent ? absentSub : null, isAbsent ? undefined : (studentNote.trim() || undefined), notes.trim(), content);
     } catch (error) { console.error("[ReportModal] report submit failed", error); }
     setSubmitting(false);
     if (!saved) { setSubmitFailed(true); return; }
     setSubmitted(true);
 
-    // Generate the same branded report as a PDF and store it so the student
-    // can download their own copy later (the "Download PDF" button below
-    // gives the teacher an instant local copy without waiting on this).
-    const reportInput = {
-      studentName: student?.name ?? "",
-      dateLabel: fmt(session.date_time),
-      status: isAbsent ? "absent" : attendance === "delayed" ? "delayed" : "completed",
-      notes,
-      entries: entries
-        .filter((e) => e.term.trim().length > 0 && e.explanation.trim().length > 0)
-        .map((e) => ({ id: e.id, type: e.type, term: e.term.trim(), explanation: e.explanation.trim() })),
-    };
-    void (async () => {
-      try {
-        const blob = await sessionReportPdfBlob(reportInput);
-        const file = new File([blob], sessionReportFileName(reportInput), { type: "application/pdf" });
-        const studentUuid = await legacyToUuid(session.student_id);
-        const reportFolder = studentUuid ? `session-reports/${studentUuid}` : "session-reports";
-        const result = await uploadContentFile(file, reportFolder);
-        if (result.ok) {
-          // Persist the PDF URL before queuing the student notification.
-          // The notification worker reads the saved session row.
-          if (!await updateSession(session.id, { report_pdf_url: result.url })) {
-            console.error("[ReportModal] PDF uploaded but URL was not saved on the session");
-          }
-        } else {
-          console.error("[ReportModal] failed to store session report PDF", result.error);
-        }
-      } catch (err) {
-        console.error("[ReportModal] failed to generate session report PDF", err);
-      }
-      // 2026-08-13 fix: submitting a Final Session Report never notified
-      // anyone outside the app — the student had no idea a report existed
-      // unless they happened to open Verbo Academy and find it themselves.
-      // Fires regardless of whether the PDF upload above succeeded; the
-      // Edge Function re-reads the session and just omits the PDF link if
-      // report_pdf_url isn't set yet.
-      notifySessionEvent(session.id, "report_ready");
-    })();
+    await savePdf();
   };
 
   const headerBg = attendanceTouched ? bgFor(attendance) : "#01304a";
@@ -1519,16 +1494,18 @@ export function ReportModal({ session, perf, subskills, onClose, onSubmit }: {
 
 
         {submitted ? (
-          <ReportPreview
-            studentName={student?.name ?? ""}
-            dateLabel={fmt(session.date_time)}
-            status={attendance === "absent" ? "absent" : attendance === "delayed" ? "delayed" : "completed"}
-            notes={notes}
-            entries={entries
-              .filter((e) => e.term.trim().length > 0 && e.explanation.trim().length > 0)
-              .map((e) => ({ id: e.id, type: e.type, term: e.term.trim(), explanation: e.explanation.trim() }))}
-            onClose={onClose}
-          />
+          <div className="mt-6 space-y-5">
+            <p role={pdfState === "failed" ? "alert" : "status"} className="rounded-lg border border-border bg-secondary/40 p-4 text-sm text-foreground">
+              {pdfState === "ready" ? "Report saved. The PDF is available in the student's dashboard." : pdfState === "failed" ? pdfError : "Report saved. Preparing the PDF for the student…"}
+            </p>
+            {pdfState === "failed" && <PrimaryButton onClick={savePdf}>Retry PDF delivery</PrimaryButton>}
+            <SessionReportContentView content={content} skills={reportInput.skills} />
+            <div className="flex flex-wrap justify-end gap-2">
+              <GhostButton onClick={onClose}>Close</GhostButton>
+              <PrimaryButton onClick={() => { void downloadSessionReportPdf(reportInput).catch(() => setPdfError("Download failed. Please try again.")); }}>Download PDF</PrimaryButton>
+            </div>
+            {pdfError && pdfState !== "failed" && <p role="alert" className="text-xs text-destructive">{pdfError}</p>}
+          </div>
         ) : (
           <>
             <div className="mt-6">
@@ -1616,55 +1593,7 @@ export function ReportModal({ session, perf, subskills, onClose, onSubmit }: {
               </div>
             ) : (
               <>
-                <div className="mt-6">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-medium text-foreground">Pedagogical entries</label>
-                    <span className="text-xs text-muted-foreground tabular-nums">
-                      {filledCount} / {MIN_ENTRIES}–{MAX_ENTRIES} filled
-                    </span>
-                  </div>
-                  <div className="mt-2 space-y-2">
-                    {entries.map((e) => (
-                      <div key={e.id} className="flex items-start gap-2">
-                        <select
-                          value={e.type}
-                          onChange={(ev) => updateEntry(e.id, { type: ev.target.value as EntryType })}
-                          className="h-[42px] w-[150px] shrink-0 rounded-lg border border-input bg-background px-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                        >
-                          {ENTRY_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-                        </select>
-                        <div className="flex flex-1 gap-2">
-                          <input
-                            value={e.term}
-                            onChange={(ev) => updateEntry(e.id, { term: ev.target.value })}
-                            placeholder={ENTRY_PLACEHOLDERS[e.type].term}
-                            className="h-[42px] min-w-0 flex-1 rounded-lg border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                          />
-                          <input
-                            value={e.explanation}
-                            onChange={(ev) => updateEntry(e.id, { explanation: ev.target.value })}
-                            placeholder={ENTRY_PLACEHOLDERS[e.type].explanation}
-                            className="h-[42px] min-w-0 flex-1 rounded-lg border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                          />
-                        </div>
-                        <button
-                          onClick={() => removeEntry(e.id)}
-                          disabled={entries.length <= 1}
-                          className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:bg-secondary disabled:opacity-40 disabled:cursor-not-allowed"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                  <button
-                    onClick={addEntry}
-                    disabled={entries.length >= MAX_ENTRIES}
-                    className="mt-3 inline-flex items-center gap-1.5 rounded-md border border-dashed border-border px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-secondary disabled:opacity-40 disabled:cursor-not-allowed"
-                  >
-                    <Plus className="h-4 w-4" /> Add new entry
-                  </button>
-                </div>
+                <SessionReportFields value={reportContent} onChange={setReportContent} />
 
                 <div className="mt-5">
                   <label className="text-xs font-medium text-foreground">Class notes <span className="text-red-600">*</span> <span className="text-muted-foreground">(required)</span></label>
@@ -1698,8 +1627,8 @@ export function ReportModal({ session, perf, subskills, onClose, onSubmit }: {
               <p className="text-xs text-muted-foreground">
                 {isAbsent
                   ? (notesFilled ? "Ready to submit." : "Comments required to submit.")
-                  : filledCount < MIN_ENTRIES
-                  ? `Add ${MIN_ENTRIES - filledCount} more entr${MIN_ENTRIES - filledCount === 1 ? "y" : "ies"} to submit.`
+                  : contentError
+                  ? contentError
                   : !notesFilled
                   ? "Class notes are required to submit."
                   : "Ready to submit."}
@@ -1717,87 +1646,6 @@ export function ReportModal({ session, perf, subskills, onClose, onSubmit }: {
 
   );
 }
-
-function ReportPreview({ studentName, dateLabel, status, notes, entries, onClose }: {
-  studentName: string; dateLabel: string; status: SessionStatus; notes: string; entries: { id: string; type: EntryType; term: string; explanation: string }[]; onClose: () => void;
-}) {
-  return (
-    <div className="mt-6 space-y-5">
-      <div className="flex items-start gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-        <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" />
-        <span>Report successfully compiled and shared with the student in their dashboard.</span>
-      </div>
-
-      <div className="rounded-xl border border-border bg-background p-6">
-        <div className="flex items-start justify-between border-b border-border pb-4">
-          <div>
-            <div className="text-[10px] font-semibold uppercase tracking-[0.18em]" style={{ color: "#01304a" }}>Verbo Language Solutions</div>
-            <h3 className="mt-1 text-lg font-semibold tracking-tight text-foreground">Session Report</h3>
-          </div>
-          <div className="text-right text-xs text-muted-foreground">
-            <div>{dateLabel}</div>
-            <div className="mt-0.5 capitalize">Status: <span className="font-medium text-foreground">{status === "completed" ? "Completed" : status}</span></div>
-          </div>
-        </div>
-
-        <div className="mt-4 grid grid-cols-2 gap-4 text-sm">
-          <div>
-            <div className="text-[11px] uppercase tracking-wider text-muted-foreground">Student</div>
-            <div className="mt-0.5 font-medium text-foreground">{studentName}</div>
-          </div>
-          <div>
-            <div className="text-[11px] uppercase tracking-wider text-muted-foreground">Entries</div>
-            <div className="mt-0.5 font-medium text-foreground">{entries.length}</div>
-          </div>
-        </div>
-
-        {entries.length > 0 && (
-          <div className="mt-5 overflow-hidden rounded-lg border border-border">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-secondary text-left text-[11px] uppercase tracking-wider text-muted-foreground">
-                  <th className="px-3 py-2 font-medium w-[120px]">Type</th>
-                  <th className="px-3 py-2 font-medium w-[200px]">Word / Phrase</th>
-                  <th className="px-3 py-2 font-medium">Definition / Note</th>
-                </tr>
-              </thead>
-              <tbody>
-                {entries.map((e) => (
-                  <tr key={e.id} className="border-t border-border">
-                    <td className="px-3 py-2 align-top">
-                      <span className="inline-flex rounded-md px-2 py-0.5 text-xs font-medium" style={{ backgroundColor: "#f3893420", color: "#01304a" }}>{e.type}</span>
-                    </td>
-                    <td className="px-3 py-2 align-top font-medium text-foreground">{e.term}</td>
-                    <td className="px-3 py-2 text-foreground">{e.explanation}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {notes.trim().length > 0 && (
-          <div className="mt-5">
-            <div className="text-[11px] uppercase tracking-wider text-muted-foreground">Teacher's comments</div>
-            <p className="mt-1 whitespace-pre-wrap text-sm text-foreground">{notes}</p>
-          </div>
-        )}
-      </div>
-
-      <div className="flex justify-end gap-2">
-        <GhostButton onClick={onClose}>Close</GhostButton>
-        <button
-          type="button"
-          onClick={() => downloadSessionReportPdf({ studentName, dateLabel, status, notes, entries })}
-          className="flex items-center justify-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-secondary"
-        >
-          <Download className="h-4 w-4" /> Download PDF
-        </button>
-      </div>
-    </div>
-  );
-}
-
 
 // ============================================================
 // New two-tier Performance Evaluation system
