@@ -372,6 +372,12 @@ function StudentDashboardContent({ user }: { user: NonNullable<ReturnType<typeof
     .filter((s) => !["scheduled", "rescheduled", "ready"].includes(s.status))
     .sort((a, b) => +new Date(b.date_time) - +new Date(a.date_time));
 
+  const pendingDemoRating = user.is_sales_demo ? history.find((s) =>
+    s.status === "completed" && !s.group_id && !s.workshop_cohort_id &&
+    !s.workshop_template_id && typeof s.student_rating !== "number" &&
+    +new Date(s.date_time) + s.duration_minutes * 60_000 <= Date.now(),
+  ) : undefined;
+
   // Level Progress + Current Course — mirror Learning Path (/student/courses)
   // for GO/Enterprise/International and My Course (/student/my-course) for VIP.
   // The legacy LEVELS catalog / user.current_level are no longer used here.
@@ -513,14 +519,15 @@ function StudentDashboardContent({ user }: { user: NonNullable<ReturnType<typeof
         if (s.status !== "completed") return false;
         if (typeof s.student_rating === "number") return false;
         const end = +new Date(s.date_time) + s.duration_minutes * 60_000;
-        return now - end <= RATING_LOOKBACK_MS && end <= now;
+        // The presentation account keeps a fixed history across sales visits.
+        return (user.is_sales_demo || now - end <= RATING_LOOKBACK_MS) && end <= now;
       });
       setRatingSession(recentUnrated ?? null);
     };
     tick();
     const id = setInterval(tick, 15_000);
     return () => clearInterval(id);
-  }, [upcoming, history, handled]);
+  }, [upcoming, history, handled, user.is_sales_demo]);
 
   const handleSubmit = async (rating: number, note: string): Promise<boolean> => {
     if (!ratingSession) return false;
@@ -1312,7 +1319,14 @@ function StudentDashboardContent({ user }: { user: NonNullable<ReturnType<typeof
 
       {/* History */}
       <section data-tour="session-history" className="verbo-fade-up motion-reduce:animate-none" style={{ animationDelay: "300ms" }}>
-        <SectionTitle>Session History</SectionTitle>
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+          <SectionTitle>Session History</SectionTitle>
+          {pendingDemoRating && (
+            <GhostButton onClick={() => setRatingSession(pendingDemoRating)}>
+              <Star className="h-4 w-4" /> Rate session
+            </GhostButton>
+          )}
+        </div>
         <PremiumCard className="verbo-card-hover">
           <div className="hidden md:grid md:grid-cols-[1fr_1fr_110px_140px] gap-4 px-4 pb-3 text-[10px] uppercase tracking-wider text-muted-foreground">
             <div>Date</div>

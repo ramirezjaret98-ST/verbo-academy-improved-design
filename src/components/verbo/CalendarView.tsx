@@ -279,7 +279,7 @@ export function CalendarView({
         </div>
         {studentExperience && <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-border pt-3 text-xs text-muted-foreground">
           <strong>Clubs</strong>
-          <span className="inline-flex items-center gap-1.5"><MessageCircle size={16} color="#15803d" aria-hidden /> Available</span>
+          <span className="inline-flex items-center gap-1.5"><MessageCircle size={16} color="#5fca16" aria-hidden /> Available</span>
           <span className="inline-flex items-center gap-1.5"><MessageCircle size={16} color="#c2410c" aria-hidden /> Full</span>
           <span className="inline-flex items-center gap-1.5"><MessageCircle size={16} color="#64748b" aria-hidden /> Ended</span>
           <span className="inline-flex items-center gap-1.5"><Check size={16} color="#15803d" aria-hidden /> Reserved</span>
