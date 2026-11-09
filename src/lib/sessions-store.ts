@@ -894,7 +894,8 @@ export async function submitSessionReport(input: {
   const status: ExtSessionStatus = input.attendance === "absent" ? "absent" : "completed";
   const numericId = Number(input.sessionId);
   if (!Number.isFinite(numericId)) return null;
-  const { data, error } = await supabase.rpc("submit_one_on_one_session_report_v2" as never, {
+  const reportRpc = input.reportContent?.version === 3 ? "submit_one_on_one_session_report_v3" : "submit_one_on_one_session_report_v2";
+  const { data, error } = await supabase.rpc(reportRpc as never, {
     p_session_id: numericId,
     p_attendance: input.attendance,
     p_absent_cause: status === "absent" ? input.absentCause ?? "student" : null,
