@@ -23,7 +23,7 @@ import { PlanModal } from "@/components/verbo/PlanModal";
 import { ReorderLessonPlansModal } from "@/components/verbo/ReorderLessonPlansModal";
 import { SessionReportFields, newReportEntry } from "@/components/verbo/SessionReportFields";
 import { SessionReportContentView } from "@/components/verbo/SessionReportContent";
-import { REPORT_SECTIONS, cleanReportContent, reportContentError, type SessionReportContent } from "@/lib/session-report-content";
+import { MIN_REPORT_ENTRIES, cleanReportContent, reportContentError, type SessionReportContent } from "@/lib/session-report-content";
 import { downloadSessionReportPdf, sessionReportPdfBlob, sessionReportFileName } from "@/lib/session-report-pdf";
 import { downloadCollaborationPdf, downloadKpiSummaryPdf } from "@/lib/simple-docs-pdf";
 import { uploadContentFile } from "@/lib/content-uploads";
@@ -1412,7 +1412,7 @@ export function ReportModal({ session, perf, subskills, onClose, onSubmit }: {
   const [absentSub, setAbsentSub] = useState<AttendanceSubStatus | null>(null);
   const [notes, setNotes] = useState("");
   const [studentNote, setStudentNote] = useState("");
-  const [reportContent, setReportContent] = useState<SessionReportContent>(() => ({ version: 2, todayWin: "", nextMove: "", entries: REPORT_SECTIONS.slice(0, 4).map(section => newReportEntry(section.type)), skipped: {} }));
+  const [reportContent, setReportContent] = useState<SessionReportContent>(() => ({ version: 3, todayWin: "", nextMove: "", entries: Array.from({ length: MIN_REPORT_ENTRIES }, () => newReportEntry()), skipped: {} }));
   const [pdfState, setPdfState] = useState<"pending" | "saving" | "ready" | "failed">("pending");
   const [pdfError, setPdfError] = useState("");
   const [submitted, setSubmitted] = useState(false);

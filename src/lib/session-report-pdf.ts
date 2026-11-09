@@ -310,7 +310,38 @@ export async function buildSessionReportPdf(input: SessionReportInput): Promise<
   doc.line(MARGIN, y, W - MARGIN, y);
   y += 28;
 
+  // Split text cards across pages so long comments/highlights stay above the footer.
+  const textCard = (title: string, text: string) => {
+    if (!text.trim()) return;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    const lines: string[] = doc.splitTextToSize(sanitizePdfText(text.trim()), contentWidth - 40);
+    let offset = 0;
+    while (offset < lines.length) {
+      if (y + 79 > 760) { doc.addPage(); y = 56; }
+      const capacity = Math.max(1, Math.floor((760 - y - 54) / 13));
+      const chunk = lines.slice(offset, offset + capacity);
+      const height = 54 + chunk.length * 13;
+      doc.setFillColor(...CARD_BG);
+      doc.roundedRect(MARGIN, y, contentWidth, height, RADIUS, RADIUS, "F");
+      doc.setFillColor(...ORANGE);
+      doc.rect(MARGIN, y + 5, 4, height - 10, "F");
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(9);
+      doc.setTextColor(...NAVY);
+      doc.text(title + (offset ? " (CONTINUED)" : ""), MARGIN + 20, y + 24);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(10);
+      doc.setTextColor(...TEXT);
+      chunk.forEach((line, i) => doc.text(line, MARGIN + 20, y + 44 + i * 13));
+      offset += chunk.length;
+      y += height + 20;
+    }
+  };
+  if (input.content?.version === 3) textCard("TODAY'S WIN", input.content.todayWin);
+
   // Pedagogical entries
+  if (y + 90 > 760) { doc.addPage(); y = 56; }
   doc.setFont("helvetica", "bold");
   doc.setFontSize(11);
   doc.setTextColor(...NAVY);
@@ -348,7 +379,7 @@ export async function buildSessionReportPdf(input: SessionReportInput): Promise<
         overflow: "linebreak",
       },
       headStyles: {
-        fillColor: false,
+        fillColor: NAVY,
         lineWidth: 0,
         textColor: WHITE,
         fontStyle: "bold",
@@ -448,38 +479,9 @@ export async function buildSessionReportPdf(input: SessionReportInput): Promise<
     }
   }
 
-  // Teacher's comments — its own card so it reads as a distinct block, not
-  // a visual continuation of the entries table above it.
-  if (notes.trim().length > 0) {
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(10);
-    const noteLines = doc.splitTextToSize(notes.trim(), contentWidth - 40);
-    const textBlockH = noteLines.length * 13;
-    const cardH = 22 + 16 + textBlockH + 14;
-
-    if (y + cardH > 760) {
-      doc.addPage();
-      y = 56;
-    }
-
-    doc.setFillColor(...CARD_BG);
-    doc.roundedRect(MARGIN, y, contentWidth, cardH, RADIUS, RADIUS, "F");
-    doc.setFillColor(...ORANGE);
-    doc.roundedRect(MARGIN, y, 5, cardH, 2, 2, "F");
-    doc.setFillColor(...ORANGE);
-    doc.rect(MARGIN + 2, y, 3, cardH, "F");
-
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(9);
-    doc.setTextColor(...NAVY);
-    doc.text("TEACHER'S COMMENTS", MARGIN + 20, y + 24, { charSpace: 0.5 });
-
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(10);
-    doc.setTextColor(...TEXT);
-    doc.text(noteLines, MARGIN + 20, y + 44);
-
-    y += cardH + 20;
+  textCard("TEACHER'S COMMENTS", notes);
+  if (input.content?.version === 3) {
+    textCard("INSTRUCTIONS FOR THE NEXT SESSION", input.content.nextMove);
   }
 
   // Footer — small organic orange wave on every page, plus the usual

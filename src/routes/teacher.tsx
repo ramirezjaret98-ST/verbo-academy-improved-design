@@ -5,7 +5,7 @@ import { PageTransition } from "@/components/verbo/PageTransition";
 import { Footer } from "@/components/verbo/Footer";
 import { TopNav, NavItem, NavGroup } from "@/components/verbo/TopNav";
 import { AnnouncementBanner } from "@/components/verbo/AnnouncementBanner";
-import { SessionControlPanel } from "@/components/verbo/SessionControlPanel";
+import { TeacherReportReminder } from "@/components/verbo/TeacherReportReminder";
 import { useAuth } from "@/lib/auth";
 import { USERS } from "@/lib/mock-data";
 import {
@@ -70,7 +70,7 @@ function Layout() {
         <main className="mx-auto w-full max-w-7xl flex-1 pt-24 pb-10">
           <div className="px-6">
             <AnnouncementBanner />
-            <SessionControlPanel />
+            <TeacherReportReminder />
             <PageTransition>
               <Outlet />
             </PageTransition>

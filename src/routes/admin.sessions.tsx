@@ -1,5 +1,4 @@
 import { academyDateTime, academyISO } from "@/lib/academy-time";
-import { SessionControlPanel } from "@/components/verbo/SessionControlPanel";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { USERS, userById } from "@/lib/mock-data";
@@ -99,7 +98,6 @@ function Page() {
       </div>
 
       <UnclaimedRequestsBanner />
-      <SessionControlPanel admin />
 
 
       {/* Bulk schedule panel */}

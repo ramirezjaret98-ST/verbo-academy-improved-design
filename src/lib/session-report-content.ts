@@ -50,7 +50,7 @@ export interface ReportEntry {
   example?: string;
 }
 export interface SessionReportContent {
-  version: 2;
+  version: 2 | 3;
   todayWin: string;
   nextMove: string;
   entries: ReportEntry[];
@@ -58,6 +58,7 @@ export interface SessionReportContent {
   skipped: Partial<Record<ReportEntryType, string>>;
 }
 export const MAX_REPORT_ENTRIES = 10;
+export const MIN_REPORT_ENTRIES = 6;
 export const REPORT_TEXT_LIMIT = 2000;
 
 export function reportContentError(
@@ -66,14 +67,15 @@ export function reportContentError(
 ): string | undefined {
   if (absent) return undefined;
   if (!content.todayWin.trim()) return "Add Today's Win.";
-  if (!content.nextMove.trim()) return "Add Your Next Move.";
+  if (content.version === 2 && !content.nextMove.trim()) return "Add Your Next Move.";
   if (content.todayWin.length > REPORT_TEXT_LIMIT || content.nextMove.length > REPORT_TEXT_LIMIT)
     return "Keep each highlight under 2,000 characters.";
   const started = content.entries.filter(
     (e) => e.term.trim() || e.explanation.trim() || e.example?.trim(),
   );
-  if (!started.length || started.length > MAX_REPORT_ENTRIES)
-    return "Add between 1 and 10 learning entries.";
+  const minimum = content.version === 3 ? MIN_REPORT_ENTRIES : 1;
+  if (started.length < minimum || started.length > MAX_REPORT_ENTRIES)
+    return `Add between ${minimum} and 10 learning entries.`;
   if (started.some((e) => !e.term.trim() || !e.explanation.trim()))
     return "Complete both fields in each entry, or remove the unfinished entry.";
   if (
@@ -82,7 +84,7 @@ export function reportContentError(
     )
   )
     return "Keep each entry field under 2,000 characters.";
-  for (const section of REPORT_SECTIONS.slice(0, 4)) {
+  for (const section of content.version === 2 ? REPORT_SECTIONS.slice(0, 4) : []) {
     const hasEntries = started.some((e) => e.type === section.type);
     const reason = content.skipped[section.type]?.trim();
     if (!hasEntries && !reason) return `Add ${section.title}, or explain why it was not covered.`;
@@ -96,7 +98,7 @@ export function cleanReportContent(
   absent = false,
 ): SessionReportContent {
   return {
-    version: 2,
+    version: content.version,
     todayWin: absent ? "" : content.todayWin.trim(),
     nextMove: absent ? "" : content.nextMove.trim(),
     entries: absent

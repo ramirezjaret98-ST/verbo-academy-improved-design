@@ -51,6 +51,7 @@ export function SessionReportContentView({
   content: ReportContent;
   skills?: SessionReportSkills;
 }) {
+  if (content.version === 3) return <ClassicSessionReportContent content={content} skills={skills} />;
   return (
     <div className="space-y-5">
       {content.todayWin && (
@@ -123,6 +124,44 @@ export function SessionReportContentView({
           </p>
         </section>
       )}
+    </div>
+  );
+}
+
+function ClassicSessionReportContent({ content, skills }: { content: ReportContent; skills?: SessionReportSkills }) {
+  const rated = skills ? Object.entries(skills).filter(([, value]) => Number.isFinite(value) && value > 0) : [];
+  return (
+    <div className="space-y-5">
+      {content.todayWin && <section className="rounded-lg border-l-4 border-[#f38934] bg-secondary/40 p-4">
+        <h4 className="text-xs font-bold uppercase text-foreground">Today's Win</h4>
+        <p className="mt-2 whitespace-pre-wrap break-words text-sm text-foreground">{content.todayWin}</p>
+      </section>}
+      {content.entries.length > 0 && <div className="overflow-x-auto rounded-lg border border-border">
+        <table className="w-full min-w-[440px] table-fixed text-left text-sm">
+          <caption className="sr-only">Session learning entries</caption>
+          <thead className="bg-[#01304a] text-xs text-white"><tr>
+            <th scope="col" className="w-[24%] px-3 py-2">Type</th>
+            <th scope="col" className="w-[30%] px-3 py-2">Word / Phrase</th>
+            <th scope="col" className="px-3 py-2">Definition / Note</th>
+          </tr></thead>
+          <tbody>{content.entries.map(entry => <tr key={entry.id} className="border-t border-border odd:bg-secondary/20">
+            <td className="break-words px-3 py-2 align-top text-xs font-semibold text-foreground">{entry.type}</td>
+            <td className="whitespace-pre-wrap break-words px-3 py-2 align-top font-medium text-foreground">{entry.term}</td>
+            <td className="whitespace-pre-wrap break-words px-3 py-2 align-top text-foreground">{entry.explanation}</td>
+          </tr>)}</tbody>
+        </table>
+      </div>}
+      {rated.length > 0 && <section>
+        <h4 className="mb-2 text-xs font-bold uppercase text-foreground">Skill ratings</h4>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">{rated.map(([key, value]) => <div key={key} className="rounded-lg bg-secondary/50 p-3">
+          <p className="text-xs capitalize text-muted-foreground">{key}</p>
+          <p className="mt-1 text-lg font-semibold text-foreground">{value.toFixed(1)}<span className="text-xs text-muted-foreground"> / 5</span></p>
+        </div>)}</div>
+      </section>}
+      {content.nextMove && <section className="rounded-lg bg-secondary/40 p-4">
+        <h4 className="text-xs font-bold uppercase text-foreground">Instructions for the next session</h4>
+        <p className="mt-2 whitespace-pre-wrap break-words text-sm text-foreground">{content.nextMove}</p>
+      </section>}
     </div>
   );
 }
