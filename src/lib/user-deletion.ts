@@ -9,6 +9,7 @@
 // look-alike entries with no real account behind most of them) or a real
 // account created by mistake.
 import { USERS, hideMockUser, type User } from "./mock-data";
+import { FunctionsHttpError } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { legacyToUuid, invalidateUserIdBridge } from "./user-id-bridge";
 import { STUDENTS_EVENT } from "./students-store";
@@ -68,12 +69,22 @@ export interface DeleteUserResult {
 export async function deleteUserAccount(user: User): Promise<DeleteUserResult> {
   const uuid = await legacyToUuid(user.id);
   if (uuid) {
-    const { data, error } = await supabase.functions.invoke("admin-delete-user", {
+    const { data, error } = await supabase.functions.invoke<DeleteUserResult>("admin-delete-user", {
       body: { uuid, confirm: true },
     });
-    const invokeError = (data as { error?: string } | null)?.error;
-    if (error || invokeError) {
-      return { ok: false, error: invokeError || error?.message || "No se pudo eliminar la cuenta." };
+    if (error instanceof FunctionsHttpError) {
+      const response: Response = error.context;
+      const payload = await response.json().catch(() => null) as { error?: unknown; message?: unknown } | null;
+      const message = payload?.error ?? payload?.message;
+      return {
+        ok: false,
+        error: typeof message === "string" && message.trim()
+          ? message
+          : `Could not delete the account (HTTP ${response.status}).`,
+      };
+    }
+    if (error || data?.ok !== true) {
+      return { ok: false, error: data?.error || error?.message || "Could not delete the account." };
     }
     invalidateUserIdBridge();
   }
