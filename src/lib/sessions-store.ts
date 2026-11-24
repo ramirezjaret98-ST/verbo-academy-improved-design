@@ -92,6 +92,7 @@ export interface ExtSession {
   attendance_delayed?: boolean;
   report_submitted_at?: string;
   origin?: "course" | "workshop" | "spotlight" | "group";
+  session_credit?: "plan" | "courtesy" | "released";
   workshop_cohort_id?: string;
   workshop_template_id?: string;
   workshop_topic?: string;
@@ -215,6 +216,7 @@ function mapSessionRow(row: SessionRow, members: MemberStatusRow[], edits: Admin
     attendance_delayed: row.attendance_delayed ?? undefined,
     report_submitted_at: row.report_submitted_at ?? undefined,
     origin: row.origin ?? undefined,
+    session_credit: row.session_credit ?? undefined,
     workshop_cohort_id: row.workshop_cohort_id !== null ? String(row.workshop_cohort_id) : undefined,
     workshop_template_id: row.workshop_template_id !== null ? String(row.workshop_template_id) : undefined,
     workshop_topic: row.workshop_topic ?? undefined,
@@ -325,6 +327,17 @@ export function loadSessions(): ExtSession[] {
   return operationalCache;
 }
 
+export function upcomingCourtesySessions(studentId: string, sessions: readonly ExtSession[]) {
+  const now = Date.now();
+  return sessions.filter((session) =>
+    session.student_id === studentId &&
+    session.session_credit === "courtesy" &&
+    !session.schedule_hold &&
+    ["scheduled", "ready", "rescheduled", "rearranged", "delayed", "pending_reschedule"].includes(session.status) &&
+    +new Date(session.date_time) >= now,
+  ).sort((a, b) => +new Date(a.date_time) - +new Date(b.date_time));
+}
+
 /** Administration retains held classes so a new time can be assigned. */
 export function loadAllSessions(): ExtSession[] {
   if (!hydrated) void hydrate();
@@ -418,6 +431,9 @@ function createSessionInternal(input: Partial<ExtSession> & {
       teams_link: input.teams_link,
       status: input.status ?? "scheduled",
       origin: input.origin,
+      session_credit: input.session_credit === "courtesy" ? "courtesy" : undefined,
+      attendance_sub_status: input.attendance_sub_status ?? null,
+      holiday_makeup: input.holiday_makeup ?? false,
       notes: input.notes ?? null,
       group_id: input.group_id ? Number(input.group_id) : null,
       workshop_cohort_id: input.workshop_cohort_id ? Number(input.workshop_cohort_id) : null,
