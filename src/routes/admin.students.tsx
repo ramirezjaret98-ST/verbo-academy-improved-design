@@ -337,7 +337,11 @@ function Page() {
       notifyError(failure, { context: `Updating ${u.name}` });
       throw failure;
     }
-    applyClubPackageProfile(u, (data as { profile?: Record<string, unknown> } | null)?.profile);
+    const savedProfile = (data as { profile?: Record<string, unknown> } | null)?.profile;
+    applyClubPackageProfile(u, savedProfile);
+    if (savedProfile && "remaining_sessions" in savedProfile) {
+      u.remaining_sessions = typeof savedProfile.remaining_sessions === "number" ? savedProfile.remaining_sessions : undefined;
+    }
     const idx = USERS.findIndex((existing) => existing.id === u.id);
     if (idx >= 0) USERS[idx] = u; else USERS.push(u);
     const registered = readRegisteredStudents();
@@ -842,6 +846,7 @@ function StudentFormModal({
   }));
 
   const [emailTouched, setEmailTouched] = useState(false);
+  const [balanceTouched, setBalanceTouched] = useState(false);
   const [attemptedSave, setAttemptedSave] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -945,6 +950,7 @@ function StudentFormModal({
   };
 
   const editSessions = (k: "hired_sessions" | "remaining_sessions", v: number) => {
+    if (k === "remaining_sessions") setBalanceTouched(true);
     setF((prev) => ({ ...prev, [k]: v, sessions_auto: false }));
   };
 
@@ -1025,6 +1031,8 @@ function StudentFormModal({
     const accessPlan = (f.access_plan || undefined) as AccessPlanId | undefined;
     const id = initial?.id ?? `u${Date.now()}`;
     const isPerf = f.product_type === "performance";
+    const writeBalance = !editing || balanceTouched ||
+      f.product_type !== (initial?.product_type ?? "performance") || f.product !== (initial?.product ?? "");
     const u: User = {
       id,
       name: f.name.trim(),
@@ -1043,7 +1051,7 @@ function StudentFormModal({
       current_level: isPerf ? (f.current_level || undefined) : undefined,
       member_since: f.member_since || undefined,
       hired_sessions: isPerf ? (Number(f.hired_sessions) || 0) : 0,
-      remaining_sessions: isPerf ? (Number(f.remaining_sessions) || 0) : 0,
+      remaining_sessions: writeBalance ? (isPerf ? Number(f.remaining_sessions) || 0 : 0) : undefined,
       sessions_auto: isPerf ? f.sessions_auto : undefined,
       sessions_per_week: isPerf ? (Number(f.sessions_per_week) || 1) : undefined,
       session_duration: isPerf ? (Number(f.session_duration) || 60) : undefined,

@@ -30,7 +30,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
 import { USERS, userById } from "@/lib/mock-data";
 import {
-  loadSessions, subscribeSessions, studentSetSessionStatus, logSessionConnect,
+  loadSessions, subscribeSessions, studentSetSessionStatus, logSessionConnect, upcomingCourtesySessions,
   SUB_STATUS_META, lastCoveredSummaryFor,
   type ExtSession, type ExtSessionStatus,
 } from "@/lib/sessions-store";
@@ -43,7 +43,7 @@ import {
 } from "@/lib/calendar-events";
 import { Card, PrimaryButton, GhostButton, AccentModalHeader, InfoStatRow, AnimatedNumber } from "@/components/verbo/ui";
 
-import { X, Video, AlertTriangle, Sparkles, CalendarClock, Clock, ArrowLeft, ChevronRight, Users as UsersIcon, BookOpen, Star, MessageCircle } from "lucide-react";
+import { X, Video, Gift, AlertTriangle, Sparkles, CalendarClock, Clock, ArrowLeft, ChevronRight, Users as UsersIcon, BookOpen, Star, MessageCircle } from "lucide-react";
 import spotlightArt from "@/assets/spotlight1.png";
 import nextUpArt from "@/assets/Verbot_up_next.svg";
 import { getLessonPlan } from "@/lib/lesson-plans-store";
@@ -79,6 +79,15 @@ import { ProfilePeekCard } from "@/components/verbo/ProfilePeekCard";
 import { useAvatar } from "@/lib/avatar-store";
 
 
+
+const courtesyDate = new Intl.DateTimeFormat("en-US", {
+  timeZone: "America/Mexico_City",
+  weekday: "short",
+  month: "short",
+  day: "numeric",
+  hour: "numeric",
+  minute: "2-digit",
+});
 
 export const Route = createFileRoute("/student/sessions")({
   validateSearch: (search: Record<string, unknown>) => ({
@@ -217,6 +226,7 @@ function Page() {
   const freemium = useCoreFreemiumGate(user);
   if (!user) return null;
 
+  const courtesy = upcomingCourtesySessions(user.id, loadSessions());
   const isSignature = user.access_plan === "Signature";
   const isCore = user.access_plan === "Core";
   const spotlightCapNum = resolvedMonthlyCap(user.id, "spotlight");
@@ -278,6 +288,19 @@ function Page() {
         </button>
       </div>
 
+
+      {courtesy.length > 0 && (
+        <aside aria-label="Courtesy sessions" className="flex items-start gap-3 rounded-2xl border border-primary/15 bg-primary/5 px-5 py-4 text-primary">
+          <Gift aria-hidden="true" className="mt-0.5 h-5 w-5 shrink-0" />
+          <div>
+            <p className="text-sm font-semibold">{courtesy.length} {courtesy.length === 1 ? "courtesy session" : "courtesy sessions"} from Verbo</p>
+            <p className="mt-1 text-xs">These extra sessions are on us.</p>
+            <ul className="mt-2 flex flex-wrap gap-2 text-xs">
+              {courtesy.map((session) => <li key={session.id} className="rounded-full bg-card px-3 py-1">{courtesyDate.format(new Date(session.date_time))}</li>)}
+            </ul>
+          </div>
+        </aside>
+      )}
 
       <div className="grid items-stretch gap-4 lg:grid-cols-3">
         <NextEventCard events={events} onEventClick={handleEventClick} />
@@ -1153,9 +1176,9 @@ function SessionsRemainingCard({ studentId }: { studentId: string }) {
       <div className="relative flex items-start justify-between gap-4">
         <div className="flex items-center gap-2">
           <span className="inline-block h-2 w-2 rounded-full bg-[#f38934] shadow-[0_0_8px_rgba(243,137,52,0.6)]" />
-          <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#01304a]/70">Sessions remaining</div>
+          <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#01304a]/70">{g ? "Sessions remaining" : "Available to schedule"}</div>
         </div>
-        <div className="text-right text-[11px] font-medium text-[#01304a]/55">{done} used</div>
+        <div className="text-right text-[11px] font-medium text-[#01304a]/55">{done} {g ? "used" : "allocated"}</div>
       </div>
 
       <div className="relative mt-3 flex items-end justify-between gap-4">

@@ -10,6 +10,7 @@ import {
   updateSession,
   updateSessionsBulk,
   subscribeSessions,
+  upcomingCourtesySessions,
   WORKSHOP_STATUS_META,
   type ExtSession,
 
@@ -81,6 +82,7 @@ function Page() {
         status: s.status,
         attendance_sub_status: s.attendance_sub_status,
         holiday_makeup: s.holiday_makeup,
+        session_credit: s.session_credit,
       });
     }
   };
@@ -140,7 +142,10 @@ function Page() {
         <SectionTitle>Students</SectionTitle>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {students.map((s) => {
-            const scheduled = sessions.filter((x) => {
+            const counts = effectiveSessionCounts(s.id, { hired: s.hired_sessions, remaining: s.remaining_sessions });
+            const { hired, remaining } = counts;
+            const individual = counts.source === "individual";
+            const allocated = individual ? Math.max(0, hired - remaining) : sessions.filter((x) => {
               const belongs = x.student_id === s.id
                 || (!!x.member_statuses && Object.prototype.hasOwnProperty.call(x.member_statuses, s.id));
               if (!belongs || x.schedule_hold) return false;
@@ -149,10 +154,8 @@ function Page() {
               const status = x.member_statuses?.[s.id] ?? x.status;
               return !["completed", "absent"].includes(status);
             }).length;
-            const counts = effectiveSessionCounts(s.id, { hired: s.hired_sessions, remaining: s.remaining_sessions });
-            const hired = counts.hired;
-            const remaining = counts.remaining;
-            const pct = hired ? Math.min(100, (scheduled / hired) * 100) : 0;
+            const courtesy = individual ? upcomingCourtesySessions(s.id, sessions).length : 0;
+            const pct = hired ? Math.min(100, (allocated / hired) * 100) : 0;
             const urgency =
               remaining === 0
                 ? "urgent"
@@ -196,14 +199,14 @@ function Page() {
                 <div className="mt-5 rounded-xl border border-border bg-secondary/30 p-3">
                   <div className="flex items-center justify-between">
                     <div className="flex flex-col items-start gap-1">
-                      <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Scheduled</div>
+                      <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">{individual ? "Plan allocated" : "Scheduled"}</div>
                       <div className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-base font-semibold" style={{ backgroundColor: `${BRAND}15`, color: BRAND }}>
-                        {scheduled}
+                        {allocated}
                         <span className="text-xs opacity-70">/ {hired}</span>
                       </div>
                     </div>
                     <div className="flex flex-col items-end gap-1">
-                      <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Remaining</div>
+                      <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">{individual ? "Available to schedule" : "Remaining"}</div>
                       <div
                         className="inline-flex items-center justify-center rounded-lg px-2.5 py-1 text-base font-semibold"
                         style={{
@@ -215,6 +218,7 @@ function Page() {
                       </div>
                     </div>
                   </div>
+                  {courtesy > 0 && <div className="mt-2 text-xs font-semibold text-primary">{courtesy} upcoming {courtesy === 1 ? "courtesy session" : "courtesy sessions"}</div>}
                   <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-secondary">
                     <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: ORANGE }} />
                   </div>
@@ -262,6 +266,7 @@ function BulkScheduler({
   const [endDate, setEndDate] = useState("");
   const [time, setTime] = useState("19:00");
   const [days, setDays] = useState<number[]>([1, 3]); // Mon, Wed
+  const [courtesy, setCourtesy] = useState(false);
 
   const student = students.find((s) => s.id === studentId);
   // Shared source of truth: the student's Video Call Link (Students profile).
@@ -269,13 +274,20 @@ function BulkScheduler({
     ? (getStudentVideoLink(student.id) || `https://teams.microsoft.com/l/meetup/${student.id}`)
     : "";
 
-  const scheduledForStudent = existing.filter(
-    (x) => x.student_id === studentId && !["completed", "absent"].includes(x.status),
+  const counts = student ? effectiveSessionCounts(student.id, {
+    hired: student.hired_sessions,
+    remaining: student.remaining_sessions,
+  }) : undefined;
+  const isIndividual = counts?.source === "individual";
+  const scheduleCourtesy = isIndividual && courtesy;
+  const pendingLegacy = existing.filter((session) => session.student_id === studentId &&
+    !session.session_credit &&
+    (isIndividual
+      ? (!session.origin || session.origin === "course") &&
+        ["scheduled", "ready", "rescheduled", "rearranged", "delayed", "pending_reschedule"].includes(session.status)
+      : !["completed", "absent"].includes(session.status)),
   ).length;
-  const hiredForStudent = student
-    ? effectiveSessionCounts(student.id, { hired: student.hired_sessions }).hired
-    : 0;
-  const remaining = Math.max(0, hiredForStudent - scheduledForStudent);
+  const remaining = Math.max(0, (isIndividual ? counts.remaining : counts?.hired ?? 0) - pendingLegacy);
 
   type GenSlot = { date: Date; holiday: boolean; makeup: boolean };
   const generated = useMemo<GenSlot[]>(() => {
@@ -322,7 +334,7 @@ function BulkScheduler({
   const holidayHits = generated.filter((g) => g.holiday).length;
   const makeupCount = generated.filter((g) => g.makeup).length;
   const consumingCount = generated.length - holidayHits;
-  const overLimit = consumingCount > remaining;
+  const overLimit = !scheduleCourtesy && consumingCount > remaining;
 
   // Summary of dates skipped on the last Assign because the teacher was already
   // booked with another student at that exact date/time.
@@ -374,6 +386,7 @@ function BulkScheduler({
         duration_minutes: duration,
         teams_link: teamsLink,
         status: "scheduled",
+        session_credit: scheduleCourtesy ? "courtesy" : undefined,
         ...(slot.makeup ? { holiday_makeup: true } : {}),
       });
     });
@@ -435,6 +448,13 @@ function BulkScheduler({
         </div>
       </Field>
 
+      {isIndividual && (
+        <label className="flex w-fit cursor-pointer items-center gap-2 text-sm font-medium">
+          <input type="checkbox" checked={courtesy} onChange={(event) => setCourtesy(event.target.checked)} className="accent-primary" />
+          Schedule as courtesy
+        </label>
+      )}
+
       {generated.length > 0 && (
         <div
           className="flex items-start gap-3 rounded-xl border p-4 text-sm"
@@ -448,11 +468,13 @@ function BulkScheduler({
           <div>
             {overLimit ? (
               <>
-                <div className="font-semibold">Attention: This range generates {consumingCount} plan sessions, but the student only has {remaining} hours remaining.</div>
+                <div className="font-semibold">Attention: This range generates {consumingCount} plan sessions, but the student has {remaining} sessions available to schedule.</div>
                 <div className="mt-0.5 text-xs">Please adjust the range to fit within the contracted plan.</div>
               </>
+            ) : scheduleCourtesy ? (
+              <div>This range will generate <span className="font-semibold">{consumingCount}</span> courtesy sessions.</div>
             ) : (
-              <div>This range will generate <span className="font-semibold">{consumingCount}</span> sessions that count toward the plan. Student has <span className="font-semibold">{remaining}</span> hours remaining.</div>
+              <div>This range will generate <span className="font-semibold">{consumingCount}</span> plan sessions. <span className="font-semibold">{remaining}</span> sessions are available to schedule.</div>
             )}
             {holidayHits > 0 && (
               <div className="mt-1 text-xs">
@@ -744,6 +766,7 @@ function SessionRow({
                 {(session.absent_cause ?? "student") === "teacher" ? "· Teacher" : "· Student"}
               </span>
             )}
+            {session.session_credit === "courtesy" && <Pill tone="muted">Courtesy</Pill>}
             {session.holiday_makeup && (
               <span
                 className="inline-flex items-center rounded-full bg-[#92400e] px-2 py-0.5 text-[10px] font-semibold text-white"

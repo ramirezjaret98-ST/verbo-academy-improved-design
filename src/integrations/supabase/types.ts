@@ -2944,6 +2944,7 @@ export type Database = {
           needs_substitute: boolean | null
           notes: string | null
           origin: Database["public"]["Enums"]["session_origin"] | null
+          session_credit: "plan" | "courtesy" | "released" | null
           report_comments: string | null
           report_locked: boolean | null
           report_pdf_url: string | null
@@ -2985,6 +2986,7 @@ export type Database = {
           needs_substitute?: boolean | null
           notes?: string | null
           origin?: Database["public"]["Enums"]["session_origin"] | null
+          session_credit?: "plan" | "courtesy" | "released" | null
           report_comments?: string | null
           report_locked?: boolean | null
           report_pdf_url?: string | null
@@ -3026,6 +3028,7 @@ export type Database = {
           needs_substitute?: boolean | null
           notes?: string | null
           origin?: Database["public"]["Enums"]["session_origin"] | null
+          session_credit?: "plan" | "courtesy" | "released" | null
           report_comments?: string | null
           report_locked?: boolean | null
           report_pdf_url?: string | null

@@ -19,7 +19,7 @@ import { useAuth } from "@/lib/auth";
 import { userById } from "@/lib/mock-data";
 import { hydrateTeachers } from "@/lib/teacher-model";
 import { effectiveSessionCounts, groupOfStudent } from "@/lib/groups-store";
-import { subscribeSessions, getSessionsSnapshot, getServerSessionsSnapshot, submitStudentRating, studentAttendance, logSessionConnect, type ExtSession, type ExtSessionStatus } from "@/lib/sessions-store";
+import { upcomingCourtesySessions, subscribeSessions, getSessionsSnapshot, getServerSessionsSnapshot, submitStudentRating, studentAttendance, logSessionConnect, type ExtSession, type ExtSessionStatus } from "@/lib/sessions-store";
 import { withinConnectWindow, CONNECT_HINT } from "@/lib/session-connect";
 import {
   getPerformanceSnapshot,
@@ -268,6 +268,7 @@ function StudentDashboardContent({ user }: { user: NonNullable<ReturnType<typeof
     getSessionsSnapshot,
     getServerSessionsSnapshot,
   );
+  const courtesyCount = upcomingCourtesySessions(user.id, sessions).length;
   const performance = useSyncExternalStore(
     subscribePerformance,
     getPerformanceSnapshot,
@@ -606,11 +607,16 @@ function StudentDashboardContent({ user }: { user: NonNullable<ReturnType<typeof
                 className="rounded-full bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary"
                 title={grp ? "Shared with your group" : undefined}
               >
-                {c.remaining} of {c.hired} sessions remaining
+                {c.remaining} of {c.hired} {grp ? "sessions remaining" : "available to schedule"}
                 {grp && <span className="ml-1 font-normal text-muted-foreground">· group</span>}
               </div>
             );
           })()}
+          {courtesyCount > 0 && (
+            <Link to="/student/sessions" search={{ focus: undefined, prep: undefined, highlight: undefined }} className="rounded-full bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary">
+              {courtesyCount} {courtesyCount === 1 ? "courtesy session" : "courtesy sessions"}
+            </Link>
+          )}
           <button className="verbo-report-btn" onClick={() => setReportOpen(true)} aria-label="Report" title="Report">
             <span className="sign"><ShieldAlert className="h-4 w-4" /></span>
             <span className="text">Report</span>
